@@ -30,4 +30,6 @@ fieldsToKeep = {
    'waterBody': str, 
    'countryCode': str, 
    'license': str, 
+   'occurrenceStatus': str,
+   'geodeticDatum': str,
  }
