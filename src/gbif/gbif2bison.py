@@ -108,8 +108,8 @@ class GBIFReader(object):
       """
       @note: returns True if either is open
       """
-      if ((not self._intF is None and not self._intF.closed) or 
-          (not self._verbF is None and self._verbF.closed)):
+      if ((not self._if is None and not self._if.closed) or 
+          (not self._vf is None and self._vf.closed)):
          return True
       return False
 
@@ -118,8 +118,8 @@ class GBIFReader(object):
       '''
       @summary: Close input datafiles
       '''
-      self._intF.close()
-      self._verbF.close()
+      self._if.close()
+      self._vf.close()
 
    # .............................................................................
    def getFieldMeta(self):
@@ -223,7 +223,8 @@ class GBIFReader(object):
       csv.field_size_limit(sys.maxsize)
       try:
          f = codecs.open(datafile, 'w', ENCODING)
-         csvreader = csv.writer(f, delimiter=delimiter)
+         csvreader = csv.DictWriter(f, fieldnames=fldnames, 
+                                    delimiter=delimiter)
       except Exception, e:
          raise Exception('Failed to read or open {}, ({})'
                          .format(datafile, str(e)))
@@ -324,6 +325,12 @@ class GBIFReader(object):
                break
             else:
                rec['canonicalName'] = val
+         # Compute? providerID
+         elif fldname == 'publisher':
+               rec['providerID'] = val
+         # Compute? resourceID
+         elif fldname == 'datasetKey':
+               rec['resourceID'] = val
          # delete absence records
          elif fldname == 'occurrenceStatus':
             if val.lower() == 'absent':
@@ -350,7 +357,8 @@ class GBIFReader(object):
          elif fldname == 'decimalLatitude':
             lat = float(val)
          # Save modified val
-         if fldname not in ('decimalLongitude', 'decimalLatitude'):
+         if fldname not in ('decimalLongitude', 'decimalLatitude', 'taxonKey',
+                            'publisher', 'datasetKey'):
             rec[fldname] = val
          
       lon, lat = self._getPoint(lon, lat, cntry)
@@ -369,15 +377,15 @@ class GBIFReader(object):
          outWriter, outf = self.getCSVDictWriter(self.outFname, 
                                                  ORDERED_OUT_FIELDS, 
                                                  DELIMITER)
-         outWriter.writerheader()
+         outWriter.writeheader()
          while (self._vCsvreader is not None and 
                 self._iCsvreader is not None):
-            vline, vRecno = self.getLine(self.verbCsvreader, vRecno)
-            iline, iRecno = self.getLine(self.intCsvreader, iRecno)
-            byline = self.createBisonLine(vline, iline)
+            vline, vRecno = self.getLine(self._vCsvreader, vRecno)
+            iline, iRecno = self.getLine(self._iCsvreader, iRecno)
+            byline = self.createBisonData(vline, iline)
             outWriter.writerow(byline)
       finally:
-         self._close()
+         self.close()
          outf.close()
          
 # ...............................................
