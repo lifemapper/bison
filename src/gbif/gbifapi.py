@@ -27,9 +27,13 @@ import urllib2
 
 from constants import DELIMITER, GBIF_URL, ENCODING
         
-outProvFname = 'outProviderAll.txt'
-inProvFname = 'inProvider.txt'
+inProvFname = 'inProviderIDs.txt'
+outProvFname = 'outProviderRecs.txt'
 
+outDSFname = 'outDatasetRecs.txt'
+
+# outProvFname = 'outProviderRecs.txt'
+# inProvFname = 'inProviderIDs.txt'
 # .............................................................................
 class GBIFCodes(object):
    """
@@ -53,8 +57,6 @@ class GBIFCodes(object):
 # ...............................................
    def resolveDatasetKey(self, dsKey):
       row = []
-#       header = ['owningorganization_id', 'legacyid', 'dataset_id', 'name', 
-#                 'description', 'citation', 'created', 'modified', 'website_url']
       url = '{}/dataset/{}'.format(GBIF_URL, dsKey)
       response = urllib2.urlopen(url)
       data = json.load(response)
@@ -95,7 +97,9 @@ class GBIFCodes(object):
    def getProviderCodes(self):
       header = ['legacyid', 'key', 'title', 'description', 'created', 
                 'modified', 'homepage']
-      url = '{}/organization/'.format(GBIF_URL)
+      legacyid = 9999
+      desc = homepage = ''
+      url = '{}/organization?limit=9999'.format(GBIF_URL)
       response = urllib2.urlopen(url)
       data = json.load(response)
       allProvs = data['results']
@@ -115,21 +119,9 @@ class GBIFCodes(object):
                outLegacyid = prov['identifiers'][0]['identifier']
                inf.write(outLegacyid + '\n')
                legacyid = self._saveNLDelCR(outLegacyid)
-            else:
-               legacyid="9999"
-            row.append(legacyid)
-   
-            row.append(self._saveNLDelCR(prov['key']))
-            row.append(self._saveNLDelCR(prov['title']))
-   
+      
             if prov.has_key("description"):
-               descVal = self._saveNLDelCR(prov['description'])
-            else:
-               descVal = ""
-            row.append(descVal)
-   
-            row.append(self._saveNLDelCR(prov['created']))
-            row.append(self._saveNLDelCR(prov['modified']))
+               desc = self._saveNLDelCR(prov['description'])
                
             if prov.has_key("homepage"):
                homepageVal= prov['homepage']
@@ -137,11 +129,9 @@ class GBIFCodes(object):
                   homepageVal = self._saveNLDelCR(prov['homepage'][0])
                elif type(homepageVal) is str:
                   homepageVal = self._saveNLDelCR(prov['homepage'])
-               else:
-                  homepageVal = ""
-            else:
-               homepageVal=""
-            row.append(homepageVal)
+
+            row = [legacyid, prov['key'], prov['title'], desc, prov['created'],
+                   prov['modified'], homepage]
             
             outf.write(DELIMITER.join(row))
                
@@ -150,15 +140,57 @@ class GBIFCodes(object):
          inf.close()
 
 # ...............................................
-   def resolveProviderKey(self, prvKey):
-      row = []
+   def getDatasetCodes(self):
+      header = ['publishingOrganizationKey', 'key', 'title', 'description', 
+                'citation', 'rights', 'logoUrl', 'created', 'modified', 
+                'homepage']
 #       header = ['owningorganization_id', 'legacyid', 'dataset_id', 'name', 
 #                 'description', 'citation', 'created', 'modified', 'website_url']
+      orgkey = title = rights = logo = desc = homepage = ''
+      url = '{}/dataset?limit=9999'.format(GBIF_URL)
+      response = urllib2.urlopen(url)
+      data = json.load(response)
+      allDatasets = data['results']
+      print 'Received {} datasets from GBIF'.format(len(allDatasets))
+      try:
+         outf = codecs.open(outDSFname, 'w', ENCODING)
+         outf.write(DELIMITER.join(header))
+
+         recno = 0
+         for ds in allDatasets:
+            recno += 1
+            row = []
+            if ds.has_key("title"):
+               title = self._saveNLDelCR(ds['title'])
+            if ds.has_key("rights"):
+               rights = self._saveNLDelCR(ds['rights'])
+            if ds.has_key("logoUrl"):
+               logo = self._saveNLDelCR(ds['logoUrl'])
+            if ds.has_key("description"):
+               desc = self._saveNLDelCR(ds['description'])
+               
+            if ds.has_key("homepage"):
+               homepageVal= ds['homepage']
+               if type(homepageVal) is list and len(homepageVal) > 0:
+                  homepageVal = self._saveNLDelCR(ds['homepage'][0])
+               elif type(homepageVal) is str:
+                  homepageVal = self._saveNLDelCR(ds['homepage'])
+            
+            row = [orgkey, ds['key'], title, desc, ds['citation']['text'], 
+                   rights, logo, ds['created'], ds['modified'], homepage]
+            outf.write(DELIMITER.join(row))
+               
+      finally:
+         outf.close()
+
+# ...............................................
+   def resolveProviderKey(self, prvKey):
+      row = []
       url = '{}/organization/{}'.format(GBIF_URL, prvKey)
       response = urllib2.urlopen(url)
       data = json.load(response)
       legacyid = 'NA'
-      orgkey = title = desc = citation = rights = logo = homepage = logo = ''
+      orgkey = title = desc = citation = rights = logourl = homepage = ''
       if data.has_key('key'):
          if data.has_key('publishingOrganizationKey'):
             orgkey = self._saveNLDelCR(data['publishingOrganizationKey'])
@@ -215,30 +247,10 @@ import cStringIO
 import json
 import urllib2
 
-from gbif.constants import *
-from gbif.gbifresolve import *
+from src.gbif.constants import *
+from src.gbif.gbifresolve import *
 
 gc = GBIFCodes()
 
-header = ['legacyid', 'key', 'title', 'description', 'created', 
-          'modified', 'homepage']
-          
-outf = codecs.open(gc.outFname, 'w', ENCODING)
-writer = csv.writer(outf, delimiter=DELIMITER)
-
-newId=1000
-provlistUrl = '{}/organization?limit=9999'.format(GBIF_URL)
-provResp = urllib2.urlopen(provlistUrl)
-writer.writerow(header)
-outf.write('\t'.join(header))
-
-# Getting the code
-data = json.load(provResp)
-print "Length:", len(data)
-allProvs = data['results']
-
-
-
-gc.getProviderCodes()
 
 """
