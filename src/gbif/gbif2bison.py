@@ -29,7 +29,7 @@ import StringIO
 import xml.etree.ElementTree as ET
 
 from constants import *
-from gbifresolve import GBIFCodes
+from gbifapi import GBIFCodes
 
 # .............................................................................
 class UTF8Recoder:
@@ -72,19 +72,22 @@ class GBIFReader(object):
     * GBIF-interpreted data from occurrence.txt
    """
    # ...........................
-   def __init__(self, verbatimFname, interpretedFname, metaFname):
+   def __init__(self, verbatimFname, interpretedFname, metaFname, outFname, datasetPath):
       """
       @summary: Constructor
       """
       self.codeResolver = GBIFCodes()
       self.verbatimFname = verbatimFname
       self.interpFname = interpretedFname
-      self._intF = None
-      self._verbF = None
-      self._intCsvreader = None
-      self._verbCsvreader = None
-      self.metaFname = metaFname
+      self.outFname = outFname
+      self._datasetPath = datasetPath
+      self._if = None
+      self._vf = None
+      self._iCsvreader = None
+      self._vCsvreader = None
+      self._metaFname = metaFname
       self.fldMeta = None
+      self.dsMeta = {}
       
    # .............................................................................
    def open(self):
@@ -92,13 +95,13 @@ class GBIFReader(object):
       @summary: Read metadata and open datafiles for reading
       '''
       self.fldMeta = self.getFieldMeta()
-      (self.intCsvreader, 
-       self._intF) = self.getCSVReader(self.interpFname, DELIMITER)
-      (self.verbCsvreader, 
-       self._verbF)  = self.getCSVReader(self.verbatimFname, DELIMITER)
+      (self._iCsvreader, 
+       self._if) = self.getCSVReader(self.interpFname, DELIMITER)
+      (self._vCsvreader, 
+       self._vf)  = self.getCSVReader(self.verbatimFname, DELIMITER)
       # Pull the header row from each file, we use metadata for field indices
-      _ = self.getLine(self.verbCsvreader)
-      _ = self.getLine(self.intCsvreader)
+      _ = self.getLine(self._vCsvreader, 0)
+      _ = self.getLine(self._iCsvreader, 0)
    
    # .............................................................................
    def isOpen(self):
@@ -133,7 +136,7 @@ class GBIFReader(object):
       '''
       tdwg = '{http://rs.tdwg.org/dwc/text/}'
       fields = {}
-      tree = ET.parse(META_FNAME)
+      tree = ET.parse(self._metaFname)
       root = tree.getroot()
       # Child will reference INTERPRETED or VERBATIM file
       for child in root:
@@ -156,6 +159,38 @@ class GBIFReader(object):
       return fields
 
    # .............................................................................
+   def getDatasetMeta(self, uuid):
+      '''
+      @summary: Read metadata for dataset with this uuid
+      dataset element contains:
+         alternateIdentifier
+         alternateIdentifier
+         alternateIdentifier
+         title
+         creator
+         metadataProvider
+         associatedParty
+         pubDate
+         language
+         abstract
+         keywordSet
+         keywordSet
+         intellectualRights
+         distribution
+         coverage
+         maintenance
+         contact
+         methods
+         project
+      '''
+      fname = os.path.join(self._datasetPath, '{}.txt'.format(uuid))
+      tree = ET.parse(fname)
+      root = tree.getroot()
+      ds  = root.find('dataset')
+      title = ds.find('title').text
+      return title
+
+   # .............................................................................
    def getCSVReader(self, datafile, delimiter):
       '''
       @summary: Get a CSV reader that can handle encoding
@@ -163,21 +198,37 @@ class GBIFReader(object):
       f = None  
       csv.field_size_limit(sys.maxsize)
       try:
-         f = open(datafile, 'r')
+         f = codecs.open(datafile, 'r', ENCODING)
+#          f = open(datafile, 'r')
          csvreader = csv.reader(f, delimiter=delimiter)
       except Exception, e:
-         try:
-            f = StringIO.StringIO()
-            f.write(datafile.encode(ENCODING))
-            f.seek(0)
-            csvreader = csv.reader(f, delimiter=delimiter)
-         except IOError, e:
-            raise 
-         except Exception, e:
-            raise Exception('Failed to read or open {}, ({})'
-                            .format(datafile, str(e)))
+#          try:
+#             f = StringIO.StringIO()
+#             f.write(datafile.encode(ENCODING))
+#             f.seek(0)
+#             csvreader = csv.reader(f, delimiter=delimiter)
+#          except IOError, e:
+#             raise 
+#          except Exception, e:
+         raise Exception('Failed to read or open {}, ({})'
+                         .format(datafile, str(e)))
       return csvreader, f
    
+   # .............................................................................
+   def getCSVDictWriter(self, datafile, fldnames, delimiter):
+      '''
+      @summary: Get a CSV writer that can handle encoding
+      '''
+      f = None  
+      csv.field_size_limit(sys.maxsize)
+      try:
+         f = codecs.open(datafile, 'w', ENCODING)
+         csvreader = csv.writer(f, delimiter=delimiter)
+      except Exception, e:
+         raise Exception('Failed to read or open {}, ({})'
+                         .format(datafile, str(e)))
+      return csvreader, f
+
    # ...............................................
    def getLine(self, csvreader, recno):
       '''
@@ -240,42 +291,64 @@ class GBIFReader(object):
          val = ''
       return val
    # ...............................................
-   def createBisonData(self, verbline, intline):
+   def createBisonData(self, vline, iline):
       """
       @param verbLine: A CSV record of original provider DarwinCore occurrence data 
       @param intLine: A CSV record of GBIF-interpreted DarwinCore occurrence data 
       """
       rec = {}
-      self.fldMeta.keys()
-      for fldname, meta in self.fldMeta:
+      for fldname, meta in self.fldMeta.iteritems():
          if meta['version'] == VERBATIM:
-            val = verbline[meta[VERBATIM]]
+            try:
+               val = vline[self.fldMeta[fldname][VERBATIM]]
+            except KeyError, e:
+               print'{} not in VERBATIM data, using INTERPRETED'.format(fldname) 
+               val = iline[self.fldMeta[fldname][INTERPRETED]]
          else:
-            val = intline[meta[INTERPRETED]]
-         # Update fields to be edited
+            try:
+               val = iline[self.fldMeta[fldname][INTERPRETED]]
+            except KeyError, e:
+               print'{} not in INTERPRETED data, using VERBATIM'.format(fldname) 
+               val = vline[self.fldMeta[fldname][VERBATIM]]
+
+         # Replace N/A
          if val.lower() in PROHIBITED_VALS:
             val = ''
+            print'Field {}, val {} prohibited'.format(fldname, val) 
          # delete records with no canonical name
          if fldname == 'taxonKey':
             val = self._getCanonicalName(val)
             if val is None:
                rec = None
+               print'Field {}, val {} does not contain canonical'.format(fldname, val) 
                break
+            else:
+               rec['canonicalName'] = val
          # delete absence records
          elif fldname == 'occurrenceStatus':
             if val.lower() == 'absent':
                rec = None
+               print'Field {}, val {} is absence data'.format(fldname, val) 
                break
-         # delete absence records
+         # simplify basisOfRecord terms
          elif fldname == 'basisOfRecord':
             if val in TERM_CONVERT.keys():
                val = TERM_CONVERT[val]
+               print'Field {}, val {} converted'.format(fldname, val) 
+         # Convert year to integer
+         elif fldname == 'year':
+            try:
+               val = int(val)
+            except:
+               print'Field {}, val {} is not an integer'.format(fldname, val) 
+               val = None
+         # check Long/Lat fields
          elif fldname == 'countryCode':
             cntry = val
          elif fldname == 'decimalLongitude':
-            lon = val
+            lon = float(val)
          elif fldname == 'decimalLatitude':
-            lat = val
+            lat = float(val)
          # Save modified val
          if fldname not in ('decimalLongitude', 'decimalLatitude'):
             rec[fldname] = val
@@ -290,49 +363,62 @@ class GBIFReader(object):
       try:
          if self.isOpen():
             self.close()
-         verbCsvreader, intCsvreader = self.open()
-         verbRecno = intRecno = 0
+         self.open()
+         vRecno = iRecno = 1
          
-         while (self._recnum < 4 and 
-                verbCsvreader is not None and 
-                intCsvreader is not None):
-            verbline, verbRecno = self.getLine(self.verbCsvreader, verbRecno)
-            intline, intRecno = self.getLine(self.intCsvreader, intRecno)
-            byline = self.createBisonLine(verbline, intline)
+         outWriter, outf = self.getCSVDictWriter(self.outFname, 
+                                                 ORDERED_OUT_FIELDS, 
+                                                 DELIMITER)
+         outWriter.writerheader()
+         while (self._vCsvreader is not None and 
+                self._iCsvreader is not None):
+            vline, vRecno = self.getLine(self.verbCsvreader, vRecno)
+            iline, iRecno = self.getLine(self.intCsvreader, iRecno)
+            byline = self.createBisonLine(vline, iline)
+            outWriter.writerow(byline)
       finally:
          self._close()
+         outf.close()
          
 # ...............................................
 if __name__ == '__main__':
    subdir = SUBDIRS[0]
    interpFname = os.path.join(DATAPATH, subdir, INTERPRETED)
    verbatimFname = os.path.join(DATAPATH, subdir, VERBATIM)
-   gr = GBIFReader(verbatimFname, interpFname)
+   outFname = os.path.join(DATAPATH, subdir, 'outBison.csv')
+   datasetPath = os.path.join(DATAPATH, subdir, DATASET_DIR) 
+   gr = GBIFReader(verbatimFname, interpFname, META_FNAME, outFname, datasetPath)
    gr.extractData()
    
    
 """
-import os
 import csv
-import xml.etree.ElementTree as ET
+import codecs
+import os
 import sys
 import StringIO
+import xml.etree.ElementTree as ET
 
-from gbif.constants import *
-from gbif.portaldownload import *
+from src.gbif.gbif2bison import *
+from src.gbif.constants import *
+from src.gbif.gbifapi import GBIFCodes
 
 subdir = SUBDIRS[0]
 interpFname = os.path.join(DATAPATH, subdir, INTERPRETED)
 verbatimFname = os.path.join(DATAPATH, subdir, VERBATIM)
-gr = GBIFResolver(verbatimFname, interpFname, META_FNAME)
+outFname = os.path.join(DATAPATH, subdir, 'outBison.csv')
+datasetPath = os.path.join(DATAPATH, subdir, DATASET_DIR)
+
+gr = GBIFReader(verbatimFname, interpFname, META_FNAME, outFname, datasetPath)
 gr.open()
 
-vcsv = gr.verbCsvreader
-icsv = gr.intCsvreadersolver
+uuid = 'ffb63b32-306e-415c-87a3-34c60d157a2a'
+fname = os.path.join(gr._datasetPath, '{}.xml'.format(uuid))
 
-verbLine = gr.getLine(gr.verbCsvreader)
-intLine = gr.getLine(gr.intCsvreader)
-
+vRecno = iRecno = 1
+vline, vRecno = gr.getLine(gr._vCsvreader, vRecno)
+iline, iRecno = gr.getLine(gr._iCsvreader, iRecno)
+byline = gr.createBisonData(vline, iline)
 
 currmeta = fnameElt.text
 
