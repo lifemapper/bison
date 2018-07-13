@@ -1,7 +1,8 @@
-from LmCommon.common.apiquery import bison
+
 NAMESPACE = {'tdwg': 'http://rs.tdwg.org/dwc/text/',
              'gbif': 'http://rs.gbif.org/terms/1.0/',
              'dublin': 'http://purl.org/dc/terms/'}
+GBIF_URL = 'http://api.gbif.org/v1'
 ENCODING = 'utf-8'
 
 DATAPATH = '/tank/data/input/bison/'
@@ -22,6 +23,9 @@ TERM_CONVERT = {'humanObservation': 'observation',
                 'preservedSpecimen': 'specimen', 
                 'fossilSpecimen': 'specimen'}
 
+# Test these against lowercase values
+PROHIBITED_VALS = ['na', '#na', 'n/a']
+
 SAVE_FIELDS = {
    # pull canonical name from API and taxonKey
    'taxonKey': (NO_OUTPUT, INTERPRETED),
@@ -39,8 +43,8 @@ SAVE_FIELDS = {
    'catalogNumber': (str, VERBATIM),
    'recordedBy': (str, VERBATIM),
    'recordNumber': (str, VERBATIM),
-   'decimalLatitude': (float, VERBATIM),
-   'decimalLongitude': (float, VERBATIM),
+   'decimalLatitude': (float, INTERPRETED),
+   'decimalLongitude': (float, INTERPRETED),
    'elevation': (str, VERBATIM), 
    'depth': (str, VERBATIM), 
    'county': (str, VERBATIM), 
