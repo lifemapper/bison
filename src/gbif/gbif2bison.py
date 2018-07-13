@@ -85,10 +85,12 @@ class GBIFReader(object):
       self._verbCsvreader = None
       self.metaFname = metaFname
       self.fldMeta = None
-      self._recnum = 0
       
    # .............................................................................
    def open(self):
+      '''
+      @summary: Read metadata and open datafiles for reading
+      '''
       self.fldMeta = self.getFieldMeta()
       (self.intCsvreader, 
        self._intF) = self.getCSVReader(self.interpFname, DELIMITER)
@@ -110,6 +112,9 @@ class GBIFReader(object):
 
    # .............................................................................
    def close(self):
+      '''
+      @summary: Close input datafiles
+      '''
       self._intF.close()
       self._verbF.close()
 
@@ -152,6 +157,9 @@ class GBIFReader(object):
 
    # .............................................................................
    def getCSVReader(self, datafile, delimiter):
+      '''
+      @summary: Get a CSV reader that can handle encoding
+      '''
       f = None  
       csv.field_size_limit(sys.maxsize)
       try:
@@ -171,23 +179,26 @@ class GBIFReader(object):
       return csvreader, f
    
    # ...............................................
-   def getLine(self, csvreader):
+   def getLine(self, csvreader, recno):
+      '''
+      @summary: Return a line while keeping track of the line number and errors
+      '''
       success = False
       line = None
       while not success and csvreader is not None:
-         self._recnum += 1
+         recno += 1
          try:
             line = csvreader.next()
             success = True
          except OverflowError, e:
-            print( 'Overflow on line {} ({})'.format(self._recnum, str(e)))
+            print( 'Overflow on line {} ({})'.format(recno, str(e)))
          except StopIteration:
-            print('EOF on line {}'.format(self._recnum))
+            print('EOF on line {}'.format(recno))
             success = True
          except Exception, e:
-            print('Bad record on line {} ({})'.format(self._recnum, e))
+            print('Bad record on line {} ({})'.format(recno, e))
          
-      return line
+      return line, recno
 
    # ...............................................
    def _getCanonicalName(self, val):
@@ -242,26 +253,36 @@ class GBIFReader(object):
          else:
             val = intline[meta[INTERPRETED]]
          # Update fields to be edited
+         if val.lower() in PROHIBITED_VALS:
+            val = ''
          # delete records with no canonical name
          if fldname == 'taxonKey':
             val = self._getCanonicalName(val)
             if val is None:
                rec = None
                break
+         # delete absence records
+         elif fldname == 'occurrenceStatus':
+            if val.lower() == 'absent':
+               rec = None
+               break
+         # delete absence records
+         elif fldname == 'basisOfRecord':
+            if val in TERM_CONVERT.keys():
+               val = TERM_CONVERT[val]
          elif fldname == 'countryCode':
             cntry = val
          elif fldname == 'decimalLongitude':
             lon = val
          elif fldname == 'decimalLatitude':
             lat = val
-         # delete absence records
-         elif fldname == 'occurrenceStatus':
-            if val.lower() == 'absent':
-               rec = None
-               break
+         # Save modified val
+         if fldname not in ('decimalLongitude', 'decimalLatitude'):
+            rec[fldname] = val
          
-         lon, lat = self._getPoint(lon, lat, cntry)
-         rec[fldname] = val
+      lon, lat = self._getPoint(lon, lat, cntry)
+      rec['decimalLongitude'] = lon
+      rec['decimalLatitude'] = lat
       return rec
    
    # ...............................................
@@ -270,12 +291,13 @@ class GBIFReader(object):
          if self.isOpen():
             self.close()
          verbCsvreader, intCsvreader = self.open()
+         verbRecno = intRecno = 0
          
          while (self._recnum < 4 and 
                 verbCsvreader is not None and 
                 intCsvreader is not None):
-            verbline = self.getLine(self.verbCsvreader)
-            intline = self.getLine(self.intCsvreader)
+            verbline, verbRecno = self.getLine(self.verbCsvreader, verbRecno)
+            intline, intRecno = self.getLine(self.intCsvreader, intRecno)
             byline = self.createBisonLine(verbline, intline)
       finally:
          self._close()
@@ -285,7 +307,7 @@ if __name__ == '__main__':
    subdir = SUBDIRS[0]
    interpFname = os.path.join(DATAPATH, subdir, INTERPRETED)
    verbatimFname = os.path.join(DATAPATH, subdir, VERBATIM)
-   gr = GBIFResolver(verbatimFname, interpFname)
+   gr = GBIFReader(verbatimFname, interpFname)
    gr.extractData()
    
    
@@ -306,7 +328,7 @@ gr = GBIFResolver(verbatimFname, interpFname, META_FNAME)
 gr.open()
 
 vcsv = gr.verbCsvreader
-icsv = gr.intCsvreader
+icsv = gr.intCsvreadersolver
 
 verbLine = gr.getLine(gr.verbCsvreader)
 intLine = gr.getLine(gr.intCsvreader)
