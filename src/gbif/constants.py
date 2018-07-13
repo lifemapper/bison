@@ -1,3 +1,4 @@
+from LmCommon.common.apiquery import bison
 NAMESPACE = {'tdwg': 'http://rs.tdwg.org/dwc/text/',
              'gbif': 'http://rs.gbif.org/terms/1.0/',
              'dublin': 'http://purl.org/dc/terms/'}
@@ -15,6 +16,11 @@ VERBATIM = 'verbatim.txt'
 
 NO_OUTPUT = None
 COMPUTED = None
+
+TERM_CONVERT = {'humanObservation': 'observation', 
+                'machineObservation': 'observation',
+                'preservedSpecimen': 'specimen', 
+                'fossilSpecimen': 'specimen'}
 
 SAVE_FIELDS = {
    # pull canonical name from API and taxonKey
