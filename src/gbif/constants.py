@@ -15,8 +15,24 @@ META_FNAME = '/tank/data/input/bison/us/meta.xml'
 CLIP_CHAR = '/'
 DELIMITER = '\t'
 
-INTERPRETED = 'occurrence.txt'
-VERBATIM = 'verbatim.txt'
+LOG_FORMAT = ' '.join(["%(asctime)s",
+                       "%(threadName)s.%(module)s.%(funcName)s",
+                       "line",
+                       "%(lineno)d",
+                       "%(levelname)-8s",
+                       "%(message)s"])
+
+LOG_DATE_FORMAT = '%d %b %Y %H:%M'
+LOGFILE_MAX_BYTES = 52000000 
+LOGFILE_BACKUP_COUNT = 5
+
+
+# INTERPRETED = 'occurrence.txt'
+# VERBATIM = 'verbatim.txt'
+# OUT_BISON = 'outBison.txt'
+INTERPRETED = 'gbifInterpreted500.txt'
+VERBATIM = 'gbifVerbatim500.txt'
+OUT_BISON = 'outBison500.txt'
 
 NO_OUTPUT = None
 COMPUTED = None
