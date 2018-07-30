@@ -18,7 +18,7 @@ def usage():
    # ..........................................................................
 class GbifFixer(object):
    # ...............................................
-   def __init__(self, inputFilename, delimiter, log):
+   def __init__(self, inputFilename, delimiter):
       """
       @param inputFilename: full pathname of a CSV file containing records 
              uniquely identified by the first field in a record.
@@ -30,14 +30,16 @@ class GbifFixer(object):
       """
       self.messyfile = inputFilename
       self.delimiter = delimiter
-      self.log = log
+      self.log = None
 
       basepath, _ = os.path.splitext(inputFilename)
       pth, dataname = os.path.split(basepath)
+#       scriptname, _ = os.path.splitext(os.path.basename(__file__))
+#       logfname = os.path.join(pth, '{}_{}.log'.format(scriptname, dataname))      
+#       log = getLogger(scriptname, logfname)
       
       self.pth = pth
       self.splitBase = os.path.join(pth, 'split_{}'.format(dataname))
-      self.sortBase = os.path.join(pth, 'sm_sort_{}'.format(dataname))
       self.tidyfile = os.path.join(pth, 'tidy_{}.csv'.format(dataname))
       self._openfiles = {}
       
@@ -75,13 +77,21 @@ class GbifFixer(object):
       newname = '{}_{}.csv'.format(basename, idx)
       writer = self._openWriter(newname)
       return writer, newname, idx
-         
+
+   # ...............................................
+   def _setLogger(self, logfname):
+      scriptname, ext = os.path.splitext(os.path.basename(__file__))
+      self.log = getLogger(scriptname, logfname)
+      
+
    # ...............................................
    def split(self):
       """
       @summary: Split original data file into multiple sorted files.
       @note: Replicate the original header on each smaller sorted file
       """
+      self._setLogger(self.splitBase + '.log')
+
       reader = self._openReader(self.messyfile)
       header = next(reader)
 
@@ -169,6 +179,7 @@ class GbifFixer(object):
       """
       @summary: Merge sorted files into a single larger sorted file.
       """
+      self._setLogger(self.tidyfile.replace('csv', 'log'))
       rdrRecs = self._getSplitReadersFirstRecs()
       writer, outf = getCSVWriter(self.tidyfile, self.delimiter)
       self._openfiles[self.tidyfile] = outf
@@ -184,6 +195,10 @@ class GbifFixer(object):
       """
       @summary: Test merged/sorted file
       """
+      self._setLogger(self.tidyfile.replace('.csv', '_test.log'))
+
+      self.log.info('Testing file {}'.format(self.tidyfile))
+      reccount = 0
       reader = self._openReader(self.tidyfile)
       header = next(reader)
       if header[SORT_IDX] != 'gbifID':
@@ -191,6 +206,7 @@ class GbifFixer(object):
          
       currid = 0
       for row in reader:
+         reccount += 1
          try:
             gbifid = int(row[SORT_IDX])
          except:
@@ -204,6 +220,7 @@ class GbifFixer(object):
             else:
                currid = gbifid
                
+      self.log.info('File contained {} records'.format(reccount))
       self.closeOne(self.tidyfile)
                   
 
@@ -220,19 +237,13 @@ if __name__ == "__main__":
          delimiter = DELIMITER
    else:
       usage()
-   if cmd not in ('split', 'merge', 'check'):   
+   if cmd not in ('split', 'merge', 'test'):   
       usage()
        
    if not os.path.exists(datafname):
       print ('Input CSV file {} does not exist'.format(datafname))
-       
-   basepath, ext = os.path.splitext(datafname)
-   pth, dataname = os.path.split(basepath)
-   scriptname, ext = os.path.splitext(os.path.basename(__file__))
-   logfname = os.path.join(pth, '{}_{}_{}.log'.format(scriptname, dataname, cmd))      
-   log = getLogger(scriptname, logfname)
-    
-   gf = GbifFixer(datafname, delimiter, log)
+           
+   gf = GbifFixer(datafname, delimiter)
     
    try:
       if cmd  == 'split':
@@ -260,6 +271,9 @@ if __name__ == "__main__":
 
 
 """
+python src/gbif/gbifsort.py  /tank/data/input/bison/territories/verbatim.txt test
+
+
 import os
 import sys
 
@@ -308,5 +322,15 @@ inf.close()
 outf.close()
 
 # gf.split()
+
+
+COUNTER=100
+while [  $COUNTER -lt 1000 ]; do
+   let COUNTER=COUNTER+1 
+   echo split_multimedia_$COUNTER*
+   for i in $( ls /tank/data/input/bison/us/split_multimedia_$COUNTER* ); do
+      rm -f $i
+   done
+done
 
 """

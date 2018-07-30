@@ -22,14 +22,15 @@ Liz's email
 * Initial extract of requested GBIF data fields based on our 11 
   iso_country_codes e.g. AS,CA, FM, GU, MH, MP, PR, PW, UM, US, and VI
   (see Pg 20 of BISON Data Workflow (July 3. 2018).pdf)
-* Eliminate all records from the BISON Provider (440) (to avoid duplication in BISON)
+* Remove all records from the BISON Provider (440, or 362?, use UUID) 
+  to avoid duplication in BISON
 * Run scientificName values through either the Python script (attached 
   pyGbifLoad.zip) OR GBIF name parser (https://www.gbif.org/tools/name-parser) 
   and replace with resulting canonicalName values (we want the original clean 
   scientific name submitted by the Data Providers sans taxon author and year; 
   rather than GBIF's 'interpreted' scientificName values)
-* Remove all records with scientificName (or canonicalName?)=blank
-* Research/remove all records with occurrenceStatus=absent (if available in GBIF download)
+* Remove all records with scientificName=blank
+* Remove all records with occurrenceStatus=absent 
 * For records with 0,0 coordinates - change any decimalLatitude and 
   decimalLongitude field '0' (zero) values to null/blank (we/BISON may still 
   be able to georeference these records)

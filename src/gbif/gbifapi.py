@@ -25,7 +25,7 @@ import codecs
 import json
 import urllib2
 
-from constants import DELIMITER, GBIF_URL, ENCODING
+from constants import DELIMITER, GBIF_URL, ENCODING, URL_ESCAPES
         
 inProvFname = 'inProviderIDs.txt'
 outProvFname = 'outProviderRecs.txt'
@@ -58,40 +58,53 @@ class GBIFCodes(object):
    def resolveDatasetKey(self, dsKey):
       row = []
       url = '{}/dataset/{}'.format(GBIF_URL, dsKey)
-      response = urllib2.urlopen(url)
-      data = json.load(response)
-      legacyid = 'NA'
-      orgkey = title = desc = citation = rights = logo = homepage = logo = ''
-      if data.has_key('key'):
-         if data.has_key('publishingOrganizationKey'):
-            orgkey = self._saveNLDelCR(data['publishingOrganizationKey'])
-
-         if (data.has_key('identifiers') 
-             and len(data['identifiers']) > 0 
-             and data['identifiers'][0]['type'] == 'GBIF_PORTAL'):
-            legacyid = data['identifiers'][0]['identifier']
-         
-         if data.has_key('title'):
-            title = self._saveNLDelCR(data['title'])            
-
-         if data.has_key('description'):
-            desc = self._saveNLDelCR(data['description'])
-         
-         if data.has_key('citation'):
-            citation = self._saveNLDelCR(data['citation']['text'])
+      try:
+         response = urllib2.urlopen(url)
+      except Exception, e:
+         print ('Failed to resolve datasetKey with {}'.format(url))
+      else:
+         data = json.load(response)
+         legacyid = 'NA'
+         orgkey = title = desc = citation = rights = logourl = homepage = ''
+         if data.has_key('key'):
+            if data.has_key('publishingOrganizationKey'):
+               orgkey = self._saveNLDelCR(data['publishingOrganizationKey'])
+   
+            if (data.has_key('identifiers') 
+                and len(data['identifiers']) > 0 
+                and data['identifiers'][0]['type'] == 'GBIF_PORTAL'):
+               legacyid = data['identifiers'][0]['identifier']
             
-         if data.has_key('rights'):
-            rights = self._saveNLDelCR(data['rights'])
+            if data.has_key('title'):
+               title = self._saveNLDelCR(data['title'])            
+   
+            if data.has_key('description'):
+               desc = self._saveNLDelCR(data['description'])
+            
+            if data.has_key('citation'):
+               citation = self._saveNLDelCR(data['citation']['text'])
+               
+            if data.has_key('rights'):
+               rights = self._saveNLDelCR(data['rights'])
+   
+            if data.has_key('logoUrl'):
+               logourl = data['logoUrl']
+            
+            if data.has_key('homepage'):
+               homepage = data['homepage']
 
-         if data.has_key('logoUrl'):
-            logourl = data['logoUrl']
-         
-         if data.has_key('homepage'):
-            homepage = data['homepage']
-
-         row = [orgkey, legacyid, data['key'], title, desc, citation, rights, logourl,
-                data['created'], data['modified'], homepage]
+            row = [orgkey, legacyid, data['key'], title, desc, citation, rights, 
+                   logourl, data['created'], data['modified'], homepage]
       return row
+
+# ...............................................
+   def getProviderFromDatasetKey(self, dsKey):
+      row = self.resolveDatasetKey(dsKey)
+      try:
+         publishingOrgUUID = row[0]
+      except:
+         print('No record for datasetKey {}'.format(dsKey))
+      return publishingOrgUUID
 
 # ...............................................
    def getProviderCodes(self):
@@ -184,9 +197,10 @@ class GBIFCodes(object):
          outf.close()
 
 # ...............................................
-   def resolveProviderKey(self, prvKey):
+   def resolvePublisher(self, publisher):
+      # returns GBIF providerId
       row = []
-      url = '{}/organization/{}'.format(GBIF_URL, prvKey)
+      url = '{}/organization/{}'.format(GBIF_URL, publisher)
       response = urllib2.urlopen(url)
       data = json.load(response)
       legacyid = 'NA'
@@ -223,8 +237,7 @@ class GBIFCodes(object):
       return row
 
 # ...............................................
-   def resolveTaxonKey(self, taxKey):
-      row = []
+   def resolveCanonicalFromTaxonKey(self, taxKey):
       canName = None
       url = '{}/species/{}'.format(GBIF_URL, taxKey)
       response = urllib2.urlopen(url)
@@ -233,12 +246,29 @@ class GBIFCodes(object):
          canName = data['canonicalName']
          row = [taxKey, canName, data['datasetKey']]
       return canName
-#       return row
+
+# ...............................................
+   def resolveCanonicalFromScientific(self, sciname):
+      canName = None
+      for replaceStr, withStr in URL_ESCAPES:
+         sciname = sciname.replace(replaceStr, withStr)
+      url = '{}/parser/name?name={}'.format(GBIF_URL, str(sciname))
+      try:
+         response = urllib2.urlopen(url)
+      except Exception, e:
+         print ('Failed to resolve name with {}'.format(url))
+      else:
+         data = json.load(response)
+         if type(data) is list and len(data) > 0:
+            data = data[0]
+         if data.has_key('canonicalName'):
+            canName = data['canonicalName']
+      return canName
 
 # ...............................................
 if __name__ == '__main__':
    gc = GBIFCodes()
-   gc.getProviderCodes()
+   gc.getDatasetCodes()
    
 """
 import csv

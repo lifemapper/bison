@@ -28,20 +28,6 @@ from constants import *
 from gbifapi import GBIFCodes
 from tools import getCSVReader, getCSVWriter
 
-# # .............................................................................
-# def unicode_csv_reader(unicode_csv_data, dialect=unicodecsv.excel, delimiter=DELIMITER,
-#                        **kwargs):
-#    # csv.py doesn't do Unicode; encode temporarily as UTF-8:
-#    csv_reader = unicodecsv.reader(utf_8_encoder(unicode_csv_data),
-#                            dialect=dialect, delimiter=delimiter, **kwargs)
-#    for row in csv_reader:
-#       # decode UTF-8 back to Unicode, cell by cell:
-#       yield [unicode(cell, 'utf-8') for cell in row]
-# 
-# def utf_8_encoder(unicode_csv_data):
-#    for line in unicode_csv_data:
-#       yield line.encode('utf-8')
-
 # .............................................................................
 class GBIFReader(object):
    """
@@ -58,6 +44,7 @@ class GBIFReader(object):
       self.verbatimFname = verbatimFname
       self.interpFname = interpretedFname
       self.outFname = outFname
+      self._datasetPubs = {}
       self._datasetPath = datasetPath
       self._if = None
       self._vf = None
@@ -67,6 +54,151 @@ class GBIFReader(object):
       self.fldMeta = None
       self.dsMeta = {}
       
+   # ...............................................
+   def _cleanVal(self, val):
+      val = val.strip()
+      if val.lower() in PROHIBITED_VALS:
+         val = ''
+      return val
+
+   # ...............................................
+   def _getValFromCorrectLine(self, fldname, meta, vline, iline):
+      """
+      @param fldname: field name 
+      @param meta: tuple including datatype and INTERPRETED or VERBATIM 
+                   identifier for file to pull value from
+      @param vline: A CSV record of original provider DarwinCore occurrence data 
+      @param iline: A CSV record of GBIF-interpreted DarwinCore occurrence data 
+      """
+      # get column Index in correct file
+      if meta['version'] == VERBATIM:
+         try:
+            val = vline[self.fldMeta[fldname][VERBATIM]]
+         except KeyError, e:
+            print'{} not in VERBATIM data, using INTERPRETED'.format(fldname) 
+            val = iline[self.fldMeta[fldname][INTERPRETED]]
+      else:
+         try:
+            val = iline[self.fldMeta[fldname][INTERPRETED]]
+         except KeyError, e:
+            print'{} not in INTERPRETED data, using VERBATIM'.format(fldname) 
+            try:
+               val = vline[self.fldMeta[fldname][VERBATIM]]
+            except Exception, e:
+               print'{} not in either file'.format(fldname)
+      return val
+
+   # ...............................................
+   def _updatePoint(self, rec):
+      try:
+         rec['decimalLongitude']
+      except:
+         rec['decimalLongitude'] = None
+
+      try:
+         rec['decimalLatitude']
+      except:
+         rec['decimalLatitude'] = None
+
+      try:
+         cntry = rec['countryCode']
+      except:
+         rec['countryCode'] = None
+         
+      # Change 0,0 to None
+      if rec['decimalLongitude'] == 0 and rec['decimalLatitude'] == 0:
+         rec['decimalLongitude'] = None
+         rec['decimalLatitude'] = None
+      # Make sure US longitude is negative
+      elif (cntry == 'US' 
+            and rec['decimalLongitude'] is not None 
+            and rec['decimalLongitude'] > 0):
+         rec['decimalLongitude'] = rec['decimalLongitude'] * -1 
+
+   # ...............................................
+   def _fillPublisher(self, rec):
+      """
+      @summary: If publisher is missing from record, use API to get from 
+               datasetKey.  Save values in a dictionary to avoid re-querying
+               same values.
+      """
+      datasetKey = rec['resourceID']
+      pubID = rec['providerID']
+      if pubID is None or pubID == '':
+         try: 
+            pubId = self._datasetPubs[datasetKey]
+         except:
+            if datasetKey is not None:
+               pubID = self.codeResolver.getProviderFromDatasetKey(datasetKey)
+               self._datasetPubs[datasetKey] = pubID
+         rec['providerID'] = pubID
+
+   # ...............................................
+   def _getCanonical(self, rec):
+      # Try from scientificName first, then taxonKey
+      canName = None
+      try:
+         canName = self.codeResolver.resolveCanonicalFromScientific(rec['scientificName'])
+      except:
+         print('gbifID {}: Could not get canonical'
+               .format(rec['gbifID'])) 
+         try:
+            canName = self.codeResolver.resolveCanonicalFromTaxonKey(rec['taxonKey'])
+         except:
+            print('gbifID {}: Could not get canonical from taxonKey {}'
+                  .format(rec['gbifID'], rec['taxonKey'])) 
+      return canName
+
+   # ...............................................
+   def _updateFieldOrSignalRemove(self, gbifID, fldname, val):
+      # Replace N/A
+      if val.lower() in PROHIBITED_VALS:
+         val = ''
+         print('gbifID {}: Field {}, val {} prohibited'
+               .format(gbifID, fldname, val)) 
+         
+      # Get providerID, remove if BISON UUID
+      elif fldname == 'publisher':
+         fldname = 'providerID'
+         if val == BISON_UUID:
+            print ('Found BISON publisher')
+            fldname = val = None
+
+      # Get resourceID
+      elif fldname == 'datasetKey':
+         fldname = 'resourceID'
+               
+      # simplify basisOfRecord terms
+      elif fldname == 'basisOfRecord':
+         if val in TERM_CONVERT.keys():
+            val = TERM_CONVERT[val]
+            print('gbifID {}: basisOfRecord converted to {}'.format(gbifID, val)) 
+            
+      # Convert year to integer
+      elif fldname == 'year':
+         try:
+            val = int(val)
+         except:
+            if val != '':
+               print('gbifID {}: Year {} is not an integer'.format(gbifID, val))
+            val = None 
+
+      # remove records with occurrenceStatus  = absence
+      elif fldname == 'occurrenceStatus' and val.lower() == 'absent':
+         fldname = val = None
+         print('gbifID {}: record is absence data'.format(gbifID)) 
+         
+      # gather geo fields for check/convert
+      elif fldname in ('decimalLongitude', 'decimalLatitude'):
+         try:
+            val = float(val)
+         except Exception, e:
+            if val != '':
+               print('gbifID {}: {} lat/long is not number'.format(gbifID, val))
+            val = None
+         
+      return fldname, val
+
    # ...............................................
    def open(self):
       '''
@@ -89,6 +221,23 @@ class GBIFReader(object):
       _ = self.getLine(self._iCsvreader, 0)
    
    # ...............................................
+   def openInterpreted(self):
+      '''
+      @summary: Read metadata and open datafiles for reading
+      '''
+      self.fldMeta = self.getFieldMetaFromInterpreted()
+      
+      (self._iCsvreader, 
+       self._if) = getCSVReader(self.interpFname, DELIMITER)
+       
+      (self._outWriter, 
+       self._outf) = getCSVWriter(self.outFname, DELIMITER)
+
+       
+      # Pull the header row 
+      _ = self.getLine(self._iCsvreader, 0)
+
+   # ...............................................
    def isOpen(self):
       """
       @note: returns True if either is open
@@ -103,111 +252,19 @@ class GBIFReader(object):
       '''
       @summary: Close input datafiles
       '''
-      self._if.close()
-      self._vf.close()
-      self._outf.close()
+      try:
+         self._if.close()
+      except Exception, e:
+         pass
+      try:
+         self._vf.close()
+      except Exception, e:
+         pass
+      try:
+         self._outf.close()
+      except Exception, e:
+         pass
 
-   # ...............................................
-   def getFieldMeta(self):
-      '''
-      @summary: Read metadata for verbatim and interpreted data files, and
-                for fields we are interested in:
-                extract column index for each file, add datatype. and 
-                add which file (verbatim or interpreted) to extract field value  
-                from.  Resulting metadata will look like:
-                     fields = {term: {VERBATIM_BASENAME: columnIndex,
-                                      INTERPRETED_BASENAME: columnIndex, 
-                                      dtype: str,
-                                      useVersion: ?_BASENAME}, ...}
-      '''
-      tdwg = '{http://rs.tdwg.org/dwc/text/}'
-      fields = {}
-      tree = ET.parse(self._metaFname)
-      root = tree.getroot()
-      # Child will reference INTERPRETED or VERBATIM file
-      for child in root:
-         fileElt = child.find('tdwg:files', NAMESPACE)
-         fnameElt= fileElt .find('tdwg:location', NAMESPACE)
-         currmeta = fnameElt.text
-         if currmeta in (INTERPRETED, VERBATIM):
-            flds = child.findall(tdwg+'field')
-            for fld in flds:
-               idx = int(fld.get('index'))
-               temp = fld.get('term')
-               term = temp[temp.rfind(CLIP_CHAR)+1:]
-               if term in SAVE_FIELDS.keys():
-                  if not fields.has_key(term):
-                     fields[term] = {currmeta: idx,
-                                     'dtype': SAVE_FIELDS[term][0],
-                                     'version': SAVE_FIELDS[term][1]}
-                  else:
-                     fields[term][currmeta] = idx
-      return fields
-
-   # ...............................................
-   def getDatasetMeta(self, uuid):
-      '''
-      @summary: Read metadata for dataset with this uuid
-      dataset element contains:
-         alternateIdentifier
-         alternateIdentifier
-         alternateIdentifier
-         title
-         creator
-         metadataProvider
-         associatedParty
-         pubDate
-         language
-         abstract
-         keywordSet
-         keywordSet
-         intellectualRights
-         distribution
-         coverage
-         maintenance
-         contact
-         methods
-         project
-      '''
-      fname = os.path.join(self._datasetPath, '{}.txt'.format(uuid))
-      tree = ET.parse(fname)
-      root = tree.getroot()
-      ds  = root.find('dataset')
-      title = ds.find('title').text
-      return title
-
-#    # .............................................................................
-#    def getCSVReader(self, datafile, delimiter):
-#       '''
-#       @summary: Get a CSV reader that can handle encoding
-#       '''
-#       f = None  
-#       unicodecsv.field_size_limit(sys.maxsize)
-#       try:
-#          f = open(datafile, 'rb')
-#          csvreader = unicodecsv.reader(f, delimiter=delimiter, encoding=ENCODING)
-#       except Exception, e:
-#          raise Exception('Failed to read or open {}, ({})'
-#                          .format(datafile, str(e)))
-#       return csvreader, f
-#    
-#    # .............................................................................
-# #    def getCSVDictWriter(self, datafile):
-#    def getCSVWriter(self, datafile, delimiter):
-#       '''
-#       @summary: Get a CSV writer that can handle encoding
-#       '''
-#       unicodecsv.field_size_limit(sys.maxsize)
-#       try:
-#          f = open(datafile, 'wb') 
-#          writer = unicodecsv.writer(f, delimiter=delimiter, encoding=ENCODING)
-# 
-#       except Exception, e:
-#          raise Exception('Failed to read or open {}, ({})'
-#                          .format(datafile, str(e)))
-#       return writer, f
-
-   # ...........................
    # ...............................................
    def getLine(self, csvreader, recno):
       '''
@@ -231,134 +288,178 @@ class GBIFReader(object):
       return line, recno
 
    # ...............................................
-   def _getCanonicalName(self, val):
-      canName = self.codeResolver.resolveTaxonKey(val)
-      return canName
+   def getFieldMeta(self):
+      '''
+      @summary: Read metadata for verbatim and interpreted data files, and
+                for fields we are interested in:
+                extract column index for each file, add datatype. and 
+                add which file (verbatim or interpreted) to extract field value  
+                from.  Resulting metadata will look like:
+                     fields = {term: {VERBATIM_BASENAME: columnIndex,
+                                      INTERPRETED_BASENAME: columnIndex, 
+                                      dtype: str,
+                                      useVersion: ?_BASENAME}, ...}
+      '''
+      tdwg = '{http://rs.tdwg.org/dwc/text/}'
+      fields = {}
+      tree = ET.parse(self._metaFname)
+      root = tree.getroot()
+      # Child will reference INTERPRETED or VERBATIM file
+      for child in root:
+         fileElt = child.find('tdwg:files', NAMESPACE)
+         fnameElt= fileElt .find('tdwg:location', NAMESPACE)
+         currmeta = fnameElt.text
+         sortedname = 'tidy_' + currmeta.replace('txt', 'csv')
+         if sortedname in (INTERPRETED, VERBATIM):
+            flds = child.findall(tdwg+'field')
+            for fld in flds:
+               idx = int(fld.get('index'))
+               temp = fld.get('term')
+               term = temp[temp.rfind(CLIP_CHAR)+1:]
+               if term in SAVE_FIELDS.keys():
+                  if not fields.has_key(term):
+                     fields[term] = {currmeta: idx,
+                                     'dtype': SAVE_FIELDS[term][0],
+                                     'version': SAVE_FIELDS[term][1]}
+                  else:
+                     fields[term][currmeta] = idx
+      return fields
 
    # ...............................................
-   def _getProviderID(self, val):
-      canName = self.codeResolver.resolveTaxonKey(val)
-      return canName
+   def getFieldMetaFromInterpreted(self):
+      '''
+      @summary: Read metadata for interpreted data file, and
+                for fields we are interested in:
+                extract column index for each file, add datatype. 
+                Resulting metadata will look like:
+                     fields = {term: (columnIndex, dtype), 
+                               ...
+                               }
+      '''
+      tdwg = '{http://rs.tdwg.org/dwc/text/}'
+      fields = {}
+      tree = ET.parse(self._metaFname)
+      root = tree.getroot()
+      # Child will reference INTERPRETED or VERBATIM file
+      for child in root:
+         fileElt = child.find('tdwg:files', NAMESPACE)
+         fnameElt= fileElt .find('tdwg:location', NAMESPACE)
+         currmeta = fnameElt.text
+         sortedname = 'tidy_' + currmeta.replace('txt', 'csv')
+         if sortedname == INTERPRETED:
+            flds = child.findall(tdwg+'field')
+            for fld in flds:
+               idx = int(fld.get('index'))
+               temp = fld.get('term')
+               term = temp[temp.rfind(CLIP_CHAR)+1:]
+               if term in SAVE_FIELDS.keys():
+                  dtype = SAVE_FIELDS[term][0]
+               else:
+                  dtype = str
+               if not fields.has_key(term):
+                  fields[term] = (idx, dtype)
+      return fields
 
+#    # ...............................................
+#    def getDatasetMeta(self, uuid):
+#       '''
+#       @summary: Read metadata for dataset with this uuid
+#       '''
+#       fname = os.path.join(self._datasetPath, '{}.txt'.format(uuid))
+#       tree = ET.parse(fname)
+#       root = tree.getroot()
+#       ds  = root.find('dataset')
+#       title = ds.find('title').text
+#       return title
+      
    # ...............................................
-   def _getResourceID(self, val):
-      return val
+   def createBisonLineFromInterpreted(self, iline):
+      """
+      @param vline: A CSV record of original provider DarwinCore occurrence data 
+      @param iline: A CSV record of GBIF-interpreted DarwinCore occurrence data 
+      """
+      rec = {}
+      row = []
+      gbifID = iline[0]
+      for fldname, (idx, dtype) in self.fldMeta.iteritems():
+         val = iline[idx]
+
+         fldname, val = self._updateFieldOrSignalRemove(gbifID, fldname, val)
+         if fldname is None:
+            return row
+         else:
+            rec[fldname] = val
+            
+      # If publisher is missing from record, use API to get from datasetKey
+      self._fillPublisher(rec)
+
+      # Modify lat/lon vals if necessary
+      self._updatePoint(rec)
+      
+      # Ignore record without canonicalName
+      canName = self._getCanonical(rec)
+      if canName is None:
+         return row
+         
+      # Ignore absence record 
+      if rec['occurrenceStatus'].lower() == 'absent':
+         print('gbifID {}: Field {}, val {} is absence data'
+               .format(gbifID, fldname, val)) 
+         return row
+      
+      # create the ordered row
+      for fld in ORDERED_OUT_FIELDS:
+         try:
+            row.append(rec[fld])
+         except KeyError, e:
+            row.append('')
+
+      return row
    
-   # ...............................................
-   def _testOccurrenceStatus(self, val):
-      if val.lower() == 'absent':
-         return None
-      return val
-
-   # ...............................................
-   def _getPoint(self, lon, lat, cntry):
-      if lon == 0 and lat == 0:
-         lon = None
-         lat = None
-      elif cntry == 'US' and lon is not None and lon > 0:
-         lon = lon * -1 
-      return lon, lat
-
-   # ...............................................
-   def _chuckIt(self, rec):
-      pass
-
-   # ...............................................
-   def _cleanVal(self, val):
-      val = val.strip()
-      if val.lower() in PROHIBITED_VALS:
-         val = ''
-      return val
    # ...............................................
    def createBisonLine(self, vline, iline):
       """
-      @param verbLine: A CSV record of original provider DarwinCore occurrence data 
-      @param intLine: A CSV record of GBIF-interpreted DarwinCore occurrence data 
+      @param vline: A CSV record of original provider DarwinCore occurrence data 
+      @param iline: A CSV record of GBIF-interpreted DarwinCore occurrence data 
       """
-      rec = {}
-      gbifID = vline[0]
-      lon = lat = cntry = None
-      for fldname, meta in self.fldMeta.iteritems():
-         # get column Index in correct file
-         if meta['version'] == VERBATIM:
-            try:
-               val = vline[self.fldMeta[fldname][VERBATIM]]
-            except KeyError, e:
-               print'{} not in VERBATIM data, using INTERPRETED'.format(fldname) 
-               val = iline[self.fldMeta[fldname][INTERPRETED]]
-         else:
-            try:
-               val = iline[self.fldMeta[fldname][INTERPRETED]]
-            except KeyError, e:
-               print'{} not in INTERPRETED data, using VERBATIM'.format(fldname) 
-               val = vline[self.fldMeta[fldname][VERBATIM]]
-
-         # Replace N/A
-         if val.lower() in PROHIBITED_VALS:
-            val = ''
-            print('gbifID {}: Field {}, val {} prohibited'
-                  .format(gbifID, fldname, val)) 
-         # delete records with no canonical name
-         if fldname == 'taxonKey':
-            val = self._getCanonicalName(val)
-            if val is None:
-               print('gbifID {}: Field {}, val {} does not contain canonical'
-                     .format(gbifID, fldname, val)) 
-               return []
-            else:
-               rec['canonicalName'] = val
-         # Compute? providerID
-         elif fldname == 'publisher':
-               rec['providerID'] = val
-         # Compute? resourceID
-         elif fldname == 'datasetKey':
-               rec['resourceID'] = val
-         # delete absence records
-         elif fldname == 'occurrenceStatus':
-            if val.lower() == 'absent':
-               print('gbifID {}: Field {}, val {} is absence data'
-                     .format(gbifID, fldname, val)) 
-               return []
-         # simplify basisOfRecord terms
-         elif fldname == 'basisOfRecord':
-            if val in TERM_CONVERT.keys():
-               val = TERM_CONVERT[val]
-               print('gbifID {}: Field {}, val {} converted'
-                     .format(gbifID, fldname, val)) 
-         # Convert year to integer
-         elif fldname == 'year':
-            try:
-               val = int(val)
-            except:
-               print('gbifID {}: Field {}, val {} is not an integer'
-                     .format(gbifID, fldname, val)) 
-               val = None
-         # check Long/Lat fields
-         elif fldname == 'countryCode':
-            cntry = val
-         elif fldname == 'decimalLongitude':
-            lon = float(val)
-         elif fldname == 'decimalLatitude':
-            lat = float(val)
-         # Save modified val
-         if fldname not in ('decimalLongitude', 'decimalLatitude', 'taxonKey',
-                            'publisher', 'datasetKey'):
-            rec[fldname] = val
-         
-      lon, lat = self._getPoint(lon, lat, cntry)
-      rec['decimalLongitude'] = lon
-      rec['decimalLatitude'] = lat
-      # create the ordered row
       row = []
+      rec = {}
+      gbifID = iline[0]
+      for fldname, meta in self.fldMeta.iteritems():
+         val = self._getValFromCorrectLine(fldname, meta, vline, iline)
+         fldname, val = self._updateFieldOrSignalRemove(gbifID, fldname, val)
+         if fldname is None:
+            return row
+         else:
+            rec[fldname] = val
+
+      # If publisher is missing from record, use API to get from datasetKey
+      self._fillPublisher(rec)
+
+      # Modify lat/lon vals if necessary
+      self._updatePoint(rec)
+      
+      # Ignore record without canonicalName
+      canName = self._getCanonical(rec)
+      if canName is None:
+         return row
+         
+      # Ignore absence record 
+      if rec['occurrenceStatus'].lower() == 'absent':
+         print('gbifID {}: Field {}, val {} is absence data'
+               .format(gbifID, fldname, val)) 
+         return row
+      
+      # create the ordered row
       for fld in ORDERED_OUT_FIELDS:
          try:
             row.append(rec[fld])
          except KeyError, e:
             row.append('')
       return row
-   
+         
    # ...............................................
-   def extractData(self):      
+   def extractData(self):
       if self.isOpen():
          self.close()
       try:
@@ -380,7 +481,28 @@ class GBIFReader(object):
                      .format(vRecno, iRecno, vline[0], iline[0]))
       finally:
          self.close()
+
+   # ...............................................
+   def extractDataFromInterpreted(self):      
+      if self.isOpen():
+         self.close()
+      try:
+         self.openInterpreted()
+         iRecno = 1
          
+         self._outWriter.writerow(ORDERED_OUT_FIELDS)
+         while (self._iCsvreader is not None and iRecno < 500):
+            # Get interpreted record
+            iline, iRecno = self.getLine(self._iCsvreader, iRecno)
+            if iline is None:
+               break
+            coreId = iline[0]
+            # Create new record
+            byline = self.createBisonLineFromInterpreted(iline)
+            self._outWriter.writerow(byline)
+      finally:
+         self.close()
+
 # ...............................................
 if __name__ == '__main__':
    subdir = SUBDIRS[0]
@@ -389,7 +511,8 @@ if __name__ == '__main__':
    outFname = os.path.join(DATAPATH, subdir, OUT_BISON)
    datasetPath = os.path.join(DATAPATH, subdir, DATASET_DIR) 
    gr = GBIFReader(verbatimFname, interpFname, META_FNAME, outFname, datasetPath)
-   gr.extractData()
+   gr.extractDataFromInterpreted()
+#    gr.extractData()
    
    
 """
@@ -401,36 +524,52 @@ import xml.etree.ElementTree as ET
 from src.gbif.gbif2bison import *
 from src.gbif.constants import *
 from src.gbif.gbifapi import GBIFCodes
+from src.gbif.gbif2bison import GBIFReader
 
 subdir = SUBDIRS[0]
 interpFname = os.path.join(DATAPATH, subdir, INTERPRETED)
 verbatimFname = os.path.join(DATAPATH, subdir, VERBATIM)
-outFname = os.path.join(DATAPATH, subdir, 'outBison.csv')
+outFname = os.path.join(DATAPATH, subdir, OUT_BISON)
 datasetPath = os.path.join(DATAPATH, subdir, DATASET_DIR)
 
 gr = GBIFReader(verbatimFname, interpFname, META_FNAME, outFname, datasetPath)
-gr.open()
-
-outWriter, outf = gr.getCSVWriter(gr.outFname, DELIMITER)
-outWriter.writerow(ORDERED_OUT_FIELDS)
 
 
-vRecno = iRecno = 1
-for i in range(35):
-   vline, vRecno = gr.getLine(gr._vCsvreader, vRecno)
-   iline, iRecno = gr.getLine(gr._iCsvreader, iRecno)
-   byline = gr.createBisonData(vline, iline)
-   outWriter.writerow(byline)
+gr.openInterpreted()
+fm = gr.fldMeta
+iRecno = 1
 
-vline, vRecno = gr.getLine(gr._vCsvreader, vRecno)
 iline, iRecno = gr.getLine(gr._iCsvreader, iRecno)
-byrow = gr.createBisonData(vline, iline)
-brow = outWriter.writerow(byline)
+rec = {}
+gbifID = iline[0]
+for fldname, (idx, dtype) in gr.fldMeta.iteritems():
+   print
+   print fldname
+   val = iline[idx]
+   fldname, val = gr._updateFieldOrSignalRemove(gbifID, fldname, val)
+   if fldname is None:
+      print('Removed with bad field')
+   else:
+      rec[fldname] = val
+      print fldname, val
+      
+gr._fillPublisher(rec)
+gr._updatePoint(rec)
+canName = self._getCanonical(rec)
+if canName is None:
+   print('gbifID {}: Field {}, val {} is absence data'
+         .format(gbifID, fldname, val)) 
 
-currmeta = fnameElt.text
+ 
+if rec['occurrenceStatus'].lower() == 'absent':
+   print('gbifID {}: Field {}, val {} is absence data'
+         .format(gbifID, fldname, val)) 
 
 
-gr.extractData()
+
+# byline = self.createBisonLineFromInterpreted(iline)
+
+# gr.extractData()
 
 """
    
