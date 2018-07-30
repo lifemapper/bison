@@ -158,12 +158,9 @@ class GBIFReader(object):
          print('gbifID {}: Field {}, val {} prohibited'
                .format(gbifID, fldname, val)) 
          
-      # Get providerID, remove if BISON UUID
+      # Get providerID
       elif fldname == 'publisher':
          fldname = 'providerID'
-         if val == BISON_UUID:
-            print ('Found BISON publisher')
-            fldname = val = None
 
       # Get resourceID
       elif fldname == 'datasetKey':
@@ -392,10 +389,11 @@ class GBIFReader(object):
             rec[fldname] = val
             
       # If publisher is missing from record, use API to get from datasetKey
+      # Ignore BISON records 
       self._fillPublisher(rec)
-
-      # Modify lat/lon vals if necessary
-      self._updatePoint(rec)
+      if rec['providerID'] == BISON_UUID:
+         print ('Found BISON publisher')
+         return row
 
       # Ignore absence record 
       if rec['occurrenceStatus'].lower() == 'absent':
@@ -407,6 +405,9 @@ class GBIFReader(object):
       canName = self._getCanonical(rec)
       if canName is None:
          return row
+
+      # Modify lat/lon vals if necessary
+      self._updatePoint(rec)
       
       # create the ordered row
       for fld in ORDERED_OUT_FIELDS:
