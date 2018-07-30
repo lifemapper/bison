@@ -40,7 +40,7 @@ class GBIFReader(object):
       """
       @summary: Constructor
       """
-      self.codeResolver = GBIFCodes()
+      self.gbifRes = GBIFCodes()
       self.verbatimFname = verbatimFname
       self.interpFname = interpretedFname
       self.outFname = outFname
@@ -129,7 +129,7 @@ class GBIFReader(object):
             pubId = self._datasetPubs[datasetKey]
          except:
             if datasetKey is not None:
-               pubID = self.codeResolver.getProviderFromDatasetKey(datasetKey)
+               pubID = self.gbifRes.getProviderFromDatasetKey(datasetKey)
                self._datasetPubs[datasetKey] = pubID
          rec['providerID'] = pubID
 
@@ -138,15 +138,16 @@ class GBIFReader(object):
       # Try from scientificName first, then taxonKey
       canName = None
       try:
-         canName = self.codeResolver.resolveCanonicalFromScientific(rec['scientificName'])
+         canName = self.gbifRes.resolveCanonicalFromScientific(rec['scientificName'])
+         print('gbifID {}: Canonical {} from scientificName'
+               .format(rec['gbifID'], canName)) 
       except:
-         print('gbifID {}: Could not get canonical'
-               .format(rec['gbifID'])) 
          try:
-            canName = self.codeResolver.resolveCanonicalFromTaxonKey(rec['taxonKey'])
+            canName = self.gbifRes.resolveCanonicalFromTaxonKey(rec['taxonKey'])
+            print('gbifID {}: Canonical {} from taxonKey'
+                  .format(rec['gbifID'], canName)) 
          except:
-            print('gbifID {}: Could not get canonical from taxonKey {}'
-                  .format(rec['gbifID'], rec['taxonKey'])) 
+            print('gbifID {}: Failed to get canonical'.format(rec['gbifID'])) 
       return canName
 
    # ...............................................
@@ -382,7 +383,7 @@ class GBIFReader(object):
       row = []
       gbifID = iline[0]
       for fldname, (idx, dtype) in self.fldMeta.iteritems():
-         val = iline[idx]
+         val = iline[idx].strip()
 
          fldname, val = self._updateFieldOrSignalRemove(gbifID, fldname, val)
          if fldname is None:
@@ -395,16 +396,16 @@ class GBIFReader(object):
 
       # Modify lat/lon vals if necessary
       self._updatePoint(rec)
-      
-      # Ignore record without canonicalName
-      canName = self._getCanonical(rec)
-      if canName is None:
-         return row
-         
+
       # Ignore absence record 
       if rec['occurrenceStatus'].lower() == 'absent':
          print('gbifID {}: Field {}, val {} is absence data'
                .format(gbifID, fldname, val)) 
+         return row
+      
+      # Ignore record without canonicalName
+      canName = self._getCanonical(rec)
+      if canName is None:
          return row
       
       # create the ordered row
@@ -439,17 +440,17 @@ class GBIFReader(object):
       # Modify lat/lon vals if necessary
       self._updatePoint(rec)
       
-      # Ignore record without canonicalName
-      canName = self._getCanonical(rec)
-      if canName is None:
-         return row
-         
       # Ignore absence record 
       if rec['occurrenceStatus'].lower() == 'absent':
          print('gbifID {}: Field {}, val {} is absence data'
                .format(gbifID, fldname, val)) 
          return row
-      
+
+      # Ignore record without canonicalName
+      canName = self._getCanonical(rec)
+      if canName is None:
+         return row
+               
       # create the ordered row
       for fld in ORDERED_OUT_FIELDS:
          try:
@@ -506,7 +507,8 @@ class GBIFReader(object):
 # ...............................................
 if __name__ == '__main__':
    subdir = SUBDIRS[0]
-   interpFname = os.path.join(DATAPATH, subdir, INTERPRETED)
+#    interpFname = os.path.join(DATAPATH, subdir, INTERPRETED)
+   interpFname = os.path.join(DATAPATH, subdir, 'interpretedTerritories500.csv')
    verbatimFname = os.path.join(DATAPATH, subdir, VERBATIM)
    outFname = os.path.join(DATAPATH, subdir, OUT_BISON)
    datasetPath = os.path.join(DATAPATH, subdir, DATASET_DIR) 

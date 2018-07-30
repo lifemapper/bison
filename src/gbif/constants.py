@@ -31,7 +31,7 @@ LOGFILE_BACKUP_COUNT = 5
 
 INTERPRETED = 'tidy_occurrence.csv'
 VERBATIM = 'tidy_verbatim.csv'
-OUT_BISON = 'outBison.txt'
+OUT_BISON = 'outBison.csv'
 
 NO_OUTPUT = None
 COMPUTED = None
@@ -99,8 +99,7 @@ SAVE_FIELDS = {
 
 
 ORDERED_OUT_FIELDS = [
-   'gbifID', 
-   'canonicalName', 'canonicalNameFromTaxonKey', 'canonicalNameFromSciname', 
+   'gbifID', 'canonicalName',  
    'basisOfRecord', 'eventDate', 'year', 
    'verbatimEventDate', 'institutionCode', 'institutionId', 
    'ownerInstitutionCode', 'collectionID', 'occurrenceID', 'catalogNumber', 
