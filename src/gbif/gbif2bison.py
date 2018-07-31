@@ -51,18 +51,37 @@ class GBIFReader(object):
              datasets referenced in occurrence records.
       """
       self.gbifRes = GBIFCodes()
-      self.verbatimFname = verbatimFname
+      # Interpreted GBIF occurrence file
       self.interpFname = interpretedFname
-      self.outFname = outFname
-      self._datasetPubs = {}
-      self._datasetPath = datasetPath
       self._if = None
-      self._vf = None
       self._iCsvreader = None
+      # Verbatim GBIF occurrence file
+      self.verbatimFname = verbatimFname
+      self._vf = None
       self._vCsvreader = None
+      # Output BISON occurrence file
+      self.outFname = outFname
+      self._outf = None
+      self._outWriter = None
+      pth = os.path.abspath(outFname)
+      # Output Canonical name lookup file
+      self.outCanonicalFname = os.path.join(pth, 'canonicalLookup.csv')
+      self._outcf = None
+      self._outCanWriter = None
+      # Output Provider UUID lookup file
+      self.outProviderFname = os.path.join(pth, 'providerLookup.csv')
+      self._outpf = None
+      self._outProvWriter = None
+      # GBIF metadata file for occurrence files
       self._metaFname = metaFname
+      # Path to GBIF provided dataset metadata files
+      self._datasetPath = datasetPath
+
+      self._datasetPubs = {}
+
       self.fldMeta = None
       self.dsMeta = {}
+      self._files = [self._if, self._vf, self._outf, self._outcf, self._outpf]
       
    # ...............................................
    def _cleanVal(self, val):
@@ -145,12 +164,14 @@ class GBIFReader(object):
       pubID = rec['providerID']
       if pubID is None or pubID == '':
          try: 
-            pubId = self._datasetPubs[datasetKey]
+            pubID = self._datasetPubs[datasetKey]
          except:
             if datasetKey is not None:
                pubID = self.gbifRes.getProviderFromDatasetKey(datasetKey)
                self._datasetPubs[datasetKey] = pubID
-         rec['providerID'] = pubID
+               rec['providerID'] = pubID
+      provValues = [datasetKey, pubID]
+      self._outProvWriter.writerow(provValues)
 
    # ...............................................
    def _updateYear(self, rec):
@@ -176,19 +197,23 @@ class GBIFReader(object):
       @todo: Save file(s?) with 'gbifID, scientificName, taxonKey, canonicalName' 
              to minimize re-queries on the same species or re-run.
       """
-      canName = None
+      canName = sciname = taxkey = None
       try:
-         canName = self.gbifRes.resolveCanonicalFromScientific(rec['scientificName'])
+         sciname = rec['scientificName']
+         canName = self.gbifRes.resolveCanonicalFromScientific(sciname)
          print('gbifID {}: Canonical {} from scientificName'
                .format(rec['gbifID'], canName)) 
       except:
          try:
-            canName = self.gbifRes.resolveCanonicalFromTaxonKey(rec['taxonKey'])
+            taxkey = rec['taxonKey']
+            canName = self.gbifRes.resolveCanonicalFromTaxonKey(taxkey)
             print('gbifID {}: Canonical {} from taxonKey'
                   .format(rec['gbifID'], canName)) 
          except:
             print('gbifID {}: Failed to get canonical'.format(rec['gbifID']))
       rec['canonicalName'] = canName
+      canonicalValues = [sciname, taxkey, canName]
+      self._outCanWriter.writerow(canonicalValues)
 
    # ...............................................
    def _updateFieldOrSignalRemove(self, gbifID, fldname, val):
@@ -249,30 +274,24 @@ class GBIFReader(object):
       '''
       @summary: Read and populate metadata, open datafiles for reading, output
                 files for writing
-      @todo: Save canonicalNames into a file to avoid querying repeatedly.
+      @todo: Save canonicalNames and provider UUIDs into a file to avoid 
+             querying repeatedly.
       '''
-      self.fldMeta = self.getFieldMeta()
-      
-      (self._iCsvreader, 
-       self._if) = getCSVReader(self.interpFname, DELIMITER)
+      self.openInterpreted()
        
       (self._vCsvreader, 
        self._vf)  = getCSVReader(self.verbatimFname, DELIMITER)
        
-      (self._outWriter, 
-       self._outf) = getCSVWriter(self.outFname, DELIMITER)
-
-       
       # Pull the header row from each file, we use metadata for field indices
       _ = self.getLine(self._vCsvreader, 0)
-      _ = self.getLine(self._iCsvreader, 0)
    
    # ...............................................
    def openInterpreted(self):
       '''
       @summary: Read and populate metadata, open datafiles for reading, output
                 files for writing
-      @todo: Save canonicalNames into a file to avoid querying repeatedly.
+      @todo: Save canonicalNames and provider UUIDs into a file to avoid 
+             querying repeatedly.
       '''
       self.fldMeta = self.getFieldMetaFromInterpreted()
       
@@ -281,7 +300,13 @@ class GBIFReader(object):
        
       (self._outWriter, 
        self._outf) = getCSVWriter(self.outFname, DELIMITER)
-
+       
+      (self._outCanWriter, 
+       self._outcf) = getCSVWriter(self.outCanonicalFname, DELIMITER)
+       
+       
+      (self._outProvWriter, 
+       self._outpf) = getCSVWriter(self.outProviderFname, DELIMITER)
        
       # Pull the header row 
       _ = self.getLine(self._iCsvreader, 0)
@@ -291,10 +316,9 @@ class GBIFReader(object):
       """
       @summary: Return true if any files are open.
       """
-      if ((not self._if is None and not self._if.closed) or 
-          (not self._vf is None and self._vf.closed) or
-          (not self._outf is None and self._outf.closed)):
-         return True
+      for f in self._files:
+         if not f is None and not f.closed:
+            return True
       return False
 
    # ...............................................
@@ -302,18 +326,11 @@ class GBIFReader(object):
       '''
       @summary: Close input datafiles and output file
       '''
-      try:
-         self._if.close()
-      except Exception, e:
-         pass
-      try:
-         self._vf.close()
-      except Exception, e:
-         pass
-      try:
-         self._outf.close()
-      except Exception, e:
-         pass
+      for f in self._files:
+         try:
+            f.close()
+         except Exception, e:
+            pass
 
    # ...............................................
    def getLine(self, csvreader, recno):

@@ -36,10 +36,15 @@ OUT_BISON = 'outBison.csv'
 NO_OUTPUT = None
 COMPUTED = None
 
-TERM_CONVERT = {'humanObservation': 'observation', 
-                'machineObservation': 'observation',
-                'preservedSpecimen': 'specimen', 
-                'fossilSpecimen': 'specimen'}
+TERM_CONVERT = {'FOSSIL_SPECIMEN': 'fossil',
+                'LITERATURE': 'literature',
+                'LIVING_SPECIMEN': 'living',
+                'HUMAN_OBSERVATION': 'observation',
+                'MACHINE_OBSERVATION': 'observation',
+                'OBSERVATION': 'observation',
+                'MATERIAL_SAMPLE': 'specimen',
+                'PRESERVED_SPECIMEN': 'specimen',
+                'UNKNOWN': 'unknown'}
 
 # Test these against lowercase values
 PROHIBITED_VALS = ['na', '#na', 'n/a']
