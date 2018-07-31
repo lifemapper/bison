@@ -39,6 +39,16 @@ class GBIFReader(object):
    def __init__(self, verbatimFname, interpretedFname, metaFname, outFname, datasetPath):
       """
       @summary: Constructor
+      @param verbatimFname: Full filename containing records from the GBIF 
+             verbatim occurrence table
+      @param interpretedFname: Full filename containing records from the GBIF 
+             interpreted occurrence table
+      @param metaFname: Full filename containing metadata for all data files in the 
+             Darwin Core GBIF Occurrence download:
+                https://www.gbif.org/occurrence/search
+      @param outFname: Full filename for the output BISON CSV file
+      @param datasetPath: Directory containing individual files describing 
+             datasets referenced in occurrence records.
       """
       self.gbifRes = GBIFCodes()
       self.verbatimFname = verbatimFname
@@ -57,6 +67,7 @@ class GBIFReader(object):
    # ...............................................
    def _cleanVal(self, val):
       val = val.strip()
+      # TODO: additional conversion of unicode?
       if val.lower() in PROHIBITED_VALS:
          val = ''
       return val
@@ -64,6 +75,8 @@ class GBIFReader(object):
    # ...............................................
    def _getValFromCorrectLine(self, fldname, meta, vline, iline):
       """
+      @summary: IFF gathering values from separate lines (matched on gbifID)
+                use metadata to pull the value from the indicated line.
       @param fldname: field name 
       @param meta: tuple including datatype and INTERPRETED or VERBATIM 
                    identifier for file to pull value from
@@ -90,6 +103,11 @@ class GBIFReader(object):
 
    # ...............................................
    def _updatePoint(self, rec):
+      """
+      @summary: Update the decimal longitude and latitude, replacing 0,0 with 
+                None, None and ensuring that US points have a negative longitude.
+      @param rec: dictionary of all fieldnames and values for this record
+      """
       try:
          rec['decimalLongitude']
       except:
@@ -118,9 +136,10 @@ class GBIFReader(object):
    # ...............................................
    def _fillPublisher(self, rec):
       """
-      @summary: If publisher is missing from record, use API to get from 
-               datasetKey.  Save values in a dictionary to avoid re-querying
-               same values.
+      @summary: Fill missing publisher/providerID by querying the GBIF API 
+               for this datasetKey.  Save retrieved values in a dictionary to 
+               avoid re-querying the same datasetKeys.
+      @param rec: dictionary of all fieldnames and values for this record
       """
       datasetKey = rec['resourceID']
       pubID = rec['providerID']
@@ -134,8 +153,29 @@ class GBIFReader(object):
          rec['providerID'] = pubID
 
    # ...............................................
+   def _updateYear(self, rec):
+      """
+      @todo: This function does not yet fill values
+      @summary: Update missing year values by extracting it from the eventDate.
+      @param rec: dictionary of all fieldnames and values for this record
+      """
+      if rec['year'] is None:
+         dt = rec['eventDate']
+         if dt is not None and dt != '':
+            print('Event date is {}!'.format(dt))
+            
+
+   # ...............................................
    def _getCanonical(self, rec):
-      # Try from scientificName first, then taxonKey
+      """
+      @summary: Fill canonicalName by querying the GBIF API. First use the
+                scientificName in the GBIF name parser.  If that fails, 
+                query the GBIF species API with the taxonKey.
+      @param rec: dictionary of all fieldnames and values for this record
+      @note: The name parser fails on unicode namestrings
+      @todo: Save file(s?) with 'gbifID, scientificName, taxonKey, canonicalName' 
+             to minimize re-queries on the same species or re-run.
+      """
       canName = None
       try:
          canName = self.gbifRes.resolveCanonicalFromScientific(rec['scientificName'])
@@ -147,11 +187,18 @@ class GBIFReader(object):
             print('gbifID {}: Canonical {} from taxonKey'
                   .format(rec['gbifID'], canName)) 
          except:
-            print('gbifID {}: Failed to get canonical'.format(rec['gbifID'])) 
-      return canName
+            print('gbifID {}: Failed to get canonical'.format(rec['gbifID']))
+      rec['canonicalName'] = canName
 
    # ...............................................
    def _updateFieldOrSignalRemove(self, gbifID, fldname, val):
+      """
+      @summary: Update fields with any BISON-requested changed, or signal 
+                to remove the record by returning None for fldname and val.
+      @param gbifID: GBIF identifier for this record, used just for logging
+      @param fldname: Fieldname in current record
+      @param val: Value for this field in current record
+      """
       # Replace N/A
       if val.lower() in PROHIBITED_VALS:
          val = ''
@@ -200,7 +247,9 @@ class GBIFReader(object):
    # ...............................................
    def open(self):
       '''
-      @summary: Read metadata and open datafiles for reading
+      @summary: Read and populate metadata, open datafiles for reading, output
+                files for writing
+      @todo: Save canonicalNames into a file to avoid querying repeatedly.
       '''
       self.fldMeta = self.getFieldMeta()
       
@@ -221,7 +270,9 @@ class GBIFReader(object):
    # ...............................................
    def openInterpreted(self):
       '''
-      @summary: Read metadata and open datafiles for reading
+      @summary: Read and populate metadata, open datafiles for reading, output
+                files for writing
+      @todo: Save canonicalNames into a file to avoid querying repeatedly.
       '''
       self.fldMeta = self.getFieldMetaFromInterpreted()
       
@@ -238,17 +289,18 @@ class GBIFReader(object):
    # ...............................................
    def isOpen(self):
       """
-      @note: returns True if either is open
+      @summary: Return true if any files are open.
       """
       if ((not self._if is None and not self._if.closed) or 
-          (not self._vf is None and self._vf.closed)):
+          (not self._vf is None and self._vf.closed) or
+          (not self._outf is None and self._outf.closed)):
          return True
       return False
 
    # ...............................................
    def close(self):
       '''
-      @summary: Close input datafiles
+      @summary: Close input datafiles and output file
       '''
       try:
          self._if.close()
@@ -359,7 +411,7 @@ class GBIFReader(object):
       return fields
 
 #    # ...............................................
-#    def getDatasetMeta(self, uuid):
+#    def getDatasetTitle(self, uuid):
 #       '''
 #       @summary: Read metadata for dataset with this uuid
 #       '''
@@ -371,16 +423,52 @@ class GBIFReader(object):
 #       return title
       
    # ...............................................
+   def _updateFilterRec(self, rec):
+      """
+      @summary: Update record with all BISON-requested changes, or remove 
+                the record by setting it to None.
+      @param rec: dictionary of all fieldnames and values for this record
+      """
+      gbifID = rec['gbifID']
+      # If publisher is missing from record, use API to get from datasetKey
+      # Ignore BISON records 
+      self._fillPublisher(rec)
+      if rec['providerID'] == BISON_UUID:
+         print ('gbifID {} from BISON publisher'.format(gbifID))
+         rec = None
+
+      # Ignore absence record 
+      if rec and rec['occurrenceStatus'].lower() == 'absent':
+         print('gbifID {} is absence data'.format(gbifID)) 
+         rec = None
+      
+      if rec:
+         self._updateYear(rec)
+         
+         # Ignore record without canonicalName
+         self._getCanonical(rec)
+         if rec['canonicalName'] is None:
+            rec = None
+
+      if rec:
+         # Modify lat/lon vals if necessary
+         self._updatePoint(rec)
+
+   # ...............................................
    def createBisonLineFromInterpreted(self, iline):
       """
-      @param vline: A CSV record of original provider DarwinCore occurrence data 
-      @param iline: A CSV record of GBIF-interpreted DarwinCore occurrence data 
+      @summary: Create a list of values, ordered by BISON-requested fields in 
+                ORDERED_OUT_FIELDS, with individual values and/or entire record
+                modified according to BISON needs.
+      @param iline: A CSV record of GBIF-interpreted DarwinCore occurrence data
+      @return: list of ordered fields containing BISON-interpreted values for 
+               a single GBIF occurrence record. 
       """
-      rec = {}
       row = []
       gbifID = iline[0]
+      rec = {'gbifID': gbifID}
       for fldname, (idx, dtype) in self.fldMeta.iteritems():
-         val = iline[idx].strip()
+         val = self._cleanVal(iline[idx])
 
          fldname, val = self._updateFieldOrSignalRemove(gbifID, fldname, val)
          if fldname is None:
@@ -388,41 +476,29 @@ class GBIFReader(object):
          else:
             rec[fldname] = val
             
-      # If publisher is missing from record, use API to get from datasetKey
-      # Ignore BISON records 
-      self._fillPublisher(rec)
-      if rec['providerID'] == BISON_UUID:
-         print ('Found BISON publisher')
-         return row
-
-      # Ignore absence record 
-      if rec['occurrenceStatus'].lower() == 'absent':
-         print('gbifID {}: Field {}, val {} is absence data'
-               .format(gbifID, fldname, val)) 
-         return row
+      # Update values and/or filter record out
+      self._updateFilterRec(rec)
       
-      # Ignore record without canonicalName
-      canName = self._getCanonical(rec)
-      if canName is None:
-         return row
-
-      # Modify lat/lon vals if necessary
-      self._updatePoint(rec)
-      
-      # create the ordered row
-      for fld in ORDERED_OUT_FIELDS:
-         try:
-            row.append(rec[fld])
-         except KeyError, e:
-            row.append('')
+      if rec:
+         # create the ordered row
+         for fld in ORDERED_OUT_FIELDS:
+            try:
+               row.append(rec[fld])
+            except KeyError, e:
+               row.append('')
 
       return row
    
    # ...............................................
    def createBisonLine(self, vline, iline):
       """
+      @summary: Create a list of values, ordered by BISON-requested fields in 
+                ORDERED_OUT_FIELDS, with individual values and/or entire record
+                modified according to BISON needs.
       @param vline: A CSV record of original provider DarwinCore occurrence data 
-      @param iline: A CSV record of GBIF-interpreted DarwinCore occurrence data 
+      @param iline: A CSV record of GBIF-interpreted DarwinCore occurrence data
+      @return: list of ordered fields containing BISON-interpreted values for 
+               a single GBIF occurrence record. 
       """
       row = []
       rec = {}
@@ -435,33 +511,30 @@ class GBIFReader(object):
          else:
             rec[fldname] = val
 
-      # If publisher is missing from record, use API to get from datasetKey
-      self._fillPublisher(rec)
-
-      # Modify lat/lon vals if necessary
-      self._updatePoint(rec)
+      # Update values and/or filter record out
+      self._updateFilterRec(rec)
       
-      # Ignore absence record 
-      if rec['occurrenceStatus'].lower() == 'absent':
-         print('gbifID {}: Field {}, val {} is absence data'
-               .format(gbifID, fldname, val)) 
-         return row
+      if rec:
+         # create the ordered row
+         for fld in ORDERED_OUT_FIELDS:
+            try:
+               row.append(rec[fld])
+            except KeyError, e:
+               row.append('')
 
-      # Ignore record without canonicalName
-      canName = self._getCanonical(rec)
-      if canName is None:
-         return row
-               
-      # create the ordered row
-      for fld in ORDERED_OUT_FIELDS:
-         try:
-            row.append(rec[fld])
-         except KeyError, e:
-            row.append('')
       return row
          
    # ...............................................
    def extractData(self):
+      """
+      @summary: Create a CSV file containing GBIF occurrence records extracted 
+                from the verbatim and interpreted occurrence files provided 
+                from an Occurrence Download, in Darwin Core format.  Records 
+                are assembled by matching gbifIDs from each file, and pulling 
+                some values from each file. Values may be modified and records 
+                may be discarded according to BISON requests.
+      @return: A CSV file of BISON-modified records from a GBIF download. 
+      """
       if self.isOpen():
          self.close()
       try:
@@ -485,7 +558,15 @@ class GBIFReader(object):
          self.close()
 
    # ...............................................
-   def extractDataFromInterpreted(self):      
+   def extractDataFromInterpreted(self):
+      """
+      @summary: Create a CSV file containing GBIF occurrence records extracted 
+                from the interpreted occurrence file provided 
+                from an Occurrence Download, in Darwin Core format.  Values may
+                be modified and records may be discarded according to 
+                BISON requests.
+      @return: A CSV file of BISON-modified records from a GBIF download. 
+      """
       if self.isOpen():
          self.close()
       try:
@@ -493,7 +574,7 @@ class GBIFReader(object):
          iRecno = 1
          
          self._outWriter.writerow(ORDERED_OUT_FIELDS)
-         while (self._iCsvreader is not None and iRecno < 500):
+         while (self._iCsvreader is not None and iRecno <= 500):
             # Get interpreted record
             iline, iRecno = self.getLine(self._iCsvreader, iRecno)
             if iline is None:
@@ -501,7 +582,8 @@ class GBIFReader(object):
             coreId = iline[0]
             # Create new record
             byline = self.createBisonLineFromInterpreted(iline)
-            self._outWriter.writerow(byline)
+            if byline:
+               self._outWriter.writerow(byline)
       finally:
          self.close()
 
@@ -556,19 +638,9 @@ for fldname, (idx, dtype) in gr.fldMeta.iteritems():
       rec[fldname] = val
       print fldname, val
       
-gr._fillPublisher(rec)
-gr._updatePoint(rec)
-canName = self._getCanonical(rec)
-if canName is None:
-   print('gbifID {}: Field {}, val {} is absence data'
-         .format(gbifID, fldname, val)) 
+gr._updateFilterRec(rec)
 
- 
-if rec['occurrenceStatus'].lower() == 'absent':
-   print('gbifID {}: Field {}, val {} is absence data'
-         .format(gbifID, fldname, val)) 
-
-
+gr.close()
 
 # byline = self.createBisonLineFromInterpreted(iline)
 
