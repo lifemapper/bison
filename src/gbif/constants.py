@@ -29,9 +29,13 @@ LOGFILE_MAX_BYTES = 52000000
 LOGFILE_BACKUP_COUNT = 5
 
 
-INTERPRETED = 'tidy_occurrence.csv'
-VERBATIM = 'tidy_verbatim.csv'
-OUT_BISON = 'outBison.csv'
+# INTERPRETED = 'tidy_occurrence.csv'
+INTERPRETED = 'occurrence_lines_500-1500'
+VERBATIM = 'tidy_verbatim'
+OUT_BISON = 'outBison'
+
+SUBSET_PREFIX = '_lines_'
+CSV_EXT = '.csv'
 
 NO_OUTPUT = None
 COMPUTED = None
@@ -46,23 +50,25 @@ TERM_CONVERT = {'FOSSIL_SPECIMEN': 'fossil',
                 'PRESERVED_SPECIMEN': 'specimen',
                 'UNKNOWN': 'unknown'}
 
+
 # Test these against lowercase values
 PROHIBITED_VALS = ['na', '#na', 'n/a']
 
 SAVE_FIELDS = {
    # pull canonical name from API and taxonKey
    'gbifID': (str, INTERPRETED),
-   # pull canonical name from API and taxonKey
-   'taxonKey': (NO_OUTPUT, INTERPRETED),
-   'canonicalName': (str, COMPUTED),
+   # pull canonical name from GBIF parser API and scientificName 
+   #      or species API and taxonKey
    'scientificName': (str, INTERPRETED),
+   'taxonKey': (str, INTERPRETED),
+   'canonicalName': (str, COMPUTED),
     
    'basisOfRecord': (str, INTERPRETED), 
    'eventDate': (str, INTERPRETED), 
    'year': (int, INTERPRETED),
    'verbatimEventDate': (str, INTERPRETED), 
    'institutionCode': (str, INTERPRETED), 
-   'institutionId': (str, INTERPRETED), 
+   'institutionID': (str, INTERPRETED), 
    'ownerInstitutionCode': (str, INTERPRETED),
    'collectionID': (str, INTERPRETED),
    'occurrenceID': (str, INTERPRETED),
@@ -104,14 +110,14 @@ SAVE_FIELDS = {
 
 
 ORDERED_OUT_FIELDS = [
-   'gbifID', 'canonicalName',  
+   'gbifID', 'scientificName', 'taxonKey', 'canonicalName',  
    'basisOfRecord', 'eventDate', 'year', 
-   'verbatimEventDate', 'institutionCode', 'institutionId', 
+   'verbatimEventDate', 'institutionCode', 'institutionID', 
    'ownerInstitutionCode', 'collectionID', 'occurrenceID', 'catalogNumber', 
    'recordedBy', 'recordNumber', 'decimalLatitude', 'decimalLongitude', 
    'elevation', 'depth', 'county', 'higherGeographyID', 'stateProvince', 
-   'providerID', 'resourceID', 'vernacularName', 'kingdom', 'geodeticDatum', 
-   'coordinatePrecision', 'coordinateAccuracy', 'verbatimLocality', 'waterBody', 
+   'providerID', 'resourceID', 'vernacularName', 'kingdom', 
+   'coordinatePrecision', 'verbatimLocality', 'waterBody', 
    'countryCode', 'license', 'occurrenceStatus']
 
 TEST_FIELDS = ['occurrenceStatus', 'decimalLatitude', 'decimalLongitude']

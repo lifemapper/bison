@@ -22,13 +22,18 @@ def getCSVReader(datafile, delimiter):
    return reader, f
 
 # .............................................................................
-def getCSVWriter(datafile, delimiter):
+def getCSVWriter(datafile, delimiter, doAppend=True):
    '''
    @summary: Get a CSV writer that can handle encoding
    '''
    unicodecsv.field_size_limit(sys.maxsize)
+   if doAppend:
+      mode = 'ab'
+   else:
+      mode = 'wb'
+      
    try:
-      f = open(datafile, 'wb') 
+      f = open(datafile, mode) 
       writer = unicodecsv.writer(f, delimiter=delimiter, encoding=ENCODING)
 
    except Exception, e:
