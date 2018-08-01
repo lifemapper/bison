@@ -5,13 +5,16 @@ NAMESPACE = {'tdwg':   'http://rs.tdwg.org/dwc/text/',
              'xsi':    'http://www.w3.org/2001/XMLSchema-instance',
              'dublin': 'http://purl.org/dc/terms/'}
 GBIF_URL = 'http://api.gbif.org/v1'
+# http://api.gbif.org/v1/organization?identifier=362
 BISON_UUID = 'c3ad790a-d426-4ac1-8e32-da61f81f0117'
 ENCODING = 'utf-8'
 
-DATAPATH = '/tank/data/input/bison/'
-SUBDIRS = ('territories', 'us')
+# DATAPATH = '/tank/data/input/bison/'
+DATAPATH = '/state/partition1/data/bison/'
+SUBDIRS = ('terr', 'us')
 DATASET_DIR = 'dataset'
-META_FNAME = '/tank/data/input/bison/us/meta.xml'
+META_FNAME = '/state/partition1/data/bison/terr/meta.xml'
+# META_FNAME = '/tank/data/input/bison/us/meta.xml'
 
 CLIP_CHAR = '/'
 DELIMITER = '\t'
@@ -35,8 +38,8 @@ OUT_BISON = 'outBison'
 CSV_EXT = '.csv'
 SUBSET_PREFIX = '_lines_'
 
-SUBSET = '500-1500'
-# SUBSET = '1500-4000'
+SUBSET = '0-2000'
+
 
 NO_OUTPUT = None
 COMPUTED = None

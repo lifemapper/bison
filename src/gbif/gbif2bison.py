@@ -75,20 +75,21 @@ class GBIFReader(object):
       self._outcf = None
       self._outCanWriter = None
       # Output Provider UUID lookup file
-      self.outProviderFname = os.path.join(pth, 'providerLookup.csv')
-      self._outpf = None
-      self._outProvWriter = None
+      self.outOrgFname = os.path.join(pth, 'providerLookup.csv')
+      self._outof = None
+      self._outOrgWriter = None
       # GBIF metadata file for occurrence files
       self._metaFname = metaFname
       # Path to GBIF provided dataset metadata files
       self._datasetPath = datasetPath
 
-      self._providerLookup = {}
-      self._canonicalLookup = {}
+      self._datasetLookup = {}
+      self._orgLookup = {}
+      self._nameLookup = {}
 
       self.fldMeta = None
       self.dsMeta = {}
-      self._files = [self._if, self._vf, self._outf, self._outcf, self._outpf]
+      self._files = [self._if, self._vf, self._outf, self._outcf, self._outof]
       logname, _ = os.path.splitext(os.path.basename(__file__))
       indataname, _ = os.path.splitext(os.path.basename(interpretedFname))
       logfname = os.path.join(pth, indataname + '.log')
@@ -166,25 +167,50 @@ class GBIFReader(object):
          rec['decimalLongitude'] = rec['decimalLongitude'] * -1 
 
    # ...............................................
-   def _fillPublisher(self, rec):
+   def _fillOrganizationDatasetVals(self, rec):
       """
-      @summary: Fill missing publisher/providerID by querying the GBIF API 
-               for this datasetKey.  Save retrieved values in a dictionary to 
-               avoid re-querying the same datasetKeys.
+      @summary: Fill missing organization and dataset values by querying the 
+               GBIF API using the GBIF UUIDs.  Save retrieved values in 2 
+               dictionaries to avoid re-querying the same UUIDs.
       @param rec: dictionary of all fieldnames and values for this record
+      @note: Save to 2 file(s?) with lines like:
+                 'providerID (aka publisher), provider name/code, provider homepage'
+                 'datasetKey (aka resource), dataset name/code, dataset homepage'
+             to minimize re-queries for matching datasets/organizations and testing.
+      @note: Provider/publisher UUID may be pulled from dataset 
+      @note: Lookup dictionaries are:
+                   {orgUUID: (org name/code, org homepage),
+                    ...}  
+                   {datasetUUID: (dataset name/code, dataset homepage, orgUUID),
+                    ...}        
       """
-      datasetKey = rec['resourceID']
-      pubID = rec['providerID']
-      if pubID is None or pubID == '':
+      datasetUUID = rec['resourceID']
+      orgUUID = rec['providerID']
+      orgUUIDFromDS = ''
+      if datasetUUID != '':
          try: 
-            pubID = self._providerLookup[datasetKey]
+            (dsCode, dsUrl, orgUUIDFromDS) = self._datasetLookup[datasetUUID]
          except:
-            if datasetKey is not None:
-               pubID = self.gbifRes.getProviderFromDatasetKey(datasetKey)
-               self._providerLookup[datasetKey] = pubID
-               provValues = [datasetKey, pubID]
-               self._outProvWriter.writerow(provValues)
-         rec['providerID'] = pubID
+            dsDict = self.gbifRes.resolveDataset(datasetUUID)
+            if dsDict:
+               orgUUIDFromDS = dsDict['publishingOrganizationKey']
+               self._datasetLookup[datasetUUID] = (dsDict['title'], 
+                                                   dsDict['homepage'],
+                                                   orgUUIDFromDS)
+            else:
+               self._log.error('Failed to resolve datasetKey {}'.format(datasetUUID))
+      else:
+         self._log.error('gbifID {}: Missing datasetKey'.format(rec['gbifID']))
+         
+      if orgUUID == '' and orgUUIDFromDS != '':
+         orgUUID = orgUUIDFromDS
+         orgDict = self.gbifRes.resolveOrganization(orgUUID)
+         if orgDict:
+            self._orgLookup[datasetUUID] = (orgDict['title'], 
+                                            orgDict['homepage'])
+      provValues = [datasetKey, pubID]
+      self._outOrgWriter.writerow(provValues)
+         rec['providerID'] = provUrl
 
    # ...............................................
    def _correctDates(self, rec):
@@ -227,18 +253,21 @@ class GBIFReader(object):
                 query the GBIF species API with the taxonKey.
       @param rec: dictionary of all fieldnames and values for this record
       @note: The name parser fails on unicode namestrings
-      @todo: Save file(s?) with 'gbifID, scientificName, taxonKey, canonicalName' 
+      @note: Save to file(s?) with lines like:
+                 'scientificName, taxonKey, canonicalName'
              to minimize re-queries on the same species or re-run.
-      @todo: Lookup first from (file, sorted on gbifid, dictionary?) if possible  
+      @note: Lookup dictionary is {sciname: canonicalName,
+                                   taxonKey: canonicalName,
+                                   ...}  
       """
       canName = sciname = taxkey = None
       try:
          sciname = rec['scientificName']
-         canName = self._canonicalLookup[sciname]
+         canName = self._nameLookup[sciname]
       except:
          try:
             canName = self.gbifRes.resolveCanonicalFromScientific(sciname)
-            self._canonicalLookup[sciname] = canName
+            self._nameLookup[sciname] = canName
             canonicalValues = [sciname, taxkey, canName]
             self._outCanWriter.writerow(canonicalValues)
             self._log.info('gbifID {}: Canonical {} from scientificName'
@@ -246,11 +275,11 @@ class GBIFReader(object):
          except:
             try:
                taxkey = rec['taxonKey']
-               canName = self._canonicalLookup[taxkey]
+               canName = self._nameLookup[taxkey]
             except:
                try:
                   canName = self.gbifRes.resolveCanonicalFromTaxonKey(taxkey)
-                  self._canonicalLookup[taxkey] = canName
+                  self._nameLookup[taxkey] = canName
                   canonicalValues = [sciname, taxkey, canName]
                   self._outCanWriter.writerow(canonicalValues)
                   self._log.info('gbifID {}: Canonical {} from taxonKey'
@@ -384,13 +413,13 @@ class GBIFReader(object):
       # Write the header row 
       self._outWriter.writerow(ORDERED_OUT_FIELDS)
        
-      self._canonicalLookup, self._outCanWriter, self._outcf = \
+      self._nameLookup, self._outCanWriter, self._outcf = \
             self._openForReadWrite(self.outCanonicalFname, numKeys=2,
                         header=['scientificName', 'taxonKey', 'canonicalName'])
             
-      self._providerLookup, self._outProvWriter, self._outpf = \
-            self._openForReadWrite(self.outProviderFname, numKeys=1,
-                        header=['datasetKey', 'providerID'])
+      self._orgLookup, self._outOrgWriter, self._outof = \
+            self._openForReadWrite(self.outOrgFname, numKeys=1,
+                        header=['orgUUID', 'title', 'homepage'])
        
 
    # ...............................................

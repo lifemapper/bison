@@ -55,47 +55,64 @@ class GBIFCodes(object):
       return fval
 
 # ...............................................
-   def resolveDatasetKey(self, dsKey):
-      row = []
+   def resolveDataset(self, dsKey):
+      dataDict = {}
+      # returns GBIF dataset
+      if dsKey == '':
+         return dataDict
+      
       url = '{}/dataset/{}'.format(GBIF_URL, dsKey)
       try:
          response = urllib2.urlopen(url)
       except Exception, e:
-         print ('Failed to resolve datasetKey with {}'.format(url))
-      else:
-         data = json.load(response)
-         legacyid = 'NA'
-         orgkey = title = desc = citation = rights = logourl = homepage = ''
-         if data.has_key('key'):
-            if data.has_key('publishingOrganizationKey'):
-               orgkey = self._saveNLDelCR(data['publishingOrganizationKey'])
-   
-            if (data.has_key('identifiers') 
-                and len(data['identifiers']) > 0 
-                and data['identifiers'][0]['type'] == 'GBIF_PORTAL'):
-               legacyid = data['identifiers'][0]['identifier']
-            
-            if data.has_key('title'):
-               title = self._saveNLDelCR(data['title'])            
-   
-            if data.has_key('description'):
-               desc = self._saveNLDelCR(data['description'])
-            
-            if data.has_key('citation'):
-               citation = self._saveNLDelCR(data['citation']['text'])
-               
-            if data.has_key('rights'):
-               rights = self._saveNLDelCR(data['rights'])
-   
-            if data.has_key('logoUrl'):
-               logourl = data['logoUrl']
-            
-            if data.has_key('homepage'):
-               homepage = data['homepage']
+         print('Failed to resolve URL {}'.format(url))
+         return dataDict
 
-            row = [orgkey, legacyid, data['key'], title, desc, citation, rights, 
-                   logourl, data['created'], data['modified'], homepage]
-      return row
+      data = json.load(response)
+      legacyid = 'NA'
+      orgkey = title = desc = citation = rights = logourl = homepage = ''
+      if data.has_key('key'):
+         if data.has_key('publishingOrganizationKey'):
+            orgkey = self._saveNLDelCR(data['publishingOrganizationKey'])
+            dataDict['publishingOrganizationKey'] = orgkey
+
+         if (data.has_key('identifiers') 
+             and len(data['identifiers']) > 0 
+             and data['identifiers'][0]['type'] == 'GBIF_PORTAL'):
+            legacyid = data['identifiers'][0]['identifier']
+            dataDict['legacyID'] = legacyid
+         
+         if data.has_key('title'):
+            title = self._saveNLDelCR(data['title'])
+            dataDict['title'] = title
+
+         if data.has_key('description'):
+            desc = self._saveNLDelCR(data['description'])
+            dataDict['description'] = desc
+         
+         if data.has_key('citation'):
+            citation = self._saveNLDelCR(data['citation']['text'])
+            dataDict['citation'] = citation
+            
+         if data.has_key('rights'):
+            rights = self._saveNLDelCR(data['rights'])
+            dataDict['rights'] = rights
+
+         if data.has_key('logoUrl'):
+            logourl = data['logoUrl']
+            dataDict['logoUrl'] = logourl
+         
+         if data.has_key('homepage'):
+            homepage = data['homepage']
+            dataDict['homepage'] = homepage
+            
+         dataDict['key'] = data['key']
+         dataDict['created'] = data['created']
+         dataDict['modified'] = data['modified']
+
+#             row = [orgkey, legacyid, data['key'], title, desc, citation, rights, 
+#                    logourl, data['created'], data['modified'], homepage]
+      return dataDict
 
 # ...............................................
    def getProviderFromDatasetKey(self, dsKey):
@@ -197,44 +214,64 @@ class GBIFCodes(object):
          outf.close()
 
 # ...............................................
-   def resolvePublisher(self, publisher):
+   def resolveOrganization(self, orgUUID):
       # returns GBIF providerId
-      row = []
-      url = '{}/organization/{}'.format(GBIF_URL, publisher)
-      response = urllib2.urlopen(url)
+      dataDict = {}
+      if orgUUID == '':
+         return dataDict
+      
+      url = '{}/organization/{}'.format(GBIF_URL, orgUUID)
+      try:
+         response = urllib2.urlopen(url)
+      except Exception, e:
+         print('Failed to resolve URL {}'.format(url))
+         return dataDict
+
       data = json.load(response)
       legacyid = 'NA'
       orgkey = title = desc = citation = rights = logourl = homepage = ''
       if data.has_key('key'):
          if data.has_key('publishingOrganizationKey'):
             orgkey = self._saveNLDelCR(data['publishingOrganizationKey'])
+            dataDict['publishingOrganizationKey'] = orgkey
 
          if (data.has_key('identifiers') 
              and len(data['identifiers']) > 0 
              and data['identifiers'][0]['type'] == 'GBIF_PORTAL'):
             legacyid = data['identifiers'][0]['identifier']
+            dataDict['legacyID'] = legacyid
          
          if data.has_key('title'):
             title = self._saveNLDelCR(data['title'])            
+            dataDict['title'] = title
 
          if data.has_key('description'):
             desc = self._saveNLDelCR(data['description'])
+            dataDict['description'] = desc
          
          if data.has_key('citation'):
             citation = self._saveNLDelCR(data['citation']['text'])
-            
+            dataDict['citation'] = citation
+
          if data.has_key('rights'):
             rights = self._saveNLDelCR(data['rights'])
+            dataDict['rights'] = rights
 
          if data.has_key('logoUrl'):
             logourl = data['logoUrl']
+            dataDict['logoUrl'] = logourl
          
          if data.has_key('homepage'):
             homepage = data['homepage']
+            dataDict['homepage'] = homepage
+            
+         dataDict['key'] = data['key']
+         dataDict['created'] = data['created']
+         dataDict['modified'] = data['modified']
 
-         row = [orgkey, legacyid, data['key'], title, desc, citation, rights, logourl,
-                data['created'], data['modified'], homepage]
-      return row
+#          row = [orgkey, legacyid, data['key'], title, desc, citation, rights, logourl,
+#                 data['created'], data['modified'], homepage]
+      return dataDict
 
 # ...............................................
    def resolveCanonicalFromTaxonKey(self, taxKey):
