@@ -26,8 +26,7 @@ import xml.etree.ElementTree as ET
 
 from constants import *
 from gbifapi import GBIFCodes
-from tools import getCSVReader, getCSVWriter
-from src.gbif.tools import getLogger
+from tools import getCSVReader, getCSVWriter, getLogger
 
 # .............................................................................
 class GBIFReader(object):
@@ -91,7 +90,8 @@ class GBIFReader(object):
       self.dsMeta = {}
       self._files = [self._if, self._vf, self._outf, self._outcf, self._outpf]
       logname, _ = os.path.splitext(os.path.basename(__file__))
-      logfname = os.path.join(pth, logname + '.log')
+      indataname, _ = os.path.splitext(os.path.basename(interpretedFname))
+      logfname = os.path.join(pth, indataname + '.log')
       if os.path.exists(logfname):
          os.remove(logfname)
       self._log = getLogger(logname, logfname)
@@ -182,34 +182,45 @@ class GBIFReader(object):
             if datasetKey is not None:
                pubID = self.gbifRes.getProviderFromDatasetKey(datasetKey)
                self._providerLookup[datasetKey] = pubID
-               rec['providerID'] = pubID
                provValues = [datasetKey, pubID]
                self._outProvWriter.writerow(provValues)
+         rec['providerID'] = pubID
 
    # ...............................................
-   def _updateYear(self, rec):
+   def _correctDates(self, rec):
       """
-      @todo: This function does not yet fill values
-      @summary: Update missing year values by extracting it from the eventDate.
+      @summary: Make sure that eventDate is parse-able into integers and update 
+                missing year value by extracting from the eventDate.
       @param rec: dictionary of all fieldnames and values for this record
+      @note: BISON eventDate should be ISO 8601, ex: 2018-08-01
+             GBIF combines with time (and here UTC time zone), ex: 2018-08-01T14:19:56+00:00
       """
+      fillyr = False
+      # Test year field
+      try:
+         rec['year'] = int(rec['year'])
+      except:
+         fillyr = True
+         
+      # Test eventDate field
       tmp = rec['eventDate']
       dateonly = tmp.split('T')[0]
-      rec['eventDate'] = dateonly
-      if rec['year'] == '' and rec['eventDate'] != '':
-         try:
-            yr = dateonly.split('-')[0]
-         except:
-            self._log.info('Event date {} cannot be parsed'.format(dateonly))
-         else:
+      if dateonly != '':
+         parts = dateonly.split('-')
+         for i in range(len(parts)):
             try:
-               rec['year'] = int(yr)
-               self._log.info('Event date {} parsed for year'.format(dateonly))
+               int(parts[i])
             except:
-               self._log.info('Event date {} does not have an integer year'.format(dateonly))
+               self._log.info('Event date {} cannot be parsed into integers'.format(tmp))
+            else:
+               rec['eventDate'] = dateonly
+               if fillyr:
+                  rec['year'] = parts[0]
+      # Save invalid date?
+#       rec['eventDate'] = dateonly
 
    # ...............................................
-   def _getCanonical(self, rec):
+   def _fillCanonical(self, rec):
       """
       @summary: Fill canonicalName by querying the GBIF API. First use the
                 scientificName in the GBIF name parser.  If that fails, 
@@ -487,7 +498,7 @@ class GBIFReader(object):
          fnameElt= fileElt .find('tdwg:location', NAMESPACE)
          currmeta = fnameElt.text
          sortedname = 'tidy_' + currmeta.replace('txt', 'csv')
-         if sortedname == INTERPRETED:
+         if sortedname.find(INTERPRETED) >= 0:
             flds = child.findall(tdwg+'field')
             for fld in flds:
                idx = int(fld.get('index'))
@@ -533,11 +544,12 @@ class GBIFReader(object):
          self._log.info('gbifID {} is absence data'.format(gbifID)) 
          rec = None
       
+      # Format eventDate and fill missing year
       if rec:
-         self._updateYear(rec)
+         self._correctDates(rec)
          
          # Ignore record without canonicalName
-         self._getCanonical(rec)
+         self._fillCanonical(rec)
          if rec['canonicalName'] is None:
             rec = None
 
@@ -725,63 +737,54 @@ class GBIFReader(object):
 # ...............................................
 if __name__ == '__main__':
    subdir = SUBDIRS[0]
-   interpFname = os.path.join(DATAPATH, subdir, INTERPRETED + CSV_EXT)
-   idx = INTERPRETED.find('_lines_')
-   postfix = INTERPRETED[idx:]
+   postfix = ''
+   if SUBSET is not None and SUBSET != '':
+      postfix = SUBSET_PREFIX + SUBSET
+   interpFname = os.path.join(DATAPATH, subdir, INTERPRETED + postfix + CSV_EXT)
 #    interpFname = os.path.join(DATAPATH, subdir, 'interpretedTerritories500.csv')
    verbatimFname = os.path.join(DATAPATH, subdir, VERBATIM + CSV_EXT)
    outFname = os.path.join(DATAPATH, subdir, OUT_BISON + postfix + CSV_EXT)
    datasetPath = os.path.join(DATAPATH, subdir, DATASET_DIR) 
+   
    gr = GBIFReader(verbatimFname, interpFname, META_FNAME, outFname, datasetPath)
    gr.extractDataFromInterpreted()
    gr.testExtract()
    
    
 """
-import unicodecsv
 import os
-import sys
 import xml.etree.ElementTree as ET
 
 from src.gbif.gbif2bison import *
 from src.gbif.constants import *
 from src.gbif.gbifapi import GBIFCodes
-from src.gbif.gbif2bison import GBIFReader
+from src.gbif.tools import *
+
+from src.gbif.gbif2bison import *
 
 subdir = SUBDIRS[0]
-interpFname = os.path.join(DATAPATH, subdir, INTERPRETED)
-verbatimFname = os.path.join(DATAPATH, subdir, VERBATIM)
-outFname = os.path.join(DATAPATH, subdir, OUT_BISON)
-datasetPath = os.path.join(DATAPATH, subdir, DATASET_DIR)
+if SUBSET is not None and SUBSET != '':
+   postfix = SUBSET_PREFIX + SUBSET
+
+
+interpFname = os.path.join(DATAPATH, subdir, INTERPRETED + postfix + CSV_EXT)
+outFname = os.path.join(DATAPATH, subdir, OUT_BISON + postfix + CSV_EXT)   
 
 gr = GBIFReader(verbatimFname, interpFname, META_FNAME, outFname, datasetPath)
 
-
 gr.openInterpreted()
 fm = gr.fldMeta
-irecno = 1
+line, recno = gr.getLine(gr._iCsvrdr, 0)
+while (line is not None):
+   line, recno = gr.getLine(gr._iCsvrdr, recno)
+   if line is None:
+      break
+   byline = gr.createBisonLineFromInterpreted(line)
+   if byline:
+      gr._outWriter.writerow(byline)      
 
-iline, irecno = gr.getLine(gr._iCsvrdr, irecno)
-rec = {}
-gbifID = iline[0]
-for fldname, (idx, dtype) in gr.fldMeta.iteritems():
-   print
-   print fldname
-   val = iline[idx]
-   fldname, val = gr._updateFieldOrSignalRemove(gbifID, fldname, val)
-   if fldname is None:
-      gr._log.info('Removed with bad field')
-   else:
-      rec[fldname] = val
-      print fldname, val
-      
-gr._updateFilterRec(rec)
 
 gr.close()
-
-# byline = self.createBisonLineFromInterpreted(iline)
-
-# gr.extractData()
 
 """
    

@@ -29,13 +29,14 @@ LOGFILE_MAX_BYTES = 52000000
 LOGFILE_BACKUP_COUNT = 5
 
 
-# INTERPRETED = 'tidy_occurrence.csv'
-INTERPRETED = 'occurrence_lines_500-1500'
+INTERPRETED = 'tidy_occurrence'
 VERBATIM = 'tidy_verbatim'
 OUT_BISON = 'outBison'
-
-SUBSET_PREFIX = '_lines_'
 CSV_EXT = '.csv'
+SUBSET_PREFIX = '_lines_'
+
+SUBSET = '500-1500'
+# SUBSET = '1500-4000'
 
 NO_OUTPUT = None
 COMPUTED = None
