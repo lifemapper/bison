@@ -36,7 +36,7 @@ class GBIFReader(object):
              * GBIF-interpreted data from occurrence.txt
    @note: To chunk the file into more easily managed small files (i.e. fewer 
           GBIF API queries), split using sed command output to file like: 
-            sed -e '1,500d;1500q' tidy_occurrence.csv > tidy_occurrence_lines_500-1500.csv
+            sed -e '1,5000d;10000q' occurrence.txt > occurrence_lines_5000-10000.csv
           where 1-500 are lines to delete, and 1500 is the line on which to stop.
    """
    # ...............................................
@@ -74,10 +74,14 @@ class GBIFReader(object):
       self.outCanonicalFname = os.path.join(pth, 'canonicalLookup.csv')
       self._outcf = None
       self._outCanWriter = None
-      # Output Provider UUID lookup file
-      self.outOrgFname = os.path.join(pth, 'providerLookup.csv')
+      # Output Organization UUID lookup file
+      self.outOrgFname = os.path.join(pth, 'orgLookup.csv')
       self._outof = None
       self._outOrgWriter = None
+      # Output Dataset UUID lookup file
+      self.outDSFname = os.path.join(pth, 'datasetLookup.csv')
+      self._outdf = None
+      self._outDSWriter = None
       # GBIF metadata file for occurrence files
       self._metaFname = metaFname
       # Path to GBIF provided dataset metadata files
@@ -160,11 +164,15 @@ class GBIFReader(object):
       if rec['decimalLongitude'] == 0 and rec['decimalLatitude'] == 0:
          rec['decimalLongitude'] = None
          rec['decimalLatitude'] = None
+         self._log.info('gbifID {} with 0,0 location changed to None, None'
+                        .format(rec['gbifID'])) 
       # Make sure US longitude is negative
       elif (cntry == 'US' 
             and rec['decimalLongitude'] is not None 
             and rec['decimalLongitude'] > 0):
          rec['decimalLongitude'] = rec['decimalLongitude'] * -1 
+         self._log.info('gbifID {} US data with positive longitude negated'
+                        .format(rec['gbifID'])) 
 
    # ...............................................
    def _fillOrganizationDatasetVals(self, rec):
@@ -173,44 +181,79 @@ class GBIFReader(object):
                GBIF API using the GBIF UUIDs.  Save retrieved values in 2 
                dictionaries to avoid re-querying the same UUIDs.
       @param rec: dictionary of all fieldnames and values for this record
-      @note: Save to 2 file(s?) with lines like:
-                 'providerID (aka publisher), provider name/code, provider homepage'
-                 'datasetKey (aka resource), dataset name/code, dataset homepage'
-             to minimize re-queries for matching datasets/organizations and testing.
-      @note: Provider/publisher UUID may be pulled from dataset 
+      @note: For both Organizations (provider/publisher) and Datasets (resource)
+             we want to get info from the GBIF API including 
+             GBIF UUID, name/code, and URL.  
+             Save to 2 files to minimize re-queries for matching 
+             datasets/organizations and testing. Lines look like:
+            'orgUUID, orgName, orgUrl'
+            'datasetUUID, datasetName, datasetHomepage, orgUUID'
+      @note: orgUUIDOrganization UUID may be pulled from dataset API if missing.
       @note: Lookup dictionaries are:
-                   {orgUUID: (org name/code, org homepage),
+                   {orgUUID: (orgName, orgHomepage),
                     ...}  
-                   {datasetUUID: (dataset name/code, dataset homepage, orgUUID),
+                   {datasetUUID: (dsName, dsHomepage, orgUUID),
                     ...}        
       """
+      # Dataset/resource/collection
       datasetUUID = rec['resourceID']
-      orgUUID = rec['providerID']
-      orgUUIDFromDS = ''
+      dsCode = dsUrl = orgUUID = ''      
       if datasetUUID != '':
          try: 
-            (dsCode, dsUrl, orgUUIDFromDS) = self._datasetLookup[datasetUUID]
+            (dsCode, dsUrl, orgUUID) = self._datasetLookup[datasetUUID]
          except:
             dsDict = self.gbifRes.resolveDataset(datasetUUID)
-            if dsDict:
-               orgUUIDFromDS = dsDict['publishingOrganizationKey']
-               self._datasetLookup[datasetUUID] = (dsDict['title'], 
-                                                   dsDict['homepage'],
-                                                   orgUUIDFromDS)
-            else:
+            try:
+               orgUUID = dsDict['publishingOrganizationKey']
+               dsCode = dsDict['title']
+               dsUrl = dsDict['homepage']
+               if type(dsUrl) is list and len(dsUrl) > 0:
+                  dsUrl = dsUrl[0]
+               # Save dataset values to lookup
+               self._datasetLookup[datasetUUID] = (dsCode, dsUrl, orgUUID)
+               # Save dataset values to file
+               self._outDSWriter.writerow([datasetUUID, dsCode, dsUrl, orgUUID])
+            except:
                self._log.error('Failed to resolve datasetKey {}'.format(datasetUUID))
-      else:
-         self._log.error('gbifID {}: Missing datasetKey'.format(rec['gbifID']))
-         
-      if orgUUID == '' and orgUUIDFromDS != '':
-         orgUUID = orgUUIDFromDS
+      # Save dataset values to record, provided values take precedence
+      if rec['ownerInstitutionCode'] == '':
+         rec['ownerInstitutionCode'] = dsCode
+         self._log.info('gbifID {}: ownerInstitutionCode filled with {}'
+                        .format(rec['gbifID'], dsCode))
+      if rec['collectionID'] == '':
+         rec['collectionID'] = dsUrl
+         self._log.info('gbifID {}: collectionID filled with {}'
+                        .format(rec['gbifID'], dsUrl))
+      rec['providerID'] = orgUUID
+      self._log.info('gbifID {}: providerID filled with {} from dataset API'
+                     .format(rec['gbifID'], orgUUID))
+               
+      # Organization/provider/institution
+      orgCode = orgUrl = ''         
+      try: 
+         (orgCode, orgUrl) = self._orgLookup[orgUUID]
+      except:
          orgDict = self.gbifRes.resolveOrganization(orgUUID)
-         if orgDict:
-            self._orgLookup[datasetUUID] = (orgDict['title'], 
-                                            orgDict['homepage'])
-      provValues = [datasetKey, pubID]
-      self._outOrgWriter.writerow(provValues)
-         rec['providerID'] = provUrl
+         try:
+            orgCode = orgDict['title']
+            orgUrl = orgDict['homepage']
+            if type(orgUrl) is list and len(orgUrl) > 0:
+               orgUrl = orgUrl[0]
+            # Save org values to lookup
+            self._orgLookup[orgUUID] = (orgCode, orgUrl)
+            # Save org values to file
+            self._outOrgWriter.writerow([orgUUID, orgCode, orgUrl])
+         except:
+               self._log.error('Failed to resolve org UUID {}'.format(orgUUID))
+      # Save org values to record, provided values take precedence
+      if rec['institutionCode'] == '':
+         rec['institutionCode'] = orgCode
+         self._log.info('gbifID {}: institutionCode filled with {}'
+                        .format(rec['gbifID'], orgCode))
+      if rec['institutionID'] == '':
+         rec['institutionID'] = orgUrl
+         self._log.info('gbifID {}: institutionID filled with {}'
+                        .format(rec['gbifID'], orgUrl))
 
    # ...............................................
    def _correctDates(self, rec):
@@ -233,17 +276,19 @@ class GBIFReader(object):
       dateonly = tmp.split('T')[0]
       if dateonly != '':
          parts = dateonly.split('-')
-         for i in range(len(parts)):
-            try:
+         try:
+            for i in range(len(parts)):
                int(parts[i])
-            except:
-               self._log.info('Event date {} cannot be parsed into integers'.format(tmp))
-            else:
-               rec['eventDate'] = dateonly
-               if fillyr:
-                  rec['year'] = parts[0]
-      # Save invalid date?
-#       rec['eventDate'] = dateonly
+         except:
+            self._log.info('Event date {} cannot be parsed into integers'.format(tmp))
+         else:
+            rec['eventDate'] = dateonly
+            if fillyr:
+               rec['year'] = parts[0]
+               self._log.info('gbifID {}: Year filled with {}'
+                              .format(rec['gbifID'], parts[0]))
+            self._log.info('gbifID {}: Event date {} changed to {}'
+                           .format(rec['gbifID'], tmp, dateonly))
 
    # ...............................................
    def _fillCanonical(self, rec):
@@ -303,11 +348,11 @@ class GBIFReader(object):
          self._log.info('gbifID {}: Field {}, val {} prohibited'
                .format(gbifID, fldname, val)) 
          
-      # Get providerID
+      # Get providerID (aka publisher, organization)
       elif fldname == 'publisher':
          fldname = 'providerID'
 
-      # Get resourceID
+      # Get resourceID (aka dataset, collection)
       elif fldname == 'datasetKey':
          fldname = 'resourceID'
                
@@ -328,7 +373,7 @@ class GBIFReader(object):
          except:
             if val != '':
                self._log.info('gbifID {}: Year {} is not an integer'.format(gbifID, val))
-            val = None 
+            val = '' 
 
       # remove records with occurrenceStatus  = absence
       elif fldname == 'occurrenceStatus' and val.lower() == 'absent':
@@ -361,7 +406,7 @@ class GBIFReader(object):
        
       
    # ...............................................
-   def _openForReadWrite(self, fname, numKeys=1, header=None):
+   def _openForReadWrite(self, fname, numKeys=1, numVals=1, header=None):
       '''
       @summary: Read and populate lookup table if file exists, open and return
                 file and csvwriter for writing or appending. If lookup file 
@@ -372,20 +417,34 @@ class GBIFReader(object):
       
       if os.path.exists(fname):
          doAppend = True
-         recno = 0
+         colCount = 2
+         if header is not None:
+            colCount = len(header)
+         if (numKeys + numVals) != colCount:
+            raise Exception('Column count != keys + vals')
+         keyIdxs = []
+         valIdxs = []      
+         for i in range(colCount):
+            if i < numKeys:
+               keyIdxs.append(i)
+            else:
+               valIdxs.append(i)
          try:
             csvRdr, infile = getCSVReader(fname, DELIMITER)
             # get header
-            line, recno = self.getLine(csvRdr, recno)
-            valIdx = len(line) - 1
-            # save lookup vals to dictionary
+            line, recno = self.getLine(csvRdr, 0)
+            # read lookup vals into dictionary
             while (line is not None):
                line, recno = self.getLine(csvRdr, recno)
                if line:
-                  val = line[valIdx]
-                  for key in range(numKeys):
-                     if line[key] != '' and val != '':
-                        lookupDict[line[key]] = val
+                  # read one or more values
+                  if len(valIdxs) == 1:
+                     val = line[valIdxs[0]]
+                  else:
+                     val = [line[v] for v in valIdxs]
+                  # read one or more keys
+                  for k in range(numKeys):
+                     lookupDict[line[k]] = val
          finally:
             infile.close()
       
@@ -400,8 +459,8 @@ class GBIFReader(object):
       '''
       @summary: Read and populate metadata, open datafiles for reading, output
                 files for writing
-      @todo: Save canonicalNames and provider UUIDs into a file to avoid 
-             querying repeatedly.
+      @todo: Save canonicalNames and dataset and organization UUIDs into a file 
+             to avoid querying repeatedly.
       '''
       self.fldMeta = self.getFieldMetaFromInterpreted()
       
@@ -414,13 +473,16 @@ class GBIFReader(object):
       self._outWriter.writerow(ORDERED_OUT_FIELDS)
        
       self._nameLookup, self._outCanWriter, self._outcf = \
-            self._openForReadWrite(self.outCanonicalFname, numKeys=2,
+            self._openForReadWrite(self.outCanonicalFname, numKeys=2, numVals=1,
                         header=['scientificName', 'taxonKey', 'canonicalName'])
             
       self._orgLookup, self._outOrgWriter, self._outof = \
-            self._openForReadWrite(self.outOrgFname, numKeys=1,
+            self._openForReadWrite(self.outOrgFname, numKeys=1, numVals=2,
                         header=['orgUUID', 'title', 'homepage'])
        
+      self._datasetLookup, self._outDSWriter, self._outdf = \
+            self._openForReadWrite(self.outDSFname, numKeys=1, numVals=3,
+                        header=['datasetUUID', 'title', 'homepage', 'orgUUID'])
 
    # ...............................................
    def isOpen(self):
@@ -563,14 +625,14 @@ class GBIFReader(object):
       gbifID = rec['gbifID']
       # If publisher is missing from record, use API to get from datasetKey
       # Ignore BISON records 
-      self._fillPublisher(rec)
+      self._fillOrganizationDatasetVals(rec)
       if rec['providerID'] == BISON_UUID:
-         self._log.info('gbifID {} from BISON publisher'.format(gbifID))
+         self._log.info('gbifID {} from BISON publisher discarded'.format(gbifID))
          rec = None
 
       # Ignore absence record 
       if rec and rec['occurrenceStatus'].lower() == 'absent':
-         self._log.info('gbifID {} is absence data'.format(gbifID)) 
+         self._log.info('gbifID {} with absence data discarded'.format(gbifID)) 
          rec = None
       
       # Format eventDate and fill missing year
@@ -579,7 +641,8 @@ class GBIFReader(object):
          
          # Ignore record without canonicalName
          self._fillCanonical(rec)
-         if rec['canonicalName'] is None:
+         if rec['canonicalName'] is None or rec['canonicalName'] == '':
+            self._log.info('gbifID {} with unresolvable name/key discarded'.format(gbifID)) 
             rec = None
 
       if rec:
@@ -614,8 +677,8 @@ class GBIFReader(object):
       self._updateFilterRec(rec)
       
       if rec:
-         if gbifID == '107835':
-            pass
+#          if gbifID == '107835':
+#             pass
          # create the ordered row
          for fld in ORDERED_OUT_FIELDS:
             try:
@@ -714,7 +777,6 @@ class GBIFReader(object):
             # Get interpreted record
             line, recno = self.getLine(self._iCsvrdr, recno)
             if line is None:
-               print('line is none')
                break
             # Create new record
             byline = self.createBisonLineFromInterpreted(line)
@@ -752,12 +814,6 @@ class GBIFReader(object):
                else:
                   goodTotal += 1
                line, recno = self.getLine(csvreader, recno)
-#             for i in range(len(ORDERED_OUT_FIELDS)):
-#                try:
-#                   rec[ORDERED_OUT_FIELDS[i]] = line[i]
-#                except Exception, e:
-#                   print('Failed on column {} of record {} with gbifID {}'
-#                         .format(i, recno, gbifID))
          print('Read {} good out of {} total records from output file'
                   .format(goodTotal, recno))
       finally:

@@ -38,18 +38,23 @@ Liz's email
   values to simpler BISON values 
   e.g. humanObservation and machineObservation=observation; 
   FossilSpecimen=fossil, LivingSpecimen=living;... 
-* Provider, organization, dataset 
+* Provider/publisher/organization, dataset/resource/collection
   None of these should ever be blank:
-
-    providerID (numeric code)
-    institutionCode (text string/name of provider)
-    resourceID (numeric code)
-    wnerInstitutionCollectionCode (text string/name of dataset)
+    Provider/publisher/organization
+    * providerID (numeric code)
+    * institutionCode (text string/name of provider)
+    
+    Dataset/resource/collection
+    * resourceID (numeric code)
+    * ownerInstitutionCode (text string/name of dataset)
 
   These are sometimes blank:
 
-    institutionID (Provider's organizational URL - not a GBIF URL)
-    collectionID (Dataset's URL if on the Web elsewhere - not a GBIF URL)
+    Provider/publisher/organization
+    * institutionID (Provider's organizational URL - not a GBIF URL)
+    
+    Dataset/resource/collection
+    * collectionID (Dataset's URL if on the Web elsewhere - not a GBIF URL)
 
 
 

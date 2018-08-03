@@ -32,13 +32,13 @@ LOGFILE_MAX_BYTES = 52000000
 LOGFILE_BACKUP_COUNT = 5
 
 
-INTERPRETED = 'tidy_occurrence'
-VERBATIM = 'tidy_verbatim'
+INTERPRETED = 'occurrence'
+VERBATIM = 'verbatim'
 OUT_BISON = 'outBison'
 CSV_EXT = '.csv'
 SUBSET_PREFIX = '_lines_'
 
-SUBSET = '0-2000'
+SUBSET = '0-5000'
 
 
 NO_OUTPUT = None
@@ -66,21 +66,51 @@ SAVE_FIELDS = {
    'scientificName': (str, INTERPRETED),
    'taxonKey': (str, INTERPRETED),
    'canonicalName': (str, COMPUTED),
+   'vernacularName': (str, INTERPRETED), 
+   'kingdom': (str, INTERPRETED), 
     
    'basisOfRecord': (str, INTERPRETED), 
+   
    'eventDate': (str, INTERPRETED), 
    'year': (int, INTERPRETED),
    'verbatimEventDate': (str, INTERPRETED), 
+   
+   # GBIF 'Organization'
+   #--------------
    'institutionCode': (str, INTERPRETED), 
    'institutionID': (str, INTERPRETED), 
+#    # pull providerID from dataset API and publishingOrganizationKey
+#    'publisher': (NO_OUTPUT, INTERPRETED),
+   'providerID': (str, COMPUTED), 
+   
+   # GBIF 'Dataset'
+   #--------------
+   # I believe ownerInstitutionCode is incorrect, and should be collectionCode,
+   # so including both.
+   # pull resource from API and datasetKey
+   'datasetKey': (NO_OUTPUT, INTERPRETED),
+   'resourceID': (str, COMPUTED),
    'ownerInstitutionCode': (str, INTERPRETED),
+   'collectionCode': (str, INTERPRETED),
    'collectionID': (str, INTERPRETED),
+
+   # Occurrence record info
    'occurrenceID': (str, INTERPRETED),
    'catalogNumber': (str, INTERPRETED),
    'recordedBy': (str, INTERPRETED),
    'recordNumber': (str, INTERPRETED),
+   
+   # Geospatial occurrence record info
    'decimalLatitude': (float, INTERPRETED),
    'decimalLongitude': (float, INTERPRETED),
+   'geodeticDatum': (str, INTERPRETED), 
+   'coordinatePrecision': (str, INTERPRETED), 
+   'coordinateAccuracy': (str, INTERPRETED), 
+   'locality': (str, INTERPRETED), 
+   'verbatimLocality': (str, INTERPRETED), 
+   'habitat': (str, INTERPRETED), 
+   'waterBody': (str, INTERPRETED), 
+   'countryCode': (str, INTERPRETED), 
    # `elevation` is only in INTERPRETED, `verbatimElevation` in both
    'elevation': (str, INTERPRETED), 
    # `depth` is only in INTERPRETED, `verbatimDepth` in both
@@ -88,23 +118,7 @@ SAVE_FIELDS = {
    'county': (str, INTERPRETED), 
    'higherGeographyID': (str, INTERPRETED), 
    'stateProvince': (str, INTERPRETED), 
-   
-   # pull publisher from API and ?
-   'publisher': (NO_OUTPUT, INTERPRETED),
-   'providerID': (str, COMPUTED), 
-   
-   # pull resource from API and datasetKey
-   'datasetKey': (NO_OUTPUT, INTERPRETED),
-   'resourceID': (str, COMPUTED),
-   
-   'vernacularName': (str, INTERPRETED), 
-   'kingdom': (str, INTERPRETED), 
-   'geodeticDatum': (str, INTERPRETED), 
-   'coordinatePrecision': (str, INTERPRETED), 
-   'coordinateAccuracy': (str, INTERPRETED), 
-   'verbatimLocality': (str, INTERPRETED), 
-   'waterBody': (str, INTERPRETED), 
-   'countryCode': (str, INTERPRETED), 
+         
    'license': (str, INTERPRETED), 
    # delete records with status=absent
    'occurrenceStatus': (str, INTERPRETED),
@@ -117,12 +131,13 @@ ORDERED_OUT_FIELDS = [
    'gbifID', 'scientificName', 'taxonKey', 'canonicalName',  
    'basisOfRecord', 'eventDate', 'year', 
    'verbatimEventDate', 'institutionCode', 'institutionID', 
-   'ownerInstitutionCode', 'collectionID', 'occurrenceID', 'catalogNumber', 
+   'ownerInstitutionCode', 'collectionCode', 'collectionID', 
+   'occurrenceID', 'catalogNumber', 
    'recordedBy', 'recordNumber', 'decimalLatitude', 'decimalLongitude', 
    'elevation', 'depth', 'county', 'higherGeographyID', 'stateProvince', 
    'providerID', 'resourceID', 'vernacularName', 'kingdom', 
-   'coordinatePrecision', 'verbatimLocality', 'waterBody', 
-   'countryCode', 'license', 'occurrenceStatus']
+   'coordinatePrecision', 'locality', 'verbatimLocality','habitat', 'waterBody', 
+   'countryCode', 'license']
 
 TEST_FIELDS = ['occurrenceStatus', 'decimalLatitude', 'decimalLongitude']
 COMPUTE_FIELDS = {'taxonKey': 'canonicalName', 
