@@ -164,15 +164,21 @@ class GBIFReader(object):
       if rec['decimalLongitude'] == 0 and rec['decimalLatitude'] == 0:
          rec['decimalLongitude'] = None
          rec['decimalLatitude'] = None
-         self._log.info('gbifID {} with 0,0 location changed to None, None'
-                        .format(rec['gbifID'])) 
+#          try:
+#             self._log.info('gbifID {} with 0,0 location changed to None, None'
+#                         .format(rec['gbifID']))
+#          except Exception, e:
+#             self._log.error('Exception in logging {}'.format(e))
       # Make sure US longitude is negative
       elif (cntry == 'US' 
             and rec['decimalLongitude'] is not None 
             and rec['decimalLongitude'] > 0):
          rec['decimalLongitude'] = rec['decimalLongitude'] * -1 
-         self._log.info('gbifID {} US data with positive longitude negated'
-                        .format(rec['gbifID'])) 
+#          try:
+#             self._log.info('gbifID {} US data with positive longitude negated'
+#                         .format(rec['gbifID']))
+#          except Exception, e:
+#             self._log.error('Exception in logging {}'.format(e))
 
    # ...............................................
    def _fillOrganizationDatasetVals(self, rec):
@@ -214,19 +220,32 @@ class GBIFReader(object):
                # Save dataset values to file
                self._outDSWriter.writerow([datasetUUID, dsCode, dsUrl, orgUUID])
             except:
-               self._log.error('Failed to resolve datasetKey {}'.format(datasetUUID))
+               pass
+#                try:
+#                   self._log.info('Failed to resolve datasetKey {}'.format(datasetUUID))
+#                except Exception, e:
+#                   self._log.error('Exception in logging {}'.format(e))
       # Save dataset values to record, provided values take precedence
       if rec['ownerInstitutionCode'] == '':
          rec['ownerInstitutionCode'] = dsCode
-         self._log.info('gbifID {}: ownerInstitutionCode filled with {}'
-                        .format(rec['gbifID'], dsCode))
+#          try:
+#             self._log.info('gbifID {}: ownerInstitutionCode filled with {}'
+#                            .format(rec['gbifID'], dsCode))
+#          except Exception, e:
+#             self._log.error('Exception in logging {}'.format(e))
       if rec['collectionID'] == '':
          rec['collectionID'] = dsUrl
-         self._log.info('gbifID {}: collectionID filled with {}'
-                        .format(rec['gbifID'], dsUrl))
+#          try:
+#             self._log.info('gbifID {}: collectionID filled with {}'
+#                            .format(rec['gbifID'], dsUrl))
+#          except Exception, e:
+#             self._log.error('Exception in logging {}'.format(e))
       rec['providerID'] = orgUUID
-      self._log.info('gbifID {}: providerID filled with {} from dataset API'
-                     .format(rec['gbifID'], orgUUID))
+#       try:
+#          self._log.info('gbifID {}: providerID filled with {} from dataset API'
+#                         .format(rec['gbifID'], orgUUID))
+#       except Exception, e:
+#          self._log.error('Exception in logging {}'.format(e))
                
       # Organization/provider/institution
       orgCode = orgUrl = ''         
@@ -244,16 +263,27 @@ class GBIFReader(object):
             # Save org values to file
             self._outOrgWriter.writerow([orgUUID, orgCode, orgUrl])
          except:
-               self._log.error('Failed to resolve org UUID {}'.format(orgUUID))
+            pass
+#             try:
+#                self._log.info('Failed to resolve org UUID {}'.format(orgUUID))
+#             except Exception, e:
+#                self._log.error('Exception in logging {}'.format(e))
       # Save org values to record, provided values take precedence
       if rec['institutionCode'] == '':
          rec['institutionCode'] = orgCode
-         self._log.info('gbifID {}: institutionCode filled with {}'
-                        .format(rec['gbifID'], orgCode))
+#          try:
+#             self._log.info('gbifID {}: institutionCode filled with {}'
+#                            .format(rec['gbifID'], orgCode))
+#          except Exception, e:
+#             self._log.error('Exception in logging {}'.format(e))
+
       if rec['institutionID'] == '':
          rec['institutionID'] = orgUrl
-         self._log.info('gbifID {}: institutionID filled with {}'
-                        .format(rec['gbifID'], orgUrl))
+#          try:
+#             self._log.info('gbifID {}: institutionID filled with {}'
+#                            .format(rec['gbifID'], orgUrl))
+#          except Exception, e:
+#             self._log.error('Exception in logging {}'.format(e))
 
    # ...............................................
    def _correctDates(self, rec):
@@ -280,15 +310,25 @@ class GBIFReader(object):
             for i in range(len(parts)):
                int(parts[i])
          except:
-            self._log.info('Event date {} cannot be parsed into integers'.format(tmp))
+            pass
+#             try:
+#                self._log.info('Event date {} cannot be parsed into integers'.format(tmp))
+#             except Exception, e:
+#                self._log.error('Exception in logging {}'.format(e))
          else:
             rec['eventDate'] = dateonly
+#             try:
+#                self._log.info('gbifID {}: Event date {} changed to {}'
+#                               .format(rec['gbifID'], tmp, dateonly))
+#             except Exception, e:
+#                self._log.error('Exception in logging {}'.format(e))
             if fillyr:
                rec['year'] = parts[0]
-               self._log.info('gbifID {}: Year filled with {}'
-                              .format(rec['gbifID'], parts[0]))
-            self._log.info('gbifID {}: Event date {} changed to {}'
-                           .format(rec['gbifID'], tmp, dateonly))
+#                try:
+#                   self._log.info('gbifID {}: Year filled with {}'
+#                                  .format(rec['gbifID'], parts[0]))
+#                except Exception, e:
+#                   self._log.error('Exception in logging {}'.format(e))
 
    # ...............................................
    def _fillCanonical(self, rec):
@@ -315,8 +355,12 @@ class GBIFReader(object):
             self._nameLookup[sciname] = canName
             canonicalValues = [sciname, taxkey, canName]
             self._outCanWriter.writerow(canonicalValues)
-            self._log.info('gbifID {}: Canonical {} from scientificName'
-                  .format(rec['gbifID'], canName)) 
+#             try:
+#                self._log.info('gbifID {}: Canonical {} from scientificName'
+#                      .format(rec['gbifID'], canName))
+#             except Exception, e:
+#                self._log.error('Exception in logging {}'.format(e))
+ 
          except:
             try:
                taxkey = rec['taxonKey']
@@ -327,10 +371,17 @@ class GBIFReader(object):
                   self._nameLookup[taxkey] = canName
                   canonicalValues = [sciname, taxkey, canName]
                   self._outCanWriter.writerow(canonicalValues)
-                  self._log.info('gbifID {}: Canonical {} from taxonKey'
-                        .format(rec['gbifID'], canName)) 
+#                   try:
+#                      self._log.info('gbifID {}: Canonical {} from taxonKey'
+#                            .format(rec['gbifID'], canName)) 
+#                   except Exception, e:
+#                      self._log.error('Exception in logging {}'.format(e))
                except:
-                  self._log.info('gbifID {}: Failed to get canonical'.format(rec['gbifID']))
+                  pass
+#                   try:
+#                      self._log.info('gbifID {}: Failed to get canonical'.format(rec['gbifID']))
+#                   except Exception, e:
+#                      self._log.error('Exception in logging {}'.format(e))
       rec['canonicalName'] = canName
 
    # ...............................................
@@ -345,8 +396,11 @@ class GBIFReader(object):
       # Replace N/A
       if val.lower() in PROHIBITED_VALS:
          val = ''
-         self._log.info('gbifID {}: Field {}, val {} prohibited'
-               .format(gbifID, fldname, val)) 
+#          try:
+#             self._log.info('gbifID {}: Field {}, val {} prohibited'
+#                            .format(gbifID, fldname, val)) 
+#          except Exception, e:
+#             self._log.error('Exception in logging {}'.format(e))
          
       # Get providerID (aka publisher, organization)
       elif fldname == 'publisher':
@@ -361,32 +415,36 @@ class GBIFReader(object):
          if val in TERM_CONVERT.keys():
             val = TERM_CONVERT[val]
             
-      # check for verbatimLocality terms
-      elif fldname == 'verbatimLocality':
-         if val != '':
-            self._log.info('gbifID {}: verbatimLocality {}'.format(gbifID, val))
-
       # Convert year to integer
       elif fldname == 'year':
          try:
             val = int(val)
          except:
-            if val != '':
-               self._log.info('gbifID {}: Year {} is not an integer'.format(gbifID, val))
+#             if val != '':
+#                try:
+#                   self._log.info('gbifID {}: Year {} is not an integer'.format(gbifID, val))
+#                except Exception, e:
+#                   self._log.error('Exception in logging {}'.format(e))
             val = '' 
 
       # remove records with occurrenceStatus  = absence
       elif fldname == 'occurrenceStatus' and val.lower() == 'absent':
          fldname = val = None
-         self._log.info('gbifID {}: record is absence data'.format(gbifID)) 
+#          try:
+#             self._log.info('gbifID {}: record is absence data'.format(gbifID)) 
+#          except Exception, e:
+#             self._log.error('Exception in logging {}'.format(e))
          
       # gather geo fields for check/convert
       elif fldname in ('decimalLongitude', 'decimalLatitude'):
          try:
             val = float(val)
          except Exception, e:
-            if val != '':
-               self._log.info('gbifID {}: {} lat/long is not number'.format(gbifID, val))
+#             if val != '':
+#                try:
+#                   self._log.info('gbifID {}: {} lat/long is not number'.format(gbifID, val))
+#                except Exception, e:
+#                   self._log.error('Exception in logging {}'.format(e))                  
             val = None
          
       return fldname, val
@@ -662,8 +720,8 @@ class GBIFReader(object):
       row = []
       gbifID = iline[0]
       rec = {'gbifID': gbifID}
-      self._log.info('')
-      self._log.info('Record {}'.format(gbifID))
+      #self._log.info('')
+      #self._log.info('Record {}'.format(gbifID))
       for fldname, (idx, dtype) in self.fldMeta.iteritems():
          val = self._cleanVal(iline[idx])
 
@@ -821,19 +879,38 @@ class GBIFReader(object):
 
 # ...............................................
 if __name__ == '__main__':
+   import argparse
+   parser = argparse.ArgumentParser(
+            description=("""Parse a GBIF occurrence dataset downloaded
+                            from the GBIF occurrence web service in
+                            Darwin Core format.  The dataset will be 
+                            chunked into subsets by line numbers to reduce 
+                            load when processing.
+                         """))
+#    parser.add_argument('--basepath', default=None,
+#             help=('Path to the data files to be processed'))
+   parser.add_argument('--start_line', type=int, default=1,
+            help=('First line from original file in dataset'))
+   parser.add_argument('--stop_line', type=int, default=1000000,
+            help=('Last line from original file in dataset'))
+   args = parser.parse_args()
+   first = args.start_line
+   last = args.stop_line
+
    subdir = SUBDIRS[0]
-   postfix = ''
-   if SUBSET is not None and SUBSET != '':
-      postfix = SUBSET_PREFIX + SUBSET
+   postfix = '{}{}-{}'.format(SUBSET_PREFIX, first, last)
    interpFname = os.path.join(DATAPATH, subdir, INTERPRETED + postfix + CSV_EXT)
-#    interpFname = os.path.join(DATAPATH, subdir, 'interpretedTerritories500.csv')
-   verbatimFname = os.path.join(DATAPATH, subdir, VERBATIM + CSV_EXT)
-   outFname = os.path.join(DATAPATH, subdir, OUT_BISON + postfix + CSV_EXT)
-   datasetPath = os.path.join(DATAPATH, subdir, DATASET_DIR) 
-   
-   gr = GBIFReader(verbatimFname, interpFname, META_FNAME, outFname, datasetPath)
-   gr.extractDataFromInterpreted()
-   gr.testExtract()
+   if os.path.exists(interpFname):
+   #    interpFname = os.path.join(DATAPATH, subdir, 'interpretedTerritories500.csv')
+      verbatimFname = os.path.join(DATAPATH, subdir, VERBATIM + CSV_EXT)
+      outFname = os.path.join(DATAPATH, subdir, OUT_BISON + postfix + CSV_EXT)
+      datasetPath = os.path.join(DATAPATH, subdir, DATASET_DIR) 
+      
+      gr = GBIFReader(verbatimFname, interpFname, META_FNAME, outFname, datasetPath)
+      gr.extractDataFromInterpreted()
+#       gr.testExtract()
+   else:
+      print('Filename {} does not exist'.format(interpFname))
    
    
 """
