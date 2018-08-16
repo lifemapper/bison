@@ -13,7 +13,8 @@ ENCODING = 'utf-8'
 DATAPATH = '/state/partition1/data/bison/'
 SUBDIRS = ('terr', 'us')
 DATASET_DIR = 'dataset'
-META_FNAME = '/state/partition1/data/bison/terr/meta.xml'
+META_FNAME = 'meta.xml'
+# META_FNAME = '/state/partition1/data/bison/terr/meta.xml'
 # META_FNAME = '/tank/data/input/bison/us/meta.xml'
 
 CLIP_CHAR = '/'
@@ -35,6 +36,8 @@ LOGFILE_BACKUP_COUNT = 5
 INTERPRETED = 'occurrence'
 VERBATIM = 'verbatim'
 OUT_BISON = 'outBison'
+OUT_PROVIDER = 'outProviderRecs.txt'
+OUT_DATASET = 'outDatasetRecs.txt'
 CSV_EXT = '.csv'
 SUBSET_PREFIX = '_lines_'
 
@@ -128,14 +131,18 @@ SAVE_FIELDS = {
 
 
 ORDERED_OUT_FIELDS = [
-   'gbifID', 'scientificName', 'taxonKey', 'canonicalName',  
+   'gbifID', 'scientificName', 'taxonKey', 
+#    'canonicalName',  
    'basisOfRecord', 'eventDate', 'year', 
    'verbatimEventDate', 'institutionCode', 'institutionID', 
    'ownerInstitutionCode', 'collectionCode', 'collectionID', 
    'occurrenceID', 'catalogNumber', 
    'recordedBy', 'recordNumber', 'decimalLatitude', 'decimalLongitude', 
    'elevation', 'depth', 'county', 'higherGeographyID', 'stateProvince', 
-   'providerID', 'resourceID', 'vernacularName', 'kingdom', 
+   # Keep original UUID values for later lookup
+   'publisher',    # 'providerID', 
+   'datasetKey',   # 'resourceID', 
+   'vernacularName', 'kingdom', 
    'coordinatePrecision', 'locality', 'verbatimLocality','habitat', 'waterBody', 
    'countryCode', 'license']
 
