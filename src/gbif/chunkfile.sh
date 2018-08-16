@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 #!/bin/bash
 #
 # This script 
@@ -95,7 +96,3 @@ do
 	let c=c+1
 done
 TimeStamp "# End"
-
-# bash /state/partition1/workspace/bison/src/gbif/chunkfile.sh 7000000 1
-
- 
