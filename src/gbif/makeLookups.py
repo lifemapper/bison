@@ -28,7 +28,8 @@ import xml.etree.ElementTree as ET
 from constants import DELIMITER
 from gbifapi import GBIFCodes
 from tools import getCSVReader, getCSVWriter, getLogger
-      
+   
+DS_UUID_FNAME = '/Users/astewart/git/lifemapper/bison/src/gbif/datasetUUIDs.txt'
 # .............................................................................
 class GBIFMetaReader(object):
    """
@@ -56,9 +57,9 @@ class GBIFMetaReader(object):
       self.provFname = provFname
       
       self.resFname = resFname
-      self._dsf = None
-      self._files.append(self._dsf)
-      self._dsWriter = None
+      self._resf = None
+      self._files.append(self._resf)
+      self._resWriter = None
 
       self.canFname = canFname
       self._canf = None
@@ -99,35 +100,26 @@ class GBIFMetaReader(object):
    # ...............................................
    def extractDatasetMetadata(self):
       """
-      @summary: Create a CSV file containing GBIF occurrence records extracted 
-                from the interpreted occurrence file provided 
-                from an Occurrence Download, in Darwin Core format.  Values may
-                be modified and records may be discarded according to 
-                BISON requests.
-      @return: A CSV file of BISON-modified records from a GBIF download. 
+      @summary: Create a CSV file containing GBIF dataset metadata  
+                extracted from the GBIF API, for only datasets with UUIDs 
+                in the DS_UUID_FNAME..
+      @return: A CSV file of metadata records for GBIF datasets. 
       """
-      self.gbifRes.getDatasetCodes(self.resFname)
-#       datasets = {}
-#       
-#       self._dsf, self._dsWriter = getCSVWriter(self.dsFname, DELIMITER)
-# 
-#       fnames = glob.glob('*.xml')
-#       for fname in fnames:
-#          os.path.join(self._datasetPath, fname)
-#          uuid, _ = os.path.splitext(fname)
-#          dinfo = self._getDatasetInfo(fname)
-#          datasets[uuid] = dinfo
+      uuids = set()
+      for line in open(DS_UUID_FNAME, 'r'):
+         stp = line.rfind('.xml')
+         uuid = line[:stp]
+         uuids.add(uuid)
+         
+      self.gbifRes.getDatasetCodes(self.resFname, uuids)
    
 
    # ...............................................
    def extractProviderMetadata(self):
       """
-      @summary: Create a CSV file containing GBIF occurrence records extracted 
-                from the interpreted occurrence file provided 
-                from an Occurrence Download, in Darwin Core format.  Values may
-                be modified and records may be discarded according to 
-                BISON requests.
-      @return: A CSV file of BISON-modified records from a GBIF download. 
+      @summary: Create a CSV file containing GBIF organizations metadata 
+                extracted from the GBIF API
+      @return: A CSV file of metadata records for GBIF organizations. 
       """
       self.gbifRes.getProviderCodes(self.provFname)
 

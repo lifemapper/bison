@@ -166,7 +166,8 @@ class GBIFCodes(object):
       return row
 
 # ...............................................
-   def getCodesFromAPI(self, apitype, outfname, header, preserveFormatingKeys):
+   def getCodesFromAPI(self, apitype, outfname, header, preserveFormatingKeys,
+                       saveUUIDs=None):
       if apitype not in ('organization', 'dataset'):
          raise Exception('What kind of query is {}?'.format(apitype))
 
@@ -183,19 +184,20 @@ class GBIFCodes(object):
       if total > 0:
          try:
             outf = codecs.open(outfname, 'w', ENCODING)
-            outf.write(DELIMITER.join(header))
+            outf.write(DELIMITER.join(header) + NEWLINE)
             
             recno = 0
             while total <= pcount:  
                print 'Received {} {}s from GBIF'.format(len(allObjs), apitype)
                for obj in allObjs:
                   recno += 1
-                  row = self._processRecordInfo(obj, header, 
-                                                preserveFormatingKeys=preserveFormatingKeys)
-                  try:
-                     outf.write(DELIMITER.join(row) + NEWLINE)
-                  except Exception, e:
-                     raise
+                  if (saveUUIDs is None or obj['key'] in saveUUIDs):
+                     row = self._processRecordInfo(obj, header, 
+                                    preserveFormatingKeys=preserveFormatingKeys)
+                     try:
+                        outf.write(DELIMITER.join(row) + NEWLINE)
+                     except Exception, e:
+                        raise
                   
                if isComplete:
                   total = pcount + 1
@@ -222,12 +224,12 @@ class GBIFCodes(object):
       self.getCodesFromAPI('organization', outfname, header, formatKeys)
 
 # ...............................................
-   def getDatasetCodes(self, outfname):
+   def getDatasetCodes(self, outfname, uuids):
       header = ['publishingOrganizationKey', 'key', 'title', 'description', 
                 'citation', 'rights', 'logoUrl', 'created', 'modified', 
                 'homepage']
       formatKeys = ['title', 'rights', 'logoUrl', 'description', 'homepage']
-      self.getCodesFromAPI('dataset', outfname, header, formatKeys)
+      self.getCodesFromAPI('dataset', outfname, header, formatKeys, uuids)
 
 
 # ...............................................
