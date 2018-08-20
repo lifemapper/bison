@@ -36,8 +36,6 @@ LOGFILE_BACKUP_COUNT = 5
 INTERPRETED = 'occurrence'
 VERBATIM = 'verbatim'
 OUT_BISON = 'outBison'
-OUT_PROVIDER = 'outProviderRecs.txt'
-OUT_DATASET = 'outDatasetRecs.txt'
 CSV_EXT = '.csv'
 SUBSET_PREFIX = '_lines_'
 

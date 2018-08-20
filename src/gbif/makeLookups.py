@@ -25,26 +25,24 @@ import glob
 import os
 import xml.etree.ElementTree as ET
 
-from constants import *
+from constants import DELIMITER
 from gbifapi import GBIFCodes
-from tools import openForReadWrite, getLogger
+from tools import getCSVReader, getCSVWriter, getLogger
       
 # .............................................................................
 class GBIFMetaReader(object):
    """
-   @summary: GBIF Record containing CSV record of 
-             * original provider data from verbatim.txt
-             * GBIF-interpreted data from occurrence.txt
-   @note: To chunk the file into more easily managed small files (i.e. fewer 
-          GBIF API queries), split using sed command output to file like: 
-            sed -e '1,5000d;10000q' occurrence.txt > occurrence_lines_5000-10000.csv
-          where 1-500 are lines to delete, and 1500 is the line on which to stop.
+   @summary: Get or Read supporting GBIF metadata for organizations (BISON 
+             provider), datasets (BISON resource), and species names. 
+   @note: 
    """
    # ...............................................
-   def __init__(self, outProviders, outDatasets, datasetPath):
+   def __init__(self, provFname, resFname, canFname, inSpeciesFname, datasetPath):
       """
       @summary: Constructor
-      @param outFname: Full filename for the output lookup file for datasets 
+      @param provFname: Full filename for the output lookup file for organization/provider
+      @param resFname: Full filename for the output lookup file for dataset/resource
+      @param canFname: Full filename for the output lookup file for canonical names 
       @param datasetPath: Directory containing individual files describing 
              datasets referenced in occurrence records.
       """
@@ -54,45 +52,41 @@ class GBIFMetaReader(object):
       # Path to GBIF provided dataset metadata files
       self._datasetPath = datasetPath
       
-      # Output metadata file
-      self.outFname = outFname
-      self._outf = None
-      self._files.append(self._outf)
-      self._outWriter = None
-      pth, outbasename = os.path.split(outFname)
-      outbase, ext = os.path.splitext(outbasename)
+      # Output lookup files
+      self.provFname = provFname
+      
+      self.resFname = resFname
+      self._dsf = None
+      self._files.append(self._dsf)
+      self._dsWriter = None
+
+      self.canFname = canFname
+      self._canf = None
+      self._files.append(self._canf)
+      self._canWriter = None
+      
+      self.inSpeciesFname = inSpeciesFname
+      self._inf = None
+      self._files.append(self._inf)
+      self._speciesReader = None
+      
+      pth, outbasename = os.path.split(provFname)
       
       # Input for dataset and provider UUID lookup
       self.datasetLookup = {}
       self.providerLookup = {}
 
       logname, _ = os.path.splitext(os.path.basename(__file__))
-      logfname = os.path.join(pth, outbase + '.log')
+      logfname = os.path.join(pth, logname + '.log')
       if os.path.exists(logfname):
          os.remove(logfname)
       self._log = getLogger(logname, logfname)
       
    # ...............................................
-
- 
-   # ...............................................
-   def getDatasetTitle(self, uuid):
+   def _getDatasetInfo(self, fname):
       '''
       @summary: Read metadata for dataset with this uuid
       '''
-      fname = os.path.join(self._datasetPath, '{}.txt'.format(uuid))
-      tree = ET.parse(fname)
-      root = tree.getroot()
-      ds  = root.find('dataset')
-      title = ds.find('title').text
-      return title
-      
-   # ...............................................
-   def getDatasetInfo(self, fname):
-      '''
-      @summary: Read metadata for dataset with this uuid
-      '''
-      fullfname = os.path.join(self._datasetPath, fname)
       try:
          tree = ET.parse(fname)
          root = tree.getroot()
@@ -100,7 +94,7 @@ class GBIFMetaReader(object):
          title = ds.find('title').text
          
       except Exception, e:
-         self._log.error('Failed parsing {}, exception {}'.format(fullfname, e))
+         self._log.error('Failed parsing {}, exception {}'.format(fname, e))
 
    # ...............................................
    def extractDatasetMetadata(self):
@@ -112,19 +106,17 @@ class GBIFMetaReader(object):
                 BISON requests.
       @return: A CSV file of BISON-modified records from a GBIF download. 
       """
-      if self.isOpen():
-         self.close()
-         
-      datasets = {}
-      
-      lookupDict, outWriter, outfile = openForReadWrite(fname, numKeys=1, numVals=1, header=None, 
-                     delimiter=DELIMITER)
-
-      fnames = glob.glob('*.xml')
-      for fname in fnames:
-         uuid = os.path.splitext(fname)
-         dinfo = self.getDatasetInfo(fname)
-         datasets[uuid] = dinfo
+      self.gbifRes.getDatasetCodes(self.resFname)
+#       datasets = {}
+#       
+#       self._dsf, self._dsWriter = getCSVWriter(self.dsFname, DELIMITER)
+# 
+#       fnames = glob.glob('*.xml')
+#       for fname in fnames:
+#          os.path.join(self._datasetPath, fname)
+#          uuid, _ = os.path.splitext(fname)
+#          dinfo = self._getDatasetInfo(fname)
+#          datasets[uuid] = dinfo
    
 
    # ...............................................
@@ -137,32 +129,47 @@ class GBIFMetaReader(object):
                 BISON requests.
       @return: A CSV file of BISON-modified records from a GBIF download. 
       """
-      if self.isOpen():
-         self.close()
-         
-      datasets = {}
-      
-      lookupDict, outWriter, outfile = openForReadWrite(fname, numKeys=1, numVals=1, header=None, 
-                     delimiter=DELIMITER)
-
-      fnames = glob.glob('*.xml')
-      for fname in fnames:
-         uuid = os.path.splitext(fname)
-         dinfo = self.getDatasetInfo(fname)
-         datasets[uuid] = dinfo
-   
+      self.gbifRes.getProviderCodes(self.provFname)
 
 
 # ...............................................
 if __name__ == '__main__':
-   outDatasets = os.path.join(DATAPATH, 'datasetMeta.csv')
-   outProviders = os.path.join(DATAPATH, 'providerMeta.csv')
-   for subdir in SUBDIRS:      
-      datasetPath = os.path.join(DATAPATH, subdir, DATASET_DIR) 
-      dr = GBIFMetaReader(outDatasets, outProviders, datasetPath)
-      
-      dr.extractData()
+   import argparse
+   parser = argparse.ArgumentParser(
+            description=("""Parse GBIF provided dataset metadata files, 
+                            Request and parse provider metadata from GBIF API,
+                            Request parsing of a file of species names, or request
+                            and parse results from GBIF species API for taxonkey.
+                         """))
+   parser.add_argument('name_id_input_file', type=str, 
+                       help="""
+                       Full pathname of the input file containing 
+                       scientificName and taxonKey(s) for names to be resolved.
+                       """)
+   parser.add_argument('dataset_path', type=str, 
+                       help=""""
+                       The pathname for direcxtory containing GBIF dataset 
+                       metadata files.
+                       """)
+   parser.add_argument('--names_only', type=bool, default=False,
+            help=('Re-read a bison output file to retrieve scientificName and taxonID.'))
+   args = parser.parse_args()
+   nameIdFname = args.name_id_input_file
+   datasetPath = args.dataset_path
    
+   if os.path.exists(nameIdFname):
+      pth, basefname = os.path.split(nameIdFname)
+      
+      provFname = os.path.join(pth, 'providerLookup.csv')
+      resFname = os.path.join(pth, 'resourceLookup.csv')
+      canFname = os.path.join(pth, 'canonicalLookup.csv')
+      
+      gmr = GBIFMetaReader(provFname, resFname, canFname, nameIdFname, datasetPath)
+      print('Calling program with input/output {}'.format(nameIdFname, datasetPath))
+      gmr.extractDatasetMetadata()
+#       gmr.extractProviderMetadata()
+   else:
+      print('Filename {} does not exist'.format(nameIdFname))
    
 """
 

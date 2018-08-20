@@ -27,7 +27,8 @@ import os
 import urllib2
 
 from constants import (DELIMITER, GBIF_URL, ENCODING, URL_ESCAPES, 
-                       DATAPATH, OUT_PROVIDER, OUT_DATASET)
+                       DATAPATH)
+NEWLINE = '\n'
         
 # outProvFname = 'outProviderRecs.txt'
 # inProvFname = 'inProviderIDs.txt'
@@ -43,14 +44,27 @@ class GBIFCodes(object):
    
 # ...............................................
    def _saveNL(self, strval):
-      fval = strval.replace("\n", "\\n")
+      fval = strval.replace(NEWLINE, "\\n")
       return fval
 
 # ...............................................
    def _saveNLDelCR(self, strval):
-      fval = strval.replace("\n", "\\n").replace("\r", "")
+      fval = strval.replace(NEWLINE, "\\n").replace("\r", "")
       return fval
 
+# ...............................................
+   def _clipDate(self, longdate):
+      dateonly = longdate.split('T')[0]
+      if dateonly != '':
+         parts = dateonly.split('-')
+         try:
+            for i in range(len(parts)):
+               int(parts[i])
+         except:
+            print ('Failed to parse date {} into integers'.format(longdate))
+            dateonly = ''
+      return dateonly
+            
 # ...............................................
    def resolveDataset(self, dsKey):
       dataDict = {}
@@ -107,8 +121,6 @@ class GBIFCodes(object):
          dataDict['created'] = data['created']
          dataDict['modified'] = data['modified']
 
-#             row = [orgkey, legacyid, data['key'], title, desc, citation, rights, 
-#                    logourl, data['created'], data['modified'], homepage]
       return dataDict
 
 # ...............................................
@@ -120,53 +132,44 @@ class GBIFCodes(object):
          print('No record for datasetKey {}'.format(dsKey))
       return publishingOrgUUID
 
-# ...............................................
-   def _processProviderInfo(self, prov):
-      desc = homepage = ''
-      
-      if prov.has_key("description"):
-         desc = self._saveNLDelCR(prov['description'])
-         
-      if prov.has_key("homepage"):
-         homepage= prov['homepage']
-         if type(homepage) is list and len(homepage) > 0:
-            homepage = self._saveNLDelCR(prov['homepage'][0])
-         elif type(homepage) is str:
-            homepage = self._saveNLDelCR(prov['homepage'])
-
-      row = [prov['key'], prov['title'], desc, prov['created'],
-             prov['modified'], homepage]
-      
-      return row
                
 # ...............................................
-   def _processDatasetInfo(self, ds):
-      orgkey = title = desc = rights = logo = homepage = None 
-           
-      if ds.has_key("title"):
-         title = self._saveNLDelCR(ds['title'])
-      if ds.has_key("rights"):
-         rights = self._saveNLDelCR(ds['rights'])
-      if ds.has_key("logoUrl"):
-         logo = self._saveNLDelCR(ds['logoUrl'])
-      if ds.has_key("description"):
-         desc = self._saveNLDelCR(ds['description'])
-         
-      if ds.has_key("homepage"):
-         homepage= ds['homepage']
-         if type(homepage) is list and len(homepage) > 0:
-            homepage = self._saveNLDelCR(ds['homepage'][0])
-         elif type(homepage) is str:
-            homepage = self._saveNLDelCR(ds['homepage'])
-      
-      row = [orgkey, ds['key'], title, desc, ds['citation']['text'], 
-             rights, logo, ds['created'], ds['modified'], homepage]
-      
+   def _processRecordInfo(self, rec, header, preserveFormatingKeys=[]):
+      row = []
+      for key in header:
+         try:
+            val = rec[key]
+            
+            if type(val) is list:
+               if len(val) > 0:
+                  val = val[0]
+               else:
+                  val = ''
+                  
+            if key in preserveFormatingKeys:
+               val = self._saveNLDelCR(val)
+               
+            elif key == 'citation':
+               if type(val) is dict:
+                  try:
+                     val = val['text']
+                  except:
+                     pass
+               
+            elif key in ('created', 'modified'):
+               val = self._clipDate(val)
+                  
+         except KeyError:
+            val = ''
+         row.append(val)
+
       return row
 
-
 # ...............................................
-   def getCodesFromAPI(self, apitype, outfname, header):
+   def getCodesFromAPI(self, apitype, outfname, header, preserveFormatingKeys):
+      if apitype not in ('organization', 'dataset'):
+         raise Exception('What kind of query is {}?'.format(apitype))
+
       offset = 0
       pagesize = 1000
       url = '{}/{}?offset={}&limit={}'.format(GBIF_URL, apitype, offset, pagesize)
@@ -176,33 +179,35 @@ class GBIFCodes(object):
       allObjs = data['results']
       isComplete = data['endOfRecords']
       total = len(allObjs)
-      
-      while (not isComplete and total < pcount):  
-         print 'Received {} {}s from GBIF'.format(len(allObjs), apitype)
+
+      if total > 0:
          try:
             outf = codecs.open(outfname, 'w', ENCODING)
             outf.write(DELIMITER.join(header))
-
-            recno = 0
-            for obj in allObjs:
-               recno += 1
-               if apitype == 'organization':
-                  row = self._processProviderInfo(obj)
-               elif apitype == 'dataset':
-                  row = self._processDatasetInfo(obj)
-               else:
-                  print('What kind of query is {}?'.format(apitype))
-                             
-               outf.write(DELIMITER.join(row))
-
-            url = '{}/{}?offset={}&limit={}'.format(GBIF_URL, apitype, offset, pagesize)
-            response = urllib2.urlopen(url)
-            data = json.load(response)
-            pcount = data['count']
-            allObjs = data['results']
-            isComplete = data['endOfRecords']
-            total += len(allObjs)
             
+            recno = 0
+            while total <= pcount:  
+               print 'Received {} {}s from GBIF'.format(len(allObjs), apitype)
+               for obj in allObjs:
+                  recno += 1
+                  row = self._processRecordInfo(obj, header, 
+                                                preserveFormatingKeys=preserveFormatingKeys)
+                  try:
+                     outf.write(DELIMITER.join(row) + NEWLINE)
+                  except Exception, e:
+                     raise
+                  
+               if isComplete:
+                  total = pcount + 1
+               else:
+                  offset += pagesize
+                  url = '{}/{}?offset={}&limit={}'.format(GBIF_URL, apitype, offset, pagesize)
+                  response = urllib2.urlopen(url)
+                  data = json.load(response)
+                  allObjs = data['results']
+                  isComplete = data['endOfRecords']
+                  total += len(allObjs)
+               
          except Exception, e:
             raise      
          finally:
@@ -210,93 +215,19 @@ class GBIFCodes(object):
 
 
 # ...............................................
-   def getProviderCodes(self):
+   def getProviderCodes(self, outfname):
       header = ['key', 'title', 'description', 'created', 
                 'modified', 'homepage']
-      outProvFname = os.path.join(DATAPATH, OUT_PROVIDER)
-      self.getCodesFromAPI('organization', outProvFname, header)
+      formatKeys = ['description', 'homepage']
+      self.getCodesFromAPI('organization', outfname, header, formatKeys)
 
 # ...............................................
-   def getDatasetCodes(self):
+   def getDatasetCodes(self, outfname):
       header = ['publishingOrganizationKey', 'key', 'title', 'description', 
                 'citation', 'rights', 'logoUrl', 'created', 'modified', 
                 'homepage']
-      outDSFname = os.path.join(DATAPATH, OUT_DATASET)
-      self.getCodesFromAPI('dataset', outDSFname, header)
-
-# # ...............................................
-#    def getProviderCodes(self):
-#       header = ['key', 'title', 'description', 'created', 
-#                 'modified', 'homepage']
-#       offset = 0
-#       pagesize = 1000
-#       url = '{}/organization?offset={}&limit={}'.format(GBIF_URL, offset, pagesize)
-#       response = urllib2.urlopen(url)
-#       data = json.load(response)
-#       pcount = data['count']
-#       allProvs = data['results']
-#       isComplete = data['endOfRecords']
-#       total = len(allProvs)
-#       
-#       while (not isComplete and total < pcount):  
-#          print 'Received {} organizations from GBIF'.format(len(allProvs))
-#          try:
-#             outf = codecs.open(outProvFname, 'w', ENCODING)
-#             outf.write(DELIMITER.join(header))
-# 
-#             recno = 0
-#             for prov in allProvs:
-#                recno += 1
-#                row = self._processProviderInfo(prov)               
-#                outf.write(DELIMITER.join(row))
-#          except Exception, e:
-#             raise      
-#          finally:
-#             outf.close()
-
-# # ...............................................
-#    def getDatasetCodes(self):
-#       header = ['publishingOrganizationKey', 'key', 'title', 'description', 
-#                 'citation', 'rights', 'logoUrl', 'created', 'modified', 
-#                 'homepage']
-# #       header = ['owningorganization_id', 'legacyid', 'dataset_id', 'name', 
-# #                 'description', 'citation', 'created', 'modified', 'website_url']
-#       orgkey = title = rights = logo = desc = homepage = ''
-#       url = '{}/dataset?limit=9999'.format(GBIF_URL)
-#       response = urllib2.urlopen(url)
-#       data = json.load(response)
-#       allDatasets = data['results']
-#       print 'Received {} datasets from GBIF'.format(len(allDatasets))
-#       try:
-#          outf = codecs.open(outDSFname, 'w', ENCODING)
-#          outf.write(DELIMITER.join(header))
-# 
-#          recno = 0
-#          for ds in allDatasets:
-#             recno += 1
-#             row = []
-#             if ds.has_key("title"):
-#                title = self._saveNLDelCR(ds['title'])
-#             if ds.has_key("rights"):
-#                rights = self._saveNLDelCR(ds['rights'])
-#             if ds.has_key("logoUrl"):
-#                logo = self._saveNLDelCR(ds['logoUrl'])
-#             if ds.has_key("description"):
-#                desc = self._saveNLDelCR(ds['description'])
-#                
-#             if ds.has_key("homepage"):
-#                homepageVal= ds['homepage']
-#                if type(homepageVal) is list and len(homepageVal) > 0:
-#                   homepageVal = self._saveNLDelCR(ds['homepage'][0])
-#                elif type(homepageVal) is str:
-#                   homepageVal = self._saveNLDelCR(ds['homepage'])
-#             
-#             row = [orgkey, ds['key'], title, desc, ds['citation']['text'], 
-#                    rights, logo, ds['created'], ds['modified'], homepage]
-#             outf.write(DELIMITER.join(row))
-#                
-#       finally:
-#          outf.close()
+      formatKeys = ['title', 'rights', 'logoUrl', 'description', 'homepage']
+      self.getCodesFromAPI('dataset', outfname, header, formatKeys)
 
 
 # ...............................................

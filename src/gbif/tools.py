@@ -84,61 +84,61 @@ def getLine(csvreader, recno):
 
    return line, recno
 
-# ...............................................
-def openForReadWrite(fname, numKeys=1, numVals=1, header=None, 
-                     delimiter='\t'):
-   '''
-   @summary: Read and populate lookup table if file exists, open and return
-             file and csvwriter for writing or appending. If lookup file 
-             is new, write header if provided.
-   '''
-   lookupDict = {}
-   doAppend = False
-   
-   if os.path.exists(fname):
-      doAppend = True
-      colCount = 2
-      if header is not None:
-         colCount = len(header)
-      if (numKeys + numVals) != colCount:
-         raise Exception('Column count != keys + vals')
-      keyIdxs = []
-      valIdxs = []      
-      for i in range(colCount):
-         if i < numKeys:
-            keyIdxs.append(i)
-         else:
-            valIdxs.append(i)
-      
-      try:
-         csvRdr, infile = getCSVReader(fname, delimiter)
-         # get header
-         line, recno = self.getLine(csvRdr, 0)
-         # read lookup vals into dictionary
-         while (line is not None):
-            line, recno = self.getLine(csvRdr, recno)
-            if line and len(line) == len(valIdxs):
-               try:
-                  # read one or more values
-                  if len(valIdxs) == 1:
-                     val = line[valIdxs[0]]
-                  else:
-                     val = [line[v] for v in valIdxs]
-                  # read one or more keys
-                  for k in range(numKeys):
-                     lookupDict[line[k]] = val
-               except Exception, e:
-                  self._log.warn('Failed to read line {} from {}'
-                                 .format(recno, fname))
-         print('Read lookup file {}'.format(fname))
-      finally:
-         infile.close()
-   
-   outWriter, outfile = getCSVWriter(fname, delimiter, doAppend=doAppend)
-   print('Re-opened lookup file {} for appending'.format(fname))
-
-   if not doAppend and header is not None:
-      outWriter.writerow(header)
-   
-   return lookupDict, outWriter, outfile 
+# # ...............................................
+# def openForReadWrite(fname, numKeys=1, numVals=1, header=None, 
+#                      delimiter='\t'):
+#    '''
+#    @summary: Read and populate lookup table if file exists, open and return
+#              file and csvwriter for writing or appending. If lookup file 
+#              is new, write header if provided.
+#    '''
+#    lookupDict = {}
+#    doAppend = False
+#    
+#    if os.path.exists(fname):
+#       doAppend = True
+#       colCount = 2
+#       if header is not None:
+#          colCount = len(header)
+#       if (numKeys + numVals) != colCount:
+#          raise Exception('Column count != keys + vals')
+#       keyIdxs = []
+#       valIdxs = []      
+#       for i in range(colCount):
+#          if i < numKeys:
+#             keyIdxs.append(i)
+#          else:
+#             valIdxs.append(i)
+#       
+#       try:
+#          csvRdr, infile = getCSVReader(fname, delimiter)
+#          # get header
+#          line, recno = self.getLine(csvRdr, 0)
+#          # read lookup vals into dictionary
+#          while (line is not None):
+#             line, recno = self.getLine(csvRdr, recno)
+#             if line and len(line) == len(valIdxs):
+#                try:
+#                   # read one or more values
+#                   if len(valIdxs) == 1:
+#                      val = line[valIdxs[0]]
+#                   else:
+#                      val = [line[v] for v in valIdxs]
+#                   # read one or more keys
+#                   for k in range(numKeys):
+#                      lookupDict[line[k]] = val
+#                except Exception, e:
+#                   self._log.warn('Failed to read line {} from {}'
+#                                  .format(recno, fname))
+#          print('Read lookup file {}'.format(fname))
+#       finally:
+#          infile.close()
+#    
+#    outWriter, outfile = getCSVWriter(fname, delimiter, doAppend=doAppend)
+#    print('Re-opened lookup file {} for appending'.format(fname))
+# 
+#    if not doAppend and header is not None:
+#       outWriter.writerow(header)
+#    
+#    return lookupDict, outWriter, outfile 
 
