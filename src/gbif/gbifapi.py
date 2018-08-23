@@ -24,11 +24,12 @@
 import codecs
 import json
 import os
+import requests
+from requests.auth import HTTPBasicAuth
 import urllib2
 
 from constants import (DELIMITER, GBIF_URL, ENCODING, URL_ESCAPES, 
-                       DATAPATH)
-NEWLINE = '\n'
+                       DATAPATH, NEWLINE)
         
 # outProvFname = 'outProviderRecs.txt'
 # inProvFname = 'inProviderIDs.txt'
@@ -321,10 +322,89 @@ class GBIFCodes(object):
             canName = data['canonicalName']
       return canName
 
+
+# ...............................................
+   def _postToParser(self, url, indata):
+      output = None
+      files = {'file': indata}
+      headers={'Content-Type': 'application/octet-stream',
+               'Content-Length': len(indata)}
+      auth = HTTPBasicAuth('name', 'pswd')
+      
+      try:
+         response = requests.post(url, files=files, headers=headers, auth=auth)
+      except Exception, e:
+         try:
+            retcode = response.status_code
+            reason = response.reason
+         except:
+            retcode = 500
+            reason = 'Unknown Error'
+         print('Failed on URL {}, code = {}, reason = {} ({})'.format(
+                           url, retcode, reason, str(e)))
+      else:
+         if response.ok:
+            try:
+               output = response.json()
+            except Exception, e:
+               try:
+                  output = response.content
+               except Exception, e:
+                  output = response.text
+               else:
+                  print('Failed to interpret output of URL {}, content = {}; ({})'
+                     .format(url, response.content, str(e)))
+         else:
+            try:
+               retcode = response.status_code
+               reason = response.reason
+            except:
+               retcode = 500
+               reason = 'Unknown Error'
+            print('Failed ({}: {}) for URL {}'
+                  .format(retcode, reason, url))
+      return output, retcode, reason
+
+# ...............................................
+   def parseScientificListFromFile(self, fname, outputType='json'):
+      baseurl = GBIF_URL.replace('http', 'https')
+      url = '{}/parser/name/'.format(baseurl)
+#       headers = {'Content-Type': 'application/json'}
+      try:
+         f = open(fname, 'rb')
+         indata = f.read()
+      except Exception, e:
+         print('Failed reading input file {}, err: {}'.format(fname, str(e)))
+         return
+      else:
+         output, retcode, reason = self._postToParser(url, indata)
+      finally:
+         f.close()
+         
+
 # ...............................................
 if __name__ == '__main__':
+   import argparse
+   parser = argparse.ArgumentParser(
+            description=("""Submit data to GBIF API services as a GET request
+                            or file as a POST request.
+                         """))
+   parser.add_argument('--name_file', type=str, default=None,
+                       help="""
+                       Full pathname of the input file containing UTF-8 encoded
+                       scientificNames to be parsed into canonicalNames.
+                       """)
+   args = parser.parse_args()
+   nameFname = args.name_file
+   
    gc = GBIFCodes()
-   gc.getProviderCodes()
+   if nameFname is not None:
+      if os.path.exists(nameFname):
+         gc.parseScientificListFromFile(nameFname)
+   else:
+      print('Filename {} does not exist'.format(nameFname))
+
+#    gc.getProviderCodes()
    
 """
 import csv

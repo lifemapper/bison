@@ -19,6 +19,7 @@ META_FNAME = 'meta.xml'
 
 CLIP_CHAR = '/'
 DELIMITER = '\t'
+NEWLINE = '\n'
 URL_ESCAPES = [ [" ", "%20"], [",", "%2C"] ]
 
 LOG_FORMAT = ' '.join(["%(asctime)s",

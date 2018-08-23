@@ -24,16 +24,16 @@ usage ()
 
 ### Set variables 
 set_defaults() {
-	start=$1
-	count=$2
-	inc=1000000
-	pth=/state/partition1/data/bison/terr
-	base=occurrence
-	outbase=outBison
+    start=$1
+    count=$2
+    inc=1000000
+    pth=/state/partition1/data/bison/terr
+    base=occurrence
+    outbase=outBison
 
-	echo $pth/$base$postfix.csv
+    echo $pth/$base$postfix.csv
 	
-	PROCESS_CSV=/state/partition1/workspace/bison/src/gbif/gbif2bison.py
+    PROCESS_CSV=/state/partition1/workspace/bison/src/gbif/gbif2bison.py
 
     THISNAME=`/bin/basename $0`
 
@@ -45,9 +45,9 @@ set_defaults() {
 
 ### Convert some data 
 convert_data() {
-	start=$1
-	stop=$2
-	postfix=_lines_$start-$stop
+    start=$1
+    stop=$2
+    postfix=_lines_$start-$stop
 	
     infile=$pth/$base$postfix.csv
     if [ -s $infile ]; then
@@ -57,14 +57,14 @@ convert_data() {
     fi
 
     outfile=$pth/$outbase$postfix.csv
-	if [ -s $outfile ]; then
-		LogStuff "${outfile} exists"
-	else
-		LogStuff "${outfile} does not exist"
-		TimeStamp "process into ${outfile}" >> $LOG
-		time python $PROCESS_CSV --start_line=$start --stop_line=$stop >> $LOG
-	    TimeStamp ""
-	fi
+    if [ -s $outfile ]; then
+	LogStuff "${outfile} exists"
+    else
+	LogStuff "${outfile} does not exist"
+	TimeStamp "process into ${outfile}" >> $LOG
+	time python $PROCESS_CSV >> $LOG
+	TimeStamp ""
+    fi
 }
 
 TimeStamp () {
