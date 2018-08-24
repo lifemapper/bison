@@ -30,6 +30,7 @@ import urllib2
 
 from constants import (DELIMITER, GBIF_URL, ENCODING, URL_ESCAPES, 
                        DATAPATH, NEWLINE)
+from src.gbif.tools import getCSVWriter
         
 # outProvFname = 'outProviderRecs.txt'
 # inProvFname = 'inProviderIDs.txt'
@@ -324,24 +325,24 @@ class GBIFCodes(object):
 
 
 # ...............................................
-   def _postToParser(self, url, indata):
-      output = None
-      files = {'file': indata}
-      headers={'Content-Type': 'application/octet-stream',
-               'Content-Length': len(indata)}
-      auth = HTTPBasicAuth('name', 'pswd')
+   def _postToParser(self, url, infname):
+      response = output = None
+      headers={'Accept': 'application/json',
+               'Content-Type': 'application/json'}
+#       auth = HTTPBasicAuth()
+      auth = None
+      indata = open(infname, 'rb')
       
       try:
-         response = requests.post(url, files=files, headers=headers, auth=auth)
+#          response = requests.post(url, files=files, headers=headers, auth=auth)
+         response = requests.post(url, data=indata, 
+                                  headers=headers, auth=auth)
       except Exception, e:
-         try:
+         if response is not None:
             retcode = response.status_code
             reason = response.reason
-         except:
-            retcode = 500
-            reason = 'Unknown Error'
-         print('Failed on URL {}, code = {}, reason = {} ({})'.format(
-                           url, retcode, reason, str(e)))
+         else:
+            print('Failed on URL {} ({})'.format(url, str(e)))
       else:
          if response.ok:
             try:
@@ -352,34 +353,47 @@ class GBIFCodes(object):
                except Exception, e:
                   output = response.text
                else:
-                  print('Failed to interpret output of URL {}, content = {}; ({})'
-                     .format(url, response.content, str(e)))
+                  print('Failed to interpret output of URL {} ({})'
+                     .format(url, str(e)))
          else:
             try:
-               retcode = response.status_code
+               retcode = response.status_code      
                reason = response.reason
             except:
-               retcode = 500
-               reason = 'Unknown Error'
-            print('Failed ({}: {}) for URL {}'
-                  .format(retcode, reason, url))
-      return output, retcode, reason
+               print('Failed to find failure reason for URL {} ({})'
+                  .format(url, str(e)))
+            else:
+               print('Failed on URL {} ({}: {})'
+                     .format(url, retcode, reason))
+      finally:
+         indata.close()
+         
+      return output
 
 # ...............................................
-   def parseScientificListFromFile(self, fname, outputType='json'):
+   def parseScientificListFromFile(self, infname, outfname):
       baseurl = GBIF_URL.replace('http', 'https')
       url = '{}/parser/name/'.format(baseurl)
-#       headers = {'Content-Type': 'application/json'}
-      try:
-         f = open(fname, 'rb')
-         indata = f.read()
-      except Exception, e:
-         print('Failed reading input file {}, err: {}'.format(fname, str(e)))
-         return
-      else:
-         output, retcode, reason = self._postToParser(url, indata)
-      finally:
-         f.close()
+      output = self._postToParser(url, infname)
+      
+      if output is not None:
+         try:
+            csvwriter, f = getCSVWriter(outfname, DELIMITER)
+            for rec in output:
+               if rec['parsed']:
+                  try:
+                     sciname = rec['scientificName']
+                     canname = rec['canonicalName']
+                     csvwriter.writerow([sciname, canname])
+                  except KeyError, e:
+                     print('Missing key in output record, err: {}'.format(str(e)))
+                  except Exception, e:
+                     print('Failed writing output record, err: {}'.format(str(e)))
+         except Exception, e:
+            print('Failed writing outfile {}, err: {}'.format(outfname, str(e)))            
+         finally:
+            f.close()
+            
          
 
 # ...............................................
@@ -397,16 +411,25 @@ if __name__ == '__main__':
    args = parser.parse_args()
    nameFname = args.name_file
    
-   gc = GBIFCodes()
-   if nameFname is not None:
-      if os.path.exists(nameFname):
-         gc.parseScientificListFromFile(nameFname)
-   else:
-      print('Filename {} does not exist'.format(nameFname))
+#    gc = GBIFCodes()
+#    if nameFname is not None:
+#       if os.path.exists(nameFname):
+#          gc.parseScientificListFromFile(nameFname)
+#    else:
+#       print('Filename {} does not exist'.format(nameFname))
 
 #    gc.getProviderCodes()
    
 """
+
+curl -i \
+  --user usr:pswd \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -X POST -d @/state/partition1/data/bison/us/nameUUIDForLookup_1-10000000_sciname.json \
+  http://api.gbif.org/v1/parser/name
+
+
 import csv
 import codecs
 import cStringIO

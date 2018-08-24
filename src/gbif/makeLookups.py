@@ -21,16 +21,17 @@
           Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 
           02110-1301, USA.
 """
+import codecs
 import glob
 import os
 import xml.etree.ElementTree as ET
 
-from constants import DELIMITER, NEWLINE
+from constants import DELIMITER, NEWLINE, ENCODING
 from gbifapi import GBIFCodes
 from tools import getCSVReader, getCSVWriter, getLogger
 
    
-DS_UUID_FNAME = '/Users/astewart/git/lifemapper/bison/src/gbif/datasetUUIDs.txt'
+DS_UUID_FNAME = '/state/partition1/data/bison/datasetUUIDs.txt'
 # .............................................................................
 class GBIFMetaReader(object):
    """
@@ -39,7 +40,7 @@ class GBIFMetaReader(object):
    @note: 
    """
    # ...............................................
-   def __init__(self, provFname, resFname, canFname, inSpeciesFname=None, datasetPath=None):
+   def __init__(self, provFname, resFname, nameIdFname=None, datasetPath=None):
       """
       @summary: Constructor
       @param provFname: Full filename for the output lookup file for organization/provider
@@ -48,6 +49,14 @@ class GBIFMetaReader(object):
       @param datasetPath: Directory containing individual files describing 
              datasets referenced in occurrence records.
       """
+      self.nameIdFname = nameIdFname
+      self.scinameFname = None
+      self.scinameCannameFname = None
+      if nameIdFname is not None:
+         spfullbasename, _ = os.path.splitext(nameIdFname)
+         self.scinameFname = spfullbasename + '_sciname.json'
+         self.scinameCannameFname = spfullbasename + '_sciname_canname.csv'
+
       self.gbifRes = GBIFCodes()
       self._files = []
             
@@ -61,18 +70,7 @@ class GBIFMetaReader(object):
       self._resf = None
       self._files.append(self._resf)
       self._resWriter = None
-
-      self.canFname = canFname
-      self._canf = None
-      self._files.append(self._canf)
-      self._canWriter = None
       
-      self.inSpeciesFname = inSpeciesFname
-      if inSpeciesFname is None:
-         self.outSciFname = None
-      else:
-         spfullbasename, _ = os.path.splitext(inSpeciesFname)
-         self.outSciFname = spfullbasename + '_sciname_.txt'
          
       # Path to GBIF provided dataset metadata files
       self._datasetPath = datasetPath
@@ -100,20 +98,14 @@ class GBIFMetaReader(object):
          self._log.error('Failed parsing {}, exception {}'.format(fname, e))
 
    # ...............................................
-   def extractDatasetMetadata(self):
+   def extractDatasetMetadata(self, uuidList):
       """
       @summary: Create a CSV file containing GBIF dataset metadata  
                 extracted from the GBIF API, for only datasets with UUIDs 
                 in the DS_UUID_FNAME..
       @return: A CSV file of metadata records for GBIF datasets. 
       """
-      uuids = set()
-      for line in open(DS_UUID_FNAME, 'r'):
-         stp = line.rfind('.xml')
-         uuid = line[:stp]
-         uuids.add(uuid)
-         
-      self.gbifRes.getDatasetCodes(self.resFname, uuids)
+      self.gbifRes.getDatasetCodes(self.resFname, uuidList)
    
    # ...............................................
    def extractProviderMetadata(self):
@@ -123,49 +115,179 @@ class GBIFMetaReader(object):
       @return: A CSV file of metadata records for GBIF organizations. 
       """
       self.gbifRes.getProviderCodes(self.provFname)
+      
+   # ...............................................
+   def _readData(self, csvreader):
+      encSciname = None
+      try:
+         line = csvreader.next()
+         if len(line) > 0:
+            sciname = line[0]
+      except OverflowError, e:
+         self._log.info( 'Overflow on line {} ({})'
+                         .format(csvreader.line, str(e)))
+      except StopIteration:
+         self._log.info('EOF after line {}'
+                        .format(csvreader.line_num))
+         csvreader = None
+      except Exception, e:
+         self._log.info('Bad record on line {} ({})'
+                        .format(csvreader.line_num, e))
+      else:
+         encSciname = sciname.encode(ENCODING)
+         
+      return encSciname, csvreader
+         
+   # ...............................................
+   def _writeData(self, outf, encodedString):
+      # Write encoded data as binary
+      try:
+         outf.write('"{}"'.format(encodedString))
+      except UnicodeDecodeError, e:
+         self._log.error('Decode error {}'.format(e))
+      except UnicodeEncodeError, e:
+         self._log.error('Encode error {}'.format(e))
+      
 
    # ...............................................
    def _writeGBIFParserInput(self):
       '''
       @summary: Read metadata for dataset with this uuid
       '''
-      if os.path.exists(self.outSciFname):
-         self._log.info('Scientific name list file {} already exists'
-                        .format(self.outSciFname))
-         return
+      if os.path.exists(self.scinameFname):
+         self._log.info('Deleting existing scientific name json file {}'
+                        .format(self.scinameFname))
+         os.remove(self.scinameFname)
+
       try:
-         csvwriter, scif = getCSVWriter(self.outSciFname, DELIMITER, doAppend=False)
-#          scif = open(self.outSciFname, 'w')
-         csvreader, inf = getCSVReader(self.inSpeciesFname, DELIMITER)
+         scif = open(self.scinameFname, 'wb')
+         scif.write('[{}'.format(NEWLINE))
+         csvreader, inf = getCSVReader(self.nameIdFname, DELIMITER)
+         # discard header
+         _, csvreader = self._readData(csvreader)
+         # then get/write first line
+         encSciname, csvreader = self._readData(csvreader)
+         self._writeData(scif, encSciname)
+         
          while csvreader is not None:
-            try:
-               line = csvreader.next()
-               if len(line) > 0:
-                  sciname = line[0]
-            except OverflowError, e:
-               self._log.info( 'Overflow on line {} ({})'
-                               .format(csvreader.line, str(e)))
-            except StopIteration:
-               self._log.info('EOF after line {}'
-                              .format(csvreader.line_num))
-               csvreader = None
-            except Exception, e:
-               self._log.info('Bad record on line {} ({})'
-                              .format(csvreader.line, e))
-            else:
-               csvwriter.writerow([sciname])
+            encSciname, csvreader = self._readData(csvreader)
+
+            if encSciname is not None:
+               scif.write(',{}'.format(NEWLINE))
+               self._writeData(scif, encSciname)
+
+         scif.write('{}]{}'.format(NEWLINE, NEWLINE))
       finally:
          scif.close()
          inf.close()
 
    # ...............................................
-   def parseSciNames(self):
+   def createScinameInput(self):
       '''
       @summary: Read metadata for dataset with this uuid
       '''
       self._writeGBIFParserInput()
+      
+   # ...............................................
+   def getGBIFParserOutput(self):
+      self.gbifRes.parseScientificListFromFile(self.scinameFname, 
+                                               self.scinameCannameFname)
 
+# ...............................................
+def concatenateLookups(pth, pattern, fnames=None):
+   outfname = os.path.join(pth, 'canonicalLookup.csv')
+   try:
+      csvwriter, outf = getCSVWriter(outfname, DELIMITER)
 
+      if fnames is None:
+         fnames = glob.glob(os.path.join(pth, pattern))
+      else:
+         outfname = os.path.join(pth, 'canonicalLookup_v2.csv')
+
+      for fname in fnames:
+         csvreader, inf = getCSVReader(fname, DELIMITER)
+         while csvreader is not None:
+            try:
+               line = csvreader.next()
+            except OverflowError, e:
+               print( 'Overflow on line {} ({})'.format(csvreader.line, str(e)))
+            except StopIteration:
+               print('EOF after line {}'.format(csvreader.line_num))
+               csvreader = None
+               inf.close()
+            except Exception, e:
+               print('Bad record on line {} ({})'.format(csvreader.line_num, e))
+            else:
+               csvwriter.writerow(line)
+   except Exception, e:
+      print('Failed in infile {}, {}'.format(fname, str(e)))
+   finally:
+      outf.close()
+   
+# ...............................................
+def _getNextWriter(bigFname, currFnum):
+   bigbasefname, ext  = os.path.splitext(bigFname)
+   newfname = '{}_{}{}'.format(bigbasefname, currFnum, ext)
+   csvwriter, outf = getCSVWriter(newfname, DELIMITER, doAppend=False)
+   return csvwriter, outf
+      
+# ...............................................
+def splitFile(bigFname, limit=50000):
+   currFnum = 1
+   stopLine = limit
+   csvreader, inf = getCSVReader(bigFname, DELIMITER)
+   csvwriter, outf = _getNextWriter(bigFname, currFnum)
+   while csvreader is not None and csvreader.line_num < stopLine:
+      try:
+         line = csvreader.next()
+      except OverflowError, e:
+         print( 'Overflow on line {} ({})'.format(csvreader.line, str(e)))
+      except StopIteration:
+         print('EOF after line {}'.format(csvreader.line_num))
+         csvreader = None
+         inf.close()
+      except Exception, e:
+         print('Bad record on line {} ({})'.format(csvreader.line_num, e))
+      else:
+         csvwriter.writerow(line)
+         
+      if csvreader is None:
+         outf.close()
+      elif csvreader.line_num >= stopLine:
+         outf.close()
+         currFnum += 1
+         csvwriter, outf = _getNextWriter(bigFname, currFnum)
+         stopLine += limit
+      
+# ...............................................
+def splitFile2(bigFname, limit=50000):
+   currFnum = 2
+   startLine = limit
+   stopLine = startLine + limit
+   csvreader, inf = getCSVReader(bigFname, DELIMITER)
+   csvwriter, outf = _getNextWriter(bigFname, currFnum)
+   while csvreader is not None and csvreader.line_num < stopLine:
+      try:
+         line = csvreader.next()
+      except OverflowError, e:
+         print( 'Overflow on line {} ({})'.format(csvreader.line, str(e)))
+      except StopIteration:
+         print('EOF after line {}'.format(csvreader.line_num))
+         csvreader = None
+         inf.close()
+      except Exception, e:
+         print('Bad record on line {} ({})'.format(csvreader.line_num, e))
+      else:
+         if csvreader.line_num > startLine and csvreader.line_num <= stopLine: 
+            csvwriter.writerow(line)
+         if csvreader.line_num >= stopLine:
+            pass
+            
+   outf.close()
+   csvreader = None
+   inf.close()
+         
+      
 # ...............................................
 if __name__ == '__main__':
    import argparse
@@ -174,7 +296,7 @@ if __name__ == '__main__':
                             Request and parse provider metadata from GBIF API,
                             Request parsing of a file of species names, or request
                             and parse results from GBIF species API for taxonkey.
-                         """))
+                         """))   
    parser.add_argument('--name_file', type=str, default=None,
                        help="""
                        Full pathname of the input file containing 
@@ -185,31 +307,65 @@ if __name__ == '__main__':
                        The pathname for directory containing GBIF dataset 
                        metadata files.
                        """)
+                       
+   parser.add_argument('--big_name_file', type=str, default=None,
+                       help="""
+                       Full pathname of the VERY LARGE input file to be split
+                       into smaller files.
+                       """)
+   parser.add_argument('--canonical_lookup_path', type=str, default=None, 
+                       help=""""
+                       The pathname for directory containing GBIF dataset 
+                       metadata files.
+                       """)
 #    parser.add_argument('--names_only', type=bool, default=False,
 #             help=('Re-read a bison output file to retrieve scientificName and taxonID.'))
    args = parser.parse_args()
+   bigNameIdFname = args.big_name_file
+   canonicalLookupPath = args.canonical_lookup_path
    nameIdFname = args.name_file
    datasetPath = args.dataset_path
    
-   if os.path.exists(nameIdFname):
-      pth, basefname = os.path.split(nameIdFname)
+   if bigNameIdFname and os.path.exists(bigNameIdFname):
+      splitFile(bigNameIdFname)
+#       splitFile2(bigNameIdFname)
+
+   elif canonicalLookupPath is not None:
+      fnames = [os.path.join(canonicalLookupPath, 'nameUUIDForLookup_2_sciname_canname.csv'),
+                os.path.join(canonicalLookupPath, 'canonicalLookup.csv')]
+      concatenateLookups(canonicalLookupPath, 
+                         'nameUUIDForLookup*sciname_canname.csv',
+                         fnames=fnames)
       
+   elif nameIdFname and os.path.exists(nameIdFname):
+      pth, basefname = os.path.split(nameIdFname)
       provFname = os.path.join(pth, 'providerLookup.csv')
       resFname = os.path.join(pth, 'resourceLookup.csv')
-      canFname = os.path.join(pth, 'canonicalLookup.csv')
-      
-      gmr = GBIFMetaReader(provFname, resFname, canFname, inSpeciesFname=nameIdFname, datasetPath=datasetPath)
+       
+      gmr = GBIFMetaReader(provFname, resFname, nameIdFname=nameIdFname, datasetPath=datasetPath)
       print('Calling program with input/output {}'.format(nameIdFname, datasetPath))
       if nameIdFname is not None:
-         gmr.parseSciNames()
+         if not(os.path.exists(gmr.scinameFname)):
+            gmr.createScinameInput()
+         if not(os.path.exists(gmr.scinameCannameFname)):
+            gmr.getGBIFParserOutput()
+          
       if datasetPath is not None:
+               uuids = set()
+      for line in open(DS_UUID_FNAME, 'r'):
+         stp = line.rfind('.xml')
+         uuid = line[:stp]
+         uuids.add(uuid)
+         
+
          gmr.extractDatasetMetadata()
-#       gmr.extractProviderMetadata()
+      gmr.extractProviderMetadata()
    else:
       print('Filename {} does not exist'.format(nameIdFname))
    
 """
-python makeLookups.py /state/partition1/data/bison/us/nameUUIDForLookup_1-10000000.csv  /state/partition1/data/bison/us/dataset
+python /state/partition1/workspace/bison/src/gbif/makeLookups.py \
+       --name_file /state/partition1/data/bison/us/nameUUIDForLookup_1-10000000.csv  
 
 
 
