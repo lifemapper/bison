@@ -25,15 +25,11 @@ import codecs
 import json
 import os
 import requests
-from requests.auth import HTTPBasicAuth
 import urllib2
 
-from constants import (DELIMITER, GBIF_URL, ENCODING, URL_ESCAPES, 
-                       DATAPATH, NEWLINE)
+from constants import (DELIMITER, GBIF_URL, ENCODING, URL_ESCAPES, NEWLINE)
 from src.gbif.tools import getCSVWriter
         
-# outProvFname = 'outProviderRecs.txt'
-# inProvFname = 'inProviderIDs.txt'
 # .............................................................................
 class GBIFCodes(object):
    """
@@ -334,7 +330,6 @@ class GBIFCodes(object):
       indata = open(infname, 'rb')
       
       try:
-#          response = requests.post(url, files=files, headers=headers, auth=auth)
          response = requests.post(url, data=indata, 
                                   headers=headers, auth=auth)
       except Exception, e:
@@ -403,22 +398,27 @@ if __name__ == '__main__':
             description=("""Submit data to GBIF API services as a GET request
                             or file as a POST request.
                          """))
-   parser.add_argument('--name_file', type=str, default=None,
+   parser.add_argument('--infile', type=str, default=None,
                        help="""
                        Full pathname of the input file containing UTF-8 encoded
                        scientificNames to be parsed into canonicalNames.
                        """)
+   parser.add_argument('--outfile', type=str, default=None,
+                       help="""
+                       Full pathname of the output file with UTF-8 encoded
+                       scientificNames and corresponding canonicalNames.
+                       """)
    args = parser.parse_args()
-   nameFname = args.name_file
+   inFname = args.infname
+   outFname = args.outfname
    
-#    gc = GBIFCodes()
-#    if nameFname is not None:
-#       if os.path.exists(nameFname):
-#          gc.parseScientificListFromFile(nameFname)
-#    else:
-#       print('Filename {} does not exist'.format(nameFname))
+   gc = GBIFCodes()
+   if inFname is not None and os.path.exists(inFname):
+         gc.parseScientificListFromFile(inFname, outFname)
+   else:
+      print('Filename {} does not exist'.format(inFname))
 
-#    gc.getProviderCodes()
+   gc.getProviderCodes()
    
 """
 

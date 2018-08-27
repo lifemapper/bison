@@ -21,7 +21,6 @@
           Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 
           02110-1301, USA.
 """
-import codecs
 import glob
 import os
 import xml.etree.ElementTree as ET
@@ -40,45 +39,17 @@ class GBIFMetaReader(object):
    @note: 
    """
    # ...............................................
-   def __init__(self, provFname, resFname, nameIdFname=None, datasetPath=None):
+   def __init__(self, filepath):
       """
       @summary: Constructor
-      @param provFname: Full filename for the output lookup file for organization/provider
-      @param resFname: Full filename for the output lookup file for dataset/resource
-      @param canFname: Full filename for the output lookup file for canonical names 
-      @param datasetPath: Directory containing individual files describing 
-             datasets referenced in occurrence records.
+      @param filepath: Path for input and output datafiles
       """
-      self.nameIdFname = nameIdFname
-      self.scinameFname = None
-      self.scinameCannameFname = None
-      if nameIdFname is not None:
-         spfullbasename, _ = os.path.splitext(nameIdFname)
-         self.scinameFname = spfullbasename + '_sciname.json'
-         self.scinameCannameFname = spfullbasename + '_sciname_canname.csv'
-
+      self.fullpath = filepath
       self.gbifRes = GBIFCodes()
       self._files = []
             
-      # Output lookup files
-      self.provFname = provFname
-      pth, _ = os.path.split(provFname)
-      # Input for provider UUID lookup
-      self.providerLookup = {}
-      
-      self.resFname = resFname
-      self._resf = None
-      self._files.append(self._resf)
-      self._resWriter = None
-      
-         
-      # Path to GBIF provided dataset metadata files
-      self._datasetPath = datasetPath
-      # Input for dataset UUID lookup
-      self.datasetLookup = {}
-
       logname, _ = os.path.splitext(os.path.basename(__file__))
-      logfname = os.path.join(pth, logname + '.log')
+      logfname = os.path.join(filepath, logname + '.log')
       if os.path.exists(logfname):
          os.remove(logfname)
       self._log = getLogger(logname, logfname)
@@ -98,23 +69,23 @@ class GBIFMetaReader(object):
          self._log.error('Failed parsing {}, exception {}'.format(fname, e))
 
    # ...............................................
-   def extractDatasetMetadata(self, uuidList):
+   def extractDatasetMetadata(self, resourceFname, uuidList):
       """
       @summary: Create a CSV file containing GBIF dataset metadata  
                 extracted from the GBIF API, for only datasets with UUIDs 
                 in the DS_UUID_FNAME..
       @return: A CSV file of metadata records for GBIF datasets. 
       """
-      self.gbifRes.getDatasetCodes(self.resFname, uuidList)
+      self.gbifRes.getDatasetCodes(resourceFname, uuidList)
    
    # ...............................................
-   def extractProviderMetadata(self):
+   def extractProviderMetadata(self, provFname):
       """
       @summary: Create a CSV file containing GBIF organizations metadata 
                 extracted from the GBIF API
       @return: A CSV file of metadata records for GBIF organizations. 
       """
-      self.gbifRes.getProviderCodes(self.provFname)
+      self.gbifRes.getProviderCodes(provFname)
       
    # ...............................................
    def _readData(self, csvreader):
@@ -150,19 +121,20 @@ class GBIFMetaReader(object):
       
 
    # ...............................................
-   def _writeGBIFParserInput(self):
+   def _writeGBIFParserInput(self, inNameIdFname, outScinameFname):
       '''
-      @summary: Read metadata for dataset with this uuid
+      @summary: Read scientificName, taxonKey(s) from input CSV file, write 
+                a JSON file with scientificName list for input to the 
+                GBIF parser.
+      @param inNameIdFname: Input CSV file with scientificName, and one or more
+                            taxonKeys (identifier for GBIF taxonomic record).
+      @param outScinameFname: Output JSON file with list of ScientificNames 
+                            for parsing by the GBIF parser.
       '''
-      if os.path.exists(self.scinameFname):
-         self._log.info('Deleting existing scientific name json file {}'
-                        .format(self.scinameFname))
-         os.remove(self.scinameFname)
-
       try:
-         scif = open(self.scinameFname, 'wb')
+         scif = open(outScinameFname, 'wb')
          scif.write('[{}'.format(NEWLINE))
-         csvreader, inf = getCSVReader(self.nameIdFname, DELIMITER)
+         csvreader, inf = getCSVReader(inNameIdFname, DELIMITER)
          # discard header
          _, csvreader = self._readData(csvreader)
          # then get/write first line
@@ -182,29 +154,45 @@ class GBIFMetaReader(object):
          inf.close()
 
    # ...............................................
-   def createScinameInput(self):
+   def parseScientificNames(self, nameIdBasename):
       '''
       @summary: Read metadata for dataset with this uuid
       '''
-      self._writeGBIFParserInput()
-      
-   # ...............................................
-   def getGBIFParserOutput(self):
-      self.gbifRes.parseScientificListFromFile(self.scinameFname, 
-                                               self.scinameCannameFname)
+      nameIdFname = os.path.join(self.fullpath, nameIdBasename)
+      if not os.path.exists(nameIdFname):
+         self._log.error('File {} does not exist for parsing scientific names')
+         return 
+
+      spfullbasename, _ = os.path.splitext(nameIdFname)
+      inScinameJSON = spfullbasename + '_sciname.json'
+      outScinameCannameCSV = spfullbasename + '_sciname_canname.csv'
+
+      if not os.path.exists(inScinameJSON):
+         self._writeGBIFParserInput(nameIdFname, inScinameJSON)
+      self.gbifRes.parseScientificListFromFile(inScinameJSON, 
+                                               outScinameCannameCSV)
 
 # ...............................................
-def concatenateLookups(pth, pattern, fnames=None):
-   outfname = os.path.join(pth, 'canonicalLookup.csv')
+def concatenateLookups(filepath, outfname, pattern=None, fnames=None):
+   '''
+   @summary: Concatenate named files or files matching pattern into a single file. 
+   @param filepath: Pathname to input files
+   @param outfname: Basename of output file
+   @param pattern: Pattern to match for input files
+   @param fnames: Basename of one or more input file
+   '''
+   outfname = os.path.join(filepath, outfname)
+   infnames = []
    try:
       csvwriter, outf = getCSVWriter(outfname, DELIMITER)
 
-      if fnames is None:
-         fnames = glob.glob(os.path.join(pth, pattern))
-      else:
-         outfname = os.path.join(pth, 'canonicalLookup_v2.csv')
+      if pattern is not None:
+         infnames = glob.glob(os.path.join(filepath, pattern))
+      if fnames is not None:
+         for fn in fnames:
+            infnames.append(os.path.join(filepath, fn))            
 
-      for fname in fnames:
+      for fname in infnames:
          csvreader, inf = getCSVReader(fname, DELIMITER)
          while csvreader is not None:
             try:
@@ -260,33 +248,7 @@ def splitFile(bigFname, limit=50000):
          stopLine += limit
       
 # ...............................................
-def splitFile2(bigFname, limit=50000):
-   currFnum = 2
-   startLine = limit
-   stopLine = startLine + limit
-   csvreader, inf = getCSVReader(bigFname, DELIMITER)
-   csvwriter, outf = _getNextWriter(bigFname, currFnum)
-   while csvreader is not None and csvreader.line_num < stopLine:
-      try:
-         line = csvreader.next()
-      except OverflowError, e:
-         print( 'Overflow on line {} ({})'.format(csvreader.line, str(e)))
-      except StopIteration:
-         print('EOF after line {}'.format(csvreader.line_num))
-         csvreader = None
-         inf.close()
-      except Exception, e:
-         print('Bad record on line {} ({})'.format(csvreader.line_num, e))
-      else:
-         if csvreader.line_num > startLine and csvreader.line_num <= stopLine: 
-            csvwriter.writerow(line)
-         if csvreader.line_num >= stopLine:
-            pass
-            
-   outf.close()
-   csvreader = None
-   inf.close()
-         
+
       
 # ...............................................
 if __name__ == '__main__':
@@ -297,89 +259,83 @@ if __name__ == '__main__':
                             Request parsing of a file of species names, or request
                             and parse results from GBIF species API for taxonkey.
                          """))   
+   parser.add_argument('--file_path', type=str, default=None,
+                       help="Full path to input data.")
    parser.add_argument('--name_file', type=str, default=None,
                        help="""
-                       Full pathname of the input file containing 
+                       Base filename of the input file containing 
                        scientificName and taxonKey(s) for names to be resolved.
                        """)
-   parser.add_argument('--dataset_path', type=str, default=None, 
-                       help=""""
-                       The pathname for directory containing GBIF dataset 
-                       metadata files.
-                       """)
-                       
    parser.add_argument('--big_name_file', type=str, default=None,
                        help="""
-                       Full pathname of the VERY LARGE input file to be split
+                       Base filename of the VERY LARGE input file to be split
                        into smaller files.
                        """)
-   parser.add_argument('--canonical_lookup_path', type=str, default=None, 
-                       help=""""
-                       The pathname for directory containing GBIF dataset 
-                       metadata files.
+   parser.add_argument('--do_provider', type=bool, default=False,
+                       help="""
+                       Query GBIF API to create an OrganizationUUID-provider 
+                       lookup file.
                        """)
-#    parser.add_argument('--names_only', type=bool, default=False,
-#             help=('Re-read a bison output file to retrieve scientificName and taxonID.'))
+   parser.add_argument('--do_resource', type=bool, default=False,
+                       help="""
+                       Query GBIF API to create a DatasetUUID-resource
+                       lookup file.
+                       """)
+   parser.add_argument('--do_concatenate', type=bool, default=False,
+                       help="""
+                       Concatenate canonical name lookup files into a single 
+                       large lookup file.
+                       """)
    args = parser.parse_args()
-   bigNameIdFname = args.big_name_file
-   canonicalLookupPath = args.canonical_lookup_path
-   nameIdFname = args.name_file
-   datasetPath = args.dataset_path
+   filepath = args.file_path
+   nameIdBasename = args.name_file
+   bigNameIdBasename = args.big_name_file
+   doProvider = args.do_provider
+   doResource = args.do_resource
+   doConcatenate = args.do_concatenate
    
-   if bigNameIdFname and os.path.exists(bigNameIdFname):
-      splitFile(bigNameIdFname)
-#       splitFile2(bigNameIdFname)
-
-   elif canonicalLookupPath is not None:
-      fnames = [os.path.join(canonicalLookupPath, 'nameUUIDForLookup_2_sciname_canname.csv'),
-                os.path.join(canonicalLookupPath, 'canonicalLookup.csv')]
-      concatenateLookups(canonicalLookupPath, 
-                         'nameUUIDForLookup*sciname_canname.csv',
-                         fnames=fnames)
-      
-   elif nameIdFname and os.path.exists(nameIdFname):
-      pth, basefname = os.path.split(nameIdFname)
-      provFname = os.path.join(pth, 'providerLookup.csv')
-      resFname = os.path.join(pth, 'resourceLookup.csv')
-       
-      gmr = GBIFMetaReader(provFname, resFname, nameIdFname=nameIdFname, datasetPath=datasetPath)
-      print('Calling program with input/output {}'.format(nameIdFname, datasetPath))
-      if nameIdFname is not None:
-         if not(os.path.exists(gmr.scinameFname)):
-            gmr.createScinameInput()
-         if not(os.path.exists(gmr.scinameCannameFname)):
-            gmr.getGBIFParserOutput()
-          
-      if datasetPath is not None:
-               uuids = set()
-      for line in open(DS_UUID_FNAME, 'r'):
-         stp = line.rfind('.xml')
-         uuid = line[:stp]
-         uuids.add(uuid)
-         
-
-         gmr.extractDatasetMetadata()
-      gmr.extractProviderMetadata()
+   if os.path.isdir(filepath):
+      print('Error: Filepath {} does not exist'.format(filepath))
    else:
-      print('Filename {} does not exist'.format(nameIdFname))
+      gmr = GBIFMetaReader(filepath)
+      
+      # Split files into smaller chunks
+      if bigNameIdBasename:
+         bigNameIdFname = os.path.join(filepath, bigNameIdBasename)
+         if os.path.exists(bigNameIdFname):
+            splitFile(bigNameIdFname, limit=500)
    
+      # Concatenate name lookup files into single file
+      elif doConcatenate:
+         fnames = []
+         fnames = ['canonicalLookup_2s.csv', 'canonicalLookup.csv']
+         concatenateLookups(filepath, 'canonicalLookup_us.csv', 
+#                             pattern='',
+                            fnames=fnames)
+         
+      # Canonical name from Scientific Name
+      elif nameIdBasename:
+         #  1. Create JSON Scientific name file for GBIF Parser input 
+         #  2. Create CSV ScientificName to CanonicalName lookup file from GBIF Parser 
+         gmr.parseScientificNames(nameIdBasename)
+   
+      elif doProvider:
+         # Create organization UUID to provider lookup table
+         gmr.extractProviderMetadata('providerLookup.csv')
+         
+      elif doResource:
+         # Create dataset UUID to resource lookup table (only datasets with EML files)
+         datasetPath = os.path.join(filepath, 'dataset')
+         uuids = set()       
+         if os.path.exists(datasetPath):
+            for line in open(DS_UUID_FNAME, 'r'):
+               stp = line.rfind('.xml')
+               uuid = line[:stp]
+               uuids.add(uuid)   
+         gmr.extractDatasetMetadata('resourceLookup.csv', uuids)          
+      
 """
 python /state/partition1/workspace/bison/src/gbif/makeLookups.py \
-       --name_file /state/partition1/data/bison/us/nameUUIDForLookup_1-10000000.csv  
-
-
-
-import os
-import xml.etree.ElementTree as ET
-
-fname = 'fe7e89d1-8039-43dc-a833-df08f05f36b7.xml'
-tree = ET.parse(fname)
-root = tree.getroot()
-ds  = root.find('dataset')
-title = ds.find('title').text
-
+       --file_path /state/partition1/data/bison/us \
+       --name_file /nameUUIDForLookup_2_2.csv  
 """
-   
-   
-   
-         

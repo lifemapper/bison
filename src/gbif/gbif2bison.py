@@ -167,7 +167,7 @@ class GBIFReader(object):
    # ...............................................
    def _correctDates(self, rec):
       """
-      @summary: Make sure that eventDate is parse-able into integers and update 
+      @summary: Make sure that eventDate is parsable into integers and update 
                 missing year value by extracting from the eventDate.
       @param rec: dictionary of all fieldnames and values for this record
       @note: BISON eventDate should be ISO 8601, ex: 2018-08-01
@@ -198,6 +198,7 @@ class GBIFReader(object):
    # ...............................................
    def _saveNameLookupData(self, rec):
       """
+      @todo: Stop saving taxonKey - not useful if scientificName is not parsable 
       @summary: Save scientificName and taxonID for parse or API query 
                 respectively. 
       @param rec: dictionary of all fieldnames and values for this record
@@ -416,6 +417,8 @@ class GBIFReader(object):
    # ...............................................
    def getFieldMeta(self):
       '''
+      @todo: Remove interpreted / verbatim file designations, interpreted cannot 
+             be joined to verbatim file for additional info.
       @summary: Read metadata for interpreted data file, and
                 for fields we are interested in:
                 extract column index for each file, add datatype. 

@@ -9,13 +9,9 @@ GBIF_URL = 'http://api.gbif.org/v1'
 BISON_UUID = 'c3ad790a-d426-4ac1-8e32-da61f81f0117'
 ENCODING = 'utf-8'
 
-# DATAPATH = '/tank/data/input/bison/'
-DATAPATH = '/state/partition1/data/bison/'
 SUBDIRS = ('terr', 'us')
 DATASET_DIR = 'dataset'
 META_FNAME = 'meta.xml'
-# META_FNAME = '/state/partition1/data/bison/terr/meta.xml'
-# META_FNAME = '/tank/data/input/bison/us/meta.xml'
 
 CLIP_CHAR = '/'
 DELIMITER = '\t'
@@ -87,11 +83,12 @@ SAVE_FIELDS = {
    
    # GBIF 'Dataset'
    #--------------
+   # pull resource from API and datasetKey
+   'datasetKey': (str, INTERPRETED),
+   
+   'resourceID': (str, COMPUTED),
    # I believe ownerInstitutionCode is incorrect, and should be collectionCode,
    # so including both.
-   # pull resource from API and datasetKey
-   'datasetKey': (NO_OUTPUT, INTERPRETED),
-   'resourceID': (str, COMPUTED),
    'ownerInstitutionCode': (str, INTERPRETED),
    'collectionCode': (str, INTERPRETED),
    'collectionID': (str, INTERPRETED),
@@ -133,20 +130,30 @@ ORDERED_OUT_FIELDS = [
    'gbifID', 'scientificName', 'taxonKey', 
 #    'canonicalName',  
    'basisOfRecord', 'eventDate', 'year', 
-   'verbatimEventDate', 'institutionCode', 'institutionID', 
-   'ownerInstitutionCode', 'collectionCode', 'collectionID', 
+   'verbatimEventDate', 
+   'institutionCode', 'institutionID', 
+   'ownerInstitutionCode', 
+   'collectionCode', 'collectionID', 
    'occurrenceID', 'catalogNumber', 
-   'recordedBy', 'recordNumber', 'decimalLatitude', 'decimalLongitude', 
-   'elevation', 'depth', 'county', 'higherGeographyID', 'stateProvince', 
+   'recordedBy', 
+   'recordNumber', 
+   'decimalLatitude', 'decimalLongitude', 
+   'elevation', 'depth', 
+   'county', 
+   'higherGeographyID', 
+   'stateProvince', 
    # Keep original UUID values for later lookup
    'publisher',    # 'providerID', 
    'datasetKey',   # 'resourceID', 
-   'vernacularName', 'kingdom', 
-   'coordinatePrecision', 'locality', 'verbatimLocality','habitat', 'waterBody', 
-   'countryCode', 'license']
+   'vernacularName', 
+   'kingdom', 
+   'coordinatePrecision', 
+   'locality', 'verbatimLocality','habitat', 'waterBody', 
+   'countryCode', 
+   'license']
 
-TEST_FIELDS = ['occurrenceStatus', 'decimalLatitude', 'decimalLongitude']
-COMPUTE_FIELDS = {'taxonKey': 'canonicalName', 
-                  'publisher': 'providerID',
-                  'datasetKey': 'resourceID',
-                  'basisOfRecord': None}
+# TEST_FIELDS = ['occurrenceStatus', 'decimalLatitude', 'decimalLongitude']
+# COMPUTE_FIELDS = {'taxonKey': 'canonicalName', 
+#                   'publisher': 'providerID',
+#                   'datasetKey': 'resourceID',
+#                   'basisOfRecord': None}
