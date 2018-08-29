@@ -158,7 +158,7 @@ class GBIFReader(object):
          rec['decimalLongitude'] = None
          rec['decimalLatitude'] = None
       # Make sure US longitude is negative
-      elif (cntry == 'US' 
+      elif ((cntry == 'US' || cntry == 'CA')
             and rec['decimalLongitude'] is not None 
             and rec['decimalLongitude'] > 0):
          rec['decimalLongitude'] = rec['decimalLongitude'] * -1 
