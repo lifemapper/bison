@@ -601,7 +601,3 @@ from src.gbif.gbif2bison import *
 
 
 """
-    
-    
-    
-            

@@ -335,7 +335,6 @@ class GBIFCodes(object):
         except Exception, e:
             if response is not None:
                 retcode = response.status_code
-                reason = response.reason
             else:
                 print('Failed on URL {} ({})'.format(url, str(e)))
         else:
@@ -351,6 +350,7 @@ class GBIFCodes(object):
                         print('Failed to interpret output of URL {} ({})'
                             .format(url, str(e)))
             else:
+
                 try:
                     retcode = response.status_code        
                     reason = response.reason
