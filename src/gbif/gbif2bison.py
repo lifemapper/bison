@@ -27,6 +27,7 @@ import time
 import xml.etree.ElementTree as ET
 
 from constants import *
+# todo: use unicodecsv library
 from tools import getCSVReader, getCSVWriter, getLogger
 
         
@@ -96,7 +97,7 @@ class GBIFReader(object):
     # ...............................................
     def _cleanVal(self, val):
         val = val.strip()
-        # TODO: additional conversion of unicode?
+        # todo: additional conversion of unicode?
         if val.lower() in PROHIBITED_VALS:
             val = ''
         return val
@@ -136,6 +137,9 @@ class GBIFReader(object):
         @summary: Update the decimal longitude and latitude, replacing 0,0 with 
                      None, None and ensuring that US points have a negative longitude.
         @param rec: dictionary of all fieldnames and values for this record
+        @note: function modifies original dict
+        @note: record must have lat/lon or countryCode but GBIF query is on countryCode so
+               that will never be blank.
         """
         try:
             rec['decimalLongitude']
@@ -171,6 +175,7 @@ class GBIFReader(object):
         @param rec: dictionary of all fieldnames and values for this record
         @note: BISON eventDate should be ISO 8601, ex: 2018-08-01
                GBIF combines with time (and here UTC time zone), ex: 2018-08-01T14:19:56+00:00
+        @todo: check integer provided for year matches eventDate year
         """
         fillyr = False
         # Test year field
@@ -202,6 +207,7 @@ class GBIFReader(object):
                      respectively. 
         @param rec: dictionary of all fieldnames and values for this record
         @note: The name parser fails on unicode namestrings
+        @todo: investigate UTF8 to/from API
         @note: Save to dictionary key=sciname, val=taxonid to avoid writing 
                duplicates.  Append to file to save for later script runs, with 
                lines like:
@@ -237,6 +243,7 @@ class GBIFReader(object):
                         rec['gbifID'], sciname, self._name4lookup[sciname]))
     
             except KeyError:
+                # always save a list
                 self._name4lookup[sciname] = [taxkey]
 
             if saveme:
@@ -422,9 +429,7 @@ class GBIFReader(object):
                      for fields we are interested in:
                      extract column index for each file, add datatype. 
                      Resulting metadata will look like:
-                            fields = {term: (columnIndex, dtype), 
-                                         ...
-                                         }
+                            fields = {term: (columnIndex, dtype), ... }
         '''
         tdwg = '{http://rs.tdwg.org/dwc/text/}'
         fields = {}
@@ -456,6 +461,7 @@ class GBIFReader(object):
         @summary: Update record with all BISON-requested changes, or remove 
                      the record by setting it to None.
         @param rec: dictionary of all fieldnames and values for this record
+        @note: function modifies original dict
         """
         gbifID = rec['gbifID']
 
