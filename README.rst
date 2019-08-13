@@ -59,27 +59,31 @@ Liz's email
 * For records with 0,0 coordinates - change any decimalLatitude and 
   decimalLongitude field '0' (zero) values to null/blank (we/BISON may still 
   be able to georeference these records)
+  
 * Convert GBIF basisOfRecord (http://rs.tdwg.org/dwc/terms/#basisOfRecord) 
   values to simpler BISON values 
   e.g. humanObservation and machineObservation=observation; 
   FossilSpecimen=fossil, LivingSpecimen=living;... 
-* Provider/publisher/organization, dataset/resource/collection
-  None of these should ever be blank:
-    Provider/publisher/organization
-    * providerID (numeric code)
-    * institutionCode (text string/name of provider)
-    
-    Dataset/resource/collection
-    * resourceID (numeric code)
-    * ownerInstitutionCode (text string/name of dataset)
+  
+* Provider/publisher/organization, dataset/resource/collection, 
 
-  These are sometimes blank:
-
-    Provider/publisher/organization
-    * institutionID (Provider's organizational URL - not a GBIF URL)
+   * None of these should ever be blank::
+  
+      *  Provider/publisher/organization
+          * providerID (numeric code)
+          * institutionCode (text string/name of provider)
     
-    Dataset/resource/collection
-    * collectionID (Dataset's URL if on the Web elsewhere - not a GBIF URL)
+      * Dataset/resource/collection
+          * resourceID (numeric code)
+          * ownerInstitutionCode (text string/name of dataset)
+
+   * These are sometimes blank:
+
+      * Provider/publisher/organization
+         * institutionID (Provider's organizational URL - not a GBIF URL)
+    
+      * Dataset/resource/collection
+         * collectionID (Dataset's URL if on the Web elsewhere - not a GBIF URL)
 
 
 

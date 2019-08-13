@@ -37,7 +37,7 @@ class GbifFixer(object):
         basepath, _ = os.path.splitext(inputFilename)
         pth, dataname = os.path.split(basepath)
         self.log = log
-        
+                
         self.pth = pth
         self.splitBase = os.path.join(pth, 'split_{}'.format(dataname))
         self.tidyfile = os.path.join(pth, 'tidy_{}.csv'.format(dataname))
@@ -55,6 +55,8 @@ class GbifFixer(object):
         self._openfiles[fname].close()
         self._openfiles.pop(fname)
         
+    # ...............................................
+
     # ...............................................
     def _switchOutput(self, currname, basename, idx):
         # close this chunk and start new
@@ -279,6 +281,7 @@ from gbifsort import GbifFixer
 
 ###############################################################################
 scriptname = 'gbifsort'
+<<<<<<< HEAD
 pth = '/state/partition1/data/bison/2019/caterr'
 fname = 'multimedia.txt'
 dataname, ext = os.path.splitext(fname)
@@ -286,6 +289,8 @@ cmd = 'split'
 
 ###############################################################################
 
+=======
+>>>>>>> f6a200938e32a91bc75701f5d60f17be57437773
 logfname = os.path.join(pth, '{}_{}_{}.log'.format(scriptname, dataname, cmd))        
 log = getLogger(scriptname, logfname)
 datafname = os.path.join(pth, fname)
