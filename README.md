@@ -16,6 +16,31 @@ Download Data from GBIF
 
 * Run portaldownload script to edit, filter and format data into a CSV file
 
+* GBIF download includes:
+  * citations.txt  : references for downloaded data
+  * rights.txt  : URLs for rights of each dataset represented
+  * dataset  directory of EML files of each dataset represented
+  * metadata.xml  : record count for each dataset represented
+  * meta.xml  : list of index/fields (with URL for term) for each datafile
+  * datafiles:
+    * multimedia.txt  
+    * occurrence.txt  
+    * verbatim.txt
+    
+Dependencies
+-------------
+* python2.7  (badenov /usr/bin/python)
+* unicodecsv: 
+  * Centos7: yum search --enablerepo base unicodecsv
+  * https://pypi.org/project/unicodecsv/
+
+
+Steps 2019
+-----------
+
+* On smaller, CA/Territories file
+  * sort datafiles (multimedia.txt, occurrence.txt, verbatim.txt) on gbifID
+
 Liz's email
 -----------
 

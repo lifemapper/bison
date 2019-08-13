@@ -14,7 +14,8 @@ DATASET_DIR = 'dataset'
 META_FNAME = 'meta.xml'
 
 CLIP_CHAR = '/'
-DELIMITER = '\t'
+IN_DELIMITER = '\t'
+OUT_DELIMITER = '$'
 NEWLINE = '\n'
 URL_ESCAPES = [ [" ", "%20"], [",", "%2C"] ]
 
