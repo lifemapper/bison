@@ -6,6 +6,7 @@ NAMESPACE = {'tdwg':   'http://rs.tdwg.org/dwc/text/',
              'dublin': 'http://purl.org/dc/terms/'}
 GBIF_URL = 'http://api.gbif.org/v1'
 # http://api.gbif.org/v1/organization?identifier=362
+# http://api.gbif.org/v1/organization/c3ad790a-d426-4ac1-8e32-da61f81f0117
 BISON_UUID = 'c3ad790a-d426-4ac1-8e32-da61f81f0117'
 ENCODING = 'utf-8'
 
@@ -127,8 +128,14 @@ SAVE_FIELDS = {
  }
 
 
+# 48 BISON fields - 
+#     only those with matching GBIF data from 
+#         BISON DATA FIELDS (GDrive July 3.2018).xlsx
+#     also enumerated in BISON DATA WORKFLOW(GDrive July 3.2018).pdf
 ORDERED_OUT_FIELDS = [
-   'gbifID', 'scientificName', 'taxonKey', 
+   'gbifID', 
+   # Added scientificName and taxonKey for reliable name parsing/lookup
+   'scientificName', 'taxonKey', 
 #    'canonicalName',  
    'basisOfRecord', 'eventDate', 'year', 
    'verbatimEventDate', 
@@ -149,6 +156,7 @@ ORDERED_OUT_FIELDS = [
    'vernacularName', 
    'kingdom', 
    'coordinatePrecision', 
+   # added locality for Stinger, populate from other fields
    'locality', 'verbatimLocality','habitat', 'waterBody', 
    'countryCode', 
    'license']
