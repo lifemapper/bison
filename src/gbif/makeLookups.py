@@ -25,7 +25,7 @@ import glob
 import os
 import xml.etree.ElementTree as ET
 
-from constants import DELIMITER, NEWLINE, ENCODING
+from constants import IN_DELIMITER, OUT_DELIMITER, NEWLINE, ENCODING
 from gbifapi import GBIFCodes
 from tools import getCSVReader, getCSVWriter, getLogger
 
@@ -35,7 +35,7 @@ DS_UUID_FNAME = '/state/partition1/data/bison/datasetUUIDs.txt'
 class GBIFMetaReader(object):
     """
     @summary: Get or Read supporting GBIF metadata for organizations (BISON 
-              provider), datasets (BISON resource), and species names. 
+                 provider), datasets (BISON resource), and species names. 
     @note: 
     """
     # ...............................................
@@ -134,7 +134,7 @@ class GBIFMetaReader(object):
         try:
             scif = open(outScinameFname, 'wb')
             scif.write('[{}'.format(NEWLINE))
-            csvreader, inf = getCSVReader(inNameIdFname, DELIMITER)
+            csvreader, inf = getCSVReader(inNameIdFname, IN_DELIMITER)
             # discard header
             _, csvreader = self._readData(csvreader)
             # then get/write first line
@@ -184,7 +184,7 @@ def concatenateLookups(filepath, outfname, pattern=None, fnames=None):
     outfname = os.path.join(filepath, outfname)
     infnames = []
     try:
-        csvwriter, outf = getCSVWriter(outfname, DELIMITER)
+        csvwriter, outf = getCSVWriter(outfname, OUT_DELIMITER)
 
         if pattern is not None:
             infnames = glob.glob(os.path.join(filepath, pattern))
@@ -193,7 +193,7 @@ def concatenateLookups(filepath, outfname, pattern=None, fnames=None):
                 infnames.append(os.path.join(filepath, fn))                
 
         for fname in infnames:
-            csvreader, inf = getCSVReader(fname, DELIMITER)
+            csvreader, inf = getCSVReader(fname, IN_DELIMITER)
             while csvreader is not None:
                 try:
                     line = csvreader.next()
@@ -216,14 +216,14 @@ def concatenateLookups(filepath, outfname, pattern=None, fnames=None):
 def _getNextWriter(bigFname, currFnum):
     bigbasefname, ext  = os.path.splitext(bigFname)
     newfname = '{}_{}{}'.format(bigbasefname, currFnum, ext)
-    csvwriter, outf = getCSVWriter(newfname, DELIMITER, doAppend=False)
+    csvwriter, outf = getCSVWriter(newfname, OUT_DELIMITER, doAppend=False)
     return csvwriter, outf
         
 # ...............................................
 def splitFile(bigFname, limit=50000):
     currFnum = 1
     stopLine = limit
-    csvreader, inf = getCSVReader(bigFname, DELIMITER)
+    csvreader, inf = getCSVReader(bigFname, IN_DELIMITER)
     csvwriter, outf = _getNextWriter(bigFname, currFnum)
     while csvreader is not None and csvreader.line_num < stopLine:
         try:

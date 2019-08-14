@@ -1,8 +1,9 @@
 import os
 import sys
+import unicodecsv
 
-from tools import getCSVReader, getCSVWriter, getLogger
-from constants import DELIMITER
+from tools import getLogger, getCSVReader, getCSVWriter
+from constants import IN_DELIMITER, ENCODING
 
 SORT_IDX = 0
 
@@ -18,7 +19,7 @@ def usage():
     # ..........................................................................
 class GbifFixer(object):
     # ...............................................
-    def __init__(self, inputFilename, delimiter):
+    def __init__(self, inputFilename, delimiter, log):
         """
         @param inputFilename: full pathname of a CSV file containing records 
                  uniquely identified by the first field in a record.
@@ -31,13 +32,12 @@ class GbifFixer(object):
         self.messyfile = inputFilename
         self.delimiter = delimiter
         self.log = None
+        unicodecsv.field_size_limit(sys.maxsize)
 
         basepath, _ = os.path.splitext(inputFilename)
         pth, dataname = os.path.split(basepath)
-#         scriptname, _ = os.path.splitext(os.path.basename(__file__))
-#         logfname = os.path.join(pth, '{}_{}.log'.format(scriptname, dataname))        
-#         log = getLogger(scriptname, logfname)
-        
+        self.log = log
+                
         self.pth = pth
         self.splitBase = os.path.join(pth, 'split_{}'.format(dataname))
         self.tidyfile = os.path.join(pth, 'tidy_{}.csv'.format(dataname))
@@ -56,18 +56,6 @@ class GbifFixer(object):
         self._openfiles.pop(fname)
         
     # ...............................................
-    def _openReader(self, fname):
-        if not os.path.exists(fname):
-            raise Exception('Input file {} does not exist'.format(fname))
-        reader, outf = getCSVReader(fname, self.delimiter)
-        self._openfiles[fname] = outf
-        return reader
-
-    # ...............................................
-    def _openWriter(self, fname):
-        writer, outf = getCSVWriter(fname, self.delimiter)
-        self._openfiles[fname] = outf
-        return writer
 
     # ...............................................
     def _switchOutput(self, currname, basename, idx):
@@ -75,14 +63,12 @@ class GbifFixer(object):
         self.closeOne(currname)
         idx += 1
         newname = '{}_{}.csv'.format(basename, idx)
-        writer = self._openWriter(newname)
-        return writer, newname, idx
+        # Get writer and save open file for later closing
+        writer, outf = getCSVWriter(newname, self.delimiter, ENCODING, 
+                                    doAppend=True)
+        self._openfiles[newname] = outf
 
-    # ...............................................
-    def _setLogger(self, logfname):
-        scriptname, ext = os.path.splitext(os.path.basename(__file__))
-        self.log = getLogger(scriptname, logfname)
-        
+        return writer, newname, idx
 
     # ...............................................
     def split(self):
@@ -90,14 +76,15 @@ class GbifFixer(object):
         @summary: Split original data file into multiple sorted files.
         @note: Replicate the original header on each smaller sorted file
         """
-        self._setLogger(self.splitBase + '.log')
-
-        reader = self._openReader(self.messyfile)
+        reader, outf = getCSVReader(self.messyfile, self.delimiter, ENCODING)
+        self._openfiles[self.messyfile] = outf
         header = next(reader)
 
         splitIdx = 0
         splitname = '{}_{}.csv'.format(self.splitBase, splitIdx)
-        writer = self._openWriter(splitname)
+        writer, outf = getCSVWriter(splitname, self.delimiter, ENCODING, 
+                                    doAppend=True)
+        self._openfiles[splitname] = outf        
         writer.writerow(header)
 
         currid = -1
@@ -131,7 +118,8 @@ class GbifFixer(object):
         idx = 0
         splitname = '{}_{}.csv'.format(self.splitBase, idx)
         while os.path.exists(splitname):
-            reader = self._openReader(splitname)
+            reader, outf = getCSVReader(splitname, self.delimiter, ENCODING)
+            self._openfiles[splitname] = outf
             row = next(reader)
             # If header is present, first field will not be an integer, 
             # so move to the next record
@@ -179,7 +167,6 @@ class GbifFixer(object):
         """
         @summary: Merge sorted files into a single larger sorted file.
         """
-        self._setLogger(self.tidyfile.replace('csv', 'log'))
         rdrRecs = self._getSplitReadersFirstRecs()
         writer, outf = getCSVWriter(self.tidyfile, self.delimiter)
         self._openfiles[self.tidyfile] = outf
@@ -195,11 +182,10 @@ class GbifFixer(object):
         """
         @summary: Test merged/sorted file
         """
-        self._setLogger(self.tidyfile.replace('.csv', '_test.log'))
-
         self.log.info('Testing file {}'.format(self.tidyfile))
         reccount = 0
-        reader = self._openReader(self.tidyfile)
+        reader, outf = getCSVReader(self.tidyfile, self.delimiter, ENCODING)
+        self._openfiles[self.tidyfile] = outf
         header = next(reader)
         if header[SORT_IDX] != 'gbifID':
             self.log.error('Bad header in {}'.format(self.tidyfile))
@@ -232,9 +218,9 @@ if __name__ == "__main__":
         if len(sys.argv) == 4:
             delimiter = sys.argv[3]
             if delimiter != ',':
-                delimiter = DELIMITER
+                delimiter = IN_DELIMITER
         else:
-            delimiter = DELIMITER
+            delimiter = IN_DELIMITER
     else:
         usage()
     if cmd not in ('split', 'merge', 'test'):    
@@ -242,18 +228,25 @@ if __name__ == "__main__":
          
     if not os.path.exists(datafname):
         print ('Input CSV file {} does not exist'.format(datafname))
-              
-    gf = GbifFixer(datafname, delimiter)
-     
-    try:
-        if cmd  == 'split':
-            gf.split()
-        elif cmd  == 'merge':
-            gf.merge()
-        elif cmd  == 'test':
-            gf.test()
-    finally:
-        gf.close()
+    else:
+        scriptname, ext = os.path.splitext(os.path.basename(__file__))
+        
+        pth, fname = os.path.split(datafname)
+        dataname, ext = os.path.splitext(fname)
+        logfname = os.path.join(pth, '{}_{}_{}.log'.format(scriptname, dataname, cmd))        
+        log = getLogger(scriptname, logfname)
+
+        gf = GbifFixer(datafname, delimiter, log)
+         
+        try:
+            if cmd  == 'split':
+                gf.split()
+            elif cmd  == 'merge':
+                gf.merge()
+            elif cmd  == 'test':
+                gf.test()
+        finally:
+            gf.close()
 
 #         if cmd in ('sort', 'all'):                  
 #             # Sort smaller files
@@ -272,25 +265,38 @@ if __name__ == "__main__":
 
 """
 python src/gbif/gbifsort.py  /tank/data/input/bison/territories/verbatim.txt test
+###############################################################################
 
 
 import os
 import sys
+import unicodecsv
 
-from src.gbif.tools import getCSVReader, getCSVWriter, getLogger
-from src.gbif.constants import DELIMITER
+from tools import getLogger, getCSVReader, getCSVWriter
+from constants import IN_DELIMITER, ENCODING
 
-from src.gbif.gbifsort import GbifFixer
-datafname = '/tank/data/input/bison/territories/verbatim.txt'
+SORT_IDX = 0
+
+from gbifsort import GbifFixer
+
+###############################################################################
+scriptname = 'gbifsort'
+<<<<<<< HEAD
+pth = '/state/partition1/data/bison/2019/caterr'
+fname = 'multimedia.txt'
+dataname, ext = os.path.splitext(fname)
 cmd = 'split'
 
-basepath, ext = os.path.splitext(datafname)
-pth, dataname = os.path.split(basepath)
-scriptname = 'gbifsort'
+###############################################################################
+
+=======
+>>>>>>> f6a200938e32a91bc75701f5d60f17be57437773
 logfname = os.path.join(pth, '{}_{}_{}.log'.format(scriptname, dataname, cmd))        
 log = getLogger(scriptname, logfname)
+datafname = os.path.join(pth, fname)
+gf = GbifFixer(datafname, IN_DELIMITER, log)
 
-gf = GbifFixer(datafname, DELIMITER, log)
+###############################################################################
 
 rdrRecs = gf._getSplitReadersFirstRecs()
 
