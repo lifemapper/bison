@@ -1,6 +1,10 @@
 """
 @license: gpl2
+<<<<<<< HEAD
+@copyright: Copyright (C) 2018, University of Kansas Center for Research
+=======
 @copyright: Copyright (C) 2019, University of Kansas Center for Research
+>>>>>>> f6a200938e32a91bc75701f5d60f17be57437773
 
              Lifemapper Project, lifemapper [at] ku [dot] edu, 
              Biodiversity Institute,
@@ -97,7 +101,7 @@ class GBIFReader(object):
     # ...............................................
     def _cleanVal(self, val):
         val = val.strip()
-        # todo: additional conversion of unicode?
+        # TODO: additional conversion of unicode?
         if val.lower() in PROHIBITED_VALS:
             val = ''
         return val
@@ -161,7 +165,7 @@ class GBIFReader(object):
             rec['decimalLongitude'] = None
             rec['decimalLatitude'] = None
         # Make sure US longitude is negative
-        elif ((cntry == 'US' or cntry == 'CA')
+        elif (cntry == 'US' 
                 and rec['decimalLongitude'] is not None 
                 and rec['decimalLongitude'] > 0):
             rec['decimalLongitude'] = rec['decimalLongitude'] * -1 
@@ -171,11 +175,10 @@ class GBIFReader(object):
     def _updateDates(self, rec):
         """
         @summary: Make sure that eventDate is parsable into integers and update 
-                  missing year value by extracting from the eventDate.
+                     missing year value by extracting from the eventDate.
         @param rec: dictionary of all fieldnames and values for this record
         @note: BISON eventDate should be ISO 8601, ex: 2018-08-01
-               GBIF combines with time (and here UTC time zone), ex: 2018-08-01T14:19:56+00:00
-        @todo: check integer provided for year matches eventDate year
+                 GBIF combines with time (and here UTC time zone), ex: 2018-08-01T14:19:56+00:00
         """
         fillyr = False
         # Test year field
@@ -207,11 +210,10 @@ class GBIFReader(object):
                      respectively. 
         @param rec: dictionary of all fieldnames and values for this record
         @note: The name parser fails on unicode namestrings
-        @todo: investigate UTF8 to/from API
         @note: Save to dictionary key=sciname, val=taxonid to avoid writing 
-               duplicates.  Append to file to save for later script runs, with 
-               lines like:
-                 'scientificName, taxonKey [, taxonKey, taxonKey ...]'
+                 duplicates.  Append to file to save for later script runs, with 
+                 lines like:
+                      'scientificName, taxonKey [, taxonKey, taxonKey ...]'
         """
         sciname = taxkey = None
         try:
@@ -243,7 +245,6 @@ class GBIFReader(object):
                         rec['gbifID'], sciname, self._name4lookup[sciname]))
     
             except KeyError:
-                # always save a list
                 self._name4lookup[sciname] = [taxkey]
 
             if saveme:
@@ -307,7 +308,7 @@ class GBIFReader(object):
         if os.path.exists(fname):
             doAppend = True            
             try:
-                csvRdr, infile = getCSVReader(fname, DELIMITER)
+                csvRdr, infile = getCSVReader(fname, IN_DELIMITER)
                 # get header
                 line, recno = self.getLine(csvRdr, 0)
                 # read lookup vals into dictionary
@@ -324,7 +325,7 @@ class GBIFReader(object):
             finally:
                 infile.close()
         
-        outWriter, outfile = getCSVWriter(fname, DELIMITER, doAppend=doAppend)
+        outWriter, outfile = getCSVWriter(fname, OUT_DELIMITER, doAppend=doAppend)
         self._log.info('Re-opened lookup file {} for appending'.format(fname))
 
         if not doAppend and header is not None:
@@ -342,10 +343,10 @@ class GBIFReader(object):
         self.fldMeta = self.getFieldMeta()
         
         (self._iCsvrdr, 
-         self._if) = getCSVReader(self.interpFname, DELIMITER)
+         self._if) = getCSVReader(self.interpFname, IN_DELIMITER)
          
         (self._outWriter, 
-         self._outf) = getCSVWriter(self.outFname, DELIMITER, doAppend=False)
+         self._outf) = getCSVWriter(self.outFname, OUT_DELIMITER, doAppend=False)
         # Write the header row 
         self._outWriter.writerow(ORDERED_OUT_FIELDS)
         self._log.info('Opened input/output files')
@@ -429,7 +430,9 @@ class GBIFReader(object):
                      for fields we are interested in:
                      extract column index for each file, add datatype. 
                      Resulting metadata will look like:
-                            fields = {term: (columnIndex, dtype), ... }
+                            fields = {term: (columnIndex, dtype), 
+                                         ...
+                                         }
         '''
         tdwg = '{http://rs.tdwg.org/dwc/text/}'
         fields = {}
@@ -461,7 +464,10 @@ class GBIFReader(object):
         @summary: Update record with all BISON-requested changes, or remove 
                      the record by setting it to None.
         @param rec: dictionary of all fieldnames and values for this record
+<<<<<<< HEAD
+=======
         @note: function modifies original dict
+>>>>>>> f6a200938e32a91bc75701f5d60f17be57437773
         """
         gbifID = rec['gbifID']
 
