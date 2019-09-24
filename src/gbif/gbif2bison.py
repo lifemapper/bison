@@ -168,7 +168,7 @@ class GBIFReader(object):
 
 
     # ...............................................
-    def _correctDates(self, rec):
+    def _updateDates(self, rec):
         """
         @summary: Make sure that eventDate is parsable into integers and update 
                      missing year value by extracting from the eventDate.
@@ -474,7 +474,7 @@ class GBIFReader(object):
         
         if rec:
             # Format eventDate and fill missing year
-            self._correctDates(rec)
+            self._udpateDates(rec)
             
             # Save scientificName and TaxonID for later lookup and replace
             self._saveNameLookupData(rec)
