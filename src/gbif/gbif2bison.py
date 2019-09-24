@@ -1,10 +1,6 @@
 """
 @license: gpl2
-<<<<<<< HEAD
-@copyright: Copyright (C) 2018, University of Kansas Center for Research
-=======
 @copyright: Copyright (C) 2019, University of Kansas Center for Research
->>>>>>> f6a200938e32a91bc75701f5d60f17be57437773
 
              Lifemapper Project, lifemapper [at] ku [dot] edu, 
              Biodiversity Institute,
