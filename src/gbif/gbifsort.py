@@ -92,7 +92,7 @@ class GbifFixer(object):
             currid += 1
             try:
                 gbifid = int(row[SORT_IDX])
-            except Exception as e:
+            except Exception:
                 self.log.warn('First column {} is not an integer on record {}'
                                   .format(row[SORT_IDX], reader.line_num))
             else:

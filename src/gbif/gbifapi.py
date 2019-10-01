@@ -74,7 +74,7 @@ class GBIFCodes(object):
         url = '{}/dataset/{}'.format(GBIF_URL, dsKey)
         try:
             response = urllib2.urlopen(url)
-        except Exception as e:
+        except Exception:
             print('Failed to resolve URL {}'.format(url))
             return dataDict
 
@@ -299,7 +299,7 @@ class GBIFCodes(object):
         data = json.load(response)
         if data.has_key('canonicalName'):
             canName = data['canonicalName']
-            row = [taxKey, canName, data['datasetKey']]
+#             row = [taxKey, canName, data['datasetKey']]
         return canName
 
 # ...............................................
