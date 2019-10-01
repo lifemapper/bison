@@ -2,8 +2,8 @@ import os
 import sys
 import unicodecsv
 
-from tools import getLogger, getCSVReader, getCSVWriter
-from constants import IN_DELIMITER, ENCODING
+from gbif.tools import getLogger, getCSVReader, getCSVWriter
+from gbif.constants import IN_DELIMITER, ENCODING
 
 SORT_IDX = 0
 
@@ -13,7 +13,7 @@ def usage():
     Usage:
         qsort infile 
     """
-    print output
+    print(output)
     exit(-1)
 
 # ..........................................................................
@@ -100,7 +100,7 @@ class QSorter(object):
             currid += 1
             try:
                 gbifid = int(row[SORT_IDX])
-            except Exception, e:
+            except Exception:
                 self.log.warn('First column {} is not an integer on record {}'
                                   .format(row[SORT_IDX], reader.line_num))
             else:

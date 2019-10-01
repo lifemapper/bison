@@ -27,8 +27,9 @@ import os
 import requests
 import urllib2
 
-from constants import (DELIMITER, GBIF_URL, ENCODING, URL_ESCAPES, NEWLINE)
-from src.gbif.tools import getCSVWriter
+from gbif.constants import (OUT_DELIMITER, GBIF_URL, ENCODING, 
+                            URL_ESCAPES, NEWLINE)
+from gbif.tools import getCSVWriter
           
 # .............................................................................
 class GBIFCodes(object):
@@ -73,7 +74,7 @@ class GBIFCodes(object):
         url = '{}/dataset/{}'.format(GBIF_URL, dsKey)
         try:
             response = urllib2.urlopen(url)
-        except Exception, e:
+        except Exception as e:
             print('Failed to resolve URL {}'.format(url))
             return dataDict
 
@@ -182,19 +183,19 @@ class GBIFCodes(object):
         if total > 0:
             try:
                 outf = codecs.open(outfname, 'w', ENCODING)
-                outf.write(DELIMITER.join(header) + NEWLINE)
+                outf.write(OUT_DELIMITER.join(header) + NEWLINE)
                 
                 recno = 0
                 while total <= pcount:  
-                    print 'Received {} {}s from GBIF'.format(len(allObjs), apitype)
+                    print('Received {} {}s from GBIF'.format(len(allObjs), apitype))
                     for obj in allObjs:
                         recno += 1
                         if (saveUUIDs is None or obj['key'] in saveUUIDs):
                             row = self._processRecordInfo(obj, header, 
                                                 preserveFormatingKeys=preserveFormatingKeys)
                             try:
-                                outf.write(DELIMITER.join(row) + NEWLINE)
-                            except Exception, e:
+                                outf.write(OUT_DELIMITER.join(row) + NEWLINE)
+                            except Exception:
                                 raise
                         
                     if isComplete:
@@ -208,7 +209,7 @@ class GBIFCodes(object):
                         isComplete = data['endOfRecords']
                         total += len(allObjs)
                     
-            except Exception, e:
+            except Exception:
                 raise        
             finally:
                 outf.close()
@@ -240,8 +241,8 @@ class GBIFCodes(object):
         url = '{}/organization/{}'.format(GBIF_URL, orgUUID)
         try:
             response = urllib2.urlopen(url)
-        except Exception, e:
-            print('Failed to resolve URL {}'.format(url))
+        except Exception as e:
+            print('Failed to resolve URL {} ({})'.format(url, e))
             return dataDict
 
         data = json.load(response)
@@ -309,8 +310,8 @@ class GBIFCodes(object):
         url = '{}/parser/name?name={}'.format(GBIF_URL, str(sciname))
         try:
             response = urllib2.urlopen(url)
-        except Exception, e:
-            print ('Failed to resolve name with {}'.format(url))
+        except Exception as e:
+            print ('Failed to resolve name with {}, ({})'.format(url, e))
         else:
             data = json.load(response)
             if type(data) is list and len(data) > 0:
@@ -332,7 +333,7 @@ class GBIFCodes(object):
         try:
             response = requests.post(url, data=indata, 
                                              headers=headers, auth=auth)
-        except Exception, e:
+        except Exception as e:
             if response is not None:
                 retcode = response.status_code
             else:
@@ -341,10 +342,10 @@ class GBIFCodes(object):
             if response.ok:
                 try:
                     output = response.json()
-                except Exception, e:
+                except Exception as e:
                     try:
                         output = response.content
-                    except Exception, e:
+                    except Exception:
                         output = response.text
                     else:
                         print('Failed to interpret output of URL {} ({})'
@@ -373,18 +374,18 @@ class GBIFCodes(object):
         
         if output is not None:
             try:
-                csvwriter, f = getCSVWriter(outfname, DELIMITER)
+                csvwriter, f = getCSVWriter(outfname, OUT_DELIMITER)
                 for rec in output:
                     if rec['parsed']:
                         try:
                             sciname = rec['scientificName']
                             canname = rec['canonicalName']
                             csvwriter.writerow([sciname, canname])
-                        except KeyError, e:
+                        except KeyError as e:
                             print('Missing key in output record, err: {}'.format(str(e)))
-                        except Exception, e:
+                        except Exception as e:
                             print('Failed writing output record, err: {}'.format(str(e)))
-            except Exception, e:
+            except Exception as e:
                 print('Failed writing outfile {}, err: {}'.format(outfname, str(e)))                
             finally:
                 f.close()

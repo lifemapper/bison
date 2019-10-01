@@ -26,9 +26,12 @@ import os
 import time
 import xml.etree.ElementTree as ET
 
-from constants import *
+from gbif.constants import (IN_DELIMITER, OUT_DELIMITER, PROHIBITED_VALS, 
+                            VERBATIM, INTERPRETED, TERM_CONVERT, 
+                            ORDERED_OUT_FIELDS, NAMESPACE, SAVE_FIELDS,
+                            CLIP_CHAR, META_FNAME)
 # todo: use unicodecsv library
-from tools import getCSVReader, getCSVWriter, getLogger
+from gbif.tools import getCSVReader, getCSVWriter, getLogger
 
         
 # .............................................................................
@@ -71,7 +74,7 @@ class GBIFReader(object):
         self._files.append(self._outf)
         self._outWriter = None
         pth, outbasename = os.path.split(outFname)
-        outbase, ext = os.path.splitext(outbasename)
+        outbase, _ = os.path.splitext(outbasename)
         
         # Input for Canonical name lookup
         self.name4LookupFname = os.path.join(pth, 'nameUUIDForLookup.csv')
@@ -83,7 +86,6 @@ class GBIFReader(object):
         logname, _ = os.path.splitext(os.path.basename(__file__))
         logfname = os.path.join(pth, outbase + '.log')
         if os.path.exists(logfname):
-            import time
             ts = int(time.time())
             logfname = os.path.join(pth, outbase + '.log.{}'.format(ts))
         self._log = getLogger(logname, logfname)
@@ -92,7 +94,7 @@ class GBIFReader(object):
     def _timeStamp(self, msg):
         ts = time.time()
         st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
-        self._log.info('{}:    {}'.format(ts, msg))
+        self._log.info('{}:    {}'.format(st, msg))
 
     # ...............................................
     def _cleanVal(self, val):
@@ -117,18 +119,18 @@ class GBIFReader(object):
         if meta['version'] == VERBATIM:
             try:
                 val = vline[self.fldMeta[fldname][VERBATIM]]
-            except KeyError, e:
-                print'{} not in VERBATIM data, using INTERPRETED'.format(fldname) 
+            except KeyError:
+                print('{} not in VERBATIM data, using INTERPRETED'.format(fldname))
                 val = iline[self.fldMeta[fldname][INTERPRETED]]
         else:
             try:
                 val = iline[self.fldMeta[fldname][INTERPRETED]]
-            except KeyError, e:
-                print'{} not in INTERPRETED data, using VERBATIM'.format(fldname) 
+            except KeyError:
+                print('{} not in INTERPRETED data, using VERBATIM'.format(fldname))
                 try:
                     val = vline[self.fldMeta[fldname][VERBATIM]]
-                except Exception, e:
-                    print'{} not in either file'.format(fldname)
+                except Exception:
+                    print('{} not in either file'.format(fldname))
         return val
 
     # ...............................................
@@ -286,7 +288,7 @@ class GBIFReader(object):
         elif fldname in ('decimalLongitude', 'decimalLatitude'):
             try:
                 val = float(val)
-            except Exception, e:
+            except Exception:
                 val = None
             
         return fldname, val
@@ -314,7 +316,7 @@ class GBIFReader(object):
                         try:
                             # First item is dict key, rest are vals
                             lookupDict[line[0]] = line[1:]
-                        except Exception, e:
+                        except Exception:
                             self._log.warn('Failed to read line {} from {}'
                                                 .format(recno, fname))
                 self._log.info('Read lookup file {}'.format(fname))
@@ -386,7 +388,7 @@ class GBIFReader(object):
         for f in self._files:
             try:
                 f.close()
-            except Exception, e:
+            except Exception:
                 pass
 
     # ...............................................
@@ -402,7 +404,7 @@ class GBIFReader(object):
                 if line:
                     recno += 1
                 success = True
-            except OverflowError, e:
+            except OverflowError as e:
                 recno += 1
                 self._log.info( 'Overflow on record {}, line {} ({})'
                                      .format(recno, csvreader.line, str(e)))
@@ -410,7 +412,7 @@ class GBIFReader(object):
                 self._log.info('EOF after record {}, line {}'
                                     .format(recno, csvreader.line_num))
                 success = True
-            except Exception, e:
+            except Exception as e:
                 recno += 1
                 self._log.info('Bad record on record {}, line {} ({})'
                                     .format(recno, csvreader.line, e))
@@ -498,7 +500,7 @@ class GBIFReader(object):
         for fldname, (idx, dtype) in self.fldMeta.iteritems():
             try:
                 tmpval = iline[idx]
-            except Exception, e:
+            except Exception:
                 self._log.warning('Failed to get column {}/{} for gbifID {}'
                                         .format(idx, fldname, gbifID))
                 return row
@@ -519,7 +521,7 @@ class GBIFReader(object):
             for fld in ORDERED_OUT_FIELDS:
                 try:
                     row.append(rec[fld])
-                except KeyError, e:
+                except KeyError:
                     print ('Missing field {} in record with gbifID {}'
                              .format(fld, gbifID))
                     row.append('')
@@ -556,7 +558,7 @@ class GBIFReader(object):
                 byline = self.createBisonLine(line)
                 if byline:
                     self._outWriter.writerow(byline)
-        except Exception, e:
+        except Exception as e:
             self._log.error('Failed on line {}, exception {}'.format(recno, e))
         finally:
             self.close()

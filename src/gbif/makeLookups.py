@@ -25,9 +25,9 @@ import glob
 import os
 import xml.etree.ElementTree as ET
 
-from constants import IN_DELIMITER, OUT_DELIMITER, NEWLINE, ENCODING
-from gbifapi import GBIFCodes
-from tools import getCSVReader, getCSVWriter, getLogger
+from gbif.constants import IN_DELIMITER, OUT_DELIMITER, NEWLINE, ENCODING
+from gbif.gbifapi import GBIFCodes
+from gbif.tools import getCSVReader, getCSVWriter, getLogger
 
     
 DS_UUID_FNAME = '/state/partition1/data/bison/datasetUUIDs.txt'
@@ -65,7 +65,7 @@ class GBIFMetaReader(object):
             ds  = root.find('dataset')
             title = ds.find('title').text
             
-        except Exception, e:
+        except Exception as e:
             self._log.error('Failed parsing {}, exception {}'.format(fname, e))
 
     # ...............................................
@@ -94,14 +94,14 @@ class GBIFMetaReader(object):
             line = csvreader.next()
             if len(line) > 0:
                 sciname = line[0]
-        except OverflowError, e:
+        except OverflowError as e:
             self._log.info( 'Overflow on line {} ({})'
                                  .format(csvreader.line, str(e)))
         except StopIteration:
             self._log.info('EOF after line {}'
                                 .format(csvreader.line_num))
             csvreader = None
-        except Exception, e:
+        except Exception as e:
             self._log.info('Bad record on line {} ({})'
                                 .format(csvreader.line_num, e))
         else:
@@ -114,9 +114,9 @@ class GBIFMetaReader(object):
         # Write encoded data as binary
         try:
             outf.write('"{}"'.format(encodedString))
-        except UnicodeDecodeError, e:
+        except UnicodeDecodeError as e:
             self._log.error('Decode error {}'.format(e))
-        except UnicodeEncodeError, e:
+        except UnicodeEncodeError as e:
             self._log.error('Encode error {}'.format(e))
         
 
@@ -197,17 +197,17 @@ def concatenateLookups(filepath, outfname, pattern=None, fnames=None):
             while csvreader is not None:
                 try:
                     line = csvreader.next()
-                except OverflowError, e:
+                except OverflowError as e:
                     print( 'Overflow on line {} ({})'.format(csvreader.line, str(e)))
                 except StopIteration:
                     print('EOF after line {}'.format(csvreader.line_num))
                     csvreader = None
                     inf.close()
-                except Exception, e:
+                except Exception as e:
                     print('Bad record on line {} ({})'.format(csvreader.line_num, e))
                 else:
                     csvwriter.writerow(line)
-    except Exception, e:
+    except Exception as e:
         print('Failed in infile {}, {}'.format(fname, str(e)))
     finally:
         outf.close()
@@ -228,13 +228,13 @@ def splitFile(bigFname, limit=50000):
     while csvreader is not None and csvreader.line_num < stopLine:
         try:
             line = csvreader.next()
-        except OverflowError, e:
+        except OverflowError as e:
             print( 'Overflow on line {} ({})'.format(csvreader.line, str(e)))
         except StopIteration:
             print('EOF after line {}'.format(csvreader.line_num))
             csvreader = None
             inf.close()
-        except Exception, e:
+        except Exception as e:
             print('Bad record on line {} ({})'.format(csvreader.line_num, e))
         else:
             csvwriter.writerow(line)
