@@ -10,6 +10,7 @@ Interpreter
 
 Dependencies
 * unicodecsv 0.14.1
+
     SRC_URL=https://github.com/jdunck/python-unicodecsv/archive/
     SRC_PKG=0.14.1.tar.gz
 

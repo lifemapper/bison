@@ -497,7 +497,7 @@ class GBIFReader(object):
         row = []
         gbifID = iline[0]
         rec = {'gbifID': gbifID}
-        for fldname, (idx, dtype) in self.fldMeta.iteritems():
+        for fldname, (idx, _) in self.fldMeta.iteritems():
             try:
                 tmpval = iline[idx]
             except Exception:
