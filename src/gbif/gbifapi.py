@@ -25,7 +25,7 @@ import codecs
 import json
 import os
 import requests
-import urllib2
+# import unicodecsv
 
 from gbif.constants import (OUT_DELIMITER, GBIF_URL, ENCODING, 
                             URL_ESCAPES, NEWLINE)
@@ -63,7 +63,19 @@ class GBIFCodes(object):
                 print ('Failed to parse date {} into integers'.format(longdate))
                 dateonly = ''
         return dateonly
-                
+    
+# ...............................................
+    def _getDataFromUrl(self, url, resp_type='json'):
+        data = None
+        try:
+            response = requests.get(url)
+            data = response.read()
+            if resp_type == 'json':
+                data = json.load(data)
+        except Exception:
+            print('Failed to resolve URL {}'.format(url))
+        return data
+                     
 # ...............................................
     def resolveDataset(self, dsKey):
         dataDict = {}
@@ -72,13 +84,10 @@ class GBIFCodes(object):
             return dataDict
         
         url = '{}/dataset/{}'.format(GBIF_URL, dsKey)
-        try:
-            response = urllib2.urlopen(url)
-        except Exception:
-            print('Failed to resolve URL {}'.format(url))
+        data = self._getDataFromUrl(url)
+        if data is None:
             return dataDict
-
-        data = json.load(response)
+        
         legacyid = 'NA'
         orgkey = title = desc = citation = rights = logourl = homepage = ''
         if data.has_key('key'):
@@ -173,12 +182,14 @@ class GBIFCodes(object):
         offset = 0
         pagesize = 1000
         url = '{}/{}?offset={}&limit={}'.format(GBIF_URL, apitype, offset, pagesize)
-        response = urllib2.urlopen(url)
-        data = json.load(response)
-        pcount = data['count']
-        allObjs = data['results']
-        isComplete = data['endOfRecords']
-        total = len(allObjs)
+
+        total = 0
+        data = self._getDataFromUrl(url)
+        if data is not None:
+            pcount = data['count']
+            allObjs = data['results']
+            isComplete = data['endOfRecords']
+            total = len(allObjs)
 
         if total > 0:
             try:
@@ -203,11 +214,11 @@ class GBIFCodes(object):
                     else:
                         offset += pagesize
                         url = '{}/{}?offset={}&limit={}'.format(GBIF_URL, apitype, offset, pagesize)
-                        response = urllib2.urlopen(url)
-                        data = json.load(response)
-                        allObjs = data['results']
-                        isComplete = data['endOfRecords']
-                        total += len(allObjs)
+                        data = self._getDataFromUrl(url)
+                        if data is not None:
+                            allObjs = data['results']
+                            isComplete = data['endOfRecords']
+                            total += len(allObjs) 
                     
             except Exception:
                 raise        
@@ -239,13 +250,10 @@ class GBIFCodes(object):
             return dataDict
         
         url = '{}/organization/{}'.format(GBIF_URL, orgUUID)
-        try:
-            response = urllib2.urlopen(url)
-        except Exception as e:
-            print('Failed to resolve URL {} ({})'.format(url, e))
+        data = self._getDataFromUrl(url)
+        if data is None:
             return dataDict
 
-        data = json.load(response)
         legacyid = 'NA'
         orgkey = title = desc = citation = rights = logourl = homepage = ''
         if data.has_key('key'):
@@ -295,9 +303,8 @@ class GBIFCodes(object):
     def resolveCanonicalFromTaxonKey(self, taxKey):
         canName = None
         url = '{}/species/{}'.format(GBIF_URL, taxKey)
-        response = urllib2.urlopen(url)
-        data = json.load(response)
-        if data.has_key('canonicalName'):
+        data = self._getDataFromUrl(url)
+        if data is not None and data.has_key('canonicalName'):
             canName = data['canonicalName']
 #             row = [taxKey, canName, data['datasetKey']]
         return canName
@@ -308,12 +315,8 @@ class GBIFCodes(object):
         for replaceStr, withStr in URL_ESCAPES:
             sciname = sciname.replace(replaceStr, withStr)
         url = '{}/parser/name?name={}'.format(GBIF_URL, str(sciname))
-        try:
-            response = urllib2.urlopen(url)
-        except Exception as e:
-            print ('Failed to resolve name with {}, ({})'.format(url, e))
-        else:
-            data = json.load(response)
+        data = self._getDataFromUrl(url)
+        if data is not None:
             if type(data) is list and len(data) > 0:
                 data = data[0]
             if data.has_key('canonicalName'):
@@ -324,15 +327,13 @@ class GBIFCodes(object):
 # ...............................................
     def _postToParser(self, url, infname):
         response = output = None
-        headers={'Accept': 'application/json',
-                    'Content-Type': 'application/json'}
-#         auth = HTTPBasicAuth()
+        headers={'Accept': 'application/json','Content-Type': 'application/json'}
         auth = None
         indata = open(infname, 'rb')
         
         try:
-            response = requests.post(url, data=indata, 
-                                             headers=headers, auth=auth)
+            response = requests.post(url, data=indata, headers=headers, 
+                                     auth=auth)
         except Exception as e:
             if response is not None:
                 retcode = response.status_code
@@ -435,7 +436,7 @@ import csv
 import codecs
 import cStringIO
 import json
-import urllib2
+import requests
 
 from src.gbif.constants import *
 from src.gbif.gbifresolve import *
@@ -448,7 +449,7 @@ pagesize = 1000
 legacyid = 9999
 desc = homepage = ''
 url = '{}/organization?offset={}&limit={}'.format(GBIF_URL, offset, pagesize)
-response = urllib2.urlopen(url)
+response = requests.get(url)
 data = json.load(response)
 total = data['count']
 allProvs = data['results']

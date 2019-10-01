@@ -24,13 +24,13 @@
 import datetime
 import os
 import time
+import unicodecsv
 import xml.etree.ElementTree as ET
 
 from gbif.constants import (IN_DELIMITER, OUT_DELIMITER, PROHIBITED_VALS, 
                             VERBATIM, INTERPRETED, TERM_CONVERT, 
                             ORDERED_OUT_FIELDS, NAMESPACE, SAVE_FIELDS,
                             CLIP_CHAR, META_FNAME)
-# todo: use unicodecsv library
 from gbif.tools import getCSVReader, getCSVWriter, getLogger
 
         
