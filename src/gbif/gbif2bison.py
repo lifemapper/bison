@@ -46,38 +46,38 @@ class GBIFReader(object):
              where 1-500 are lines to delete, and 1500 is the line on which to stop.
     """
     # ...............................................
-    def __init__(self, interpretedFname, metaFname, outFname):
+    def __init__(self, interpreted_fname, meta_fname, outfname):
         """
         @summary: Constructor
-        @param interpretedFname: Full filename containing records from the GBIF 
+        @param interpreted_fname: Full filename containing records from the GBIF 
                  interpreted occurrence table
-        @param metaFname: Full filename containing metadata for all data files in the 
+        @param meta_fname: Full filename containing metadata for all data files in the 
                  Darwin Core GBIF Occurrence download:
                      https://www.gbif.org/occurrence/search
-        @param outFname: Full filename for the output BISON CSV file
+        @param outfname: Full filename for the output BISON CSV file
         """
 #         self.gbifRes = GBIFCodes()
         self._files = []
         
         # Interpreted GBIF occurrence file
-        self.interpFname = interpretedFname
+        self.interp_fname = interpreted_fname
         self._if = None
         self._files.append(self._if)
         self._iCsvrdr = None
         # GBIF metadata file for occurrence files
-        self._metaFname = metaFname
+        self._meta_fname = meta_fname
         self.fldMeta = None
         
         # Output BISON occurrence file
-        self.outFname = outFname
+        self.outfname = outfname
         self._outf = None
         self._files.append(self._outf)
         self._outWriter = None
-        pth, outbasename = os.path.split(outFname)
+        pth, outbasename = os.path.split(outfname)
         outbase, _ = os.path.splitext(outbasename)
         
         # Input for Canonical name lookup
-        self.name4LookupFname = os.path.join(pth, 'nameUUIDForLookup.csv')
+        self.name4Lookup_fname = os.path.join(pth, 'nameUUIDForLookup.csv')
         self._name4lookupf = None
         self._files.append(self._name4lookupf)
         self._name4lookupWriter = None
@@ -341,10 +341,10 @@ class GBIFReader(object):
         self.fldMeta = self.getFieldMeta()
         
         (self._iCsvrdr, 
-         self._if) = getCSVReader(self.interpFname, IN_DELIMITER)
+         self._if) = getCSVReader(self.interp_fname, IN_DELIMITER)
          
         (self._outWriter, 
-         self._outf) = getCSVWriter(self.outFname, OUT_DELIMITER, doAppend=False)
+         self._outf) = getCSVWriter(self.outfname, OUT_DELIMITER, doAppend=False)
         # Write the header row 
         self._outWriter.writerow(ORDERED_OUT_FIELDS)
         self._log.info('Opened input/output files')
@@ -358,15 +358,15 @@ class GBIFReader(object):
                      querying repeatedly.
         '''
         self._nameLookup, self._outCanWriter, self._outcf = \
-                self._openForReadWrite(self.outCanonicalFname, numKeys=2, numVals=1,
+                self._openForReadWrite(self.outCanonical_fname, numKeys=2, numVals=1,
                                 header=['scientificName', 'taxonKey', 'canonicalName'])
                 
         self._orgLookup, self._outOrgWriter, self._outof = \
-                self._openForReadWrite(self.outOrgFname, numKeys=1, numVals=2,
+                self._openForReadWrite(self.outOrg_fname, numKeys=1, numVals=2,
                                 header=['orgUUID', 'title', 'homepage'])
          
         self._datasetLookup, self._outDSWriter, self._outdf = \
-                self._openForReadWrite(self.outDSFname, numKeys=1, numVals=3,
+                self._openForReadWrite(self.outDS_fname, numKeys=1, numVals=3,
                                 header=['datasetUUID', 'title', 'homepage', 'orgUUID'])
 
 
@@ -434,7 +434,7 @@ class GBIFReader(object):
         '''
         tdwg = '{http://rs.tdwg.org/dwc/text/}'
         fields = {}
-        tree = ET.parse(self._metaFname)
+        tree = ET.parse(self._meta_fname)
         root = tree.getroot()
         # Child will reference INTERPRETED or VERBATIM file
         for child in root:
@@ -462,10 +462,7 @@ class GBIFReader(object):
         @summary: Update record with all BISON-requested changes, or remove 
                      the record by setting it to None.
         @param rec: dictionary of all fieldnames and values for this record
-<<<<<<< HEAD
-=======
         @note: function modifies original dict
->>>>>>> f6a200938e32a91bc75701f5d60f17be57437773
         """
         gbifID = rec['gbifID']
 
@@ -540,11 +537,11 @@ class GBIFReader(object):
         """
         if self.isOpen():
             self.close()
-        if os.path.exists(self.outFname):
-            raise Exception('Bison output file {} exists!'.format(self.outFname))
+        if os.path.exists(self.outfname):
+            raise Exception('Bison output file {} exists!'.format(self.outfname))
         try:
             self._name4lookup, self._name4lookupWriter, self._name4lookupf = \
-                    self._openForReadWrite(self.name4LookupFname,
+                    self._openForReadWrite(self.name4Lookup_fname,
                                            header=['scientificName', 'taxonKey'])
             self.openInputOutput()
             # Pull the header row 
@@ -565,36 +562,43 @@ class GBIFReader(object):
 
 # ...............................................
 if __name__ == '__main__':
-    import argparse
-    parser = argparse.ArgumentParser(
-                description=("""Parse a GBIF occurrence dataset downloaded
-                                     from the GBIF occurrence web service in
-                                     Darwin Core format into BISON format.  
-                                 """))
-    parser.add_argument('gbif_file', type=str, 
-                              help='The full pathname of the input GBIF occurrence file')
-    parser.add_argument('bison_file', type=str, 
-                              help=""""
-                              The basefilename of the output BISON occurrence data.
-                              Path will be the same as input data.
-                              """)
-    parser.add_argument('--names_only', type=bool, default=False,
-                help=('Re-read a bison output file to retrieve scientificName and taxonID.'))
-    args = parser.parse_args()
-    rereadNames = args.names_only
-    gbifFname = args.gbif_file
-    bisonBaseFname = args.bison_file
+#     import argparse
+#     parser = argparse.ArgumentParser(
+#                 description=("""Parse a GBIF occurrence dataset downloaded
+#                                      from the GBIF occurrence web service in
+#                                      Darwin Core format into BISON format.  
+#                                  """))
+#     parser.add_argument('base_path', type=str, 
+#                         help='Absolute pathname of the directory for data transform')
+#     parser.add_argument('gbif_file', type=str, 
+#                         help='Relative filename of the input GBIF occurrence file')
+#     parser.add_argument('bison_file', type=str, 
+#                         help='Relative filename of the output BISON occurrence data.')
+#     parser.add_argument('--names_only', type=bool, default=False,
+#                 help=('Re-read a bison output file to retrieve scientificName and taxonID.'))
+#     args = parser.parse_args()
+#     rereadNames = args.names_only
+#     gbif_relfname = args.gbif_file
+#     bison_relfname = args.bison_file
+
+    # Testing data
+    rereadNames = False
+    basepath = '/tank/data/bison/2019'
+    gbif_relfname = 'raw/occurrence.txt'
+    bison_relfname = 'out/bison.csv'
     
-    if os.path.exists(gbifFname):
-        pth, basefname = os.path.split(gbifFname)
-        metaFname = os.path.join(pth, META_FNAME)
-        bisonFname = os.path.join(pth, bisonBaseFname)
+    gbif_fname = os.path.join(basepath, gbif_relfname)
+    bison_fname = os.path.join(basepath, bison_relfname)
         
-        gr = GBIFReader(gbifFname, metaFname, bisonFname)
-        print('Calling program with input/output {}'.format(gbifFname, bisonFname))
+    if os.path.exists(gbif_fname):
+        rawpth, _ = os.path.split(gbif_fname)
+        meta_fname = os.path.join(rawpth, META_FNAME)
+        
+        gr = GBIFReader(gbif_fname, meta_fname, bison_fname)
+        print('Calling program with input/output {}'.format(gbif_fname, bison_fname))
         gr.extractData()
     else:
-        print('Filename {} does not exist'.format(gbifFname))
+        print('Filename {} does not exist'.format(gbif_fname))
     
     
 """
