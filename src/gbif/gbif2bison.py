@@ -24,14 +24,13 @@
 import datetime
 import os
 import time
-import unicodecsv
 import xml.etree.ElementTree as ET
 
 from gbif.constants import (IN_DELIMITER, OUT_DELIMITER, PROHIBITED_VALS, 
-                            VERBATIM, INTERPRETED, TERM_CONVERT, 
+                            INTERPRETED, TERM_CONVERT, ENCODING,
                             ORDERED_OUT_FIELDS, NAMESPACE, SAVE_FIELDS,
                             CLIP_CHAR, META_FNAME)
-from gbif.tools import getCSVReader, getCSVWriter, getLogger
+from gbif.tools import getCSVReader, getCSVWriter, getLine, getLogger
 
         
 # .............................................................................
@@ -63,7 +62,7 @@ class GBIFReader(object):
         self.interp_fname = interpreted_fname
         self._if = None
         self._files.append(self._if)
-        self._iCsvrdr = None
+        self._reader = None
         # GBIF metadata file for occurrence files
         self._meta_fname = meta_fname
         self.fldMeta = None
@@ -72,7 +71,7 @@ class GBIFReader(object):
         self.outfname = outfname
         self._outf = None
         self._files.append(self._outf)
-        self._outWriter = None
+        self._writer = None
         pth, outbasename = os.path.split(outfname)
         outbase, _ = os.path.splitext(outbasename)
         
@@ -96,45 +95,37 @@ class GBIFReader(object):
         st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
         self._log.info('{}:    {}'.format(st, msg))
 
-    # ...............................................
-    def _cleanVal(self, val):
-        val = val.strip()
-        # TODO: additional conversion of unicode?
-        if val.lower() in PROHIBITED_VALS:
-            val = ''
-        return val
+#     # ...............................................
+#     def _getValFromCorrectLine(self, fldname, meta, vline, iline):
+#         """
+#         @summary: IFF gathering values from separate lines (matched on gbifID)
+#                   use metadata to pull the value from the indicated line.
+#         @param fldname: field name 
+#         @param meta: tuple including datatype and INTERPRETED or VERBATIM 
+#                identifier for file to pull value from
+#         @param vline: A CSV record of verbatim provider DarwinCore occurrence data 
+#         @param iline: A CSV record of GBIF-interpreted DarwinCore occurrence data 
+#         """
+#         # get column Index in correct file
+#         if meta['version'] == VERBATIM:
+#             try:
+#                 val = vline[self.fldMeta[fldname][VERBATIM]]
+#             except KeyError:
+#                 print('{} not in VERBATIM data, using INTERPRETED'.format(fldname))
+#                 val = iline[self.fldMeta[fldname][INTERPRETED]]
+#         else:
+#             try:
+#                 val = iline[self.fldMeta[fldname][INTERPRETED]]
+#             except KeyError:
+#                 print('{} not in INTERPRETED data, using VERBATIM'.format(fldname))
+#                 try:
+#                     val = vline[self.fldMeta[fldname][VERBATIM]]
+#                 except Exception:
+#                     print('{} not in either file'.format(fldname))
+#         return val
 
     # ...............................................
-    def _getValFromCorrectLine(self, fldname, meta, vline, iline):
-        """
-        @summary: IFF gathering values from separate lines (matched on gbifID)
-                  use metadata to pull the value from the indicated line.
-        @param fldname: field name 
-        @param meta: tuple including datatype and INTERPRETED or VERBATIM 
-               identifier for file to pull value from
-        @param vline: A CSV record of original provider DarwinCore occurrence data 
-        @param iline: A CSV record of GBIF-interpreted DarwinCore occurrence data 
-        """
-        # get column Index in correct file
-        if meta['version'] == VERBATIM:
-            try:
-                val = vline[self.fldMeta[fldname][VERBATIM]]
-            except KeyError:
-                print('{} not in VERBATIM data, using INTERPRETED'.format(fldname))
-                val = iline[self.fldMeta[fldname][INTERPRETED]]
-        else:
-            try:
-                val = iline[self.fldMeta[fldname][INTERPRETED]]
-            except KeyError:
-                print('{} not in INTERPRETED data, using VERBATIM'.format(fldname))
-                try:
-                    val = vline[self.fldMeta[fldname][VERBATIM]]
-                except Exception:
-                    print('{} not in either file'.format(fldname))
-        return val
-
-    # ...............................................
-    def _updatePoint(self, rec):
+    def _update_point(self, rec):
         """
         @summary: Update the decimal longitude and latitude, replacing 0,0 with 
                      None, None and ensuring that US points have a negative longitude.
@@ -143,19 +134,13 @@ class GBIFReader(object):
         @note: record must have lat/lon or countryCode but GBIF query is on countryCode so
                that will never be blank.
         """
-        try:
-            rec['decimalLongitude']
-        except:
+        if 'decimalLongitude' not in rec:
             rec['decimalLongitude'] = None
 
-        try:
-            rec['decimalLatitude']
-        except:
+        if 'decimalLatitude' not in rec:
             rec['decimalLatitude'] = None
 
-        try:
-            cntry = rec['countryCode']
-        except:
+        if 'countryCode' not in rec:
             rec['countryCode'] = None
             
         # Change 0,0 to None
@@ -163,14 +148,28 @@ class GBIFReader(object):
             rec['decimalLongitude'] = None
             rec['decimalLatitude'] = None
         # Make sure US longitude is negative
-        elif (cntry == 'US' 
+        elif (rec['countryCode'] == 'US' 
                 and rec['decimalLongitude'] is not None 
                 and rec['decimalLongitude'] > 0):
             rec['decimalLongitude'] = rec['decimalLongitude'] * -1 
 
+    # ...............................................
+    def _update_locality(self, rec):
+        """
+        @summary: Update the verbatim_locality, taking in order of preference,
+                  verbatimLocality, locality, habitat 
+        @param rec: dictionary of all fieldnames and values for this record
+        @note: function modifies original dict
+        """
+        if rec['verbatimLocality'] is not None:
+            pass
+        elif rec['locality'] is not None:
+            rec['verbatimLocality'] = rec['locality']
+        elif rec['habitat'] is not None:
+            rec['verbatimLocality'] = rec['habitat']
 
     # ...............................................
-    def _updateDates(self, rec):
+    def _update_dates(self, rec):
         """
         @summary: Make sure that eventDate is parsable into integers and update 
                      missing year value by extracting from the eventDate.
@@ -254,40 +253,46 @@ class GBIFReader(object):
 #         else:
 #             self._name4lookupWriter.writerow([rec['gbifID'], sciname, taxkey])
 
-
     # ...............................................
-    def _updateFieldOrSignalRemove(self, fldname, val):
+    def _test_transform_val(self, fldname, tmpval):
         """
-        @summary: Update fields with any BISON-requested changed, or signal 
-                     to remove the record by returning None for fldname and val.
-        @param gbifID: GBIF identifier for this record, used just for logging
+        @summary: Update values with any BISON-requested changed, or signal 
+                  to remove the record by returning None for fldname.
         @param fldname: Fieldname in current record
-        @param val: Value for this field in current record
+        @param tmpval: Value for this field in current record
         """
-        # Replace N/A
-        if val.lower() in PROHIBITED_VALS:
-            val = ''
+        tmpval2 = tmpval.strip()
+        
+        # Replace N/A and empty string
+        if tmpval2.lower() in PROHIBITED_VALS:
+            val = None
             
+        # remove records with scientificName or taxonKey missing
+        elif fldname in ('scientificName', 'taxonKey'):
+            self._log.info('Discarded record with missing scientificName or taxonKey')
+            fldname = val = None
+
+        # remove records with occurrenceStatus = absence
+        elif fldname == 'occurrenceStatus' and tmpval2.lower() == 'absent':
+            self._log.info('Discarded absence record')
+            fldname = val = None
+
         # simplify basisOfRecord terms
         elif fldname == 'basisOfRecord':
-            if val in TERM_CONVERT.keys():
+            if tmpval2 in TERM_CONVERT:
                 val = TERM_CONVERT[val]
                 
         # Convert year to integer
         elif fldname == 'year':
             try:
-                val = int(val)
+                val = int(tmpval2)
             except:
-                val = '' 
-
-        # remove records with occurrenceStatus  = absence
-        elif fldname == 'occurrenceStatus' and val.lower() == 'absent':
-            fldname = val = None
+                val = None
             
         # gather geo fields for check/convert
         elif fldname in ('decimalLongitude', 'decimalLatitude'):
             try:
-                val = float(val)
+                val = float(tmpval2)
             except Exception:
                 val = None
             
@@ -304,11 +309,12 @@ class GBIFReader(object):
         doAppend = False
         
         if os.path.exists(fname):
-            doAppend = True            
+            doAppend = True
+            recno = 0        
             try:
-                csvRdr, infile = getCSVReader(fname, IN_DELIMITER)
+                csvRdr, infile = getCSVReader(fname, IN_DELIMITER, ENCODING)
                 # get header
-                line, recno = self.getLine(csvRdr, 0)
+                line, recno = getLine(csvRdr, recno)
                 # read lookup vals into dictionary
                 while (line is not None):
                     line, recno = self.getLine(csvRdr, recno)
@@ -320,10 +326,14 @@ class GBIFReader(object):
                             self._log.warn('Failed to read line {} from {}'
                                                 .format(recno, fname))
                 self._log.info('Read lookup file {}'.format(fname))
+            except Exception as e:
+                self._log.error('Failed reading data in line {} of {}: {}'
+                                .format(fname, recno, e))
             finally:
                 infile.close()
         
-        outWriter, outfile = getCSVWriter(fname, OUT_DELIMITER, doAppend=doAppend)
+        outWriter, outfile = getCSVWriter(fname, OUT_DELIMITER, ENCODING, 
+                                          doAppend=doAppend)
         self._log.info('Re-opened lookup file {} for appending'.format(fname))
 
         if not doAppend and header is not None:
@@ -340,13 +350,13 @@ class GBIFReader(object):
         '''
         self.fldMeta = self.getFieldMeta()
         
-        (self._iCsvrdr, 
-         self._if) = getCSVReader(self.interp_fname, IN_DELIMITER)
+        (self._reader, self._if) = getCSVReader(self.interp_fname, IN_DELIMITER, 
+                                                ENCODING)
          
-        (self._outWriter, 
-         self._outf) = getCSVWriter(self.outfname, OUT_DELIMITER, doAppend=False)
+        (self._writer, self._outf) = getCSVWriter(self.outfname, OUT_DELIMITER, 
+                                                  ENCODING, doAppend=False)
         # Write the header row 
-        self._outWriter.writerow(ORDERED_OUT_FIELDS)
+        self._writer.writerow(ORDERED_OUT_FIELDS)
         self._log.info('Opened input/output files')
          
 
@@ -392,34 +402,6 @@ class GBIFReader(object):
                 pass
 
     # ...............................................
-    def getLine(self, csvreader, recno):
-        '''
-        @summary: Return a line while keeping track of the line number and errors
-        '''
-        success = False
-        line = None
-        while not success and csvreader is not None:
-            try:
-                line = csvreader.next()
-                if line:
-                    recno += 1
-                success = True
-            except OverflowError as e:
-                recno += 1
-                self._log.info( 'Overflow on record {}, line {} ({})'
-                                     .format(recno, csvreader.line, str(e)))
-            except StopIteration:
-                self._log.info('EOF after record {}, line {}'
-                                    .format(recno, csvreader.line_num))
-                success = True
-            except Exception as e:
-                recno += 1
-                self._log.info('Bad record on record {}, line {} ({})'
-                                    .format(recno, csvreader.line, e))
-
-        return line, recno
-    
-    # ...............................................
     def getFieldMeta(self):
         '''
         @todo: Remove interpreted / verbatim file designations, interpreted cannot 
@@ -448,38 +430,66 @@ class GBIFReader(object):
                     idx = int(fld.get('index'))
                     temp = fld.get('term')
                     term = temp[temp.rfind(CLIP_CHAR)+1:]
-                    if term in SAVE_FIELDS.keys():
+                    if term in SAVE_FIELDS:
                         dtype = SAVE_FIELDS[term][0]
                     else:
                         dtype = str
-                    if not fields.has_key(term):
+                    if not term in fields:
                         fields[term] = (idx, dtype)
         return fields
- 
+
     # ...............................................
-    def _updateFilterRec(self, rec):
+    def _update_rec(self, rec):
         """
         @summary: Update record with all BISON-requested changes, or remove 
                      the record by setting it to None.
         @param rec: dictionary of all fieldnames and values for this record
         @note: function modifies original dict
         """
-        gbifID = rec['gbifID']
-
-        # Ignore absence record 
-        if rec and rec['occurrenceStatus'].lower() == 'absent':
-            self._log.info('gbifID {} with absence data discarded'.format(gbifID)) 
-            rec = None
-        
-        if rec:
+        if rec is not None:
+            # Fill verbatimLocality with anything available
+            self._update_locality(rec)
             # Format eventDate and fill missing year
-            self._udpateDates(rec)
-            
+            self._update_dates(rec)
+            # Modify lat/lon vals if necessary
+            self._update_point(rec)
             # Save scientificName and TaxonID for later lookup and replace
             self._saveNameLookupData(rec)
-            
-            # Modify lat/lon vals if necessary
-            self._updatePoint(rec)
+
+    # ...............................................
+    def _clean_input(self, iline):
+        """
+        @summary: Create a list of values, ordered by BISON-requested fields in 
+                     ORDERED_OUT_FIELDS, with individual values and/or entire record
+                     modified according to BISON needs.
+        @param iline: A CSV record of GBIF-interpreted DarwinCore occurrence data
+        @return: list of ordered fields containing BISON-interpreted values for 
+                    a single GBIF occurrence record. 
+        """
+        gbifID = iline[0]
+        rec = {'gbifID': gbifID}
+        # Find values for specified fields
+        for fldname, (idx, _) in self.fldMeta.items():
+            try:
+                tmpval = iline[idx]
+            except Exception:
+                self._log.warning('Failed to get column {}/{} for gbifID {}'
+                                  .format(idx, fldname, gbifID))
+                val = None
+            else:
+                # Invalid records will return None for fldname
+                fldname, val = self._test_transform_val(fldname, tmpval)
+                
+                if fldname is None:
+                    self._log.info('Invalid record with gbifID {} discarded'
+                                   .format(gbifID))
+                    break
+                    rec = None
+                
+                else:
+                    rec[fldname] = val
+                            
+        return rec
 
     # ...............................................
     def createBisonLine(self, iline):
@@ -492,35 +502,18 @@ class GBIFReader(object):
                     a single GBIF occurrence record. 
         """
         row = []
-        gbifID = iline[0]
-        rec = {'gbifID': gbifID}
-        for fldname, (idx, _) in self.fldMeta.iteritems():
-            try:
-                tmpval = iline[idx]
-            except Exception:
-                self._log.warning('Failed to get column {}/{} for gbifID {}'
-                                        .format(idx, fldname, gbifID))
-                return row
-            else:
-                val = self._cleanVal(tmpval)
-    
-                fldname, val = self._updateFieldOrSignalRemove(fldname, val)
-                if fldname is None:
-                    return row
-                else:
-                    rec[fldname] = val
-                
-        # Update values and/or filter record out
-        self._updateFilterRec(rec)
+        rec = self._clean_input(iline)
         
-        if rec:
+        if rec is not None:
+            # Update values 
+            self._update_rec(rec)
             # create the ordered row
             for fld in ORDERED_OUT_FIELDS:
                 try:
                     row.append(rec[fld])
                 except KeyError:
                     print ('Missing field {} in record with gbifID {}'
-                             .format(fld, gbifID))
+                             .format(fld, rec['gbifID']))
                     row.append('')
 
         return row
@@ -539,22 +532,30 @@ class GBIFReader(object):
             self.close()
         if os.path.exists(self.outfname):
             raise Exception('Bison output file {} exists!'.format(self.outfname))
+        recno = 0
         try:
             self._name4lookup, self._name4lookupWriter, self._name4lookupf = \
                     self._openForReadWrite(self.name4Lookup_fname,
                                            header=['scientificName', 'taxonKey'])
             self.openInputOutput()
+            
             # Pull the header row 
-            line, recno = self.getLine(self._iCsvrdr, 0)
+            header, recno = getLine(self._reader, recno)
+            line = header
             while (line is not None):
+                
                 # Get interpreted record
-                line, recno = self.getLine(self._iCsvrdr, recno)
+                line, recno = getLine(self._reader, recno)
                 if line is None:
                     break
+                
                 # Create new record
                 byline = self.createBisonLine(line)
+                
+                # Write new record
                 if byline:
-                    self._outWriter.writerow(byline)
+                    self._writer.writerow(byline)
+                    
         except Exception as e:
             self._log.error('Failed on line {}, exception {}'.format(recno, e))
         finally:
@@ -586,32 +587,79 @@ if __name__ == '__main__':
     basepath = '/tank/data/bison/2019'
     gbif_relfname = 'raw/occurrence.txt'
     bison_relfname = 'out/bison.csv'
+    overwrite = True
     
     gbif_fname = os.path.join(basepath, gbif_relfname)
     bison_fname = os.path.join(basepath, bison_relfname)
+    rawpth, _ = os.path.split(gbif_fname)
+    meta_fname = os.path.join(rawpth, META_FNAME)
         
-    if os.path.exists(gbif_fname):
-        rawpth, _ = os.path.split(gbif_fname)
-        meta_fname = os.path.join(rawpth, META_FNAME)
-        
+    if os.path.exists(bison_fname):
+        if overwrite:
+            print('Removing old output file {}'.format(bison_fname))
+            os.remove(bison_fname)
+        else:
+            raise Exception('Output file {} already exists'.format(bison_fname))
+            
+    if os.path.exists(gbif_fname):        
         gr = GBIFReader(gbif_fname, meta_fname, bison_fname)
         print('Calling program with input/output {}'.format(gbif_fname, bison_fname))
         gr.extractData()
     else:
-        print('Filename {} does not exist'.format(gbif_fname))
+        raise Exception('Filename {} does not exist'.format(gbif_fname))
     
     
 """
-# python /state/partition1/workspace/bison/src/gbif/gbif2bison.py 7500000 8000000
+wc -l occurrence.txt 
+71057978 occurrence.txt
+
+
+import datetime
 import os
+import time
 import xml.etree.ElementTree as ET
+from gbif.constants import (IN_DELIMITER, OUT_DELIMITER, PROHIBITED_VALS, 
+                            VERBATIM, INTERPRETED, TERM_CONVERT, ENCODING,
+                            ORDERED_OUT_FIELDS, NAMESPACE, SAVE_FIELDS,
+                            CLIP_CHAR, META_FNAME)
 
-from src.gbif.gbif2bison import *
-from src.gbif.constants import *
-from src.gbif.gbifapi import GBIFCodes
-from src.gbif.tools import *
+from gbif.gbif2bison import *
 
-from src.gbif.gbif2bison import *
 
+rereadNames = False
+basepath = '/tank/data/bison/2019'
+gbif_relfname = 'raw/occurrence.txt'
+bison_relfname = 'out/bison.csv'
+overwrite = True
+
+gbif_fname = os.path.join(basepath, gbif_relfname)
+bison_fname = os.path.join(basepath, bison_relfname)
+rawpth, _ = os.path.split(gbif_fname)
+meta_fname = os.path.join(rawpth, META_FNAME)
+    
+if os.path.exists(bison_fname):
+    if overwrite:
+        print('Removing old output file {}'.format(bison_fname))
+        os.remove(bison_fname)
+    else:
+        raise Exception('Output file {} already exists'.format(bison_fname))
+
+self = GBIFReader(gbif_fname, meta_fname, bison_fname)
+
+recno = 0
+self._name4lookup, self._name4lookupWriter, self._name4lookupf = \
+        self._openForReadWrite(self.name4Lookup_fname,
+                               header=['scientificName', 'taxonKey'])
+self.openInputOutput()
+line, recno = getLine(self._reader, recno)
+# while (line is not None):
+
+line, recno = getLine(self._reader, recno)
+if line is None:
+    print('line is None')
+
+byline = self.createBisonLine(line)
+if byline:
+    self._writer.writerow(byline)
 
 """

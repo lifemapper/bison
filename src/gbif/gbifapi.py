@@ -25,7 +25,6 @@ import codecs
 import json
 import os
 import requests
-# import unicodecsv
 
 from gbif.constants import (OUT_DELIMITER, GBIF_URL, ENCODING, 
                             URL_ESCAPES, NEWLINE)
