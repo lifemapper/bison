@@ -33,13 +33,6 @@ Dependencies
         module load opt-python
         $PYPATH setup.py install
 
-    * unicodecsv 
-        ARCHIVENAME=python-unicodecsv
-        VERSION=0.14.1
-        SRC_URL=https://github.com/jdunck/$ARCHIVENAME/archive/$VERSION.tar.gz
-        OUTFILE=$ARCHIVENAME-$VERSION.tar.gz
-        wget --output-document=$OUTFILE $SRC_URL
-
     * requests 2.22.0
 
         ARCHIVENAME=requests
