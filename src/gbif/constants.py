@@ -56,7 +56,7 @@ TERM_CONVERT = {'FOSSIL_SPECIMEN': 'fossil',
 
 
 # Test these against lowercase values
-PROHIBITED_VALS = ['na', '#na', 'n/a']
+PROHIBITED_VALS = ['na', '#na', 'n/a', '']
 
 SAVE_FIELDS = {
    # pull canonical name from API and taxonKey
