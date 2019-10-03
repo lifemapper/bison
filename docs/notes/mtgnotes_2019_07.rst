@@ -97,7 +97,7 @@ Outputs:
 Process: (note LUT = lookup table)
 ==================================
     * Process GBIF data, mostly as 2018, with changes
-        * Process GBIF download to CSV file of GBIF data.  Temp result = GBIFdata.step1.csv
+        * Process GBIF download to CSV file of GBIF data.  Temp result = step1.csv
         * Filter records that fail for X reason
             * Empty string --> null
             * No scientificName or taxonKey
@@ -118,7 +118,7 @@ Process: (note LUT = lookup table)
                 * Create LUT from GBIF API + dataset UUID
             * CanonicalName: from GBIF parser + scientificName or taxonKey + API. 
           Temp result: sciName_or_taxonKey-canName LUT
-        * Process edited GBIFdata.step1.csv, replacing lookup values. 
+        * Process edited step1.csv, replacing lookup values. 
           Temp result = GBIFdata.step3.csv
             * Fill Provider name, code, url, etc from Provider LUT 
             * Fill Resource name, code, url, etc from Resource LUT 

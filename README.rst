@@ -74,20 +74,20 @@ Liz's email
    * None of these should ever be blank::
   
       *  Provider/publisher/organization
-          * providerID (numeric code)
-          * institutionCode (text string/name of provider)
+          * providerID (numeric code in GBIF publisher field)
+          * institutionCode (text string/name of provider, pulled from provider API)
     
       * Dataset/resource/collection
-          * resourceID (numeric code)
-          * ownerInstitutionCode (text string/name of dataset)
+          * resourceID (numeric code in GBIF datasetKey field)
+          * ownerInstitutionCode (text string/name of dataset, pulled from dataset API)
 
    * These are sometimes blank:
 
       * Provider/publisher/organization
-         * institutionID (Provider's organizational URL - not a GBIF URL)
+         * institutionID (Provider's organizational URL, pulled from provider API - not a GBIF URL)
     
       * Dataset/resource/collection
-         * collectionID (Dataset's URL if on the Web elsewhere - not a GBIF URL)
+         * collectionID (Dataset's URL if on the Web elsewhere, pulled from dataset API - not a GBIF URL)
 
 
 
