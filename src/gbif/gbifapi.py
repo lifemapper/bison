@@ -31,7 +31,8 @@ from gbif.constants import (OUT_DELIMITER, GBIF_URL, ENCODING,
 from gbif.tools import getCSVWriter
           
 # .............................................................................
-class GBIFCodes(object):
+# class GBIFCodes(object):
+class GbifAPI(object):
     """
     @summary: Pulls UUIDs and metadata for local resolution of 
                  GBIF Organizations, Providers, Resources
@@ -413,7 +414,7 @@ if __name__ == '__main__':
     inFname = args.infname
     outFname = args.outfname
     
-    gc = GBIFCodes()
+    gc = GbifAPI()
     if inFname is not None and os.path.exists(inFname):
             gc.parseScientificListFromFile(inFname, outFname)
     else:
