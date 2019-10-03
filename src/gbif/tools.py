@@ -48,17 +48,16 @@ def getCSVReader(datafile, delimiter, encoding):
     return reader, f
 
 # .............................................................................
-def getCSVWriter(datafile, delimiter, encoding, doAppend=True):
+def getCSVWriter(datafile, delimiter, encoding, fmode='w'):
     '''
     @summary: Get a CSV writer that can handle encoding
     '''
+    if fmode not in ('w', 'a'):
+        raise Exception('File mode must be "w" (write) or "a" (append)')
+    
     csv.field_size_limit(sys.maxsize)
-    if doAppend:
-        mode = 'a'
-    else:
-        mode = 'w'
     try:
-        f = open(datafile, mode, encoding=encoding) 
+        f = open(datafile, fmode, encoding=encoding) 
         writer = csv.writer(f, delimiter=delimiter)
     except Exception as e:
         raise Exception('Failed to read or open {}, ({})'

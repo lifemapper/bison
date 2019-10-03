@@ -21,15 +21,16 @@
              Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 
              02110-1301, USA.
 """
-import datetime
+import glob
 import os
 import time
 import xml.etree.ElementTree as ET
 
 from gbif.constants import (IN_DELIMITER, OUT_DELIMITER, PROHIBITED_VALS, 
                             INTERPRETED, TERM_CONVERT, ENCODING,
-                            ORDERED_OUT_FIELDS, NAMESPACE, SAVE_FIELDS,
-                            CLIP_CHAR, META_FNAME)
+                            ORDERED_OUT_FIELDS, COMPUTE_FIELDS, SAVE_FIELDS,
+                            CLIP_CHAR, META_FNAME, NAMESPACE)
+from gbif.gbifapi import GbifAPI
 from gbif.tools import getCSVReader, getCSVWriter, getLine, getLogger
 
         
@@ -55,13 +56,19 @@ class GBIFReader(object):
                      https://www.gbif.org/occurrence/search
         @param outfname: Full filename for the output BISON CSV file
         """
-#         self.gbifRes = GBIFCodes()
+        self._gbif_delimiter = IN_DELIMITER
+        self._bison_delimiter = OUT_DELIMITER
+        self._encoding = ENCODING
+        
+        self.gbifapi = None
+        
         self._files = []
         
         # Interpreted GBIF occurrence file
         self.interp_fname = interpreted_fname
-        self._if = None
-        self._files.append(self._if)
+        inpth, _ = os.path.split(interpreted_fname)
+        self._dataset_pth = os.path.join(inpth, 'dataset')
+        self._inf = None
         self._reader = None
         # GBIF metadata file for occurrence files
         self._meta_fname = meta_fname
@@ -70,30 +77,38 @@ class GBIFReader(object):
         # Output BISON occurrence file
         self.outfname = outfname
         self._outf = None
-        self._files.append(self._outf)
         self._writer = None
-        pth, outbasename = os.path.split(outfname)
+        outpth, outbasename = os.path.split(outfname)
         outbase, _ = os.path.splitext(outbasename)
         
         # Input for Canonical name lookup
-        self.name4Lookup_fname = os.path.join(pth, 'nameUUIDForLookup.csv')
-        self._name4lookupf = None
-        self._files.append(self._name4lookupf)
-        self._name4lookupWriter = None
-        self._name4lookup = {}
+        self.namekey_fname = os.path.join(outpth, 'namekey_list.csv')
+        self._namef = None
+        self._namekey_writer = None
+        self._namekey = {}
+
+        # Input for Publisher lookup (providerID)
+        self.pub_fname = os.path.join(outpth, 'publisher_list.txt')
+        self._pubf = None
+        self._pubset = None
+
+        # Input for Dataset lookup (datasetKey)
+        self.dsk_fname = os.path.join(outpth, 'datasetkey_list.txt')
+        self._dskf = None
+        self._dskset = set()
 
         logname, _ = os.path.splitext(os.path.basename(__file__))
-        logfname = os.path.join(pth, outbase + '.log')
+        logfname = os.path.join(outpth, outbase + '.log')
         if os.path.exists(logfname):
             ts = int(time.time())
-            logfname = os.path.join(pth, outbase + '.log.{}'.format(ts))
+            logfname = os.path.join(outpth, outbase + '.log.{}'.format(ts))
         self._log = getLogger(logname, logfname)
         
-    # ...............................................
-    def _timeStamp(self, msg):
-        ts = time.time()
-        st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
-        self._log.info('{}:    {}'.format(st, msg))
+#     # ...............................................
+#     def _time_stamp(self, msg):
+#         ts = time.time()
+#         st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
+#         self._log.info('{}:    {}'.format(st, msg))
 
 #     # ...............................................
 #     def _getValFromCorrectLine(self, fldname, meta, vline, iline):
@@ -186,72 +201,82 @@ class GBIFReader(object):
             
         # Test eventDate field
         tmp = rec['eventDate']
-        dateonly = tmp.split('T')[0]
-        if dateonly != '':
-            parts = dateonly.split('-')
-            try:
-                for i in range(len(parts)):
-                    int(parts[i])
-            except:
-                pass
-            else:
-                rec['eventDate'] = dateonly
-                if fillyr:
-                    rec['year'] = parts[0]
+        if tmp is not None:
+            dateonly = tmp.split('T')[0]
+            if dateonly != '':
+                parts = dateonly.split('-')
+                try:
+                    for i in range(len(parts)):
+                        int(parts[i])
+                except:
+                    pass
+                else:
+                    rec['eventDate'] = dateonly
+                    if fillyr:
+                        rec['year'] = parts[0]
 
     # ...............................................
-    def _saveNameLookupData(self, rec):
+    def _save_for_lookups(self, rec):
         """
-        @todo: Stop saving taxonKey - not useful if scientificName is not parsable 
-        @summary: Save scientificName and taxonID for parse or API query 
-                     respectively. 
+        @summary: Save scientificName / taxonKey and publisher for parse or query 
         @param rec: dictionary of all fieldnames and values for this record
-        @note: The name parser fails on unicode namestrings
-        @note: Save to dictionary key=sciname, val=taxonid to avoid writing 
-                 duplicates.  Append to file to save for later script runs, with 
-                 lines like:
-                      'scientificName, taxonKey [, taxonKey, taxonKey ...]'
+        @note: The GBIF name parser fails on unicode namestrings
+        @note: Invalid records with no scientificName or taxonKey were 
+               discarded earlier in self._clean_input
+        @note: Names saved to dictionary key=sciname, val=[taxonid, ...] 
+               to avoid writing duplicates.  
         """
-        sciname = taxkey = None
-        try:
-            sciname = rec['scientificName']
-        except:
-            sciname = ''
+        # Save a set of publisher UUIDs
+        publisher = rec['publisher']
+        if publisher is not None:
+            self._pubset.add(publisher)
             
+        # Save a dict of sciname: taxonKeyList
+        sciname = rec['scientificName']
+        taxkey = rec['taxonKey']
         try:
-            taxkey = rec['taxonKey']
-            try:
-                int(taxkey)
-            except:
-                self._log.warn('gbifID {}: non-integer taxonID {}'.format(
-                                    rec['gbifID'], taxkey))
-                taxkey = ''
+            int(taxkey)
         except:
-            self._log.warn('gbifID {}: missing taxonID {}'.format(rec['gbifID']))
-            taxkey = ''
-                
-        saveme = True
-        if taxkey != '':        
-            try:
-                keylist = self._name4lookup[sciname]
-                if taxkey in keylist:
-                    saveme = False
-                else:
-                    self._name4lookup[sciname].append(taxkey)
-                    self._log.warn('gbifID {}: Sciname {} has multiple taxonIDs {}'.format(
-                        rec['gbifID'], sciname, self._name4lookup[sciname]))
-    
-            except KeyError:
-                self._name4lookup[sciname] = [taxkey]
+            self._log.warn('gbifID {}: non-integer taxonID {}'.format(
+                                rec['gbifID'], taxkey))                
+        try:
+            keylist = self._namekey[sciname]
+            if taxkey not in keylist:
+                self._namekey[sciname].append(taxkey)
+        except KeyError:
+            self._namekey[sciname] = [taxkey]
 
-            if saveme:
-                row = [k for k in self._name4lookup[sciname]]
+    # ...............................................
+    def _write_lookupvals(self):
+        # Write scientific names and taxonKeys found with them in raw data
+        self._namekey_writer, self._namef = self._open_for_csv_write(
+            self.namekey_fname, header=['scientificName', 'taxonKeys'])
+        try:
+            for sciname, txkeylst in self._namekey.items():
+                row = [k for k in txkeylst]
                 row.insert(0, sciname)
-                self._name4lookupWriter.writerow(row)
-#         if (sciname == '' and taxkey == ''):
-#             rec = None
-#         else:
-#             self._name4lookupWriter.writerow([rec['gbifID'], sciname, taxkey])
+                self._namekey_writer.writerow(row)
+        finally:
+            self._namef.close()
+        
+        # Write publishers found in raw data
+        self._pubf = self._open_for_write(self.pub_fname)
+        try:
+            for pub in self._pubset:
+                self._pubf.write('{}\n'.format(pub))
+        finally:
+            self._pubf.close()
+        
+        # Write dataset UUIDs from EML files downloaded with raw data
+        dsfnames = glob.glob(os.path.join(self._dataset_pth, '*.xml'))
+        if dsfnames is not None:
+            self._dskf = self._open_for_write(self.dsk_fname)
+            try:
+                for fn in dsfnames:
+                    self._dskf.write('{}\n'.format(fn[:-4]))
+            finally:
+                self._dskf.close()
+
 
     # ...............................................
     def _test_transform_val(self, fldname, tmpval):
@@ -261,63 +286,93 @@ class GBIFReader(object):
         @param fldname: Fieldname in current record
         @param tmpval: Value for this field in current record
         """
-        tmpval2 = tmpval.strip()
+        val = tmpval.strip()
         
         # Replace N/A and empty string
-        if tmpval2.lower() in PROHIBITED_VALS:
+        if val.lower() in PROHIBITED_VALS:
             val = None
             
         # remove records with scientificName or taxonKey missing
-        elif fldname in ('scientificName', 'taxonKey'):
-            self._log.info('Discarded record with missing scientificName or taxonKey')
+        elif fldname in ('scientificName', 'taxonKey') and val is None:
+            self._log.info('Discarded rec with missing scientificName or taxonKey')
             fldname = val = None
 
         # remove records with occurrenceStatus = absence
-        elif fldname == 'occurrenceStatus' and tmpval2.lower() == 'absent':
+        elif fldname == 'occurrenceStatus' and val.lower() == 'absent':
             self._log.info('Discarded absence record')
             fldname = val = None
 
         # simplify basisOfRecord terms
         elif fldname == 'basisOfRecord':
-            if tmpval2 in TERM_CONVERT:
+            if val in TERM_CONVERT:
                 val = TERM_CONVERT[val]
                 
         # Convert year to integer
         elif fldname == 'year':
             try:
-                val = int(tmpval2)
+                val = int(val)
             except:
                 val = None
             
         # gather geo fields for check/convert
         elif fldname in ('decimalLongitude', 'decimalLatitude'):
             try:
-                val = float(tmpval2)
+                val = float(val)
             except Exception:
                 val = None
             
         return fldname, val
 
     # ...............................................
-    def _openForReadWrite(self, fname, header=None):
+    def _open_for_csv_write(self, fname, header=None):
         '''
-        @summary: Read and populate lookup table if file exists, open and return
-                     file and csvwriter for writing or appending. If lookup file 
-                     is new, write header if provided.
+        @summary: Read and populate dictionary if file exists, 
+                  then re-open for writing or appending. If lookup file 
+                  is new, write header if provided.
+        '''
+        fmode = 'w'        
+        if os.path.exists(fname):
+            fmode = 'a'
+            
+        csvwriter, outfile = getCSVWriter(fname, self._bison_delimiter, 
+                                          self._encoding, fmode=fmode)
+        self._log.info('Opened lookup file {} for write'.format(fname))
+
+        if fmode == 'w' and header is not None:
+            csvwriter.writerow(header)
+        
+        return csvwriter, outfile 
+    
+    
+    # ...............................................
+    def _open_for_write(self, fname):
+        '''
+        @summary: Open for writing or appending. 
+        '''
+        fmode = 'w'        
+        if os.path.exists(fname):
+            fmode = 'a'
+        outf = open(fname, mode=fmode, encoding=self._encoding)
+        self._log.info('Opened file {}'.format(fname))
+
+        return outf
+    
+    # ...............................................
+    def _read_dict(self, fname):
+        '''
+        @summary: Read and populate dictionary if file exists
         '''
         lookupDict = {}
-        doAppend = False
-        
         if os.path.exists(fname):
-            doAppend = True
             recno = 0        
             try:
-                csvRdr, infile = getCSVReader(fname, IN_DELIMITER, ENCODING)
+                csvRdr, infile = getCSVReader(fname, self._bison_delimiter, 
+                                              self._encoding)
                 # get header
                 line, recno = getLine(csvRdr, recno)
                 # read lookup vals into dictionary
                 while (line is not None):
-                    line, recno = self.getLine(csvRdr, recno)
+                    line, recno = getLine(csvRdr, recno)
                     if line and len(line) > 0:
                         try:
                             # First item is dict key, rest are vals
@@ -331,57 +386,63 @@ class GBIFReader(object):
                                 .format(fname, recno, e))
             finally:
                 infile.close()
+        return lookupDict
         
-        outWriter, outfile = getCSVWriter(fname, OUT_DELIMITER, ENCODING, 
-                                          doAppend=doAppend)
-        self._log.info('Re-opened lookup file {} for appending'.format(fname))
-
-        if not doAppend and header is not None:
-            outWriter.writerow(header)
+    # ...............................................
+    def _read_list(self, fname):
+        '''
+        @summary: Read and populate list if file exists. 
+        '''
+        lookupvals = set()
         
-        return lookupDict, outWriter, outfile 
-    
+        if os.path.exists(fname):
+            num = 0        
+            try:
+                inf = open(fname, mode='r', encoding=self._encoding)
+                for line in inf:
+                    num +=1
+                    val = line.strip()
+                    lookupvals.add(val)
+                self._log.info('Read lookup file {}'.format(fname))
+            except Exception as e:
+                self._log.error('Exception reading data in line {} of {}: {}'
+                                .format(num, fname, e))
+            finally:
+                inf.close()
+        
+        return lookupvals
     
     # ...............................................
-    def openInputOutput(self):
+    def open_read_files(self):
         '''
         @summary: Read GBIF metadata, open GBIF interpreted data for reading, 
-                     output file for writing
+                  output file for writing
         '''
-        self.fldMeta = self.getFieldMeta()
+        # Extract relevant GBIF metadata
+        self.fldMeta = self.get_field_meta()
+
+        # Open raw GBIF data
+        (self._reader, 
+         self._inf) = getCSVReader(self.interp_fname, self._gbif_delimiter, 
+                                   self._encoding)
+        self._files.append(self._inf) 
         
-        (self._reader, self._if) = getCSVReader(self.interp_fname, IN_DELIMITER, 
-                                                ENCODING)
-         
-        (self._writer, self._outf) = getCSVWriter(self.outfname, OUT_DELIMITER, 
-                                                  ENCODING, doAppend=False)
+        # Open output BISON file 
+        (self._writer, 
+         self._outf) = getCSVWriter(self.outfname, self._bison_delimiter, 
+                                   self._encoding)
+        self._files.append(self._outf)
+
+        # Read any existing values for lookup
+        self._namekey = self._read_dict(self.namekey_fname)
+        self._pubset = self._read_list(self.pub_fname)
+        
         # Write the header row 
         self._writer.writerow(ORDERED_OUT_FIELDS)
-        self._log.info('Opened input/output files')
-         
+        self._log.info('Opened input/output files, read lookup values')
 
     # ...............................................
-    def openReadLookups(self):
-        '''
-        @summary: Read lookup files, then re-open for appending to 
-                     save canonicalNames and organization UUIDs into files to avoid 
-                     querying repeatedly.
-        '''
-        self._nameLookup, self._outCanWriter, self._outcf = \
-                self._openForReadWrite(self.outCanonical_fname, numKeys=2, numVals=1,
-                                header=['scientificName', 'taxonKey', 'canonicalName'])
-                
-        self._orgLookup, self._outOrgWriter, self._outof = \
-                self._openForReadWrite(self.outOrg_fname, numKeys=1, numVals=2,
-                                header=['orgUUID', 'title', 'homepage'])
-         
-        self._datasetLookup, self._outDSWriter, self._outdf = \
-                self._openForReadWrite(self.outDS_fname, numKeys=1, numVals=3,
-                                header=['datasetUUID', 'title', 'homepage', 'orgUUID'])
-
-
-    # ...............................................
-    def isOpen(self):
+    def is_open(self):
         """
         @summary: Return true if any files are open.
         """
@@ -402,7 +463,7 @@ class GBIFReader(object):
                 pass
 
     # ...............................................
-    def getFieldMeta(self):
+    def get_field_meta(self):
         '''
         @todo: Remove interpreted / verbatim file designations, interpreted cannot 
                  be joined to verbatim file for additional info.
@@ -420,22 +481,23 @@ class GBIFReader(object):
         root = tree.getroot()
         # Child will reference INTERPRETED or VERBATIM file
         for child in root:
+            # does this node of metadata reference INTERPRETED or VERBATIM?
             fileElt = child.find('tdwg:files', NAMESPACE)
             fnameElt= fileElt .find('tdwg:location', NAMESPACE)
-            currmeta = fnameElt.text
-            sortedname = 'tidy_' + currmeta.replace('txt', 'csv')
-            if sortedname.find(INTERPRETED) >= 0:
+            meta4data = fnameElt.text
+
+            if meta4data.startswith(INTERPRETED):
                 flds = child.findall(tdwg+'field')
                 for fld in flds:
+                    # Get column num and short name
                     idx = int(fld.get('index'))
                     temp = fld.get('term')
                     term = temp[temp.rfind(CLIP_CHAR)+1:]
+                    # Save only fields of interest
                     if term in SAVE_FIELDS:
                         dtype = SAVE_FIELDS[term][0]
-                    else:
-                        dtype = str
-                    if not term in fields:
-                        fields[term] = (idx, dtype)
+                        if not term in fields:
+                            fields[term] = (idx, dtype)
         return fields
 
     # ...............................................
@@ -453,8 +515,8 @@ class GBIFReader(object):
             self._update_dates(rec)
             # Modify lat/lon vals if necessary
             self._update_point(rec)
-            # Save scientificName and TaxonID for later lookup and replace
-            self._saveNameLookupData(rec)
+            # Save scientificName / TaxonID, providerID and datasetKey for later lookup and replace
+            self._save_for_lookups(rec)
 
     # ...............................................
     def _clean_input(self, iline):
@@ -468,7 +530,7 @@ class GBIFReader(object):
         """
         gbifID = iline[0]
         rec = {'gbifID': gbifID}
-        # Find values for specified fields
+        # Find values for gbif fields of interest
         for fldname, (idx, _) in self.fldMeta.items():
             try:
                 tmpval = iline[idx]
@@ -492,7 +554,7 @@ class GBIFReader(object):
         return rec
 
     # ...............................................
-    def createBisonLine(self, iline):
+    def create_bisonrec_step1(self, iline):
         """
         @summary: Create a list of values, ordered by BISON-requested fields in 
                      ORDERED_OUT_FIELDS, with individual values and/or entire record
@@ -512,32 +574,33 @@ class GBIFReader(object):
                 try:
                     row.append(rec[fld])
                 except KeyError:
-                    print ('Missing field {} in record with gbifID {}'
-                             .format(fld, rec['gbifID']))
+                    # These 2 fields filled in on 2nd pass
+                    if fld not in COMPUTE_FIELDS:
+                        print ('Missing field {} in record with gbifID {}'
+                                 .format(fld, rec['gbifID']))
                     row.append('')
-
         return row
 
     # ...............................................
-    def extractData(self):
+    def first_pass(self):
         """
         @summary: Create a CSV file containing GBIF occurrence records extracted 
                      from the interpreted occurrence file provided 
                      from an Occurrence Download, in Darwin Core format.  Values may
                      be modified and records may be discarded according to 
                      BISON requests.
-        @return: A CSV file of BISON-modified records from a GBIF download. 
+        @return: A CSV file of first pass of BISON-modified records from a 
+                 GBIF download. 
+        @note: Some fields will be filled in on subsequent processing.
         """
-        if self.isOpen():
+        if self.is_open():
             self.close()
         if os.path.exists(self.outfname):
             raise Exception('Bison output file {} exists!'.format(self.outfname))
+        
         recno = 0
         try:
-            self._name4lookup, self._name4lookupWriter, self._name4lookupf = \
-                    self._openForReadWrite(self.name4Lookup_fname,
-                                           header=['scientificName', 'taxonKey'])
-            self.openInputOutput()
+            self.open_read_files()
             
             # Pull the header row 
             header, recno = getLine(self._reader, recno)
@@ -550,16 +613,66 @@ class GBIFReader(object):
                     break
                 
                 # Create new record
-                byline = self.createBisonLine(line)
+                byline = self.create_bisonrec_step1(line)
                 
                 # Write new record
                 if byline:
                     self._writer.writerow(byline)
-                    
+                                
         except Exception as e:
             self._log.error('Failed on line {}, exception {}'.format(recno, e))
         finally:
             self.close()
+
+        # Write all lookup values
+        self._write_lookupvals()
+            
+    # ...............................................
+    def create_lookup_tables(self):
+        """
+        @summary: Create lookup tables for: 
+                  BISON providerID from GBIF publisher
+                  BISON resourceID from GBIF datasetKey
+                  BISON canonicalName from GBIF scientificName and/or taxonKey
+        @return: Three files, one for each lookup table. 
+        """
+        self.gbifapi = GbifAPI()
+        
+        self._resolve_names()
+        
+        # aka publisher
+        self._resolve_providers()
+        # aka dataset
+        self._resolve_resources()
+        
+        # Write scientific names and taxonKeys found with them in raw data
+        self._namekey_writer, self._namef = self._open_for_csv_write(
+            self.namekey_fname, header=['scientificName', 'taxonKeys'])
+        try:
+            for sciname, txkeylst in self._namekey.items():
+                row = [k for k in txkeylst]
+                row.insert(0, sciname)
+                self._namekey_writer.writerow(row)
+        finally:
+            self._namef.close()
+        
+        # Write publishers found in raw data
+        self._pubf = self._open_for_write(self.pub_fname)
+        try:
+            for pub in self._pubset:
+                self._pubf.write('{}\n'.format(pub))
+        finally:
+            self._pubf.close()
+        
+        # Write dataset UUIDs from EML files downloaded with raw data
+        dsfnames = glob.glob(os.path.join(self._dataset_pth, '*.xml'))
+        if dsfnames is not None:
+            self._dskf = self._open_for_write(self.dsk_fname)
+            try:
+                for fn in dsfnames:
+                    self._dskf.write('{}\n'.format(fn[:-4]))
+            finally:
+                self._dskf.close()
 
 # ...............................................
 if __name__ == '__main__':
@@ -585,8 +698,8 @@ if __name__ == '__main__':
     # Testing data
     rereadNames = False
     basepath = '/tank/data/bison/2019'
-    gbif_relfname = 'raw/occurrence.txt'
-    bison_relfname = 'out/bison.csv'
+    gbif_relfname = 'raw/occurrence_10.txt'
+    bison_relfname = 'tmp/step1.csv'
     overwrite = True
     
     gbif_fname = os.path.join(basepath, gbif_relfname)
@@ -604,7 +717,7 @@ if __name__ == '__main__':
     if os.path.exists(gbif_fname):        
         gr = GBIFReader(gbif_fname, meta_fname, bison_fname)
         print('Calling program with input/output {}'.format(gbif_fname, bison_fname))
-        gr.extractData()
+        gr.first_pass()
     else:
         raise Exception('Filename {} does not exist'.format(gbif_fname))
     
@@ -629,7 +742,7 @@ from gbif.gbif2bison import *
 rereadNames = False
 basepath = '/tank/data/bison/2019'
 gbif_relfname = 'raw/occurrence.txt'
-bison_relfname = 'out/bison.csv'
+bison_relfname = 'tmp/bison_pass1.csv'
 overwrite = True
 
 gbif_fname = os.path.join(basepath, gbif_relfname)
@@ -647,8 +760,8 @@ if os.path.exists(bison_fname):
 self = GBIFReader(gbif_fname, meta_fname, bison_fname)
 
 recno = 0
-self._name4lookup, self._name4lookupWriter, self._name4lookupf = \
-        self._openForReadWrite(self.name4Lookup_fname,
+self._namekey, self._namekey_writer, self._namekeyf = \
+        self._read_open_for_write(self.namekey_fname,
                                header=['scientificName', 'taxonKey'])
 self.openInputOutput()
 line, recno = getLine(self._reader, recno)

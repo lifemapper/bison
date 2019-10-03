@@ -40,9 +40,8 @@ SUBSET_PREFIX = '_lines_'
 
 SUBSET = '0-5000'
 
-
 NO_OUTPUT = None
-COMPUTED = None
+# COMPUTED = None
 
 TERM_CONVERT = {'FOSSIL_SPECIMEN': 'fossil',
                 'LITERATURE': 'literature',
@@ -58,6 +57,7 @@ TERM_CONVERT = {'FOSSIL_SPECIMEN': 'fossil',
 # Test these against lowercase values
 PROHIBITED_VALS = ['na', '#na', 'n/a', '']
 
+# Fields of interest in the occurrence.txt file, short names stripped from meta.xml
 SAVE_FIELDS = {
    # pull canonical name from API and taxonKey
    'gbifID': (str, INTERPRETED),
@@ -65,7 +65,7 @@ SAVE_FIELDS = {
    #      or species API and taxonKey
    'scientificName': (str, INTERPRETED),
    'taxonKey': (str, INTERPRETED),
-   'canonicalName': (str, COMPUTED),
+#    'canonicalName': (str, COMPUTED),
    'vernacularName': (str, INTERPRETED), 
    'kingdom': (str, INTERPRETED), 
     
@@ -80,15 +80,14 @@ SAVE_FIELDS = {
    'institutionCode': (str, INTERPRETED), 
    'institutionID': (str, INTERPRETED), 
 #    # pull providerID from dataset API and publishingOrganizationKey
-#    'publisher': (NO_OUTPUT, INTERPRETED),
-   'providerID': (str, COMPUTED), 
+    'publisher': (NO_OUTPUT, INTERPRETED),
+#    'providerID': (str, COMPUTED), 
    
    # GBIF 'Dataset'
    #--------------
    # pull resource from API and datasetKey
    'datasetKey': (str, INTERPRETED),
-   
-   'resourceID': (str, COMPUTED),
+#    'resourceID': (str, COMPUTED),
    # I believe ownerInstitutionCode is incorrect, and should be collectionCode,
    # so including both.
    'ownerInstitutionCode': (str, INTERPRETED),
@@ -125,6 +124,7 @@ SAVE_FIELDS = {
    'occurrenceStatus': (str, INTERPRETED),
    # only in verbatim
 #    'geodeticDatum': (str, INTERPRETED),
+    'associatedMedia': (str, INTERPRETED)
  }
 
 
@@ -136,7 +136,7 @@ ORDERED_OUT_FIELDS = [
    'gbifID', 
    # Added scientificName and taxonKey for reliable name parsing/lookup
    'scientificName', 'taxonKey', 
-#    'canonicalName',  
+    'canonicalName',  
    'basisOfRecord', 'eventDate', 'year', 
    'verbatimEventDate', 
    'institutionCode', 'institutionID', 
@@ -151,8 +151,12 @@ ORDERED_OUT_FIELDS = [
    'higherGeographyID', 
    'stateProvince', 
    # Keep original UUID values for later lookup
-   'publisher',    # 'providerID', 
-   'datasetKey',   # 'resourceID', 
+   'providerID', 
+   'resourceID', 
+   # lookup publisher from providerID
+   'publisher',    
+   # lookup datasetKey from resourceID
+   'datasetKey',
    'vernacularName', 
    'kingdom', 
    'coordinatePrecision', 
@@ -162,7 +166,4 @@ ORDERED_OUT_FIELDS = [
    'license']
 
 # TEST_FIELDS = ['occurrenceStatus', 'decimalLatitude', 'decimalLongitude']
-# COMPUTE_FIELDS = {'taxonKey': 'canonicalName', 
-#                   'publisher': 'providerID',
-#                   'datasetKey': 'resourceID',
-#                   'basisOfRecord': None}
+COMPUTE_FIELDS = ('canonicalName', 'providerID', 'resourceID')
