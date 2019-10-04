@@ -103,7 +103,7 @@ class GBIFReader(object):
         # Input for Publisher lookup (providerID)
         self.pub_fname = os.path.join(outpth, 'publisher_list.txt')
         self._pubf = None
-        self._pubset = None
+        self._pubset = set()
         
         # Lookup table output files
         self.res_lut_fname = os.path.join(outpth, 'resource_lookup.csv')
@@ -265,8 +265,18 @@ class GBIFReader(object):
             
         # Previously tested for existence of these fields
         # Save a dict of sciname: taxonKeyList
-        sciname = rec['scientificName']
-        taxkey = rec['taxonKey']
+        try:
+            sciname = rec['scientificName']
+        except:
+            self._log.info('gbifID {} record missing scientificName field'
+                           .format(rec['gbifID']))
+        try:
+            taxkey = rec['taxonKey']
+        except:
+            self._log.info('gbifID {} record missing taxonKey field'
+                           .format(rec['gbifID']))
+        
+        
         try:
             int(taxkey)
         except:
@@ -583,16 +593,17 @@ class GBIFReader(object):
                 if fldname is None:
                     self._log.info('Invalid record with gbifID {} discarded'
                                    .format(gbifID))
-                    break
                     rec = None
+                    break
                 
                 else:
                     rec[fldname] = val
         # Double check that all fields exist in record!
-        for fldname in self.fldMeta.keys():
-            if not fldname in rec:
-                self._log.warning('Missing field {}/{} in record gbifID {}'
-                                  .format(idx, fldname, gbifID))
+        if rec is not None:
+            for fldname in self.fldMeta.keys():
+                if not fldname in rec:
+                    self._log.warning('Missing field {} in record gbifID {}'
+                                      .format(fldname, gbifID))
         return rec
 
     # ...............................................
