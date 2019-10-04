@@ -71,23 +71,23 @@ class GBIFMetaReader(object):
         return title
 
     # ...............................................
-    def get_dataset_metadata_for_uuids(self, outfname, uuid_list):
+    def get_dataset_metadata_for_uuids(self, uuids, outfname):
         """
         @summary: Create a CSV file containing GBIF dataset metadata  
                   extracted from the GBIF API for the provided list.
+        @param uuids: list of UUIDs for GBIF datasets. 
         @param outfname: target CSV file for metadata records for GBIF datasets. 
-        @param uuid_list: target CSV file for metadata records for GBIF datasets. 
         """
-        self.gbifapi.getDatasetCodes(outfname, uuid_list)
+        self.gbifapi.get_write_dataset_meta(outfname, uuids)
     
     # ...............................................
     def get_all_provider_metadata(self, outfname):
         """
         @summary: Create a CSV file containing GBIF organizations metadata 
-                  extracted from the GBIF API
+                  for BISON 'provider' fields, extracted from the GBIF API
         @param outfname: target CSV file for metadata records for GBIF organizations 
         """
-        self.gbifapi.getProviderCodes(outfname)
+        self.gbifapi.get_write_organization_meta(outfname)
             
     # ...............................................
     def _writeData(self, outf, encodedString):

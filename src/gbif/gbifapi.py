@@ -69,15 +69,18 @@ class GbifAPI(object):
         data = None
         try:
             response = requests.get(url)
-            data = response.read()
-            if resp_type == 'json':
-                data = json.load(data)
         except Exception:
             print('Failed to resolve URL {}'.format(url))
+        else:
+            if response.status_code == 200:
+                if resp_type == 'json':
+                    data = response.json()
+                else:
+                    data = response.text
         return data
                      
 # ...............................................
-    def resolveDataset(self, dsKey):
+    def query_for_dataset(self, dsKey):
         dataDict = {}
         # returns GBIF dataset
         if dsKey == '':
@@ -132,8 +135,8 @@ class GbifAPI(object):
         return dataDict
 
 # ...............................................
-    def getProviderFromDatasetKey(self, dsKey):
-        row = self.resolveDatasetKey(dsKey)
+    def find_orguuid_from_dataset(self, dsKey):
+        row = self.query_for_dataset(dsKey)
         try:
             publishingOrgUUID = row[0]
         except:
@@ -142,7 +145,7 @@ class GbifAPI(object):
 
                     
 # ...............................................
-    def _processRecordInfo(self, rec, header, preserveFormatingKeys=[]):
+    def _processRecordInfo(self, rec, header, reformat_keys=[]):
         row = []
         for key in header:
             try:
@@ -154,7 +157,7 @@ class GbifAPI(object):
                     else:
                         val = ''
                         
-                if key in preserveFormatingKeys:
+                if key in reformat_keys:
                     val = self._saveNLDelCR(val)
                     
                 elif key == 'citation':
@@ -174,8 +177,7 @@ class GbifAPI(object):
         return row
 
 # ...............................................
-    def getCodesFromAPI(self, apitype, outfname, header, preserveFormatingKeys,
-                              saveUUIDs=None):
+    def query_write_meta(self, apitype, outfname, header, reformat_keys, UUIDs=None):
         if apitype not in ('organization', 'dataset'):
             raise Exception('What kind of query is {}?'.format(apitype))
 
@@ -201,9 +203,9 @@ class GbifAPI(object):
                     print('Received {} {}s from GBIF'.format(len(allObjs), apitype))
                     for obj in allObjs:
                         recno += 1
-                        if (saveUUIDs is None or obj['key'] in saveUUIDs):
+                        if (UUIDs is None or obj['key'] in UUIDs):
                             row = self._processRecordInfo(obj, header, 
-                                                preserveFormatingKeys=preserveFormatingKeys)
+                                                reformat_keys=reformat_keys)
                             try:
                                 outf.write(OUT_DELIMITER.join(row) + NEWLINE)
                             except Exception:
@@ -227,23 +229,24 @@ class GbifAPI(object):
 
 
 # ...............................................
-    def getProviderCodes(self, outfname):
+    def get_write_organization_meta(self, outfname):
         header = ['key', 'title', 'description', 'created', 
                      'modified', 'homepage']
         formatKeys = ['description', 'homepage']
-        self.getCodesFromAPI('organization', outfname, header, formatKeys)
+        self.query_write_meta('organization', outfname, header, formatKeys)
 
 # ...............................................
-    def getDatasetCodes(self, outfname, uuids):
+    def get_write_dataset_meta(self, outfname, uuids):
         header = ['publishingOrganizationKey', 'key', 'title', 'description', 
                      'citation', 'rights', 'logoUrl', 'created', 'modified', 
                      'homepage']
         formatKeys = ['title', 'rights', 'logoUrl', 'description', 'homepage']
-        self.getCodesFromAPI('dataset', outfname, header, formatKeys, uuids)
+        self.query_write_meta('dataset', outfname, header, formatKeys, 
+                            UUIDs=uuids)
 
 
 # ...............................................
-    def resolveOrganization(self, orgUUID):
+    def query_for_organization(self, orgUUID):
         # returns GBIF providerId
         dataDict = {}
         if orgUUID == '':
@@ -300,28 +303,26 @@ class GbifAPI(object):
         return dataDict
 
 # ...............................................
-    def resolveCanonicalFromTaxonKey(self, taxKey):
-        canName = None
-        url = '{}/species/{}'.format(GBIF_URL, taxKey)
-        data = self._getDataFromUrl(url)
-        if data is not None and data.has_key('canonicalName'):
-            canName = data['canonicalName']
-#             row = [taxKey, canName, data['datasetKey']]
-        return canName
-
-# ...............................................
-    def resolveCanonicalFromScientific(self, sciname):
-        canName = None
-        for replaceStr, withStr in URL_ESCAPES:
-            sciname = sciname.replace(replaceStr, withStr)
-        url = '{}/parser/name?name={}'.format(GBIF_URL, str(sciname))
-        data = self._getDataFromUrl(url)
-        if data is not None:
-            if type(data) is list and len(data) > 0:
-                data = data[0]
-            if data.has_key('canonicalName'):
-                canName = data['canonicalName']
-        return canName
+    def find_canonical(self, taxkey=None, sciname=None):
+        canonical = None
+        if taxkey is not None:
+            url = '{}/species/{}'.format(GBIF_URL, taxkey)
+            data = self._getDataFromUrl(url)
+        elif sciname is not None:
+            for replaceStr, withStr in URL_ESCAPES:
+                sciname = sciname.replace(replaceStr, withStr)
+            url = '{}/parser/name?name={}'.format(GBIF_URL, str(sciname))
+            data = self._getDataFromUrl(url)
+            if data is not None:
+                if type(data) is list and len(data) > 0:
+                    data = data[0]
+        else:
+            raise Exception('Must provide taxonKey or scientificName')
+        
+        if data.has_key('canonicalName'):
+            canonical = data['canonicalName']
+#         row = [taxKey, canName, data['datasetKey']]
+        return canonical
 
 
 # ...............................................
@@ -368,7 +369,7 @@ class GbifAPI(object):
         return output
 
 # ...............................................
-    def parseScientificListFromFile(self, infname, outfname):
+    def get_write_parsednames(self, infname, outfname):
         baseurl = GBIF_URL.replace('http', 'https')
         url = '{}/parser/name/'.format(baseurl)
         output = self._postToParser(url, infname)
@@ -400,27 +401,48 @@ if __name__ == '__main__':
                 description=("""Submit data to GBIF API services as a GET request
                                      or file as a POST request.
                                  """))
-    parser.add_argument('--infile', type=str, default=None,
-                              help="""
-                              Full pathname of the input file containing UTF-8 encoded
-                              scientificNames to be parsed into canonicalNames.
-                              """)
-    parser.add_argument('--outfile', type=str, default=None,
-                              help="""
-                              Full pathname of the output file with UTF-8 encoded
-                              scientificNames and corresponding canonicalNames.
-                              """)
+    parser.add_argument('--outfile', type=str, default='/tmp/gbifapi_result_file.csv',
+                        help="Full pathname for the output file")
+    parser.add_argument('--name_infile', type=str, default=None,
+                        help="""
+                        Full pathname of the input file containing UTF-8 encoded
+                        scientificNames to be parsed into canonicalNames.
+                        """)
+    parser.add_argument('--dataset_path', type=str, default=None,
+                        help="""
+                        Full pathname of the input file containing dataset UUIDs
+                        for metadata retrieval.
+                        """)
     args = parser.parse_args()
-    inFname = args.infname
-    outFname = args.outfname
+    outfile = args.outfile
+    name_infile = args.name_infile
+    dataset_path = args.dataset_path
+
+    basepath = '/tank/data/bison/2019'
+    indir = 'raw'
+    tmpdir = 'tmp'
+    outdir = 'out'
+
+    outfile = os.path.join(basepath, tmpdir, 'step2.csv')
+    name_infile = os.path.join(basepath, tmpdir, 'name_lookup.csv')
+    dataset_infile = os.path.join(basepath, indir, 'dataset')
     
     gc = GbifAPI()
-    if inFname is not None and os.path.exists(inFname):
-            gc.parseScientificListFromFile(inFname, outFname)
+    if name_infile is not None and os.path.exists(name_infile):
+        gc.get_write_parsednames(name_infile, outfile)
+        
+    elif dataset_path is not None and os.path.exists(dataset_path):
+        import glob
+        # Gather dataset UUIDs from EML files downloaded with raw data
+        uuids = []
+        dsfnames = glob.glob(os.path.join(dataset_path, '*.xml'))
+        if dsfnames is not None:
+            for fn in dsfnames:
+                uuids.append(fn[:-4])
+        gc.get_write_dataset_meta(outfile, uuids)
+        
     else:
-        print('Filename {} does not exist'.format(inFname))
-
-    gc.getProviderCodes()
+        gc.get_write_organization_meta(outfile)
     
 """
 
