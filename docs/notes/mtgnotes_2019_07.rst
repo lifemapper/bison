@@ -98,26 +98,27 @@ Process: (note LUT = lookup table)
 ==================================
     * Process GBIF data, mostly as 2018, with changes
         * Process GBIF download to CSV file of GBIF data.  Temp result = step1.csv
-        * Filter records that fail for X reason
+        * Edit values for fields:
             * Empty string --> null
+            * Correct/standardize data values
+            * If verbatimLocality is not null, BISON verbatim_locality = verbatimLocality
+              elif locality is not null, BISON verbatim_locality = locality
+              else BISON verbatim_locality = habitat
+              Question: Precedence b/w habitat/locality/verbatimLocality?
+        * Discard records that fail for X reason
             * No scientificName or taxonKey
             * Question:  BISON provider, identified by???
-        * Correct/standardize data values
-        * If verbatimLocality is not null, BISON verbatim_locality = verbatimLocality
-          elif locality is not null, BISON verbatim_locality = locality
-          else BISON verbatim_locality = habitat
-          Question: Precedence b/w habitat/locality/verbatimLocality?
         * Use ‘$’ delimiter in CSV output
         * Generate 2 lists (no duplicates) during dataset processing: 
             * Provider UUIDS 
             * ScientificName/taxonKey
-        * Create LUTs
+        * Create 3 LUTs
             * Provider: with GBIF API + provider UUID. Temp result: Provider LUT
+            * CanonicalName: from GBIF parser + scientificName or taxonKey + API. 
+              Temp result: sciName_or_taxonKey-canName LUT
             * Resource: Temp result: Resource LUT
                 * Create list of dataset UUIDs from Dataset EML files
                 * Create LUT from GBIF API + dataset UUID
-            * CanonicalName: from GBIF parser + scientificName or taxonKey + API. 
-          Temp result: sciName_or_taxonKey-canName LUT
         * Process edited step1.csv, replacing lookup values. 
           Temp result = GBIFdata.step3.csv
             * Fill Provider name, code, url, etc from Provider LUT 
