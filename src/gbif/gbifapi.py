@@ -22,16 +22,20 @@
              02110-1301, USA.
 """
 import codecs
-import json
 import os
 import requests
 
-from gbif.constants import (OUT_DELIMITER, GBIF_URL, ENCODING, 
-                            URL_ESCAPES, NEWLINE)
-from gbif.tools import getCSVWriter
-          
+from gbif.constants import (GBIF_DSET_KEYS, GBIF_ORG_KEYS, GBIF_DSET_ORG_KEYS,
+                            GBIF_UUID_KEY, GBIF_ORG_UUID_FOREIGN_KEY, GBIF_URL, 
+                            GBIF_DATASET_URL, GBIF_ORGANIZATION_URL, 
+                            GBIF_BATCH_PARSER_URL, GBIF_SINGLE_PARSER_URL, 
+                            GBIF_TAXON_URL, 
+                            OUT_DELIMITER, ENCODING, URL_ESCAPES, NEWLINE)
+from gbif.tools import (getCSVWriter, getCSVDictReader, getLine, 
+                        getCSVDictWriter)
+from ast import parse
+    
 # .............................................................................
-# class GBIFCodes(object):
 class GbifAPI(object):
     """
     @summary: Pulls UUIDs and metadata for local resolution of 
@@ -40,7 +44,7 @@ class GbifAPI(object):
 # ...............................................
     def __init__(self):
         pass
-    
+
 # ...............................................
     def _saveNL(self, strval):
         fval = strval.replace(NEWLINE, "\\n")
@@ -86,7 +90,7 @@ class GbifAPI(object):
         if dsKey == '':
             return dataDict
         
-        url = '{}/dataset/{}'.format(GBIF_URL, dsKey)
+        url = GBIF_DATASET_URL + dsKey
         data = self._getDataFromUrl(url)
         if data is None:
             return dataDict
@@ -177,14 +181,15 @@ class GbifAPI(object):
         return row
 
 # ...............................................
-    def query_write_meta(self, apitype, outfname, header, reformat_keys, UUIDs=None):
+    def query_write_meta(self, apitype, outfname, header, reformat_keys, 
+                         UUIDs=None, delimiter=OUT_DELIMITER):
         if apitype not in ('organization', 'dataset'):
             raise Exception('What kind of query is {}?'.format(apitype))
 
         offset = 0
         pagesize = 1000
         url = '{}/{}?offset={}&limit={}'.format(GBIF_URL, apitype, offset, pagesize)
-
+        
         total = 0
         data = self._getDataFromUrl(url)
         if data is not None:
@@ -196,7 +201,7 @@ class GbifAPI(object):
         if total > 0:
             try:
                 outf = codecs.open(outfname, 'w', ENCODING)
-                outf.write(OUT_DELIMITER.join(header) + NEWLINE)
+                outf.write(delimiter.join(header) + NEWLINE)
                 
                 recno = 0
                 while total <= pcount:  
@@ -207,7 +212,7 @@ class GbifAPI(object):
                             row = self._processRecordInfo(obj, header, 
                                                 reformat_keys=reformat_keys)
                             try:
-                                outf.write(OUT_DELIMITER.join(row) + NEWLINE)
+                                outf.write(delimiter.join(row) + NEWLINE)
                             except Exception:
                                 raise
                         
@@ -229,21 +234,50 @@ class GbifAPI(object):
 
 
 # ...............................................
-    def get_write_organization_meta(self, outfname):
-        header = ['key', 'title', 'description', 'created', 
-                     'modified', 'homepage']
-        formatKeys = ['description', 'homepage']
-        self.query_write_meta('organization', outfname, header, formatKeys)
+    def get_write_organization_meta(self, outfname, delimiter=OUT_DELIMITER):
+        self.query_write_meta(GBIF_ORG_KEYS.apitype, outfname, GBIF_ORG_KEYS.saveme, 
+                              GBIF_ORG_KEYS.preserve_format, delimiter=delimiter)
 
 # ...............................................
-    def get_write_dataset_meta(self, outfname, uuids):
-        header = ['publishingOrganizationKey', 'key', 'title', 'description', 
-                     'citation', 'rights', 'logoUrl', 'created', 'modified', 
-                     'homepage']
-        formatKeys = ['title', 'rights', 'logoUrl', 'description', 'homepage']
-        self.query_write_meta('dataset', outfname, header, formatKeys, 
-                            UUIDs=uuids)
+    def get_write_dataset_meta(self, outfname, uuids, delimiter=OUT_DELIMITER):
+        self.query_write_meta(GBIF_DSET_KEYS.apitype, outfname, 
+                              GBIF_DSET_KEYS.saveme, 
+                              GBIF_DSET_KEYS.preserve_format, 
+                              UUIDs=uuids, delimiter=delimiter)
 
+    # ...............................................
+    def rewrite_dataset_with_orgs(self, dsfname, outfname, delimiter=OUT_DELIMITER, 
+                          encoding=ENCODING):
+        '''
+        @summary: Read and populate dictionary if file exists
+        '''
+        if not os.path.exists(dsfname):
+            raise Exception('Dataset meta file {} does not exist'.format(dsfname))
+        
+        try:
+            rdr, inf = getCSVDictReader(dsfname, delimiter, encoding)
+            wrtr, outf = getCSVDictWriter(outfname, delimiter, encoding, 
+                                          GBIF_DSET_ORG_KEYS.saveme)
+            wrtr.writeheader()
+            for dset_data in rdr:
+                combined = {}
+                orgUUID = dset_data[GBIF_ORG_UUID_FOREIGN_KEY]
+                org_data = self.query_for_organization(orgUUID)
+                
+                for key in GBIF_DSET_ORG_KEYS.saveme:
+                    if key.startswith('org_'):
+                        okey = key[4:]
+                        combined[okey] = org_data[key]
+                    else:
+                        combined[key] = dset_data[key]
+                
+                wrtr.writerow(combined)
+        except Exception as e:
+            self._log.error('Failed read {}, write {}, or org query {} ({})'
+                            .format(dsfname, outfname, orgUUID, e))
+        finally:
+            inf.close()
+            outf.close()
 
 # ...............................................
     def query_for_organization(self, orgUUID):
@@ -252,7 +286,7 @@ class GbifAPI(object):
         if orgUUID == '':
             return dataDict
         
-        url = '{}/organization/{}'.format(GBIF_URL, orgUUID)
+        url = GBIF_ORGANIZATION_URL + orgUUID
         data = self._getDataFromUrl(url)
         if data is None:
             return dataDict
@@ -305,23 +339,24 @@ class GbifAPI(object):
 # ...............................................
     def find_canonical(self, taxkey=None, sciname=None):
         canonical = None
+        
         if taxkey is not None:
-            url = '{}/species/{}'.format(GBIF_URL, taxkey)
+            url = GBIF_TAXON_URL + taxkey
             data = self._getDataFromUrl(url)
+
         elif sciname is not None:
             for replaceStr, withStr in URL_ESCAPES:
                 sciname = sciname.replace(replaceStr, withStr)
-            url = '{}/parser/name?name={}'.format(GBIF_URL, str(sciname))
+            url = GBIF_SINGLE_PARSER_URL + sciname
             data = self._getDataFromUrl(url)
             if data is not None:
                 if type(data) is list and len(data) > 0:
                     data = data[0]
         else:
-            raise Exception('Must provide taxonKey or scientificName')
+            raise Exception('Must provide taxkey or sciname')
         
         if data.has_key('canonicalName'):
             canonical = data['canonicalName']
-#         row = [taxKey, canName, data['datasetKey']]
         return canonical
 
 
@@ -369,29 +404,49 @@ class GbifAPI(object):
         return output
 
 # ...............................................
-    def get_write_parsednames(self, infname, outfname):
-        baseurl = GBIF_URL.replace('http', 'https')
-        url = '{}/parser/name/'.format(baseurl)
-        output = self._postToParser(url, infname)
+    def get_write_parsednames(self, infname, outfname, delimiter=OUT_DELIMITER,
+                              overwrite=True):
+#         url = GBIF_BATCH_PARSER_URL.replace('http', 'https')
+        if not os.path.exists(infname):
+            raise Exception('Input file {} missing'.format(outfname))
+        if os.path.exists(outfname) and overwrite:
+            os.remove(outfname)
+        else:
+            raise Exception('Output file {} exists'.format(outfname))
+        
+        name_fail = []
+        output = self._postToParser(GBIF_BATCH_PARSER_URL, infname)
         
         if output is not None:
             try:
-                csvwriter, f = getCSVWriter(outfname, OUT_DELIMITER)
+                csvwriter, f = getCSVWriter(outfname, delimiter)
                 for rec in output:
-                    if rec['parsed']:
-                        try:
-                            sciname = rec['scientificName']
-                            canname = rec['canonicalName']
-                            csvwriter.writerow([sciname, canname])
-                        except KeyError as e:
-                            print('Missing key in output record, err: {}'.format(str(e)))
-                        except Exception as e:
-                            print('Failed writing output record, err: {}'.format(str(e)))
+                    try:
+                        sciname = rec['scientificName']
+                    except KeyError as e:
+                        print('Missing scientificName in output record')
+                    except Exception as e:
+                        print('Failed reading scientificName in output record, err: {}'
+                              .format(str(e)))
+                    else:
+                        if rec['parsed'] in ['true', 'True', 't', '1']:
+                            try:
+                                canname = rec['canonicalName']
+                                csvwriter.writerow([sciname, canname])
+                            except KeyError as e:
+                                print('Missing canonicalName in output record')
+                            except Exception as e:
+                                print('Failed writing output record, err: {}'
+                                      .format(str(e)))
+                        else:
+                            name_fail.append(sciname)
+                            
             except Exception as e:
                 print('Failed writing outfile {}, err: {}'.format(outfname, str(e)))                
             finally:
                 f.close()
                 
+        return name_fail
             
 
 # ...............................................

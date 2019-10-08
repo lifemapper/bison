@@ -4,7 +4,39 @@ NAMESPACE = {'tdwg':   'http://rs.tdwg.org/dwc/text/',
              'eml':    'eml://ecoinformatics.org/eml-2.1.1',
              'xsi':    'http://www.w3.org/2001/XMLSchema-instance',
              'dublin': 'http://purl.org/dc/terms/'}
-GBIF_URL = 'http://api.gbif.org/v1'
+
+# .............................................................................
+class GBIF_ORG_KEYS(object):
+    apitype = 'organization'
+    # First 'save' key is organization UUID
+    saveme = ['key', 'title', 'description', 'created', 'modified', 'homepage']
+    preserve_format = ['description', 'homepage']
+
+# .............................................................................
+class GBIF_DSET_KEYS(object):
+    apitype = 'dataset'
+    # First 'save' key is organization UUID
+    saveme = ['key', 'publishingOrganizationKey', 'title', 'description', 
+            'citation', 'rights', 'logoUrl', 'created', 'modified', 'homepage']
+    preserve_format = ['title', 'rights', 'logoUrl', 'description', 'homepage']
+
+# .............................................................................
+class GBIF_DSET_ORG_KEYS(object):
+    # Save dataset fields with original fieldname, org fields with prefix 'org_'
+    orgflds = ['org_{}'.format(k) for k in GBIF_ORG_KEYS.save]
+    dsetflds = [k for k in GBIF_DSET_KEYS.save]
+    saveme = dsetflds.extend(orgflds)
+    
+GBIF_URL = 'https://api.gbif.org/v1'
+GBIF_DATASET_URL = '{}/{}/'.format(GBIF_URL, GBIF_DSET_KEYS.apitype)
+GBIF_ORGANIZATION_URL = '{}/{}/'.format(GBIF_URL, GBIF_ORG_KEYS.apitype)
+GBIF_BATCH_PARSER_URL = GBIF_URL + '/parser/name/'
+GBIF_SINGLE_PARSER_URL = GBIF_URL + '/parser/name?name='
+GBIF_TAXON_URL = GBIF_URL + '/species/'
+GBIF_UUID_KEY = 'key'
+GBIF_ORG_UUID_FOREIGN_KEY = 'publishingOrganizationKey'
+
+# http://api.gbif.org/v1/parser/name?name=quercus%20berberidifolia
 # http://api.gbif.org/v1/organization?identifier=362
 # http://api.gbif.org/v1/organization/c3ad790a-d426-4ac1-8e32-da61f81f0117
 BISON_UUID = 'c3ad790a-d426-4ac1-8e32-da61f81f0117'
@@ -21,7 +53,7 @@ NEWLINE = '\n'
 URL_ESCAPES = [ [" ", "%20"], [",", "%2C"] ]
 
 LOG_FORMAT = ' '.join(["%(asctime)s",
-                       "%(threadName)s.%(module)s.%(funcName)s",
+                       "%(funcName)s",
                        "line",
                        "%(lineno)d",
                        "%(levelname)-8s",
@@ -126,7 +158,7 @@ SAVE_FIELDS = {
 #    'geodeticDatum': (str, INTERPRETED),
     'associatedMedia': (str, INTERPRETED)
  }
-
+REQUIRED_FIELDS = ('scientificName', 'taxonKey')
 
 # 48 BISON fields - 
 #     only those with matching GBIF data from 

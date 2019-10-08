@@ -7,36 +7,6 @@ import sys
 from gbif.constants import (LOG_FORMAT, LOG_DATE_FORMAT, LOGFILE_MAX_BYTES,
                        LOGFILE_BACKUP_COUNT)
 
-# # .............................................................................
-# def getCSVReader(datafile, delimiter, encoding):
-#     try:
-#         f = open(datafile, 'r') 
-#         reader = unicodecsv.reader(f, delimiter=delimiter, encoding=encoding)        
-#     except Exception as e:
-#         raise Exception('Failed to read or open {}, ({})'
-#                         .format(datafile, str(e)))
-#     return reader, f
-# 
-# # .............................................................................
-# def getCSVWriter(datafile, delimiter, encoding, doAppend=True):
-#     '''
-#     @summary: Get a CSV writer that can handle encoding
-#     '''
-#     unicodecsv.field_size_limit(sys.maxsize)
-#     if doAppend:
-#         mode = 'ab'
-#     else:
-#         mode = 'wb'
-#     try:
-#         f = open(datafile, mode) 
-#         writer = unicodecsv.writer(f, delimiter=delimiter, 
-#                                    encoding=encoding)
-#     except Exception as e:
-#         raise Exception('Failed to read or open {}, ({})'
-#                         .format(datafile, str(e)))
-#     return writer, f
-
-
 # .............................................................................
 def getCSVReader(datafile, delimiter, encoding):
     try:
@@ -64,6 +34,32 @@ def getCSVWriter(datafile, delimiter, encoding, fmode='w'):
                         .format(datafile, str(e)))
     return writer, f
 
+# .............................................................................
+def getCSVDictReader(datafile, delimiter, encoding):
+    try:
+        f = open(datafile, 'r', encoding=encoding) 
+        dreader = csv.DictReader(f, delimiter=delimiter)        
+    except Exception as e:
+        raise Exception('Failed to read or open {}, ({})'
+                        .format(datafile, str(e)))
+    return dreader, f
+
+# .............................................................................
+def getCSVDictWriter(datafile, delimiter, encoding, fldnames, fmode='w'):
+    '''
+    @summary: Get a CSV writer that can handle encoding
+    '''
+    if fmode not in ('w', 'a'):
+        raise Exception('File mode must be "w" (write) or "a" (append)')
+    
+    csv.field_size_limit(sys.maxsize)
+    try:
+        f = open(datafile, fmode, encoding=encoding) 
+        writer = csv.DictWriter(f, fieldnames=fldnames, delimiter=delimiter)
+    except Exception as e:
+        raise Exception('Failed to read or open {}, ({})'
+                        .format(datafile, str(e)))
+    return writer, f
 
 # .............................................................................
 def getLogger(name, fname):

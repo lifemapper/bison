@@ -32,7 +32,7 @@ from gbif.tools import getCSVReader, getCSVWriter, getLogger, getLine
     
 DS_UUID_FNAME = '/state/partition1/data/bison/datasetUUIDs.txt'
 # .............................................................................
-class GBIFMetaReader(object):
+class Looker(object):
     """
     @summary: Get or Read supporting GBIF metadata for organizations (BISON 
               provider), datasets (BISON resource), and species names. 
