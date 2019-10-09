@@ -30,8 +30,7 @@ from gbif.constants import (IN_DELIMITER, OUT_DELIMITER, PROHIBITED_VALS,
                             INTERPRETED, TERM_CONVERT, ENCODING,
                             ORDERED_OUT_FIELDS, COMPUTE_FIELDS, SAVE_FIELDS,
                             CLIP_CHAR, META_FNAME, NAMESPACE, 
-                            GBIF_DSET_KEYS, GBIF_ORG_KEYS)
-from gbif.lookup import Looker
+                            GBIF_ORG_UUID_FOREIGN_KEY)
 from gbif.tools import (getCSVReader, getCSVDictReader, getCSVWriter, getLine, 
                         getLogger)
 from gbif.gbifapi import GbifAPI
@@ -92,9 +91,12 @@ class GBIFReader(object):
         self._pubf = None
         self._pubset = set()
         
+        # Lookup tmp data
+        self.namekey_fname = os.path.join(self.tmppath, 'namekey_list.csv')
+        self.pub_fname = os.path.join(self.tmppath, 'publisher_list.txt')
         # Lookup table output files
         self.dset_lut_fname = os.path.join(self.tmppath, 'dataset_lookup.csv')
-        self.dset_org_lut_fname = os.path.join(self.tmppath, 'dataset_org_lookup.csv')
+        self.org_lut_fname = os.path.join(self.tmppath, 'org_lookup.csv')
         self.name_lut_fname = os.path.join(self.tmppath, 'name_lookup.csv')
         
     # ...............................................
@@ -103,9 +105,6 @@ class GBIFReader(object):
         self.interp_fname = os.path.join(self.inpath, interpreted_fname)
         self._meta_fname = os.path.join(self.inpath, meta_fname)
         self.outfname = os.path.join(self.tmppath, out_fname)
-        # Lookup tmp data
-        self.namekey_fname = os.path.join(self.tmppath, 'namekey_list.csv')
-        self.pub_fname = os.path.join(self.tmppath, 'publisher_list.txt')
 
     # ...............................................
 
@@ -144,7 +143,7 @@ class GBIFReader(object):
         if logname is None:
             nm, _ = os.path.splitext(os.path.basename(__file__))
             logname = '{}.{}'.format(nm, int(time.time()))
-        logfname = os.path.join(self.outpath, '{}.log'.format(logname))
+        logfname = os.path.join(self.tmppath, '{}.log'.format(logname))
         if self._log is not None:
             self._log = None
         self._log = getLogger(logname, logfname)
@@ -428,7 +427,7 @@ class GBIFReader(object):
                     line, recno = getLine(csvRdr, recno)
                     if line and len(line) > 0:
                         try:
-                            # First item is dict key, rest are vals
+                            # First item is scientificName, rest are taxonKeys
                             lookupDict[line[0]] = list(line[1:])
                         except Exception:
                             self._log.warn('Failed to read line {} from {}'
@@ -702,7 +701,8 @@ class GBIFReader(object):
         return biline
 
     # ...............................................
-    def first_pass(self, gbif_fname, meta_fname, bison_fname, logname=None):
+    def clean_gbif_recs(self, gbif_fname, meta_fname, bison_fname, 
+                        overwrite=False, logname=None):
         """
         @summary: Create a CSV file containing GBIF occurrence records extracted 
                      from the interpreted occurrence file provided 
@@ -715,8 +715,13 @@ class GBIFReader(object):
         """
         if self.is_open():
             self.close()
+            
         if os.path.exists(self.outfname):
-            raise Exception('Bison output file {} exists!'.format(self.outfname))
+            if overwrite:
+                os.remove(self.outfname)
+            else:
+                raise Exception('Output file {} exists!'.format(self.outfname))
+            
         self._rotate_logfile(logname=logname)
         self._set_pass1_vars(gbif_fname, meta_fname, bison_fname)
 
@@ -803,21 +808,59 @@ class GBIFReader(object):
         self._write_lookupvals()
             
     # ...............................................
-    def create_lookup_tables(self, logname=None):
+    def create_lookup_tables(self, overwrite=False, logname=None):
         """
         @summary: Create lookup tables for: 
-                  BISON providerID from GBIF publisher
-                  BISON resourceID from GBIF datasetKey
+                  BISON provider from GBIF (publishing)Organization
+                  BISON resource from GBIF datasetKey
                   BISON canonicalName from GBIF scientificName and/or taxonKey
         @return: Three files, one for each lookup table. 
         """
         self._rotate_logfile(logname=logname)
         
-        self.write_dataset_org_lookup(log=self._log)
-        self.write_name_lookup(log=self._log)
-                    
+        self.write_dataset_org_lookup(overwrite=False, log=self._log)
+        self.write_name_lookup(overwrite=overwrite, log=self._log)
+
     # ...............................................
-    def write_dataset_org_lookup(self, log=None, logname=None):
+    def _get_dataset_uuids(self):
+        """
+        @summary: Get dataset UUIDs from downloaded dataset EML filenames.
+        """
+        uuids = []
+        dsfnames = glob.glob(os.path.join(self._dataset_pth, '*.xml'))
+        if dsfnames is not None:
+            start = len(self._dataset_pth)
+            if not self._dataset_pth.endswith(os.pathsep):
+                start += 1
+            stop = len('.xml')
+            for fn in dsfnames:
+                uuids.append(fn[start:-stop])
+        self._log.info('Read {} dataset UUIDs from filenames in {}'
+                       .format(len(uuids), self._dataset_pth))
+        return uuids
+    
+    # ...............................................
+    def _get_organization_uuids(self):
+        """
+        @summary: Get organization UUIDs from dataset metadata pulled from GBIF
+                  and written to the dset_lut_fname file
+        """
+        org_uuids = set()
+        try:
+            rdr, inf = getCSVDictReader(self.dset_lut_fname, OUT_DELIMITER, ENCODING)
+            for dset_data in rdr:
+                orgUUID = dset_data[GBIF_ORG_UUID_FOREIGN_KEY]
+                org_uuids.add(orgUUID) 
+        except Exception as e:
+            print('Failed read {} ({})'.format(self.dset_lut_fname, e))
+        finally:
+            inf.close()
+        self._log.info('Read {} unique organiziation UUIDs from datasets in {}'
+                       .format(len(org_uuids), self.dset_lut_fname))
+        return org_uuids
+
+    # ...............................................
+    def write_dataset_org_lookup(self, overwrite=False, log=None, logname=None):
         """
         @summary: Create lookup table for: 
                   BISON resource and provider from 
@@ -826,25 +869,40 @@ class GBIFReader(object):
                            including publishingOrganization metadata 
                            for that dataset
         """
-        if log is None:
+        if os.path.exists(self.dset_lut_fname):
+#             if overwrite:
+#                 os.remove(self.dset_lut_fname)
+#             else:
+            raise Exception('Output file {} exists!'.format(self.dset_lut_fname))
+        if log is None and gr._log is None:
             self._rotate_logfile(logname=logname)
-        
         gbifapi = GbifAPI()
+         
+        # --------------------------------------
         # Gather dataset UUIDs from EML files downloaded with raw data
-        uuids = []
-        dsfnames = glob.glob(os.path.join(self._dataset_pth, '*.xml'))
-        if dsfnames is not None:
-            for fn in dsfnames:
-                uuids.append(fn[:-4])
+        uuids = self._get_dataset_uuids()        
         # Query/save dataset information
         gbifapi.get_write_dataset_meta(self.dset_lut_fname, uuids)
-        # Query organization info for each dataset and save
-        gbifapi.rewrite_dataset_with_orgs(self.dset_lut_fname, 
-                                          self.dset_org_lut_fname)
-        return self.dset_org_lut_fname
+        self._log.info('Wrote dataset metadata to {}'
+                       .format(self.dset_lut_fname))
+        
+        if not os.path.exists(self.dset_lut_fname):
+            raise Exception('Dataset meta file {} does not exist'.format(self.dset_lut_fname))
+        if os.path.exists(self.org_lut_fname):
+            if overwrite:
+                os.remove(self.org_lut_fname)
+            else:
+                raise Exception('Output file {} exists!'.format(self.org_lut_fname))
+        # --------------------------------------
+        # Gather organization UUIDs from dataset metadata assembled above
+        org_uuids = self._get_organization_uuids()
+        # Query/save organization information
+        gbifapi.get_write_org_meta(self.org_lut_fname, org_uuids)
+        self._log.info('Wrote organization metadata to {}'
+                       .format(self.org_lut_fname))
 
     # ...............................................
-    def write_name_lookup(self, log=None, logname=None):
+    def write_name_lookup(self, overwrite=False, log=None, logname=None):
         """
         @summary: Create lookup tables for: 
                   BISON providerID from GBIF publisher
@@ -852,28 +910,61 @@ class GBIFReader(object):
                   BISON canonicalName from GBIF scientificName and/or taxonKey
         @return: Three files, one for each lookup table. 
         """
-        if log is None:
+        if not os.path.exists(self.namekey_fname):
+            raise Exception('Input file {} missing!'.format(self.namekey_fname))
+        if os.path.exists(self.name_lut_fname):
+#             if overwrite:
+#                 os.remove(self.name_lut_fname)
+#             else:
+#                 raise Exception('Output file {} exists!'.format(self.name_lut_fname))
+            raise Exception('Output LUT file {} exists!'.format(self.name_lut_fname))
+        if log is None and gr._log is None:
             self._rotate_logfile(logname=logname)
-        
         gbifapi = GbifAPI()
 
         # Read name/taxonIDs dictionary for name resolution
         namekeys = self._read_name_keys(self.namekey_fname)
-        # Write names to send to parser
-        parser_in = os.path.join(self.outpath, 'parser_in.txt')
-        if os.path.exists(parser_in):
-            os.remove(parser_in)
-        with open(parser_in, 'w', encoding=ENCODING) as f:
-            for name in namekeys.keys():
-                f.write('{}\n'.format(name))
+        namelst = list(namekeys.keys())
+        i = 0
+        limit = 1000
+        parser_infiles = []
+        names_failed_parse = []
+        while len(namelst) > 0:
+            i += 1
+            # Get the first set of names, discard from list
+            currnames = namelst[:limit]
+            namelst = namelst[limit:]
+            
+            fn = os.path.join(self.tmppath, 'parser_in_{}.txt'.format(i))
+            if os.path.exists(fn):
+                os.remove(fn)
+            # Write names to send to parser
+            with open(fn, 'w', encoding=ENCODING) as f:                
+                for name in currnames:
+                    f.write('{}\n'.format(name))
+            self._log.info('Wrote {} scientificNames to {}'.format(len(currnames), 
+                                                                   fn))
+            parser_infiles.append(fn)
+            
+        for fn in parser_infiles:
+            total, name_fail = gbifapi.get_write_parsednames(fn, 
+                                                        self.name_lut_fname)
+            names_failed_parse.extend(name_fail)
+            self._log.info('Wrote {} scientificName/clean_provided_scientific_name pairs to {}'
+                           .format(total-len(name_fail), fn))
         
-        name_fail = gbifapi.get_write_parsednames(parser_in, self.name_lut_fname)
-        with open(self.name_lut_fname, 'a', encoding=ENCODING) as f:            
+        
+        with open(self.name_lut_fname, 'a', encoding=ENCODING) as f:
+            count = 0        
             for badname in name_fail:
                 taxonkeys = namekeys[badname]
                 for tk in taxonkeys:
                     canonical = gbifapi.find_canonical(taxkey=tk)
-                    f.write('{}\n'.format(canonical))
+                    if canonical is not None:
+                        count += 1
+                        f.write('{}\n'.format(canonical))
+        self._log.info('Appended {} taxonKey/clean_provided_scientific_name to {}'
+                       .format(count, self.name_lut_fname))
         
         return self.name_lut_fname
             
@@ -889,56 +980,78 @@ if __name__ == '__main__':
 #     parser.add_argument('base_path', type=str, 
 #                         help="""
 #                         Absolute pathname of the directory for data transform.
-#                         Path should contain 'raw' subdirectory with downloaded
-#                         GBIF data and metadata.  Subdirectories 'tmp' and 'out' 
-#                         will be created if necessary, and used for temporary 
-#                         and final output files.
+#                         Path should be the parent directory of 'raw' directory 
+#                         containing with downloaded GBIF data and metadata.  
+#                         If the subdirectories 'tmp' and 'out' are not present in
+#                         the base_path, they will be created for temporary and 
+#                         final output files.
 #                         """)
-#     parser.add_argument('gbif_file', type=str, 
+#     parser.add_argument('gbif_file', type=str, default=None,
 #                         help='Base filename of the input GBIF occurrence file')
-#     parser.add_argument('bison_file', type=str, 
-#                         help='Base filename of the output BISON occurrence data.')
+#     parser.add_argument('processing_step', type=int, default=1, choices=[1,2,3],
+#                         help="""
+#                         Step number for data processing:
+#                            1: GBIF record and field filter/transform.
+#                               Names and UUIDs are saved in records for GBIF API 
+#                               resolution in Step 2.
+#                            2: Lookup table assembly:
+#                               * Query GBIF parser + scientificName if available, 
+#                                 or GBIF species API + taxonKey for BISON 
+#                                 'clean_provided_scientific_name'.
+#                               * Query GBIF dataset API + datasetKey for 
+#                                 dataset info for Bison 'resource' fields and 
+#                                 (publishing)OrganizationKey.
+#                               * Query GBIF organization API + organizationKey for 
+#                                 organization info for BISON 'provider' fields'
+#                            3: Field value replacements. Names, resource, and 
+#                               provider values are replaced with resolved values
+#                               saved in lookup tables.
+#                         """)
 #     args = parser.parse_args()
-#     rereadNames = args.names_only
-#     gbif_relfname = args.gbif_file
-#     bison_relfname = args.bison_file
+#     basepath = args.base_path
+#     gbif_basefname = args.gbif_file
+#     step = args.processing_step
 
-    # Testing data
-    rereadNames = False
+    #------------------------------------------------
+    # Testing arguments
+    #------------------------------------------------
     basepath = '/tank/data/bison/tst'
 #     basepath = '/tank/data/bison/2019'
+    gbif_basefname = 'occurrence_lines_1-3000000.txt'
+#     gbif_fname = 'occurrence.txt'
+    step = 2
+    #------------------------------------------------
+    
+    overwrite = True
     indir = 'raw'
     tmpdir = 'tmp'
     outdir = 'out'
-    gbif_fname = 'occurrence_lines_1-3000000.txt'
-#     gbif_fname = 'occurrence.txt'
-    bison_fname = 'step1.csv'
-    overwrite = True
-    
     inpath = os.path.join(basepath, indir)
     tmppath = os.path.join(basepath, tmpdir)
     outpath = os.path.join(basepath, outdir)
+
+    bison_prefix = 'bison'
+    inbase, _ = os.path.splitext(gbif_basefname)
     
-#     gbif_fname = os.path.join(inpath, gbif_fname)
-#     bison_fname = os.path.join(tmppath, bison_fname)
-#     meta_fname = os.path.join(inpath, META_FNAME)
-        
-    if os.path.exists(bison_fname):
-        if overwrite:
-            print('Removing old output file {}'.format(bison_fname))
-            os.remove(bison_fname)
-        else:
-            raise Exception('Output file {} already exists'.format(bison_fname))
-        
+    meta_fname = os.path.join(inpath, META_FNAME)
+    gbif_fname = os.path.join(inpath, gbif_basefname)
+    outbase = '{}_step{}_{}'.format(bison_prefix, step, inbase)
+    bison_out_fname = os.path.join(tmppath, outbase) + '.csv'
+    logname = outbase
+            
     os.makedirs(tmppath, mode=0o775, exist_ok=True)
     os.makedirs(outpath, mode=0o775, exist_ok=True)
             
     if os.path.exists(gbif_fname):
-        logname = 'create_lut'
         gr = GBIFReader(basepath, indir, tmpdir, outdir)
-        print('Calling program with input/output {}'.format(gbif_fname, bison_fname))
-#         gr.first_pass(gbif_fname, META_FNAME, bison_fname, overwrite=True)
-        gr.create_lookup_tables()
+        if step == 1:
+            gr.clean_gbif_recs(gbif_fname, META_FNAME, bison_out_fname, 
+                               overwrite=overwrite, logname=outbase)
+        elif step == 2:
+#             gr.write_dataset_org_lookup(overwrite=overwrite, logname=outbase)            
+            gr.write_name_lookup(overwrite=overwrite, logname=outbase)
+        elif step == 3:
+            print('Step 3 is not yet implemented')
     else:
         raise Exception('Filename {} does not exist'.format(gbif_fname))
     
@@ -949,47 +1062,6 @@ wc -l occurrence.txt
 wc -l tmp/step1.csv 
 1577732 tmp/step1.csv
 
+python3.6 /state/partition1/git/bison/src/gbif/gbif2bison.py 
 
-
-import os
-import time
-import xml.etree.ElementTree as ET
-from gbif.constants import (IN_DELIMITER, OUT_DELIMITER, PROHIBITED_VALS, 
-                            VERBATIM, INTERPRETED, TERM_CONVERT, ENCODING,
-                            ORDERED_OUT_FIELDS, NAMESPACE, SAVE_FIELDS,
-                            CLIP_CHAR, META_FNAME)
-
-from gbif.gbif2bison import *
-
-
-# Testing data
-basepath = '/tank/data/bison/tst'
-indir = 'raw'
-tmpdir = 'tmp'
-outdir = 'out'
-gbif_fname = 'occurrence_lines_1572200-1572250.txt'
-bison_fname = 'step1.csv'
-overwrite = True
-
-inpath = os.path.join(basepath, indir)
-tmppath = os.path.join(basepath, tmpdir)
-outpath = os.path.join(basepath, outdir)
-
-gbif_fname = os.path.join(inpath, gbif_fname)
-bison_fname = os.path.join(tmppath, bison_fname)
-meta_fname = os.path.join(inpath, META_FNAME)
-    
-if os.path.exists(bison_fname):
-    if overwrite:
-        print('Removing old output file {}'.format(bison_fname))
-        os.remove(bison_fname)
-    else:
-        raise Exception('Output file {} already exists'.format(bison_fname))
-    
-os.makedirs(tmppath, mode=0o775, exist_ok=True)
-os.makedirs(outpath, mode=0o775, exist_ok=True)
-            
-self = GBIFReader(gbif_fname, meta_fname, bison_fname)
-
-fields = self.get_field_meta()
 """

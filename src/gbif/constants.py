@@ -20,12 +20,6 @@ class GBIF_DSET_KEYS(object):
             'citation', 'rights', 'logoUrl', 'created', 'modified', 'homepage']
     preserve_format = ['title', 'rights', 'logoUrl', 'description', 'homepage']
 
-# .............................................................................
-class GBIF_DSET_ORG_KEYS(object):
-    # Save dataset fields with original fieldname, org fields with prefix 'org_'
-    orgflds = ['org_{}'.format(k) for k in GBIF_ORG_KEYS.save]
-    dsetflds = [k for k in GBIF_DSET_KEYS.save]
-    saveme = dsetflds.extend(orgflds)
     
 GBIF_URL = 'https://api.gbif.org/v1'
 GBIF_DATASET_URL = '{}/{}/'.format(GBIF_URL, GBIF_DSET_KEYS.apitype)
