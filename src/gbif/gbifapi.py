@@ -21,19 +21,16 @@
              Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 
              02110-1301, USA.
 """
-import codecs
 import os
 import requests
 
-from gbif.constants import (GBIF_DSET_KEYS, GBIF_ORG_KEYS, GBIF_DSET_ORG_KEYS,
-                            GBIF_UUID_KEY, GBIF_ORG_UUID_FOREIGN_KEY, GBIF_URL, 
-                            GBIF_DATASET_URL, GBIF_ORGANIZATION_URL, 
-                            GBIF_BATCH_PARSER_URL, GBIF_SINGLE_PARSER_URL, 
-                            GBIF_TAXON_URL, 
+from gbif.constants import (GBIF_DSET_KEYS, GBIF_ORG_KEYS, GBIF_URL,
+                            GBIF_DATASET_URL, GBIF_ORGANIZATION_URL,
+                            GBIF_BATCH_PARSER_URL, GBIF_SINGLE_PARSER_URL,
+                            GBIF_TAXON_URL,
                             OUT_DELIMITER, ENCODING, URL_ESCAPES, NEWLINE)
-from gbif.tools import (getCSVWriter, getCSVDictReader, getLine, 
-                        getCSVDictWriter)
-from ast import parse
+from gbif.tools import getCSVWriter
+
     
 # .............................................................................
 class GbifAPI(object):
@@ -97,38 +94,38 @@ class GbifAPI(object):
         
         legacyid = 'NA'
         orgkey = title = desc = citation = rights = logourl = homepage = ''
-        if data.has_key('key'):
-            if data.has_key('publishingOrganizationKey'):
+        if 'key' in data:
+            if 'publishingOrganizationKey' in data:
                 orgkey = self._saveNLDelCR(data['publishingOrganizationKey'])
                 dataDict['publishingOrganizationKey'] = orgkey
 
-            if (data.has_key('identifiers') 
+            if ('identifiers' in data
                  and len(data['identifiers']) > 0 
                  and data['identifiers'][0]['type'] == 'GBIF_PORTAL'):
                 legacyid = data['identifiers'][0]['identifier']
                 dataDict['legacyID'] = legacyid
             
-            if data.has_key('title'):
+            if 'title' in data:
                 title = self._saveNLDelCR(data['title'])
                 dataDict['title'] = title
 
-            if data.has_key('description'):
+            if 'description' in data:
                 desc = self._saveNLDelCR(data['description'])
                 dataDict['description'] = desc
             
-            if data.has_key('citation'):
+            if 'citation' in data:
                 citation = self._saveNLDelCR(data['citation']['text'])
                 dataDict['citation'] = citation
                 
-            if data.has_key('rights'):
+            if 'rights' in data:
                 rights = self._saveNLDelCR(data['rights'])
                 dataDict['rights'] = rights
 
-            if data.has_key('logoUrl'):
+            if 'logoUrl' in data:
                 logourl = data['logoUrl']
                 dataDict['logoUrl'] = logourl
             
-            if data.has_key('homepage'):
+            if 'homepage' in data:
                 homepage = data['homepage']
                 dataDict['homepage'] = homepage
                 
@@ -146,44 +143,43 @@ class GbifAPI(object):
         except:
             print('No record for datasetKey {}'.format(dsKey))
         return publishingOrgUUID
-
                     
 # ...............................................
     def _processRecordInfo(self, rec, header, reformat_keys=[]):
         row = []
-        for key in header:
-            try:
-                val = rec[key]
-                
-                if type(val) is list:
-                    if len(val) > 0:
-                        val = val[0]
-                    else:
-                        val = ''
-                        
-                if key in reformat_keys:
-                    val = self._saveNLDelCR(val)
+        if rec is not None:
+            for key in header:
+                try:
+                    val = rec[key]
                     
-                elif key == 'citation':
-                    if type(val) is dict:
-                        try:
-                            val = val['text']
-                        except:
-                            pass
-                    
-                elif key in ('created', 'modified'):
-                    val = self._clipDate(val)
+                    if type(val) is list:
+                        if len(val) > 0:
+                            val = val[0]
+                        else:
+                            val = ''
+                            
+                    if key in reformat_keys:
+                        val = self._saveNLDelCR(val)
                         
-            except KeyError:
-                val = ''
-            row.append(val)
-
+                    elif key == 'citation':
+                        if type(val) is dict:
+                            try:
+                                val = val['text']
+                            except:
+                                pass
+                        
+                    elif key in ('created', 'modified'):
+                        val = self._clipDate(val)
+                            
+                except KeyError:
+                    val = ''
+                row.append(val)
         return row
 
 # ...............................................
-    def query_write_meta(self, apitype, outfname, header, reformat_keys, 
-                         UUIDs=None, delimiter=OUT_DELIMITER):
-        if apitype not in ('organization', 'dataset'):
+    def query_write_all_meta(self, apitype, outfname, header, reformat_keys,
+                             delimiter=OUT_DELIMITER):
+        if apitype not in ('organization'):
             raise Exception('What kind of query is {}?'.format(apitype))
 
         offset = 0
@@ -197,87 +193,87 @@ class GbifAPI(object):
             allObjs = data['results']
             isComplete = data['endOfRecords']
             total = len(allObjs)
-
-        if total > 0:
-            try:
-                outf = codecs.open(outfname, 'w', ENCODING)
-                outf.write(delimiter.join(header) + NEWLINE)
-                
-                recno = 0
-                while total <= pcount:  
-                    print('Received {} {}s from GBIF'.format(len(allObjs), apitype))
-                    for obj in allObjs:
-                        recno += 1
-                        if (UUIDs is None or obj['key'] in UUIDs):
-                            row = self._processRecordInfo(obj, header, 
-                                                reformat_keys=reformat_keys)
-                            try:
-                                outf.write(delimiter.join(row) + NEWLINE)
-                            except Exception:
-                                raise
-                        
-                    if isComplete:
-                        total = pcount + 1
-                    else:
-                        offset += pagesize
-                        url = '{}/{}?offset={}&limit={}'.format(GBIF_URL, apitype, offset, pagesize)
-                        data = self._getDataFromUrl(url)
-                        if data is not None:
-                            allObjs = data['results']
-                            isComplete = data['endOfRecords']
-                            total += len(allObjs) 
+        if total == 0:
+            print('No records returned for url {}'.format(url))
+            return
+        with open(outfname, 'w', encoding=ENCODING) as outf:
+            outf.write(delimiter.join(header) + NEWLINE)
+            
+            recno = 0
+            while total <= pcount:  
+                print('Received {} of {} {}s from GBIF'.format(len(allObjs),
+                                                               pcount, apitype))
+                for obj in allObjs:
+                    recno += 1
+                    row = self._processRecordInfo(obj, header,
+                                        reformat_keys=reformat_keys)
+                    try:
+                        outf.write(delimiter.join(row) + NEWLINE)
+                    except Exception:
+                        raise
                     
-            except Exception:
-                raise        
-            finally:
-                outf.close()
-
+                if isComplete:
+                    total = pcount + 1
+                else:
+                    offset += pagesize
+                    url = '{}/{}?offset={}&limit={}'.format(GBIF_URL, apitype, offset, pagesize)
+                    data = self._getDataFromUrl(url)
+                    if data is not None:
+                        allObjs = data['results']
+                        isComplete = data['endOfRecords']
+                        total += len(allObjs) 
 
 # ...............................................
-    def get_write_organization_meta(self, outfname, delimiter=OUT_DELIMITER):
-        self.query_write_meta(GBIF_ORG_KEYS.apitype, outfname, GBIF_ORG_KEYS.saveme, 
-                              GBIF_ORG_KEYS.preserve_format, delimiter=delimiter)
+    def query_write_some_meta(self, apitype, outfname, header, reformat_keys,
+                              UUIDs, delimiter=OUT_DELIMITER):
+        if apitype not in ('species', 'dataset', 'organization'):
+            raise Exception('What kind of query is {}?'.format(apitype))
+        if not UUIDs:
+            print('No UUIDs provided for GBIF {} query'.format(apitype))
+            return
+        count = 0
+        loginterval = len(UUIDs) // 10
+        with open(outfname, 'w', encoding=ENCODING) as outf:
+            outf.write(delimiter.join(header) + NEWLINE)
+            for uuid in UUIDs:
+                count += 1
+                url = '{}/{}/{}'.format(GBIF_URL, apitype, uuid)
+                data = self._getDataFromUrl(url)
+                row = self._processRecordInfo(data, header,
+                                    reformat_keys=reformat_keys)
+                if (count % loginterval) == 0:
+                    print('*** Processed {} of {} {} queries ***'
+                                   .format(count, len(UUIDs), apitype))
+                try:
+                    outf.write(delimiter.join(row) + NEWLINE)
+                except Exception:
+                    print('Failed to write row {}'.format(row))
+
+# # ...............................................
+#     def get_write_organization_meta(self, outfname, delimiter=OUT_DELIMITER):
+#         self.query_write_all_meta(GBIF_ORG_KEYS.apitype, outfname,
+#                                   GBIF_ORG_KEYS.saveme,
+#                                   GBIF_ORG_KEYS.preserve_format,
+#                                   delimiter=delimiter)
 
 # ...............................................
     def get_write_dataset_meta(self, outfname, uuids, delimiter=OUT_DELIMITER):
-        self.query_write_meta(GBIF_DSET_KEYS.apitype, outfname, 
-                              GBIF_DSET_KEYS.saveme, 
-                              GBIF_DSET_KEYS.preserve_format, 
-                              UUIDs=uuids, delimiter=delimiter)
+        self.query_write_some_meta(GBIF_DSET_KEYS.apitype, outfname,
+                                   GBIF_DSET_KEYS.saveme,
+                                   GBIF_DSET_KEYS.preserve_format,
+                                   uuids,
+                                   delimiter=delimiter)
 
     # ...............................................
-    def rewrite_dataset_with_orgs(self, dsfname, outfname, delimiter=OUT_DELIMITER, 
-                          encoding=ENCODING):
+    def get_write_org_meta(self, outfname, uuids, delimiter=OUT_DELIMITER):
         '''
         @summary: Read and populate dictionary if file exists
         '''
-        if not os.path.exists(dsfname):
-            raise Exception('Dataset meta file {} does not exist'.format(dsfname))
-        
-        try:
-            rdr, inf = getCSVDictReader(dsfname, delimiter, encoding)
-            wrtr, outf = getCSVDictWriter(outfname, delimiter, encoding, 
-                                          GBIF_DSET_ORG_KEYS.saveme)
-            wrtr.writeheader()
-            for dset_data in rdr:
-                combined = {}
-                orgUUID = dset_data[GBIF_ORG_UUID_FOREIGN_KEY]
-                org_data = self.query_for_organization(orgUUID)
-                
-                for key in GBIF_DSET_ORG_KEYS.saveme:
-                    if key.startswith('org_'):
-                        okey = key[4:]
-                        combined[okey] = org_data[key]
-                    else:
-                        combined[key] = dset_data[key]
-                
-                wrtr.writerow(combined)
-        except Exception as e:
-            self._log.error('Failed read {}, write {}, or org query {} ({})'
-                            .format(dsfname, outfname, orgUUID, e))
-        finally:
-            inf.close()
-            outf.close()
+        self.query_write_some_meta(GBIF_ORG_KEYS.apitype, outfname,
+                                   GBIF_ORG_KEYS.saveme,
+                                   GBIF_ORG_KEYS.preserve_format,
+                                   uuids,
+                                   delimiter=delimiter)
 
 # ...............................................
     def query_for_organization(self, orgUUID):
@@ -293,38 +289,38 @@ class GbifAPI(object):
 
         legacyid = 'NA'
         orgkey = title = desc = citation = rights = logourl = homepage = ''
-        if data.has_key('key'):
-            if data.has_key('publishingOrganizationKey'):
+        if 'key' in data:
+            if 'publishingOrganizationKey' in data:
                 orgkey = self._saveNLDelCR(data['publishingOrganizationKey'])
                 dataDict['publishingOrganizationKey'] = orgkey
 
-            if (data.has_key('identifiers') 
+            if ('identifiers' in data
                  and len(data['identifiers']) > 0 
                  and data['identifiers'][0]['type'] == 'GBIF_PORTAL'):
                 legacyid = data['identifiers'][0]['identifier']
                 dataDict['legacyID'] = legacyid
             
-            if data.has_key('title'):
+            if 'title'in data:
                 title = self._saveNLDelCR(data['title'])                
                 dataDict['title'] = title
 
-            if data.has_key('description'):
+            if 'description' in data:
                 desc = self._saveNLDelCR(data['description'])
                 dataDict['description'] = desc
             
-            if data.has_key('citation'):
+            if 'citation' in data:
                 citation = self._saveNLDelCR(data['citation']['text'])
                 dataDict['citation'] = citation
 
-            if data.has_key('rights'):
+            if 'rights' in data:
                 rights = self._saveNLDelCR(data['rights'])
                 dataDict['rights'] = rights
 
-            if data.has_key('logoUrl'):
+            if 'logoUrl' in data:
                 logourl = data['logoUrl']
                 dataDict['logoUrl'] = logourl
             
-            if data.has_key('homepage'):
+            if 'homepage' in data:
                 homepage = data['homepage']
                 dataDict['homepage'] = homepage
                 
@@ -355,20 +351,19 @@ class GbifAPI(object):
         else:
             raise Exception('Must provide taxkey or sciname')
         
-        if data.has_key('canonicalName'):
+        if 'canonicalName' in data:
             canonical = data['canonicalName']
         return canonical
-
 
 # ...............................................
     def _postToParser(self, url, infname):
         response = output = None
-        headers={'Accept': 'application/json','Content-Type': 'application/json'}
+        headers = {'Accept': 'application/json', 'Content-Type': 'application/json'}
         auth = None
         indata = open(infname, 'rb')
         
         try:
-            response = requests.post(url, data=indata, headers=headers, 
+            response = requests.post(url, data=indata, headers=headers,
                                      auth=auth)
         except Exception as e:
             if response is not None:
@@ -404,22 +399,24 @@ class GbifAPI(object):
         return output
 
 # ...............................................
-    def get_write_parsednames(self, infname, outfname, delimiter=OUT_DELIMITER,
-                              overwrite=True):
+    def get_write_parsednames(self, infname, outfname, delimiter=OUT_DELIMITER):
 #         url = GBIF_BATCH_PARSER_URL.replace('http', 'https')
         if not os.path.exists(infname):
             raise Exception('Input file {} missing'.format(outfname))
-        if os.path.exists(outfname) and overwrite:
-            os.remove(outfname)
-        else:
-            raise Exception('Output file {} exists'.format(outfname))
         
         name_fail = []
+        if os.path.exists(outfname):
+            fmode = 'a'
+        else:
+            fmode = 'w'
+        csvwriter, f = getCSVWriter(outfname, delimiter, ENCODING, fmode=fmode)
+
         output = self._postToParser(GBIF_BATCH_PARSER_URL, infname)
+        total = 0
         
         if output is not None:
+            total = len(output)
             try:
-                csvwriter, f = getCSVWriter(outfname, delimiter)
                 for rec in output:
                     try:
                         sciname = rec['scientificName']
@@ -446,7 +443,7 @@ class GbifAPI(object):
             finally:
                 f.close()
                 
-        return name_fail
+        return total, name_fail
             
 
 # ...............................................
