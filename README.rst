@@ -1,13 +1,9 @@
 
 .. highlight:: rest
 
-Get and Process GBIF Data for BISON
-===================================
+Get and Process GBIF Data for BISON: 2018
+===========================================
 .. contents::  
-
-
-2018
-=====
 
 
 Download Data from GBIF 
@@ -45,8 +41,11 @@ Steps 2019
 * On smaller, CA/Territories file
   * sort datafiles (multimedia.txt, occurrence.txt, verbatim.txt) on gbifID
 
+Data Transformations 
+=====================
+
 Liz's email
------------
+------------
 
 * Initial extract of requested GBIF data fields based on our 11 
   iso_country_codes e.g. AS,CA, FM, GU, MH, MP, PR, PW, UM, US, and VI
