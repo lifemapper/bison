@@ -160,6 +160,7 @@ REQUIRED_FIELDS = ('scientificName', 'taxonKey')
 #     also enumerated in BISON DATA WORKFLOW(GDrive July 3.2018).pdf
 ORDERED_OUT_FIELDS = [
    'gbifID', 
+   'clean_provided_scientific_name',
    # Added scientificName and taxonKey for reliable name parsing/lookup
    'scientificName', 'taxonKey', 
     'canonicalName',  
@@ -195,4 +196,4 @@ ORDERED_OUT_FIELDS = [
 
 # TEST_FIELDS = ['occurrenceStatus', 'decimalLatitude', 'decimalLongitude']
 COMPUTE_FIELDS = ('canonicalName', 'publishingOrganizationKey', 
-                  'providerID', 'resourceID')
+                  'providerID', 'resourceID', 'clean_provided_scientific_name')
