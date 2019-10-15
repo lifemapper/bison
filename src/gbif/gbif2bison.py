@@ -31,13 +31,13 @@ from gbif.constants import (IN_DELIMITER, OUT_DELIMITER, PROHIBITED_VALS,
                             ORDERED_OUT_FIELDS, COMPUTE_FIELDS, SAVE_FIELDS,
                             CLIP_CHAR, META_FNAME, NAMESPACE, 
                             GBIF_UUID_KEY, GBIF_ORG_UUID_FOREIGN_KEY)
-from gbif.tools import (getCSVReader, getCSVDictReader, getCSVWriter, getLine, 
-                        getLogger)
+from gbif.tools import (getCSVReader, getCSVDictReader, 
+                        getCSVWriter, getCSVDictWriter, getLine, getLogger)
 from gbif.gbifapi import GbifAPI
-from pickle import NONE
-from pympler import classtracker
 from pympler import asizeof
 
+# Rough log of processing progress
+LOGINTERVAL = 1000000
         
 # .............................................................................
 class GBIFReader(object):
@@ -74,20 +74,12 @@ class GBIFReader(object):
         
         # ....................
         self.interp_fname = None
-        self._inf = None
-        self._reader = None
 
         self._meta_fname = None
         self.fldMeta = None
 
-        self.outfname = None
-        self._outf = None
-        self._writer = None
-                
         # Canonical lookup tmp data
         self.nametaxa_fname = None
-        self._namef = None
-        self._nametaxa_writer = None
         self._nametaxa = {}
         
         # Lookup tmp data
@@ -95,11 +87,11 @@ class GBIFReader(object):
 
         # Lookup table output files
         self.dset_lut_fname = os.path.join(self.tmppath, 'dataset_lookup.csv')
-        self._ds_lut = None
+        self._ds_lut = {}
         self.org_lut_fname = os.path.join(self.tmppath, 'org_lookup.csv')
-        self._org_lut = None
+        self._org_lut = {}
         self.name_lut_fname = os.path.join(self.tmppath, 'name_lookup.csv')
-        self._name_lut = None
+        self._name_lut = {}
         
     # ...............................................
 
@@ -330,17 +322,26 @@ class GBIFReader(object):
                     self._nametaxa[sciname] = [taxkey]
 
     # ...............................................
-    def _write_lookupvals(self):
+    def _write_namevals_for_lookup(self):
+        header=['scientificName', 'taxonKeys']
         # Write scientific names and taxonKeys found with them in raw data
-        self._nametaxa_writer, self._namef = self._open_for_csv_write(
-            self.nametaxa_fname, header=['scientificName', 'taxonKeys'])
+        fmode = 'w'        
+        if os.path.exists(self.nametaxa_fname):
+            fmode = 'a'
+            
         try:
-            for sciname, txkeylst in self._nametaxa.items():
-                row = [k for k in txkeylst]
-                row.insert(0, sciname)
-                self._nametaxa_writer.writerow(row)
+            writer, outf = getCSVWriter(self.nametaxa_fname, self._bison_delimiter, 
+                                        self._encoding, fmode=fmode)
+            self._log.info('Opened name/taxa file {} for write'.format(self.nametaxa_fname))
+    
+            if fmode == 'w' and header is not None:
+                writer.writerow(header)
+                for sciname, txkeylst in self._nametaxa.items():
+                    row = [k for k in txkeylst]
+                    row.insert(0, sciname)
+                    writer.writerow(row)
         finally:
-            self._namef.close()
+            outf.close()
         
     # ...............................................
     def _test_transform_val(self, fld, tmpval):
@@ -399,27 +400,6 @@ class GBIFReader(object):
         return do_discard, val
 
     # ...............................................
-    def _open_for_csv_write(self, fname, header=None):
-        '''
-        @summary: Read and populate dictionary if file exists, 
-                  then re-open for writing or appending. If lookup file 
-                  is new, write header if provided.
-        '''
-        fmode = 'w'        
-        if os.path.exists(fname):
-            fmode = 'a'
-            
-        csvwriter, outfile = getCSVWriter(fname, self._bison_delimiter, 
-                                          self._encoding, fmode=fmode)
-        self._log.info('Opened lookup file {} for write'.format(fname))
-
-        if fmode == 'w' and header is not None:
-            csvwriter.writerow(header)
-        
-        return csvwriter, outfile 
-    
-    
-    # ...............................................
     def _open_for_write(self, fname):
         '''
         @summary: Open for writing or appending. 
@@ -471,11 +451,7 @@ class GBIFReader(object):
                   dictionary of record values
         '''
         lookup = {}
-#         # track memory usage for an instance
-#         tracker = classtracker.ClassTracker()
-#         tracker.track_object(lookup)
         if os.path.exists(fname):
-            recno = 0        
             try:
                 rdr, inf = getCSVDictReader(fname, self._bison_delimiter, 
                                             self._encoding)
@@ -483,21 +459,14 @@ class GBIFReader(object):
                     uuid = data[uuidkey]
                     lookup[uuid] = data
             except Exception as e:
-                self._log.error('Failed reading data in line {} of {}: {}'
-                                .format(fname, recno, e))
+                self._log.error('Failed reading data in {}: {}'
+                                .format(fname, e))
             finally:
                 inf.close()
         if lookup:
-#             tracker.create_snapshot('Lookup table size for {}:'.format(fname))
-#             tracker.stats.print_summary()
             self._log.info('Lookup table size for {}:'.format(fname))
             self._log.info(asizeof.asized(lookup).format())
-#             self._log.info(asizeof.asized(lookup, detail=1).format())
         return lookup
-
-
-
-
 
     # ...............................................
     def read_dataset_lookup(self, logname=None):
@@ -524,7 +493,45 @@ class GBIFReader(object):
         self._org_lut = lookup
 
     # ...............................................
-    def _open_pass1_files(self):
+    def read_name_lookup(self, logname=None):
+        '''
+        @summary: Read and populate dictionary with key = uuid and 
+                  dictionary of record values
+        '''
+        self._rotate_logfile(logname=logname)        
+        lookup = {}
+        if os.path.exists(self.name_lut_fname):
+            try:
+                reader, inf = getCSVReader(self.name_lut_fname, 
+                                        self._bison_delimiter, self._encoding)
+                recno = 0
+                line, recno = getLine(reader, recno)
+                while (line is not None):
+                    recno += 1
+                    if (recno % LOGINTERVAL) == 0:
+                        self._log.info('*** Record number {} ***'.format(recno))
+                    if len(line) == 2:
+                        lookup[line[0]] = line[1]
+                    else:
+                        self._log.error('Bad line in lookup table, recno {}, line {}'
+                                        .format(recno, line))
+
+                    # Get interpreted record
+                    line, recno = getLine(reader, recno)
+            except Exception as e:
+                self._log.error('Failed reading data in {}: {}'
+                                .format(self.name_lut_fname, e))
+            finally:
+                inf.close()
+                
+            if lookup:
+                self._log.info('Lookup table size for {}:'.format(self.name_lut_fname))
+                self._log.info(asizeof.asized(lookup).format())
+        self._name_lut = lookup
+
+
+    # ...............................................
+    def _open_pass1_files(self, pass1_fname):
         '''
         @summary: Read GBIF metadata, open GBIF interpreted data for reading, 
                   output file for writing
@@ -535,21 +542,51 @@ class GBIFReader(object):
 
         # Open raw GBIF data
         self._log.info('Open raw GBIF input file {}'.format(self.interp_fname))
-        (self._reader, 
-         self._inf) = getCSVReader(self.interp_fname, self._gbif_delimiter, 
-                                   self._encoding)
-        self._files.append(self._inf) 
+        rdr, inf = getCSVReader(self.interp_fname, self._gbif_delimiter, 
+                                self._encoding)
+        self._files.append(inf) 
         
         # Open output BISON file 
-        self._log.info('Open step1 BISON output file {}'.format(self.outfname))
-        (self._writer, 
-         self._outf) = getCSVWriter(self.outfname, self._bison_delimiter, 
-                                   self._encoding)
-        self._files.append(self._outf)
-        self._writer.writerow(ORDERED_OUT_FIELDS)
+        self._log.info('Open step1 BISON output file {}'.format(pass1_fname))
+        wtr, outf = getCSVWriter(pass1_fname, self._bison_delimiter, 
+                                 self._encoding)
+        self._files.append(outf)
+        wtr.writerow(ORDERED_OUT_FIELDS)
 
         # Read any existing values for lookup
-        nametaxa = self._read_name_taxa(self.nametaxa_fname)
+        if os.path.exists(self.nametaxa_fname):
+            self._log.info('Read metadata ...')
+            self._nametaxa = self._read_name_taxa(self.nametaxa_fname)
+            
+        return rdr, wtr
+            
+    # ...............................................
+    def _open_pass2_files(self, pass1_fname, pass2_fname):
+        '''
+        @summary: Read GBIF metadata, open GBIF interpreted data for reading, 
+                  output file for writing
+        '''
+        infname = os.path.join(self.tmppath, pass1_fname)
+        outfname = os.path.join(self.tmppath, pass2_fname)
+
+        if not os.path.exists(infname):
+            raise Exception('First pass output file {} missing!'.format(infname))
+        # Open pass1 BISON file as input
+        self._log.info('Open first pass input file {}'.format(infname))
+        drdr, inf = getCSVDictReader(infname, self._bison_delimiter,
+                                     self._encoding)
+        self._files.append(inf) 
+
+        # Open pass2 BISON file for output
+        self._log.info('Open second pass output file {}'.format(outfname))
+        dwtr, outf = getCSVDictWriter(outfname, self._bison_delimiter, 
+                                      self._encoding, ORDERED_OUT_FIELDS)
+        dwtr.writeheader()
+        self._files.append(outf)
+        
+        
+                
+        return drdr, dwtr
             
     # ...............................................
     def is_open(self):
@@ -708,7 +745,7 @@ class GBIFReader(object):
         return rec
 
     # ...............................................
-    def _create_bisonrec_step1(self, iline):
+    def _create_bisonrec_pass1(self, iline):
         """
         @summary: Create a list of values, ordered by BISON-requested fields in 
                      ORDERED_OUT_FIELDS, with individual values and/or entire record
@@ -749,52 +786,57 @@ class GBIFReader(object):
                                  .format(fld, rec['gbifID']))
         return biline
 
+#     # ...............................................
+#     def _update_bisonrec_pass2(self, rec):
+#         clean_name = self._name_lut[rec['scientificName']]
+#         rec['clean_provided_scientific_name'] = clean_name
+#         return rec
+    
     # ...............................................
-    def transform_gbif_recs(self, gbif_fname, meta_fname, bison_fname, 
+    def transform_gbif_to_bison_pass1(self, gbif_fname, meta_fname, outfname, 
                             logname=None):
         """
         @summary: Create a CSV file containing GBIF occurrence records extracted 
                      from the interpreted occurrence file provided 
-                     from an Occurrence Download, in Darwin Core format.  Values may
-                     be modified and records may be discarded according to 
-                     BISON requests.
+                     from an Occurrence Download, in Darwin Core format.  
+                     Individual values may be calculated, modified or 
+                     entire records discarded according to BISON requests.
         @return: A CSV file of first pass of BISON-modified records from a 
                  GBIF download. 
         @note: Some fields will be filled in on subsequent processing.
         """
         self.interp_fname = os.path.join(self.inpath, gbif_fname)
         self._meta_fname = os.path.join(self.inpath, meta_fname)
-        self.outfname = os.path.join(self.tmppath, bison_fname)
+        pass1_fname = os.path.join(self.tmppath, outfname)
 
         if self.is_open():
             self.close()
-        if os.path.exists(self.outfname):
-            raise Exception('Output file {} exists!'.format(self.outfname))            
+        if os.path.exists(pass1_fname):
+            raise Exception('First pass output file {} exists!'.format(pass1_fname))            
         self._rotate_logfile(logname=logname)        
 
-        loginterval = 1000000
         recno = 0
         try:
-            self._open_pass1_files()
+            reader, writer = self._open_pass1_files(pass1_fname)
             
             # Pull the header row 
-            header, recno = getLine(self._reader, recno)
+            header, recno = getLine(reader, recno)
             line = header
             while (line is not None):
                 
                 # Get interpreted record
-                line, recno = getLine(self._reader, recno)
+                line, recno = getLine(reader, recno)
                 if line is None:
                     break
-                elif (recno % loginterval) == 0:
+                elif (recno % LOGINTERVAL) == 0:
                     self._log.info('*** Record number {} ***'.format(recno))
                     
                 # Create new record or empty list
-                biline = self._create_bisonrec_step1(line)
+                biline = self._create_bisonrec_pass1(line)
                 
                 # Write new record
                 if biline:
-                    self._writer.writerow(biline)
+                    writer.writerow(biline)
                                 
         except Exception as e:
             self._log.error('Failed on line {}, exception {}'.format(recno, e))
@@ -802,57 +844,50 @@ class GBIFReader(object):
             self.close()
 
         # Write all lookup values
-        self._write_lookupvals()
+        self._write_namevals_for_lookup()
             
     # ...............................................
-    def fill_with_lookup_values(self, logname=None):
+    def update_bison_pass2(self, pass1_fname, pass2_fname, logname=None):
         """
-        @summary: Create a CSV file containing GBIF occurrence records extracted 
-                     from the interpreted occurrence file provided 
-                     from an Occurrence Download, in Darwin Core format.  Values may
-                     be modified and records may be discarded according to 
-                     BISON requests.
-        @return: A CSV file of first pass of BISON-modified records from a 
-                 GBIF download. 
-        @note: Some fields will be filled in on subsequent processing.
+        @summary: Create a CSV file from pre-processed GBIF data, with
+                  clean_provided_scientific_name resolved from 
+                  original scientificName or taxonKey. 
+        @return: A CSV file of BISON-modified records from a GBIF download. 
         """
         if self.is_open():
             self.close()
-        if os.path.exists(self.outfname):
-            raise Exception('Bison output file {} exists!'.format(self.outfname))
         self._rotate_logfile(logname=logname)
 
         loginterval = 1000000
         recno = 0
         try:
-            self._open_pass1_files()
-            
-            # Pull the header row 
-            header, recno = getLine(self._reader, recno)
-            line = header
-            while (line is not None):
-                
-                # Get interpreted record
-                line, recno = getLine(self._reader, recno)
-                if line is None:
-                    break
-                elif (recno % loginterval) == 0:
+            dreader, dwriter = self._open_pass2_files(pass1_fname, pass2_fname)
+            for rec in dreader:
+                recno += 1
+                clean_name = None
+                gid = rec['gbifID']
+                # Update record
+                try:
+                    oldname = rec['scientificName']
+                except Exception as e:
+                    self._log.warning('Failed to get sciname from rec {}, gbifID {}'
+                                      .format(recno, gid))
+                try:
+                    clean_name = self._name_lut[oldname]
+                except Exception as e:
+                    self._log.warning('Failed to get clean name from sciname {} in LUT'
+                                      .format(oldname))
+                                      
+                rec['clean_provided_scientific_name'] = clean_name
+                dwriter.writerow(rec)
+                if (recno % loginterval) == 0:
                     self._log.info('*** Record number {} ***'.format(recno))
-                    
-                # Create new record or empty list
-                biline = self.create_bisonrec_step1(line)
-                
-                # Write new record
-                if biline:
-                    self._writer.writerow(biline)
-                                
+                                    
         except Exception as e:
-            self._log.error('Failed on line {}, exception {}'.format(recno, e))
+            self._log.error('Failed reading data from line {} in {}: {}'
+                            .format(recno, pass1_fname, e))                    
         finally:
             self.close()
-
-        # Write all lookup values
-        self._write_lookupvals()
 
     # ...............................................
     def _get_dataset_uuids(self):
@@ -1004,49 +1039,49 @@ class GBIFReader(object):
             
 # ...............................................
 if __name__ == '__main__':
-#     import argparse
-#     parser = argparse.ArgumentParser(
-#                 description=("""Parse a GBIF occurrence dataset downloaded
-#                                      from the GBIF occurrence web service in
-#                                      Darwin Core format into BISON format.  
-#                                  """))
-#     parser.add_argument('gbif_occ_file', type=str, 
-#                         help="""
-#                         Absolute pathname of the input GBIF occurrence file 
-#                         for data transform.  Path contain downloaded GBIF data 
-#                         and metadata.  If the subdirectories 'tmp' and 'out' 
-#                         are not present in the same directory as the raw data, 
-#                         they will be  created for temp and final output files.
-#                         """)
-#     parser.add_argument('--step', type=int, default=1, choices=[1,2,3,4],
-#                         help="""
-#                         Step number for data processing:
-#                            1: Dataset/Provider lookup table assembly:
-#                               * Query GBIF dataset API + datasetKey for 
-#                                 dataset info for Bison 'resource' fields and 
-#                                 (publishing)OrganizationKey.
-#                               * Query GBIF organization API + organizationKey for 
-#                                 organization info for BISON 'provider' fields'
-#                            2: GBIF record and field filter/transform.
-#                               Names and UUIDs are saved in records for GBIF API 
-#                               resolution in Step 2.
-#                            3: Name lookup table assembly:
-#                               * Query GBIF parser + scientificName if available, 
-#                                 or GBIF species API + taxonKey for BISON 
-#                                 'clean_provided_scientific_name'.
-#                            3: Field value replacements. Names, resource, and 
-#                               provider values are replaced with resolved values
-#                               saved in lookup tables.
-#                         """)
-#     args = parser.parse_args()
-#     gbif_occ_file = args.gbif_occ_file
-#     step = args.processing_step
+    import argparse
+    parser = argparse.ArgumentParser(
+                description=("""Parse a GBIF occurrence dataset downloaded
+                                     from the GBIF occurrence web service in
+                                     Darwin Core format into BISON format.  
+                                 """))
+    parser.add_argument('gbif_occ_file', type=str, 
+                        help="""
+                        Absolute pathname of the input GBIF occurrence file 
+                        for data transform.  Path contain downloaded GBIF data 
+                        and metadata.  If the subdirectories 'tmp' and 'out' 
+                        are not present in the same directory as the raw data, 
+                        they will be  created for temp and final output files.
+                        """)
+    parser.add_argument('--step', type=int, default=1, choices=[1,2,3,4],
+                        help="""
+                        Step number for data processing:
+                           1: Dataset/Provider lookup table assembly:
+                              * Query GBIF dataset API + datasetKey for 
+                                dataset info for Bison 'resource' fields and 
+                                (publishing)OrganizationKey.
+                              * Query GBIF organization API + organizationKey for 
+                                organization info for BISON 'provider' fields'
+                           2: GBIF record and field filter/transform.
+                              Names and UUIDs are saved in records for GBIF API 
+                              resolution in Step 2.
+                           3: Name lookup table assembly:
+                              * Query GBIF parser + scientificName if available, 
+                                or GBIF species API + taxonKey for BISON 
+                                'clean_provided_scientific_name'.
+                           3: Field value replacements. Names, resource, and 
+                              provider values are replaced with resolved values
+                              saved in lookup tables.
+                        """)
+    args = parser.parse_args()
+    gbif_occ_file = args.gbif_occ_file
+    step = args.step
 
     #------------------------------------------------
     # Testing arg3uments
     #------------------------------------------------
-    gbif_occ_file = '/tank/data/bison/2019/AS/occurrence.txt'
-    step = 3
+#     gbif_occ_file = '/tank/data/bison/2019/AS/occurrence.txt'
+#     step = 4
     #------------------------------------------------
     
     overwrite = True
@@ -1054,30 +1089,34 @@ if __name__ == '__main__':
     outdir = 'out'
     inpath, gbif_fname = os.path.split(gbif_occ_file)
     gbif_basefname, ext = os.path.splitext(gbif_fname)
-    outbase = 'step{}_{}'.format(step, gbif_basefname)
-    
+
     tmppath = os.path.join(inpath, tmpdir)
     outpath = os.path.join(inpath, outdir)
-    bison_fname = outbase + '.csv'
-            
     os.makedirs(tmppath, mode=0o775, exist_ok=True)
     os.makedirs(outpath, mode=0o775, exist_ok=True)
-            
+    
+    outbase = 'step{}_{}'.format(step, gbif_basefname)   
+    pass1_fname = 'step2_{}.csv'.format(gbif_basefname)
+    pass2_fname = 'step4_{}.csv'.format(gbif_basefname)
+    
     if not os.path.exists(gbif_occ_file):
         raise Exception('Filename {} does not exist'.format(gbif_occ_file))
     else:
         gr = GBIFReader(inpath, tmpdir, outdir)
         if step == 1:
-            gr.write_dataset_org_lookup(logname=outbase)            
+            gr.write_dataset_org_lookup(logname=outbase)
+            
         elif step == 2:
             gr.read_dataset_lookup(logname=outbase)
-            gr.read_org_lookup(logname=outbase)
-            gr.transform_gbif_recs(gbif_fname, META_FNAME, bison_fname, 
-                                   logname=outbase)
+            gr.read_org_lookup()
+            gr.transform_gbif_to_bison_pass1(gbif_fname, META_FNAME, pass1_fname)
+            
         elif step == 3:
             gr.write_name_lookup(logname=outbase)
+            
         elif step == 4:
-            gr.fill_name_values(logname=outbase)
+            gr.read_name_lookup(logname=outbase)
+            gr.update_bison_pass2(pass1_fname, pass2_fname)
     
     
 """
