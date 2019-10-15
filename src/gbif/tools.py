@@ -1,8 +1,7 @@
 import csv
 import logging
 from logging.handlers import RotatingFileHandler
-import sys
-# import unicodecsv
+from sys import maxsize
 
 from gbif.constants import (LOG_FORMAT, LOG_DATE_FORMAT, LOGFILE_MAX_BYTES,
                        LOGFILE_BACKUP_COUNT)
@@ -25,7 +24,7 @@ def getCSVWriter(datafile, delimiter, encoding, fmode='w'):
     if fmode not in ('w', 'a'):
         raise Exception('File mode must be "w" (write) or "a" (append)')
     
-    csv.field_size_limit(sys.maxsize)
+    csv.field_size_limit(maxsize)
     try:
         f = open(datafile, fmode, encoding=encoding) 
         writer = csv.writer(f, delimiter=delimiter)
@@ -52,7 +51,7 @@ def getCSVDictWriter(datafile, delimiter, encoding, fldnames, fmode='w'):
     if fmode not in ('w', 'a'):
         raise Exception('File mode must be "w" (write) or "a" (append)')
     
-    csv.field_size_limit(sys.maxsize)
+    csv.field_size_limit(maxsize)
     try:
         f = open(datafile, fmode, encoding=encoding) 
         writer = csv.DictWriter(f, fieldnames=fldnames, delimiter=delimiter)
