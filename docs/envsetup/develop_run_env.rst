@@ -40,6 +40,11 @@ Dependencies
         SRC_URL=https://github.com/kennethreitz/$ARCHIVENAME/archive/v$VERSION.tar.gz
         OUTFILE=$ARCHIVENAME-$VERSION.tar.gz
         wget --output-document=$OUTFILE $SRC_URL
+        
+    * Pypmpler 0.7 (for memory logging)
+    
+        pip3 install pympler
+
 
 Install dependencies for Rocks 7.0 (as root)::   
         PYVER=python3.6
