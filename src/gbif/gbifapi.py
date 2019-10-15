@@ -356,15 +356,10 @@ class GbifAPI(object):
         return canonical
 
 # ...............................................
-    def _postToParser(self, url, infname):
+    def _postJsonToParser(self, url, data):
         response = output = None
-        headers = {'Accept': 'application/json', 'Content-Type': 'application/json'}
-        auth = None
-        indata = open(infname, 'rb')
-        
         try:
-            response = requests.post(url, data=indata, headers=headers,
-                                     auth=auth)
+            response = requests.post(url, json=data)
         except Exception as e:
             if response is not None:
                 retcode = response.status_code
@@ -393,17 +388,10 @@ class GbifAPI(object):
                 else:
                     print('Failed on URL {} ({}: {})'
                             .format(url, retcode, reason))
-        finally:
-            indata.close()
-            
         return output
 
 # ...............................................
-    def get_write_parsednames(self, infname, outfname, delimiter=OUT_DELIMITER):
-#         url = GBIF_BATCH_PARSER_URL.replace('http', 'https')
-        if not os.path.exists(infname):
-            raise Exception('Input file {} missing'.format(outfname))
-        
+    def get_write_parsednames(self, indata, outfname, delimiter=OUT_DELIMITER):
         name_fail = []
         if os.path.exists(outfname):
             fmode = 'a'
@@ -411,7 +399,7 @@ class GbifAPI(object):
             fmode = 'w'
         csvwriter, f = getCSVWriter(outfname, delimiter, ENCODING, fmode=fmode)
 
-        output = self._postToParser(GBIF_BATCH_PARSER_URL, infname)
+        output = self._postJsonToParser(GBIF_BATCH_PARSER_URL, indata)
         total = 0
         
         if output is not None:
@@ -426,7 +414,7 @@ class GbifAPI(object):
                         print('Failed reading scientificName in output record, err: {}'
                               .format(str(e)))
                     else:
-                        if rec['parsed'] in ['true', 'True', 't', '1']:
+                        if rec['parsed'] is True:
                             try:
                                 canname = rec['canonicalName']
                                 csvwriter.writerow([sciname, canname])
@@ -448,54 +436,41 @@ class GbifAPI(object):
 
 # ...............................................
 if __name__ == '__main__':
-    import argparse
-    parser = argparse.ArgumentParser(
-                description=("""Submit data to GBIF API services as a GET request
-                                     or file as a POST request.
-                                 """))
-    parser.add_argument('--outfile', type=str, default='/tmp/gbifapi_result_file.csv',
-                        help="Full pathname for the output file")
-    parser.add_argument('--name_infile', type=str, default=None,
-                        help="""
-                        Full pathname of the input file containing UTF-8 encoded
-                        scientificNames to be parsed into canonicalNames.
-                        """)
-    parser.add_argument('--dataset_path', type=str, default=None,
-                        help="""
-                        Full pathname of the input file containing dataset UUIDs
-                        for metadata retrieval.
-                        """)
-    args = parser.parse_args()
-    outfile = args.outfile
-    name_infile = args.name_infile
-    dataset_path = args.dataset_path
+#     import argparse
+#     parser = argparse.ArgumentParser(
+#                 description=("""Submit data to GBIF API services as a GET request
+#                                      or file as a POST request.
+#                                  """))
+#     parser.add_argument('--outfile', type=str, default='/tmp/gbifapi_result_file.csv',
+#                         help="Full pathname for the output file")
+#     parser.add_argument('--name_infile', type=str, default=None,
+#                         help="""
+#                         Full pathname of the input file containing UTF-8 encoded
+#                         scientificNames to be parsed into canonicalNames.
+#                         """)
+#     parser.add_argument('--dataset_path', type=str, default=None,
+#                         help="""
+#                         Full pathname of the input file containing dataset UUIDs
+#                         for metadata retrieval.
+#                         """)
+#     args = parser.parse_args()
+#     outfile = args.outfile
+#     name_infile = args.name_infile
+#     dataset_path = args.dataset_path
 
-    basepath = '/tank/data/bison/2019'
-    indir = 'raw'
-    tmpdir = 'tmp'
-    outdir = 'out'
-
-    outfile = os.path.join(basepath, tmpdir, 'step2.csv')
-    name_infile = os.path.join(basepath, tmpdir, 'name_lookup.csv')
-    dataset_infile = os.path.join(basepath, indir, 'dataset')
+    infname = '/tank/data/bison/2019/AS/tmp/parser_in_10.txt'
+    outfname = '/tank/data/bison/2019/AS/tmp/name_parser_10.csv'
+    import json
     
     gc = GbifAPI()
-    if name_infile is not None and os.path.exists(name_infile):
-        gc.get_write_parsednames(name_infile, outfile)
+    if os.path.exists(infname):
+        names = []
+        with open(infname, 'r', encoding='utf-8') as f:
+            for line in f:
+                names.append(line.strip())
+#         jnames = json.dumps(names)
+        gc.get_write_parsednames(names, outfname)
         
-    elif dataset_path is not None and os.path.exists(dataset_path):
-        import glob
-        # Gather dataset UUIDs from EML files downloaded with raw data
-        uuids = []
-        dsfnames = glob.glob(os.path.join(dataset_path, '*.xml'))
-        if dsfnames is not None:
-            for fn in dsfnames:
-                uuids.append(fn[:-4])
-        gc.get_write_dataset_meta(outfile, uuids)
-        
-    else:
-        gc.get_write_organization_meta(outfile)
-    
 """
 
 curl -i \

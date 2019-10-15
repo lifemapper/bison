@@ -21,11 +21,11 @@ class GBIF_DSET_KEYS(object):
     preserve_format = ['title', 'rights', 'logoUrl', 'description', 'homepage']
 
     
-GBIF_URL = 'https://api.gbif.org/v1'
+GBIF_URL = 'http://api.gbif.org/v1'
 GBIF_DATASET_URL = '{}/{}/'.format(GBIF_URL, GBIF_DSET_KEYS.apitype)
 GBIF_ORGANIZATION_URL = '{}/{}/'.format(GBIF_URL, GBIF_ORG_KEYS.apitype)
 GBIF_BATCH_PARSER_URL = GBIF_URL + '/parser/name/'
-GBIF_SINGLE_PARSER_URL = GBIF_URL + '/parser/name?name='
+GBIF_SINGLE_PARSER_URL = GBIF_URL + '/species/parser/name?name='
 GBIF_TAXON_URL = GBIF_URL + '/species/'
 GBIF_UUID_KEY = 'key'
 GBIF_ORG_UUID_FOREIGN_KEY = 'publishingOrganizationKey'
@@ -176,13 +176,15 @@ ORDERED_OUT_FIELDS = [
    'county', 
    'higherGeographyID', 
    'stateProvince', 
-   # Keep original UUID values for later lookup
-   'providerID', 
-   'resourceID', 
-   # lookup publisher from providerID
+    # Keep original UUID values for later lookup
+    'providerID', 
+    'resourceID', 
    'publisher',    
-   # lookup datasetKey from resourceID
+   # use datasetKey for resource value lookups
    'datasetKey',
+   # fill publishingOrganizationKey from dataset API query, 
+   # use for provider value lookups
+   'publishingOrganizationKey',
    'vernacularName', 
    'kingdom', 
    'coordinatePrecision', 
@@ -192,4 +194,5 @@ ORDERED_OUT_FIELDS = [
    'license']
 
 # TEST_FIELDS = ['occurrenceStatus', 'decimalLatitude', 'decimalLongitude']
-COMPUTE_FIELDS = ('canonicalName', 'providerID', 'resourceID')
+COMPUTE_FIELDS = ('canonicalName', 'publishingOrganizationKey', 
+                  'providerID', 'resourceID')
