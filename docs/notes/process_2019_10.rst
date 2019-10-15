@@ -1,6 +1,28 @@
 BISON data load Oct 2019
 =======================
 
+Download Data from GBIF 
+-----------------------
+
+US
+  * http://www.gbif.org/occurrence/search?COUNTRY=US
+       * GBIF.org (15 October 2019) GBIF Occurrence Download https://doi.org/10.15468/dl.zqo0nh 
+
+
+US Territories and Canada
+  * http://www.gbif.org/occurrence/search?COUNTRY=AS&COUNTRY=CA&COUNTRY=FM&COUNTRY=GU&COUNTRY=MH&COUNTRY=MP&COUNTRY=PR&COUNTRY=PW&COUNTRY=UM&COUNTRY=VI 
+  * GBIF.org (15 October 2019) GBIF Occurrence Download https://doi.org/10.15468/dl.5qoflq 
+       * American Samoa 
+       * Canada 
+       * Micronesia, Federated States of 
+       * Guam 
+       * Marshall Islands 
+       * Northern Mariana Islands 
+       * Puerto Rico 
+       * Palau 
+       * United States Minor Outlying Islands 
+       * Virgin Islands, U.S. 
+
 Process: (note LUT = lookup table)
 --------------------------------------
     * Process GBIF data, mostly as 2018, with changes
