@@ -35,6 +35,7 @@ from gbif.tools import (getCSVReader, getCSVDictReader,
                         getCSVWriter, getCSVDictWriter, getLine, getLogger)
 from gbif.gbifapi import GbifAPI
 from pympler import asizeof
+from pickle import NONE
 
 # Rough log of processing progress
 LOGINTERVAL = 1000000
@@ -142,10 +143,10 @@ class GBIFReader(object):
         """
         if rec is not None:
             # GBIF datasetKey field, title, homepage
-            rec['resourceID'] = None
-            rec['ownerInstitutionCode'] = None
-            rec['collectionID'] = None
-            rec['publishingOrganizationKey'] = None
+            dskey = None
+            title = None
+            url = None
+            orgkey = None            
             try:
                 dskey = rec['datasetKey']
             except:
@@ -156,11 +157,17 @@ class GBIFReader(object):
                 except:
                     self._log.warning('{} missing from dataset LUT'.format(dskey))
                 else:
-                    rec['resourceID'] = dskey
-                    rec['publishingOrganizationKey'
-                        ] = metavals['publishingOrganizationKey']
-                    rec['ownerInstitutionCode'] = metavals['title']
-                    rec['collectionID'] = metavals['homepage']
+                    title = metavals['title']
+                    url = metavals['homepage']
+                    orgkey = metavals['publishingOrganizationKey']
+                    if url.find('bison.org'):
+                        rec = None
+                    else:    
+                        rec['resourceID'] = dskey
+                        rec['publishingOrganizationKey'] = orgkey
+                        rec['ownerInstitutionCode'] = title
+                        rec['collectionID'] = url
+            
         return rec
 
     # ...............................................
@@ -171,19 +178,30 @@ class GBIFReader(object):
         @note: function modifies original dict
         """
         if rec is not None:
-            # GBIF publishingOrganizationKey (from dataset LUT),
-            orgkey = rec['publishingOrganizationKey']
-            rec['providerID'] = orgkey
-            # organization title and homepage
-            rec['institutionCode'] = None
-            rec['institutionID'] = None
+            # GBIF publishingOrganizationKey (from dataset LUT)
+            orgkey = None            
+            title = None
+            url = None
+            
             try:
-                metavals = self._org_lut[orgkey]
-            except:
-                self._log.warning('{} missing from org LUT'.format(orgkey))
+                orgkey = rec['publishingOrganizationKey']
+            except: 
+                rec['publishingOrganizationKey'] = None
             else:
-                rec['institutionCode'] = metavals['title']
-                rec['institutionID'] = metavals['homepage']                
+                try:
+                    metavals = self._org_lut[orgkey]
+                except:
+                    self._log.warning('{} missing from organization LUT'.format(orgkey))
+                else:
+                    title = metavals['title']
+                    url = metavals['homepage']
+                    if url.find('bison.org'):
+                        rec = None
+                    else:    
+                        rec['providerID'] = orgkey
+                        # organization title and url
+                        rec['institutionCode'] = title
+                        rec['institutionID'] = url
         return rec
 
     # ...............................................
