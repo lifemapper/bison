@@ -10,22 +10,23 @@ Download Data from GBIF
 -----------------------
 
 * for US and US Territories
-  * http://www.gbif.org/occurrence/search?COUNTRY=US
-  * http://www.gbif.org/occurrence/search?COUNTRY=AS&COUNTRY=CA&COUNTRY=FM&COUNTRY=GU&COUNTRY=MH&COUNTRY=MP&COUNTRY=PR&COUNTRY=PW&COUNTRY=UM&COUNTRY=VI 
+
+    * http://www.gbif.org/occurrence/search?COUNTRY=US
+    * http://www.gbif.org/occurrence/search?COUNTRY=AS&COUNTRY=CA&COUNTRY=FM&COUNTRY=GU&COUNTRY=MH&COUNTRY=MP&COUNTRY=PR&COUNTRY=PW&COUNTRY=UM&COUNTRY=VI 
 
 
 * Run portaldownload script to edit, filter and format data into a CSV file
 
 * GBIF download includes:
-  * citations.txt  : references for downloaded data
-  * rights.txt  : URLs for rights of each dataset represented
-  * dataset  directory of EML files of each dataset represented
-  * metadata.xml  : record count for each dataset represented
-  * meta.xml  : list of index/fields (with URL for term) for each datafile
-  * datafiles:
-    * multimedia.txt  
-    * occurrence.txt  
-    * verbatim.txt
+    * citations.txt  : references for downloaded data
+    * rights.txt  : URLs for rights of each dataset represented
+    * dataset  directory of EML files of each dataset represented
+    * metadata.xml  : record count for each dataset represented
+    * meta.xml  : list of index/fields (with URL for term) for each datafile
+    * datafiles:
+        * multimedia.txt  
+        * occurrence.txt  
+        * verbatim.txt
     
 Dependencies
 -------------
@@ -62,31 +63,23 @@ Liz's email
 * For records with 0,0 coordinates - change any decimalLatitude and 
   decimalLongitude field '0' (zero) values to null/blank (we/BISON may still 
   be able to georeference these records)
-  
 * Convert GBIF basisOfRecord (http://rs.tdwg.org/dwc/terms/#basisOfRecord) 
   values to simpler BISON values 
   e.g. humanObservation and machineObservation=observation; 
   FossilSpecimen=fossil, LivingSpecimen=living;... 
+* Provider/publisher/organization, dataset/resource/collection
+
+     * Computed fields::
   
-* Provider/publisher/organization, dataset/resource/collection, 
-
-   * None of these should ever be blank::
-  
-      *  Provider/publisher/organization
-          * providerID (numeric code in GBIF publisher field)
-          * institutionCode (text string/name of provider, pulled from provider API)
+          *  Provider/publisher/organization
+              * providerID (required; numeric code in GBIF publisher field) 
+              * institutionCode (required; text string/name of provider, pulled from provider API)
+              * institutionID (may be blank; Provider's organizational URL, pulled from provider API - not a GBIF URL)
     
-      * Dataset/resource/collection
-          * resourceID (numeric code in GBIF datasetKey field)
-          * ownerInstitutionCode (text string/name of dataset, pulled from dataset API)
-
-   * These are sometimes blank:
-
-      * Provider/publisher/organization
-         * institutionID (Provider's organizational URL, pulled from provider API - not a GBIF URL)
-    
-      * Dataset/resource/collection
-         * collectionID (Dataset's URL if on the Web elsewhere, pulled from dataset API - not a GBIF URL)
+          * Dataset/resource/collection
+              * resourceID (required; numeric code in GBIF datasetKey field)
+              * ownerInstitutionCode (required; text string/name of dataset, pulled from dataset API)
+              * collectionID (may be blank; Dataset's URL if on the Web elsewhere, pulled from dataset API - not a GBIF URL)
 
 
 
@@ -107,34 +100,24 @@ Field list and order
 -----------------------
 
 1. clean_provided_scientific_name (DwC:scientificName)
-1. itis_common_name (Calculated, usually not mapped to DwC because this field is 
-   populated during post-processing. But if populated could use: vernacularName)
-1. itis_tsn (Calculated, usually not mapped to DwC because this field is 
-   populated during post-processing. But if populated could use: DwC: taxonID 
-   and nameAccordingToID with value of the latter set to "Integrated Taxonomic 
-   Information System (ITIS). https://www.itis.gov/")
+1. itis_common_name (Calculated, usually not mapped to DwC because this field is populated during post-processing. But if populated could use: vernacularName)
+1. itis_tsn (Calculated, usually not mapped to DwC because this field is populated during post-processing. But if populated could use: DwC: taxonID and nameAccordingToID with value of the latter set to "Integrated Taxonomic Information System (ITIS). https://www.itis.gov/")
 1. basis_of_record (Controlled vocab) (DwC: basisOfRecord)
-1. occurrence_date (YYYY-MM-DD) DwC: eventDate) *Proposed for renaming to 
-   'event_date' for consistency across BISON Data Schema
+1. occurrence_date (YYYY-MM-DD) DwC: eventDate) *Proposed for renaming to 'event_date' for consistency across BISON Data Schema
 1. year (YYYY) DwC: year)
 1. verbatim_event_date (DwC: verbatimEventDate) *Added to BISON Data Schema FY16/17
 1. provider (BISON) (DwC: institutionCode)
 1. provider_url (https://bison.usgs.gov)(DwC: institutionID)
 1. resource (dataset name) (DwC: collectionCode & datasetName)
-1. resource_url (https://bison.usgs.gov/ipt/resource?r= or other link) 
-   (DwC: collectionID)
+1. resource_url (https://bison.usgs.gov/ipt/resource?r= or other link) (DwC: collectionID)
 1. occurrence_url (DwC: occurrenceID or IPT: occurrenceDetails)
 1. catalog_number (DwC: catalogNumber)
 1. collector (DwC: recordedBy) (DwC: recordedBy)
 1. collector_number (DwC: recordNumber)
-1. valid_accepted_scientific_name (Calculated. But could use: 
-   DwC: acceptedNameUsage)
-1. valid_accepted_tsn (Calculated. But could use DwC:taxonID if not already 
-   mapped to itis_tsn; or DwC: acceptedNameUsageID)
+1. valid_accepted_scientific_name (Calculated. But could use: DwC: acceptedNameUsage)
+1. valid_accepted_tsn (Calculated. But could use DwC:taxonID if not already mapped to itis_tsn; or DwC: acceptedNameUsageID)
 1. provided_scientific_name (DwC: taxonRemarks)
-1. provided_tsn (DwC: taxonID if not already mapped to itis_tsn; and 
-   nameAccordingToID with value of the latter set to "Integrated Taxonomic 
-   Information System (ITIS). http://www.itis.gov/")
+1. provided_tsn (DwC: taxonID if not already mapped to itis_tsn; and nameAccordingToID with value of the latter set to "Integrated Taxonomic Information System (ITIS). http://www.itis.gov/")
 1. latitude (DwC: decimalLatitude)
 1. longitude (DwC: decimalLongitude)
 1. verbatim_elevation (DwC: verbatimElevation)
@@ -142,8 +125,7 @@ Field list and order
 1. calculated_county_name (Calculated, DwC: n/a)
 1. calculated_fips (Calculated, DwC: n/a)
 1. calculated_state_name (Calculated, DwC: n/a)
-1. centroid (Controlled vocab) (DwC: georeferenceRemarks WITH a 'Translation' 
-   e.g. county = county centroid; zip code = zip code centroid; etc.)
+1. centroid (Controlled vocab) (DwC: georeferenceRemarks WITH a 'Translation' e.g. county = county centroid; zip code = zip code centroid; etc.)
 1. provided_county_name (DwC: county)
 1. provided_fips (DwC: higherGeographyID)
 1. provided_state_name (DwC: stateProvince)
@@ -155,29 +137,19 @@ Field list and order
 1. provider_id (440) (DwC: n/a)
 1. resource_id (Could be mapped to DwC: datasetID)
 1. provided_common_name (DwC: vernacularName)
-1. kingdom (ITIS controlled vocab) (DwC: kingdom) *Re-labeled for DwC and 
-   BISON Data Schema consistency
+1. kingdom (ITIS controlled vocab) (DwC: kingdom) *Re-labeled for DwC and BISON Data Schema consistency
 1. geodetic_datum (DwC: geodeticDatum)
 1. coordinate_precision (DwC: coordinatePrecision)
 1. coordinate_uncertainty (DwC: coordinateUncertaintyInMeters)
 1. verbatim_locality (DwC: verbatimLocality)
-1. mrgid (DwC: n/a) *added to BISON Data Schema FY16/17 (added and populated 
-   by Dev team during data ingest; no blank column necessary in BISON-munged datasets)
-1. calculated_waterbody (DwC: waterBody) *added to BISON Data Schema FY16/17 
-   (added and populated by Dev team during data ingest; no blank column 
-   necessary in BISON-munged datasets)
-1. establishment_means (DwC: establishmentMeans WITH a 'Translation' 
-   e.g. AK = nonnative in Alaska; HI = nonnative in Hawaii; L48 =
-1. nonnative in the contiguus United States (CONUS); **Be sure to provide a 
-   translation for any unique combination of these values that
-1. appears in your dataset) *added to BISON Data Schema FY18 (added and 
-   populated by Dev team during data ingest; no blank column necessary in 
-   BISON-munged datasets)
-1. iso_country_code (Controlled vocab) (DwC: country & countryCode, unless 
-   there is a separate country name field)
-1. license (http://creativecommons.org/publicdomain/zero/1.0/legalcode) 
-   (DwC: license) *added to BISON Data Schema FY16/17 (added and populated by 
-   Dev team during data ingest; no blank column necessary in BISON-munged 
-   datasets)
+1. mrgid (DwC: n/a) *added to BISON Data Schema FY16/17 (added and populated by Dev team during data ingest; no blank column necessary in BISON-munged datasets)
+1. calculated_waterbody (DwC: waterBody) *added to BISON Data Schema FY16/17 (added and populated by Dev team during data ingest; no blank column necessary in BISON-munged datasets)
+1. establishment_means 
+     * (DwC: establishmentMeans WITH a 'Translation' e.g. AK = nonnative in Alaska; HI = nonnative in Hawaii; L48 =  US Lower 48 states )
+     * nonnative in the contiguus United States (CONUS); 
+     * Be sure to provide a translation for any unique combination of these values that appears in your dataset) 
+     * added to BISON Data Schema FY18 (added and populated by Dev team during data ingest; no blank column necessary in BISON-munged datasets)
+1. iso_country_code (Controlled vocab) (DwC: country & countryCode, unless there is a separate country name field)
+1. license (http://creativecommons.org/publicdomain/zero/1.0/legalcode)  (DwC: license) *added to BISON Data Schema FY16/17 (added and populated by Dev team during data ingest; no blank column necessary in BISON-munged datasets)
    
    
