@@ -158,7 +158,118 @@ REQUIRED_FIELDS = ('scientificName', 'taxonKey')
 #     only those with matching GBIF data from 
 #         BISON DATA FIELDS (GDrive July 3.2018).xlsx
 #     also enumerated in BISON DATA WORKFLOW(GDrive July 3.2018).pdf
-ORDERED_OUT_FIELDS = [
+BISON_FIELDS = [
+    'clean_provided_scientific_name',   
+    'itis_common_name',   
+    'itis_tsn',   
+    'basis_of_record',   
+    'occurrence_date',   
+    'year',   
+    'verbatim_event_date',   
+    'provider',   
+    'provider_url',   
+    'resource',   
+    'resource_url',   
+    'occurrence_url',   
+    'catalog_number',   
+    'collector',   
+    'collector_number',   
+    'valid_accepted_scientific_name',   
+    'acceptedNameUsage',   
+    'valid_accepted_tsn',   
+    'provided_scientific_name',   
+    'provided_tsn',   
+    'nameAccordingToID',   
+    'latitude',   
+    'longitude',   
+    'verbatim_elevation',   
+    'verbatim_depth',   
+    'calculated_county_name',   
+    'calculated_fips',   
+    'calculated_state_name',   
+    'centroid',   
+    'provided_county_name',   
+    'provided_fips',   
+    'provided_state_name',   
+    'thumb_url',   
+    'associated_media',   
+    'associated_references',   
+    'general_comments',   
+    'id',   
+    'provider_id',   
+    'resource_id',   
+    'provided_common_name',   
+    'kingdom',   
+    'geodetic_datum',   
+    'coordinate_precision',   
+    'coordinate_uncertainty',   
+    'verbatim_locality',   
+    'mrgid',   
+    'calculated_waterbody',   
+    'establishment_means',   
+    'iso_country_code',   
+    'license'
+    ]
+
+class NS(object):
+    dc = 'http://purl.org/dc/terms/'
+    dwc = 'http://rs.tdwg.org/dwc/terms/'
+    gbif = 'http://rs.gbif.org/terms/1.0/'
+
+CALCULATED = True
+GBIF_BISON_MAP = {
+    'clean_provided_scientific_name':  CALCULATED,
+    'itis_common_name': CALCULATED,
+    'itis_tsn': CALCULATED,
+    'basis_of_record': NS.dwc + 'basisOfRecord',
+    'occurrence_date': NS.dwc + 'eventDate',
+    'year': NS.dwc + 'year',
+    'verbatim_event_date': NS.dwc + 'verbatimEventDate',   
+    'provider': CALCULATED, # ???(BISON) (DwC: institutionCode)
+    'provider_url': CALCULATED, # ??? (https://bison.usgs.gov)(DwC: institutionID)   
+    'resource': CALCULATED, # (dataset name) (DwC: collectionCode & datasetName)   
+    'resource_url': CALCULATED, # (https://bison.usgs.gov/ipt/resource?r= or other link) (DwC: collectionID)   
+    'occurrence_url': NS.dwc + 'occurrenceID', # (DwC: occurrenceID or IPT: occurrenceDetails)   
+    'catalog_number': NS.dwc + 'catalogNumber',   
+    'collector': NS.dwc + 'recordedBy',   
+    'collector_number': NS.dwc + 'recordNumber',  
+    'valid_accepted_scientific_name': CALCULATED,   
+    'acceptedNameUsage': CALCULATED,
+    'valid_accepted_tsn': CALCULATED,   
+    'provided_scientific_name': NS.dwc + 'taxonRemarks',
+    'provided_tsn': CALCULATED,
+    'latitude': NS.dwc +  'decimalLatitude',
+    'longitude': NS.dwc + 'decimalLongitude',
+    'verbatim_elevation': NS.dwc + 'verbatimElevation',   
+    'verbatim_depth': NS.dwc + 'verbatimDepth',
+    'calculated_county_name': CALCULATED,   
+    'calculated_fips': CALCULATED,
+    'calculated_state_name': CALCULATED,
+    'centroid': CALCULATED,
+    'provided_county_name': NS.dwc + 'county',   
+    'provided_fips': NS.dwc + 'higherGeographyID',
+    'provided_state_name': NS.dwc + 'stateProvince',
+    'thumb_url': CALCULATED,
+    'associated_media': NS.dwc + 'associatedMedia',
+    'associated_references': NS.dwc + 'associatedReferences',
+    'general_comments': NS.dwc + 'eventRemarks',
+    'id': CALCULATED,
+    'provider_id': CALCULATED, 
+    'resource_id': NS.gbif + 'datasetKey',
+    'provided_common_name': NS.dwc + 'vernacularName',
+    'kingdom': NS.dwc + 'kingdom',
+    'geodetic_datum': NS.dwc + 'geodeticDatum',
+    'coordinate_precision':  NS.dwc + 'coordinatePrecision',   
+    'coordinate_uncertainty':  NS.dwc + 'coordinateUncertaintyInMeters',
+    'verbatim_locality': NS.dwc + 'verbatimLocality',   
+    'mrgid': CALCULATED,
+    'calculated_waterbody': CALCULATED,   
+    'establishment_means': CALCULATED,
+    'iso_country_code': CALCULATED,
+    'license': '(http://creativecommons.org/publicdomain/zero/1.0/legalcode) (DwC: license)',
+    }
+
+OLD_ORDERED_OUT_FIELDS = [
    'gbifID', 
    'clean_provided_scientific_name',
    # Added scientificName and taxonKey for reliable name parsing/lookup
