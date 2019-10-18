@@ -46,7 +46,8 @@ Process: (note LUT = lookup table)
               from publishingOrganizationKey and Provider LUT 
             * Discard records that fail for X reason
                 * No scientificName or taxonKey
-                * Question:  BISON provider, identified by???
+                * BISON provider or resource with url like bison.usgs.gov
+                * QUESTION: discard with url like bison.ornl.gov?
             * Use ‘$’ delimiter in CSV output
             * Generate ScientificName/taxonKey list during data processing: 
         * Step 3: Create Name LUT after to occ record processing

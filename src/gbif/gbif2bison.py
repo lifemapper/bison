@@ -28,9 +28,10 @@ import xml.etree.ElementTree as ET
 
 from gbif.constants import (IN_DELIMITER, OUT_DELIMITER, PROHIBITED_VALS, 
                             INTERPRETED, TERM_CONVERT, ENCODING,
-                            ORDERED_OUT_FIELDS, COMPUTE_FIELDS, SAVE_FIELDS,
+                            ORDERED_OUT_FIELDS, COMPUTE_FIELDS, GBIF_BISON_MAP, SAVE_FIELDS,
                             CLIP_CHAR, META_FNAME, NAMESPACE, 
-                            GBIF_UUID_KEY, GBIF_ORG_UUID_FOREIGN_KEY)
+                            GBIF_UUID_KEY, GBIF_ORG_UUID_FOREIGN_KEY,
+    CALCULATED)
 from gbif.tools import (getCSVReader, getCSVDictReader, 
                         getCSVWriter, getCSVDictWriter, getLine, getLogger)
 from gbif.gbifapi import GbifAPI
@@ -65,6 +66,11 @@ class GBIFReader(object):
         self._gbif_delimiter = IN_DELIMITER
         self._bison_delimiter = OUT_DELIMITER
         self._encoding = ENCODING
+        self._gbif_flds = []
+        for bisonfld, val in GBIF_BISON_MAP:
+            if val is not CALCULATED:
+                gbiffld = val[val.rfind(CLIP_CHAR)+1:]
+                self._gbif_flds.append(gbiffld)
         
         self._log = None
         self._files = []
@@ -160,7 +166,9 @@ class GBIFReader(object):
                     title = metavals['title']
                     url = metavals['homepage']
                     orgkey = metavals['publishingOrganizationKey']
-                    if url.find('bison.org'):
+                    if url.find('bison.') >= 0:
+                        self._log.info('Discard record with gbifID {}, dataset URL {}'
+                                       .format(rec['gbifID'], url))
                         rec = None
                     else:    
                         rec['resourceID'] = dskey
@@ -195,7 +203,9 @@ class GBIFReader(object):
                 else:
                     title = metavals['title']
                     url = metavals['homepage']
-                    if url.find('bison.org'):
+                    if url.find('bison.org') >= 0:
+                        self._log.info('Discard record with gbifID {}, org URL {}'
+                                       .format(rec['gbifID'], url))
                         rec = None
                     else:    
                         rec['providerID'] = orgkey
@@ -659,7 +669,7 @@ class GBIFReader(object):
                     temp = fld.get('term')
                     term = temp[temp.rfind(CLIP_CHAR)+1:]
                     # Save only fields of interest
-                    if term in SAVE_FIELDS:
+                    if term in self._gbif_flds:
                         if not term in fields:
                             fields[term] = idx
                         else:
