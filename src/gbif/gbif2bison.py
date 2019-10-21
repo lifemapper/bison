@@ -164,9 +164,9 @@ class GBIFReader(object):
             url = None
             orgkey = None            
             try:
-                dskey = rec['datasetKey']
+                dskey = rec['resource_id']
             except:
-                rec['datasetKey'] = None
+                rec['resource_id'] = None
             else:
                 try:
                     metavals = self._ds_lut[dskey]
@@ -175,16 +175,16 @@ class GBIFReader(object):
                 else:
                     title = metavals['title']
                     url = metavals['homepage']
-                    orgkey = metavals['publishingOrganizationKey']
+                    orgkey = metavals['provider_id']
                     if url.find('bison.') >= 0:
                         self._log.info('Discard record with gbifID {}, dataset URL {}'
                                        .format(rec[OCC_UUID], url))
                         rec = None
                     else:    
-                        rec['resourceID'] = dskey
-                        rec['publishingOrganizationKey'] = orgkey
-                        rec['ownerInstitutionCode'] = title
-                        rec['collectionID'] = url
+                        rec['resource_id'] = dskey
+                        rec['provider_id'] = orgkey
+                        rec['resource'] = title
+                        rec['resource_url'] = url
             
         return rec
 
@@ -202,9 +202,9 @@ class GBIFReader(object):
             url = None
             
             try:
-                orgkey = rec['publishingOrganizationKey']
+                orgkey = rec['provider_id']
             except: 
-                rec['publishingOrganizationKey'] = None
+                rec['provider_id'] = None
             else:
                 try:
                     metavals = self._org_lut[orgkey]
@@ -218,10 +218,10 @@ class GBIFReader(object):
                                        .format(rec[OCC_UUID], url))
                         rec = None
                     else:    
-                        rec['providerID'] = orgkey
+                        rec['provider_id'] = orgkey
                         # organization title and url
-                        rec['institutionCode'] = title
-                        rec['institutionID'] = url
+                        rec['provider'] = title
+                        rec['provider_url'] = url
         return rec
 
     # ...............................................
@@ -234,25 +234,32 @@ class GBIFReader(object):
         @note: record must have lat/lon or countryCode but GBIF query is on countryCode so
                that will never be blank.
         """
+        lat = lon = ctry = None
         if rec is not None:
-            if 'decimalLongitude' not in rec:
-                rec['decimalLongitude'] = None
+            try:
+                lat = float(rec['latitude'])
+            except:
+                pass
+            rec['latitude'] = lat
+            
+            try:
+                lon = float(rec['longitude']) 
+            except:
+                pass
+            rec['longitude'] = lon
     
-            if 'decimalLatitude' not in rec:
-                rec['decimalLatitude'] = None
-    
-            if 'countryCode' not in rec:
-                rec['countryCode'] = None
+            try:
+                ctry = rec['iso_country_code']
+            except:
+                rec['iso_country_code'] = None
                 
             # Change 0,0 to None
-            if rec['decimalLongitude'] == 0 and rec['decimalLatitude'] == 0:
-                rec['decimalLongitude'] = None
-                rec['decimalLatitude'] = None
+            if lat == 0 and lon == 0:
+                rec['longitude'] = None
+                rec['latitude'] = None
             # Make sure US longitude is negative
-            elif (rec['countryCode'] == 'US' 
-                    and rec['decimalLongitude'] is not None 
-                    and rec['decimalLongitude'] > 0):
-                rec['decimalLongitude'] = rec['decimalLongitude'] * -1 
+            elif (ctry in ('US', 'CA') and lon is not None and lon > 0):
+                rec['longitude'] = rec['longitude'] * -1 
         return rec
 
     # ...............................................
@@ -265,6 +272,7 @@ class GBIFReader(object):
         """
         if rec is not None:
             gid = rec[OCC_UUID]
+            # Decision for locality contents
             locality = None
             try:
                 locality = rec['verbatimLocality'] 
@@ -284,11 +292,7 @@ class GBIFReader(object):
                     locality = rec['habitat']
                 except:
                     self._log.info('Rec gbifID {} missing habitat field'
-                                   .format(gid))
-                    
-            centroid = None 
-            try: 
-                centroid 
+                                   .format(gid))                    
         return rec
 
     # ...............................................
@@ -311,7 +315,7 @@ class GBIFReader(object):
                 
             # Test eventDate field
             try:
-                tmp = rec['eventDate']
+                tmp = rec['occurrence_date']
             except:
                 self._log.info('Rec gbifID {} missing eventDate field'
                                .format(gid))
@@ -328,7 +332,7 @@ class GBIFReader(object):
                                               .format(gid, rec['eventDate']))
                             pass
                         else:
-                            rec['eventDate'] = dateonly
+                            rec['occurrence_date'] = dateonly
                             if fillyr:
                                 rec['year'] = parts[0]
         return rec
@@ -349,7 +353,7 @@ class GBIFReader(object):
             # Previously tested for existence of these fields
             # Save a dict of sciname: taxonKeyList
             try:
-                sciname = rec['scientificName']
+                sciname = rec['provided_scientific_name']
                 taxkey = rec['taxonKey']
             except Exception as e:
                 self._log.info('Rec gbifID {} missing name-related field ({})'
@@ -405,26 +409,13 @@ class GBIFReader(object):
             do_discard = True
 
         # simplify basisOfRecord terms
-        elif fld == 'basisOfRecord':
+        elif fld == 'basis_of_record':
             if val in TERM_CONVERT:
                 val = TERM_CONVERT[val]
                 
-        # Convert year to integer
-        elif fld == 'year':
-            try:
-                val = int(val)
-            except:
-                self._log.info('    Remove invalid year field {}'.format(val))
-                val = None
-            
-        # gather geo fields for check/convert
-        elif fld in ('decimalLongitude', 'decimalLatitude'):
-            try:
-                val = float(val)
-            except Exception:
-                self._log.info('    Remove invalid {} field {}'.format(fld, val))
-                val = None
-            
+        # Convert year to integer in update_dates
+        # Convert coordinates to float in update_point
+                        
         return do_discard, val
 
     # ...............................................
@@ -683,24 +674,6 @@ class GBIFReader(object):
 #                                        .format(term, fields[term], idx))
         return fields
 
-#     # ...............................................
-#     def _update_rec(self, rec):
-#         """
-#         @summary: Update record with all BISON-requested changes, or remove 
-#                      the record by setting it to None.
-#         @param rec: dictionary of all fieldnames and values for this record
-#         @note: function modifies original dict
-#         """
-#         if rec is not None:
-#             # Fill verbatimLocality with anything available
-#             self._update_locality(rec)
-#             # Format eventDate and fill missing year
-#             self._update_dates(rec)
-#             # Modify lat/lon vals if necessary
-#             self._update_point(rec)
-#             # Save scientificName / TaxonID, providerID and datasetKey for later lookup and replace
-#             self._save_for_lookups(rec)
-
     # ...............................................
     def _test_name_fields(self, rec):
         """
@@ -715,11 +688,10 @@ class GBIFReader(object):
                 if not fld in rec:
                     self._log.warning('Data misalignment? Missing {} in rec gbifID {}'
                                       .format(fld, gid))
-    
             # Required fields exist 
             sciname = taxkey = None
             try:
-                sciname = rec['scientificName']
+                sciname = rec['provided_scientific_name']
             except:
                 self._log.info('Rec missing scientificName field')
             try:
@@ -733,6 +705,9 @@ class GBIFReader(object):
                 rec = None
                 self._log.info('Discarded rec gbifID {} missing both sciname and taxkey'
                                .format(gid))
+            else:
+                rec['provided_scientific_name'] = sciname
+                rec['taxonKey'] = taxkey
         return rec
 
     # ...............................................
