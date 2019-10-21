@@ -28,10 +28,9 @@ import xml.etree.ElementTree as ET
 
 from gbif.constants import (IN_DELIMITER, OUT_DELIMITER, PROHIBITED_VALS, 
                             INTERPRETED, TERM_CONVERT, ENCODING,
-                            COMPUTE_FIELDS, BISON_GBIF_MAP, OCC_UUID,
+                            BISON_GBIF_MAP, OCC_UUID_FLD, Method,
                             CLIP_CHAR, META_FNAME, NAMESPACE, 
-                            GBIF_UUID_KEY, GBIF_ORG_UUID_FOREIGN_KEY,
-    CALCULATED)
+                            GBIF_UUID_KEY, GBIF_ORG_UUID_FOREIGN_KEY)
 from gbif.tools import (getCSVReader, getCSVDictReader, 
                         getCSVWriter, getCSVDictWriter, getLine, getLogger)
 from gbif.gbifapi import GbifAPI
@@ -71,7 +70,7 @@ class GBIFReader(object):
         self._calc_flds = []
         for (bisonfld, gbiffld) in BISON_GBIF_MAP:
             self._bison_ordered_flds.append(bisonfld)
-            if gbiffld is CALCULATED:
+            if gbiffld is Method.calculate:
                 self._calc_flds.append(gbiffld)
             else:
                 # remove namespace designation
@@ -178,7 +177,7 @@ class GBIFReader(object):
                     orgkey = metavals['provider_id']
                     if url.find('bison.') >= 0:
                         self._log.info('Discard record with gbifID {}, dataset URL {}'
-                                       .format(rec[OCC_UUID], url))
+                                       .format(rec[OCC_UUID_FLD], url))
                         rec = None
                     else:    
                         rec['resource_id'] = dskey
@@ -215,7 +214,7 @@ class GBIFReader(object):
                     url = metavals['homepage']
                     if url.find('bison.org') >= 0:
                         self._log.info('Discard record with gbifID {}, org URL {}'
-                                       .format(rec[OCC_UUID], url))
+                                       .format(rec[OCC_UUID_FLD], url))
                         rec = None
                     else:    
                         rec['provider_id'] = orgkey
@@ -271,7 +270,7 @@ class GBIFReader(object):
         @note: function modifies original dict
         """
         if rec is not None:
-            gid = rec[OCC_UUID]
+            gid = rec[OCC_UUID_FLD]
             # Decision for locality contents
             locality = None
             try:
@@ -305,7 +304,7 @@ class GBIFReader(object):
                  GBIF combines with time (and here UTC time zone), ex: 2018-08-01T14:19:56+00:00
         """
         if rec is not None:
-            gid = rec[OCC_UUID]
+            gid = rec[OCC_UUID_FLD]
             fillyr = False
             # Test year field
             try:
@@ -349,7 +348,7 @@ class GBIFReader(object):
                to avoid writing duplicates.  
         """
         if rec is not None:
-            gid = rec[OCC_UUID]
+            gid = rec[OCC_UUID_FLD]
             # Previously tested for existence of these fields
             # Save a dict of sciname: taxonKeyList
             try:
@@ -682,7 +681,7 @@ class GBIFReader(object):
         @param rec: current record dictionary
         """
         if rec is not None:
-            gid = rec[OCC_UUID]
+            gid = rec[OCC_UUID_FLD]
             # Missing fields could mean mis-aligned data
             for fld in self.gbifMeta.keys():
                 if not fld in rec:
@@ -721,7 +720,7 @@ class GBIFReader(object):
                     a single GBIF occurrence record. 
         """
         gid = iline[0]
-        rec = {OCC_UUID: gid}
+        rec = {OCC_UUID_FLD: gid}
         # Find values for gbif fields of interest
         for gfld, idx in self.gbifMeta.items():
             # Check column existence
@@ -783,9 +782,9 @@ class GBIFReader(object):
                 except KeyError:
                     biline.append('')
                     # Fields filled in on 2nd pass
-                    if fld not in COMPUTE_FIELDS:
+                    if fld not in self._calc_flds:
                         print ('Missing field {} in record with gbifID {}'
-                                 .format(fld, rec[OCC_UUID]))
+                                 .format(fld, rec[OCC_UUID_FLD]))
         return biline
 
 #     # ...............................................
@@ -867,7 +866,7 @@ class GBIFReader(object):
             for rec in dreader:
                 recno += 1
                 clean_name = None
-                gid = rec[OCC_UUID]
+                gid = rec[OCC_UUID_FLD]
                 # Update record
                 try:
                     oldname = rec['scientificName']
