@@ -1,3 +1,5 @@
+from enum import Enum, auto
+
 
 NAMESPACE = {'tdwg':   'http://rs.tdwg.org/dwc/text/',
              'gbif':   'http://rs.gbif.org/terms/1.0/',
@@ -216,58 +218,66 @@ class NS(object):
     dwc = 'http://rs.tdwg.org/dwc/terms/'
     gbif = 'http://rs.gbif.org/terms/1.0/'
 
-CALCULATED = True
-GBIF_BISON_MAP = {
-    'clean_provided_scientific_name':  CALCULATED,
-    'itis_common_name': CALCULATED,
-    'itis_tsn': CALCULATED,
-    'basis_of_record': NS.dwc + 'basisOfRecord',
-    'occurrence_date': NS.dwc + 'eventDate',
-    'year': NS.dwc + 'year',
-    'verbatim_event_date': NS.dwc + 'verbatimEventDate',   
-    'provider': CALCULATED, # ???(BISON) (DwC: institutionCode)
-    'provider_url': CALCULATED, # ??? (https://bison.usgs.gov)(DwC: institutionID)   
-    'resource': CALCULATED, # (dataset name) (DwC: collectionCode & datasetName)   
-    'resource_url': CALCULATED, # (https://bison.usgs.gov/ipt/resource?r= or other link) (DwC: collectionID)   
-    'occurrence_url': NS.dwc + 'occurrenceID', # (DwC: occurrenceID or IPT: occurrenceDetails)   
-    'catalog_number': NS.dwc + 'catalogNumber',   
-    'collector': NS.dwc + 'recordedBy',   
-    'collector_number': NS.dwc + 'recordNumber',  
-    'valid_accepted_scientific_name': CALCULATED,   
-    'acceptedNameUsage': CALCULATED,
-    'valid_accepted_tsn': CALCULATED,   
-    'provided_scientific_name': NS.dwc + 'taxonRemarks',
-    'provided_tsn': CALCULATED,
-    'latitude': NS.dwc +  'decimalLatitude',
-    'longitude': NS.dwc + 'decimalLongitude',
-    'verbatim_elevation': NS.dwc + 'verbatimElevation',   
-    'verbatim_depth': NS.dwc + 'verbatimDepth',
-    'calculated_county_name': CALCULATED,   
-    'calculated_fips': CALCULATED,
-    'calculated_state_name': CALCULATED,
-    'centroid': CALCULATED,
-    'provided_county_name': NS.dwc + 'county',   
-    'provided_fips': NS.dwc + 'higherGeographyID',
-    'provided_state_name': NS.dwc + 'stateProvince',
-    'thumb_url': CALCULATED,
-    'associated_media': NS.dwc + 'associatedMedia',
-    'associated_references': NS.dwc + 'associatedReferences',
-    'general_comments': NS.dwc + 'eventRemarks',
-    'id': CALCULATED,
-    'provider_id': CALCULATED, 
-    'resource_id': NS.gbif + 'datasetKey',
-    'provided_common_name': NS.dwc + 'vernacularName',
-    'kingdom': NS.dwc + 'kingdom',
-    'geodetic_datum': NS.dwc + 'geodeticDatum',
-    'coordinate_precision':  NS.dwc + 'coordinatePrecision',   
-    'coordinate_uncertainty':  NS.dwc + 'coordinateUncertaintyInMeters',
-    'verbatim_locality': NS.dwc + 'verbatimLocality',   
-    'mrgid': CALCULATED,
-    'calculated_waterbody': CALCULATED,   
-    'establishment_means': CALCULATED,
-    'iso_country_code': CALCULATED,
-    'license': '(http://creativecommons.org/publicdomain/zero/1.0/legalcode) (DwC: license)',
-    }
+
+LICENSE =  '(http://creativecommons.org/publicdomain/zero/1.0/legalcode) (DwC: license)'
+
+class Method(Enum):
+    calculate = auto()
+    discard = auto()
+    
+OCC_UUID = 'gbifID'
+BISON_GBIF_MAP = [
+    (OCC_UUID, OCC_UUID),
+    ('clean_provided_scientific_name', Method.calculate),
+    ('itis_common_name', Method.calculate),
+    ('itis_tsn', Method.calculate),
+    ('basis_of_record', NS.dwc + 'basisOfRecord'),
+    ('occurrence_date', NS.dwc + 'eventDate'),
+    ('year', NS.dwc + 'year'),
+    ('verbatim_event_date', NS.dwc + 'verbatimEventDate'),   
+    ('provider', Method.calculate), # ???(BISON) (DwC: institutionCode)
+    ('provider_url', Method.calculate), # ??? (https://bison.usgs.gov)(DwC: institutionID)   
+    ('resource', Method.calculate), # (dataset name) (DwC: collectionCode & datasetName)   
+    ('resource_url', Method.calculate), # (https://bison.usgs.gov/ipt/resource?r= or other link) (DwC: collectionID)   
+    ('occurrence_url', NS.dwc + 'occurrenceID'), # (DwC: occurrenceID or IPT: occurrenceDetails)   
+    ('catalog_number', NS.dwc + 'catalogNumber'),   
+    ('collector', NS.dwc + 'recordedBy'),
+    ('collector_number', NS.dwc + 'recordNumber'),  
+    ('valid_accepted_scientific_name', Method.calculate),   
+    ('acceptedNameUsage', Method.calculate),
+    ('valid_accepted_tsn', Method.calculate),   
+    ('provided_scientific_name', NS.dwc + 'scientificName'), #  taxonRemarks?
+    ('provided_tsn', Method.calculate),
+    ('latitude', NS.dwc +  'decimalLatitude'),
+    ('longitude', NS.dwc + 'decimalLongitude'),
+    ('verbatim_elevation', NS.dwc + 'verbatimElevation'),   
+    ('verbatim_depth', NS.dwc + 'verbatimDepth'),
+    ('calculated_county_name', Method.calculate),   
+    ('calculated_fips', Method.calculate),
+    ('calculated_state_name', Method.calculate),
+    ('centroid', NS.dwc + 'georeferenceRemarks'),
+    ('provided_county_name', NS.dwc + 'county'), 
+    ('provided_fips', NS.dwc + 'higherGeographyID'),
+    ('provided_state_name', NS.dwc + 'stateProvince'),
+    ('thumb_url', Method.calculate),
+    ('associated_media', NS.dwc + 'associatedMedia'),
+    ('associated_references', NS.dwc + 'associatedReferences'),
+    ('general_comments', NS.dwc + 'eventRemarks'),
+    ('id', NS.dwc + 'occurrenceID'),
+    ('provider_id', Method.calculate), 
+    ('resource_id', NS.gbif + 'datasetKey'),
+    ('provided_common_name', NS.dwc + 'vernacularName'),
+    ('kingdom', NS.dwc + 'kingdom'),
+    ('geodetic_datum', NS.dwc + 'geodeticDatum'),
+    ('coordinate_precision', NS.dwc + 'coordinatePrecision'),   
+    ('coordinate_uncertainty',  NS.dwc + 'coordinateUncertaintyInMeters'),
+    ('verbatim_locality', NS.dwc + 'verbatimLocality'),
+    ('mrgid', Method.calculate),
+    ('calculated_waterbody', Method.calculate),   
+    ('establishment_means', Method.calculate),
+    ('iso_country_code', NS.dwc + 'country'),
+    ('license', Method.calculate)
+    ]
 
 OLD_ORDERED_OUT_FIELDS = [
    'gbifID', 
@@ -306,5 +316,5 @@ OLD_ORDERED_OUT_FIELDS = [
    'license']
 
 # TEST_FIELDS = ['occurrenceStatus', 'decimalLatitude', 'decimalLongitude']
-COMPUTE_FIELDS = ('canonicalName', 'publishingOrganizationKey', 
-                  'providerID', 'resourceID', 'clean_provided_scientific_name')
+# COMPUTE_FIELDS = ('canonicalName', 'publishingOrganizationKey', 
+#                   'providerID', 'resourceID', 'clean_provided_scientific_name')
