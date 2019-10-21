@@ -98,7 +98,7 @@ BISON 47 fields with contents from GBIF dump
    * Q: scientificName OR taxonRemarks?
 #. provided_tsn
    * Calc:
-   * Q: from ITIS lookup?
+   * Q: from ITIS lookup? or use GBIF taxonKey?
 #. latitude
    * first pass: gbif decimalLatitude if exist and valid
    * second pass if missing: Calc: Georeference from 
