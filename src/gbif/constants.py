@@ -85,77 +85,6 @@ TERM_CONVERT = {'FOSSIL_SPECIMEN': 'fossil',
 # Test these against lowercase values
 PROHIBITED_VALS = ['na', '#na', 'n/a', '']
 
-# Fields of interest in the occurrence.txt file, short names stripped from meta.xml
-SAVE_FIELDS = {
-   # pull canonical name from API and taxonKey
-   'gbifID': (str, INTERPRETED),
-   # pull canonical name from GBIF parser API and scientificName 
-   #      or species API and taxonKey
-   'scientificName': (str, INTERPRETED),
-   'taxonKey': (str, INTERPRETED),
-#    'canonicalName': (str, COMPUTED),
-   'vernacularName': (str, INTERPRETED), 
-   'kingdom': (str, INTERPRETED), 
-    
-   'basisOfRecord': (str, INTERPRETED), 
-   
-   'eventDate': (str, INTERPRETED), 
-   'year': (int, INTERPRETED),
-   'verbatimEventDate': (str, INTERPRETED), 
-   
-   # GBIF 'Organization'
-   #--------------
-   'institutionCode': (str, INTERPRETED), 
-   'institutionID': (str, INTERPRETED), 
-#    # pull providerID from dataset API and publishingOrganizationKey
-    'publisher': (NO_OUTPUT, INTERPRETED),
-#    'providerID': (str, COMPUTED), 
-   
-   # GBIF 'Dataset'
-   #--------------
-   # pull resource from API and datasetKey
-   'datasetKey': (str, INTERPRETED),
-#    'resourceID': (str, COMPUTED),
-   # I believe ownerInstitutionCode is incorrect, and should be collectionCode,
-   # so including both.
-   'ownerInstitutionCode': (str, INTERPRETED),
-   'collectionCode': (str, INTERPRETED),
-   'collectionID': (str, INTERPRETED),
-
-   # Occurrence record info
-   'occurrenceID': (str, INTERPRETED),
-   'catalogNumber': (str, INTERPRETED),
-   'recordedBy': (str, INTERPRETED),
-   'recordNumber': (str, INTERPRETED),
-   
-   # Geospatial occurrence record info
-   'decimalLatitude': (float, INTERPRETED),
-   'decimalLongitude': (float, INTERPRETED),
-   'geodeticDatum': (str, INTERPRETED), 
-   'coordinatePrecision': (str, INTERPRETED), 
-   'coordinateAccuracy': (str, INTERPRETED), 
-   'locality': (str, INTERPRETED), 
-   'verbatimLocality': (str, INTERPRETED), 
-   'habitat': (str, INTERPRETED), 
-   'waterBody': (str, INTERPRETED), 
-   'countryCode': (str, INTERPRETED), 
-   # `elevation` is only in INTERPRETED, `verbatimElevation` in both
-   'elevation': (str, INTERPRETED), 
-   # `depth` is only in INTERPRETED, `verbatimDepth` in both
-   'depth': (str, INTERPRETED), 
-   'county': (str, INTERPRETED), 
-   'higherGeographyID': (str, INTERPRETED), 
-   'stateProvince': (str, INTERPRETED), 
-         
-   'license': (str, INTERPRETED), 
-   # delete records with status=absent
-   'occurrenceStatus': (str, INTERPRETED),
-   # only in verbatim
-#    'geodeticDatum': (str, INTERPRETED),
-    'associatedMedia': (str, INTERPRETED)
- }
-REQUIRED_FIELDS = ('scientificName', 'taxonKey')
-
 class NS(object):
     dc = 'http://purl.org/dc/terms/'
     dwc = 'http://rs.tdwg.org/dwc/terms/'
@@ -167,17 +96,17 @@ class Method(Enum):
     calculate = auto()
     discard = auto()
     
-OCC_FLD = 'gbifID'
-TAX_FLD = 'taxonKey'
+OCC_UUID_FLD = 'gbifID'
+TAX_UUID_FLD = 'taxonKey'
 # 47 BISON fields - (+ gbifID and taxonKey)
 #     only those with matching GBIF data from 
 #         BISON DATA FIELDS (GDrive July 3.2018).xlsx
 #     also enumerated in BISON DATA WORKFLOW(GDrive July 3.2018).pdf
 BISON_GBIF_MAP = [
     # Discard this field before final output
-    (OCC_FLD, OCC_FLD),
+    (OCC_UUID_FLD, OCC_UUID_FLD),
     # Discard this field before final output
-    (TAX_FLD, TAX_FLD),
+    (TAX_UUID_FLD, TAX_UUID_FLD),
     # Discard this field before final output
     ('occurrenceStatus', 'occurrenceStatus'),
     ('clean_provided_scientific_name', Method.calculate),
@@ -230,43 +159,3 @@ BISON_GBIF_MAP = [
     ('iso_country_code', NS.dwc + 'country'),
     ('license', Method.calculate)
     ]
-
-OLD_ORDERED_OUT_FIELDS = [
-   'gbifID', 
-   'clean_provided_scientific_name',
-   # Added scientificName and taxonKey for reliable name parsing/lookup
-   'scientificName', 'taxonKey', 
-    'canonicalName',  
-   'basisOfRecord', 'eventDate', 'year', 
-   'verbatimEventDate', 
-   'institutionCode', 'institutionID', 
-   'ownerInstitutionCode', 
-   'collectionCode', 'collectionID', 
-   'occurrenceID', 'catalogNumber', 
-   'recordedBy', 
-   'recordNumber', 
-   'decimalLatitude', 'decimalLongitude', 
-   'elevation', 'depth', 
-   'county', 
-   'higherGeographyID', 
-   'stateProvince', 
-    # Keep original UUID values for later lookup
-    'providerID', 
-    'resourceID', 
-   'publisher',    
-   # use datasetKey for resource value lookups
-   'datasetKey',
-   # fill publishingOrganizationKey from dataset API query, 
-   # use for provider value lookups
-   'publishingOrganizationKey',
-   'vernacularName', 
-   'kingdom', 
-   'coordinatePrecision', 
-   # added locality for Stinger, populate from other fields
-   'locality', 'verbatimLocality','habitat', 'waterBody', 
-   'countryCode', 
-   'license']
-
-# TEST_FIELDS = ['occurrenceStatus', 'decimalLatitude', 'decimalLongitude']
-# COMPUTE_FIELDS = ('canonicalName', 'publishingOrganizationKey', 
-#                   'providerID', 'resourceID', 'clean_provided_scientific_name')
