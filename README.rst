@@ -10,9 +10,8 @@ Download Data from GBIF
 -----------------------
 
 * for US and US Territories
-
-    * http://www.gbif.org/occurrence/search?COUNTRY=US
-    * http://www.gbif.org/occurrence/search?COUNTRY=AS&COUNTRY=CA&COUNTRY=FM&COUNTRY=GU&COUNTRY=MH&COUNTRY=MP&COUNTRY=PR&COUNTRY=PW&COUNTRY=UM&COUNTRY=VI 
+     * http://www.gbif.org/occurrence/search?COUNTRY=US
+     * http://www.gbif.org/occurrence/search?COUNTRY=AS&COUNTRY=CA&COUNTRY=FM&COUNTRY=GU&COUNTRY=MH&COUNTRY=MP&COUNTRY=PR&COUNTRY=PW&COUNTRY=UM&COUNTRY=VI 
 
 
 * Run portaldownload script to edit, filter and format data into a CSV file
@@ -32,15 +31,15 @@ Dependencies
 -------------
 * python2.7  (badenov /usr/bin/python)
 * unicodecsv: 
-  * Centos7: yum search --enablerepo base unicodecsv
-  * https://pypi.org/project/unicodecsv/
+    * Centos7: yum search --enablerepo base unicodecsv
+    * https://pypi.org/project/unicodecsv/
 
 
 Steps 2019
 -----------
 
 * On smaller, CA/Territories file
-  * sort datafiles (multimedia.txt, occurrence.txt, verbatim.txt) on gbifID
+     * sort datafiles (multimedia.txt, occurrence.txt, verbatim.txt) on gbifID
 
 Data Transformations 
 =====================
@@ -68,18 +67,16 @@ Liz's email
   e.g. humanObservation and machineObservation=observation; 
   FossilSpecimen=fossil, LivingSpecimen=living;... 
 * Provider/publisher/organization, dataset/resource/collection
-
-     * Computed fields::
-  
+     * Computed fields:
           *  Provider/publisher/organization
-              * providerID (required; numeric code in GBIF publisher field) 
-              * institutionCode (required; text string/name of provider, pulled from provider API)
-              * institutionID (may be blank; Provider's organizational URL, pulled from provider API - not a GBIF URL)
+               * providerID (required; numeric code in GBIF publisher field) 
+               * institutionCode (required; text string/name of provider, pulled from provider API)
+               * institutionID (may be blank; Provider's organizational URL, pulled from provider API - not a GBIF URL)
     
           * Dataset/resource/collection
-              * resourceID (required; numeric code in GBIF datasetKey field)
-              * ownerInstitutionCode (required; text string/name of dataset, pulled from dataset API)
-              * collectionID (may be blank; Dataset's URL if on the Web elsewhere, pulled from dataset API - not a GBIF URL)
+               * resourceID (required; numeric code in GBIF datasetKey field)
+               * ownerInstitutionCode (required; text string/name of dataset, pulled from dataset API)
+               * collectionID (may be blank; Dataset's URL if on the Web elsewhere, pulled from dataset API - not a GBIF URL)
 
 
 
@@ -96,8 +93,8 @@ Overall FIELD CHECKS
 * IF iso_country_code=US or CA then longitude=negative values
 * IF latitude AND longitude=FALSE then provided_county_name or provided_state_name=TRUE
 
-Field list and order
------------------------
+Field list and order, required 47
+---------------------------------
 
 #. clean_provided_scientific_name (DwC:scientificName)
 #. itis_common_name (Calculated, usually not mapped to DwC because this field is populated during post-processing. But if populated could use: vernacularName)
@@ -153,5 +150,4 @@ Field list and order
      
 #. iso_country_code (Controlled vocab) (DwC: country & countryCode, unless there is a separate country name field)
 #. license (http://creativecommons.org/publicdomain/zero/1.0/legalcode)  (DwC: license) *added to BISON Data Schema FY16/17 (added and populated by Dev team during data ingest; no blank column necessary in BISON-munged datasets)
-   
-   
+      
