@@ -156,68 +156,10 @@ SAVE_FIELDS = {
  }
 REQUIRED_FIELDS = ('scientificName', 'taxonKey')
 
-# 48 BISON fields - 
-#     only those with matching GBIF data from 
-#         BISON DATA FIELDS (GDrive July 3.2018).xlsx
-#     also enumerated in BISON DATA WORKFLOW(GDrive July 3.2018).pdf
-BISON_FIELDS = [
-    'clean_provided_scientific_name',   
-    'itis_common_name',   
-    'itis_tsn',   
-    'basis_of_record',   
-    'occurrence_date',   
-    'year',   
-    'verbatim_event_date',   
-    'provider',   
-    'provider_url',   
-    'resource',   
-    'resource_url',   
-    'occurrence_url',   
-    'catalog_number',   
-    'collector',   
-    'collector_number',   
-    'valid_accepted_scientific_name',   
-    'acceptedNameUsage',   
-    'valid_accepted_tsn',   
-    'provided_scientific_name',   
-    'provided_tsn',   
-    'nameAccordingToID',   
-    'latitude',   
-    'longitude',   
-    'verbatim_elevation',   
-    'verbatim_depth',   
-    'calculated_county_name',   
-    'calculated_fips',   
-    'calculated_state_name',   
-    'centroid',   
-    'provided_county_name',   
-    'provided_fips',   
-    'provided_state_name',   
-    'thumb_url',   
-    'associated_media',   
-    'associated_references',   
-    'general_comments',   
-    'id',   
-    'provider_id',   
-    'resource_id',   
-    'provided_common_name',   
-    'kingdom',   
-    'geodetic_datum',   
-    'coordinate_precision',   
-    'coordinate_uncertainty',   
-    'verbatim_locality',   
-    'mrgid',   
-    'calculated_waterbody',   
-    'establishment_means',   
-    'iso_country_code',   
-    'license'
-    ]
-
 class NS(object):
     dc = 'http://purl.org/dc/terms/'
     dwc = 'http://rs.tdwg.org/dwc/terms/'
     gbif = 'http://rs.gbif.org/terms/1.0/'
-
 
 LICENSE =  '(http://creativecommons.org/publicdomain/zero/1.0/legalcode) (DwC: license)'
 
@@ -225,9 +167,19 @@ class Method(Enum):
     calculate = auto()
     discard = auto()
     
-OCC_UUID = 'gbifID'
+OCC_FLD = 'gbifID'
+TAX_FLD = 'taxonKey'
+# 47 BISON fields - (+ gbifID and taxonKey)
+#     only those with matching GBIF data from 
+#         BISON DATA FIELDS (GDrive July 3.2018).xlsx
+#     also enumerated in BISON DATA WORKFLOW(GDrive July 3.2018).pdf
 BISON_GBIF_MAP = [
-    (OCC_UUID, OCC_UUID),
+    # Discard this field before final output
+    (OCC_FLD, OCC_FLD),
+    # Discard this field before final output
+    (TAX_FLD, TAX_FLD),
+    # Discard this field before final output
+    ('occurrenceStatus', 'occurrenceStatus'),
     ('clean_provided_scientific_name', Method.calculate),
     ('itis_common_name', Method.calculate),
     ('itis_tsn', Method.calculate),
@@ -264,7 +216,7 @@ BISON_GBIF_MAP = [
     ('associated_references', NS.dwc + 'associatedReferences'),
     ('general_comments', NS.dwc + 'eventRemarks'),
     ('id', NS.dwc + 'occurrenceID'),
-    ('provider_id', Method.calculate), 
+    ('provider_id', Method.calculate), # publishingOrganizationKey from dataset metadata
     ('resource_id', NS.gbif + 'datasetKey'),
     ('provided_common_name', NS.dwc + 'vernacularName'),
     ('kingdom', NS.dwc + 'kingdom'),
