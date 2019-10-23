@@ -53,9 +53,9 @@ Process GBIF data, mostly as 2018, with changes
     from publishingOrganizationKey and Provider LUT 
   * Discard records that fail for X reason
     
-        * No scientificName or taxonKey
-        * BISON provider or resource with url like bison.usgs.gov
-        * QUESTION: discard with url like bison.ornl.gov?
+    * No scientificName or taxonKey
+    * BISON provider or resource with url like bison.usgs.gov
+    * QUESTION: discard with url like bison.ornl.gov?
         
   * Use ‘$’ delimiter in CSV output
   * Generate ScientificName/taxonKey list during data processing: 
