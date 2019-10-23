@@ -30,7 +30,7 @@ GBIF_BATCH_PARSER_URL = GBIF_URL + '/parser/name/'
 GBIF_SINGLE_PARSER_URL = GBIF_URL + '/species/parser/name?name='
 GBIF_TAXON_URL = GBIF_URL + '/species/'
 GBIF_UUID_KEY = 'key'
-GBIF_ORG_UUID_FOREIGN_KEY = 'publishingOrganizationKey'
+GBIF_ORG_FOREIGN_KEY = 'publishingOrganizationKey'
 
 # http://api.gbif.org/v1/parser/name?name=quercus%20berberidifolia
 # http://api.gbif.org/v1/organization?identifier=362
@@ -92,60 +92,96 @@ class NS(object):
 
 LICENSE =  '(http://creativecommons.org/publicdomain/zero/1.0/legalcode) (DwC: license)'
 
-class Method(Enum):
-    calculate = auto()
-    discard = auto()
+class FillMethod(Enum):
+    gbif_meta = auto()
+    gbif_name = auto()
+    itis_tsn = auto()
+    georef = auto()
+    est_means = auto()
+    unknown = auto()
+
+    @staticmethod
+    def is_calc(mtype):
+        if mtype in (FillMethod.gbif_meta,
+                     FillMethod.gbif_name,
+                     FillMethod.itis_tsn, 
+                     FillMethod.georef, 
+                     FillMethod.est_means, 
+                     FillMethod.unknown):
+            return True
+        else:
+            return False
+
+    @staticmethod
+    def in_pass1(mtype):
+        if mtype in (FillMethod.gbif_name,
+                     FillMethod.itis_tsn, 
+                     FillMethod.georef, 
+                     FillMethod.est_means, 
+                     FillMethod.unknown):
+            return False
+        else:
+            return True
+
+    @classmethod
+    def pass1(cls):
+        return cls.gbif_meta
+    
+            
+FillLater = (FillMethod.itis_tsn, FillMethod.georef, FillMethod.est_means, 
+             FillMethod.unknown)
     
 OCC_UUID_FLD = 'gbifID'
-TAX_UUID_FLD = 'taxonKey'
+DISCARD_FIELDS = ['taxonKey', 'occurrenceStatus', 'locality', 'habitat']
 # 47 BISON fields - (+ gbifID and taxonKey)
 #     only those with matching GBIF data from 
 #         BISON DATA FIELDS (GDrive July 3.2018).xlsx
 #     also enumerated in BISON DATA WORKFLOW(GDrive July 3.2018).pdf
 BISON_GBIF_MAP = [
-    # Discard this field before final output
+    # Save UUID field for link back to original data
     (OCC_UUID_FLD, OCC_UUID_FLD),
-    # Discard this field before final output
-    (TAX_UUID_FLD, TAX_UUID_FLD),
-    # Discard this field before final output
+    # Discard these fields before final output
+    ('taxonKey', 'taxonKey'),
     ('occurrenceStatus', 'occurrenceStatus'),
-    ('clean_provided_scientific_name', Method.calculate),
-    ('itis_common_name', Method.calculate),
-    ('itis_tsn', Method.calculate),
+    ('locality', 'locality'),
+    ('habitat', 'habitat'),
+    # Save fields start here
+    ('clean_provided_scientific_name', FillMethod.gbif_name),
+    ('itis_common_name', FillMethod.itis_tsn),
+    ('itis_tsn', FillMethod.itis_tsn),
     ('basis_of_record', NS.dwc + 'basisOfRecord'),
     ('occurrence_date', NS.dwc + 'eventDate'),
     ('year', NS.dwc + 'year'),
     ('verbatim_event_date', NS.dwc + 'verbatimEventDate'),   
-    ('provider', Method.calculate), # ???(BISON) (DwC: institutionCode)
-    ('provider_url', Method.calculate), # ??? (https://bison.usgs.gov)(DwC: institutionID)   
-    ('resource', Method.calculate), # (dataset name) (DwC: collectionCode & datasetName)   
-    ('resource_url', Method.calculate), # (https://bison.usgs.gov/ipt/resource?r= or other link) (DwC: collectionID)   
+    ('provider', FillMethod.gbif_meta), # ???(BISON) (DwC: institutionCode)
+    ('provider_url', FillMethod.gbif_meta), # ??? (https://bison.usgs.gov)(DwC: institutionID)   
+    ('resource', FillMethod.gbif_meta), # (dataset name) (DwC: collectionCode & datasetName)   
+    ('resource_url', FillMethod.gbif_meta), # (https://bison.usgs.gov/ipt/resource?r= or other link) (DwC: collectionID)   
     ('occurrence_url', NS.dwc + 'occurrenceID'), # (DwC: occurrenceID or IPT: occurrenceDetails)   
     ('catalog_number', NS.dwc + 'catalogNumber'),   
     ('collector', NS.dwc + 'recordedBy'),
     ('collector_number', NS.dwc + 'recordNumber'),  
-    ('valid_accepted_scientific_name', Method.calculate),   
-    ('acceptedNameUsage', Method.calculate),
-    ('valid_accepted_tsn', Method.calculate),   
+    ('valid_accepted_scientific_name', FillMethod.itis_tsn),   
+    ('valid_accepted_tsn', FillMethod.itis_tsn),   
     ('provided_scientific_name', NS.dwc + 'scientificName'), #  taxonRemarks?
-    ('provided_tsn', Method.calculate),
+    ('provided_tsn', FillMethod.itis_tsn),
     ('latitude', NS.dwc +  'decimalLatitude'),
     ('longitude', NS.dwc + 'decimalLongitude'),
     ('verbatim_elevation', NS.dwc + 'verbatimElevation'),   
     ('verbatim_depth', NS.dwc + 'verbatimDepth'),
-    ('calculated_county_name', Method.calculate),   
-    ('calculated_fips', Method.calculate),
-    ('calculated_state_name', Method.calculate),
+    ('calculated_county_name', FillMethod.georef),   
+    ('calculated_fips', FillMethod.georef),
+    ('calculated_state_name', FillMethod.georef),
     ('centroid', NS.dwc + 'georeferenceRemarks'),
     ('provided_county_name', NS.dwc + 'county'), 
     ('provided_fips', NS.dwc + 'higherGeographyID'),
     ('provided_state_name', NS.dwc + 'stateProvince'),
-    ('thumb_url', Method.calculate),
+    ('thumb_url', FillMethod.unknown),
     ('associated_media', NS.dwc + 'associatedMedia'),
     ('associated_references', NS.dwc + 'associatedReferences'),
     ('general_comments', NS.dwc + 'eventRemarks'),
     ('id', NS.dwc + 'occurrenceID'),
-    ('provider_id', Method.calculate), # publishingOrganizationKey from dataset metadata
+    ('provider_id', FillMethod.gbif_meta), # publishingOrganizationKey from dataset metadata
     ('resource_id', NS.gbif + 'datasetKey'),
     ('provided_common_name', NS.dwc + 'vernacularName'),
     ('kingdom', NS.dwc + 'kingdom'),
@@ -153,9 +189,9 @@ BISON_GBIF_MAP = [
     ('coordinate_precision', NS.dwc + 'coordinatePrecision'),   
     ('coordinate_uncertainty',  NS.dwc + 'coordinateUncertaintyInMeters'),
     ('verbatim_locality', NS.dwc + 'verbatimLocality'),
-    ('mrgid', Method.calculate),
-    ('calculated_waterbody', Method.calculate),   
-    ('establishment_means', Method.calculate),
-    ('iso_country_code', NS.dwc + 'country'),
-    ('license', Method.calculate)
+    ('mrgid', FillMethod.georef),
+    ('calculated_waterbody', FillMethod.georef),   
+    ('establishment_means', FillMethod.est_means),
+    ('iso_country_code', NS.dwc + 'countryCode'),
+    ('license', NS.dc + 'license') # or constant?
     ]
