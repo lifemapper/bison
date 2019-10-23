@@ -29,47 +29,47 @@ Process GBIF data, mostly as 2018, with changes
 
 * Step 1: Create 2 LUTs prior to occ record processing
 
-    * Resource LUT
+  * Resource LUT
     
-        * Create list of dataset UUIDs from Dataset EML files
-        * Create LUT and list of publishingOrganization UUIDs from 
-          GBIF API + dataset UUID
-    * Provider LUT: from GBIF API + provider UUID 
+    * Create list of dataset UUIDs from Dataset EML files
+    * Create LUT and list of publishingOrganization UUIDs from 
+      GBIF API + dataset UUID
+  * Provider LUT: from GBIF API + provider UUID 
     
 * Step 2: Process GBIF download to CSV file of GBIF data.  Temp result = step2_occ.csv
 
-    * Edit values for fields:
+  * Edit values for fields:
     
-        * Empty string --> null
-        * Correct/standardize data values
-        * If verbatimLocality is not null, BISON verbatim_locality = verbatimLocality
-          elif locality is not null, BISON verbatim_locality = locality
-          else BISON verbatim_locality = habitat
-          Question: Precedence b/w habitat/locality/verbatimLocality?
+    * Empty string --> null
+    * Correct/standardize data values
+    * If verbatimLocality is not null, BISON verbatim_locality = verbatimLocality
+      elif locality is not null, BISON verbatim_locality = locality
+      else BISON verbatim_locality = habitat
+      Question: Precedence b/w habitat/locality/verbatimLocality?
           
-    * Fill Resource name, code, url, and publishingOrganizationKey 
-      from datasetKey and Resource LUT 
-    * Fill Provider name, code, url, etc 
-      from publishingOrganizationKey and Provider LUT 
-    * Discard records that fail for X reason
+  * Fill Resource name, code, url, and publishingOrganizationKey 
+    from datasetKey and Resource LUT 
+  * Fill Provider name, code, url, etc 
+    from publishingOrganizationKey and Provider LUT 
+  * Discard records that fail for X reason
     
         * No scientificName or taxonKey
         * BISON provider or resource with url like bison.usgs.gov
         * QUESTION: discard with url like bison.ornl.gov?
         
-    * Use ‘$’ delimiter in CSV output
-    * Generate ScientificName/taxonKey list during data processing: 
+  * Use ‘$’ delimiter in CSV output
+  * Generate ScientificName/taxonKey list during data processing: 
     
 * Step 3: Create Name LUT after to occ record processing
 
-    * CanonicalName: from GBIF parser + scientificName or taxonKey + API. 
+  * CanonicalName: from GBIF parser + scientificName or taxonKey + API. 
     
 * Step 4: Process edited step2_occ CSV file
 
-    * fill clean_provided_scientific_name from name LUT. 
-    * Remove any temporary columns for final BISON 47 columns 
-            
-BISON 47 fields with contents from GBIF dump
+  * fill clean_provided_scientific_name from name LUT. 
+  * Remove any temporary columns for final BISON 47 columns 
+           
+BISON 48 fields with contents from GBIF dump
 ----------------------------------------------
 #. clean_provided_scientific_name
 
