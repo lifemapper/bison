@@ -143,10 +143,10 @@ Field list and order, required 47
 #. calculated_waterbody (DwC: waterBody) *added to BISON Data Schema FY16/17 (added and populated by Dev team during data ingest; no blank column necessary in BISON-munged datasets)
 #. establishment_means 
 
-     * (DwC: establishmentMeans WITH a 'Translation' e.g. AK = nonnative in Alaska; HI = nonnative in Hawaii; L48 =  US Lower 48 states )
-     * nonnative in the contiguus United States (CONUS); 
-     * Be sure to provide a translation for any unique combination of these values that appears in your dataset) 
-     * added to BISON Data Schema FY18 (added and populated by Dev team during data ingest; no blank column necessary in BISON-munged datasets)
+   * (DwC: establishmentMeans WITH a 'Translation' e.g. AK = nonnative in Alaska; HI = nonnative in Hawaii; L48 =  US Lower 48 states )
+   * nonnative in the contiguus United States (CONUS); 
+   * Be sure to provide a translation for any unique combination of these values that appears in your dataset) 
+   * added to BISON Data Schema FY18 (added and populated by Dev team during data ingest; no blank column necessary in BISON-munged datasets)
      
 #. iso_country_code (Controlled vocab) (DwC: country & countryCode, unless there is a separate country name field)
 #. license (http://creativecommons.org/publicdomain/zero/1.0/legalcode)  (DwC: license) *added to BISON Data Schema FY16/17 (added and populated by Dev team during data ingest; no blank column necessary in BISON-munged datasets)
