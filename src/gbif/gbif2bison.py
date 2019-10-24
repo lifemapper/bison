@@ -76,7 +76,7 @@ class GBIFReader(object):
         for (bisonfld, fld_or_mthd) in BISON_GBIF_MAP:
             self._save_flds.append(bisonfld)
             if bisonfld not in DISCARD_FIELDS:
-                self._bison_ordered_flds
+                self._bison_ordered_flds.append(bisonfld)
             
             if fld_or_mthd == FillMethod.pass1():
                 self._calc_pass1.append(bisonfld)
@@ -675,7 +675,7 @@ class GBIFReader(object):
             rec = self._update_dates(rec)
             # Modify lat/lon vals if necessary
             rec = self._update_point(rec)            
-            # Save scientificName / TaxonID and providerID for later lookup and replace
+            # Save scientificName / TaxonID for later lookup and replace
             self._save_for_lookups(rec)
             # create the ordered row
             for fld in self._bison_ordered_flds:
@@ -738,6 +738,35 @@ class GBIFReader(object):
 
         # Write all lookup values
         self._write_namevals_for_lookup()
+
+    # ...............................................
+    def gather_name_input(self, inbasename, logname=None):
+        infname = os.path.join(self.tmppath, inbasename)
+        self._rotate_logfile(logname=logname)
+        
+        recno = 0
+        try:
+            self._log.info('Open initial pre-processed BISON output file {}'.format(infname))
+            # Open output BISON file 
+            dreader, inf = getCSVDictReader(infname, self._bison_delimiter,
+                                           self._encoding)
+            self._files.append(inf) 
+            for rec in dreader:
+                recno += 1
+                # Save scientificName / TaxonID for later lookup and replace
+                self._save_for_lookups(rec)
+                # Show progress
+                if (recno % LOGINTERVAL) == 0:
+                    self._log.info('*** Record number {} ***'.format(recno))
+                                
+        except Exception as e:
+            self._log.error('Failed on line {}, exception {}'.format(recno, e))
+        finally:
+            self.close()
+
+        # Write all lookup values
+        self._write_namevals_for_lookup()
+
             
     # ...............................................
     def update_bison_names(self, infname, outfname, logname=None):
@@ -751,7 +780,6 @@ class GBIFReader(object):
             self.close()
         self._rotate_logfile(logname=logname)
 
-        loginterval = 1000000
         recno = 0
         try:
             dreader, dwriter = self._open_update_files(infname, outfname)
@@ -780,7 +808,7 @@ class GBIFReader(object):
                     rec['clean_provided_scientific_name'] = clean_name                    
                     dwriter.writerow(rec)
                     
-                if (recno % loginterval) == 0:
+                if (recno % LOGINTERVAL) == 0:
                     self._log.info('*** Record number {} ***'.format(recno))
                                     
         except Exception as e:
@@ -800,7 +828,6 @@ class GBIFReader(object):
             self.close()
         self._rotate_logfile(logname=logname)
 
-        loginterval = 1000000
         recno = 0
         try:
             dreader, dwriter = self._open_update_files(infname, outfname)
@@ -813,7 +840,7 @@ class GBIFReader(object):
                 
                 dwriter.writerow(rec)
                     
-                if (recno % loginterval) == 0:
+                if (recno % LOGINTERVAL) == 0:
                     self._log.info('*** Record number {} ***'.format(recno))
                                     
         except Exception as e:
@@ -833,7 +860,6 @@ class GBIFReader(object):
             self.close()
         self._rotate_logfile(logname=logname)
 
-        loginterval = 1000000
         recno = 0
         try:
             dreader, dwriter = self._open_update_files(infname, outfname)
@@ -845,7 +871,7 @@ class GBIFReader(object):
                 
                 dwriter.writerow(rec)
                     
-                if (recno % loginterval) == 0:
+                if (recno % LOGINTERVAL) == 0:
                     self._log.info('*** Record number {} ***'.format(recno))
                                     
         except Exception as e:
@@ -1077,6 +1103,8 @@ if __name__ == '__main__':
             gr.transform_gbif_to_bison(gbif_fname, META_FNAME, pass1_fname)
             
         elif step == 3:
+            # Reread output if missing gbif name/taxkey 
+            gr.gather_name_input(pass1_fname)
             gr.write_name_lookup(logname=outbase)
             
         elif step == 4:

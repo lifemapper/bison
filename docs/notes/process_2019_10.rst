@@ -23,8 +23,8 @@ US Territories and Canada
        * United States Minor Outlying Islands 
        * Virgin Islands, U.S. 
 
-Process: (note LUT = lookup table)
---------------------------------------
+Process: (LUT = lookup table)
+-----------------------------
 Process GBIF data, mostly as 2018, with changes
 
 * Step 1: Create 2 LUTs prior to occ record processing
@@ -40,12 +40,9 @@ Process GBIF data, mostly as 2018, with changes
 
   * Edit values for fields:
     
-    * Empty string --> null
+    * NA, n/a, null --> ''
     * Correct/standardize data values
-    * If verbatimLocality is not null, BISON verbatim_locality = verbatimLocality
-      elif locality is not null, BISON verbatim_locality = locality
-      else BISON verbatim_locality = habitat
-      Question: Precedence b/w habitat/locality/verbatimLocality?
+    * BISON verbatim_locality = either 1)verbatimLocality 2) locality or 3)habitat
           
   * Fill Resource name, code, url, and publishingOrganizationKey 
     from datasetKey and Resource LUT 
@@ -54,7 +51,7 @@ Process GBIF data, mostly as 2018, with changes
   * Discard records that fail for X reason
     
     * No scientificName or taxonKey
-    * BISON provider or resource with url like bison.usgs.gov
+    * BISON provider or resource with url containing 'bison.' 
     * QUESTION: discard with url like bison.ornl.gov?
         
   * Use ‘$’ delimiter in CSV output
@@ -223,4 +220,31 @@ BISON 48 fields with contents from GBIF dump
    * Q: gbif license OR constant 'http://creativecommons.org/publicdomain/zero/1.0/legalcode'?
    
    
+
+(layerid >= 1490121 and layerid <= 1490260) or (layerid  >= 3785572 and layerid < =  3785583)
+
+[root@yeti archive]# du -skh a*
+15G     aemelton
+3.3G    amelton
+19M     amritesh
+11M     anon
+17M     aramoscabr
+28M     asiel
+[root@yeti archive]# du -skh b*
+74M     beach53
+1.4G    botany_demo
+9.5K    bsenterre
+[root@yeti archive]# du -skh c*
+30M     camayal
+414M    cjgrady
+179M    cj_monday_tester
+1.4G    cj_tuesday_demo
+100M    cshl
+[root@yeti archive]# du -skh e*
+21M     ellienau
+[root@yeti archive]# du -skh D*
+16M     DANIELC
+[root@yeti archive]# du -skh d*
+17M     darunabas
+1.6G    demo_user
 
