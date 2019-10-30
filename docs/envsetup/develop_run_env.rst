@@ -11,8 +11,11 @@ Interpreter
         module load opt-python
         python3.6 --version
 
-Dependencies
-*************
+Dependencies (running on CentOS 7.6)
+**************************************
+
+Python dependencies
+====================
     * pip3.6 (needed for setuptools)
         python3.6 -m ensurepip --default-pip
         pip3 --version
@@ -44,6 +47,14 @@ Dependencies
     * Pypmpler 0.7 (for memory logging)
     
         pip3 install pympler
+        
+System dependencies
+====================
+    * gdal dependencies from epel repo: 
+      libaec (1.0.4-1), hdf5 (1.8.12-11), proj, libtiff (4.0.3-27), geos(3.4.2-2)
+    
+        yum install --enablerepo epel libaec.x86_64  libaec-devel.x86_64
+        yum install --enablerepo epel hdf5.x86_64 hdf5-devel.x86_64
 
 
 Install dependencies for Rocks 7.0 (as root)::   

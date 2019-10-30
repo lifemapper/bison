@@ -80,8 +80,17 @@ process info at: https://my.usgs.gov/confluence/display/DEV/SAS+Development
 * Step 1/2: Geo resolution
 
   * shapefiles from Shayne for point in polygons
-  * World_EEZ_v8_20140228_splitpolygons.zip, using attributes MRGID & EEZEEZ: https://my.usgs.gov/jira/browse/BISA-763 
+  * World_EEZ_v8_20140228_splitpolygons.zip, using attributes MRGID & EEZEEZ: 
+    https://my.usgs.gov/jira/browse/BISA-763 
+    Shayne says: "I think we will always need to check EEZ as there is some 
+    overlap with the other layers"
   * US Counties.zip for US and Canada: https://my.usgs.gov/jira/browse/BISA-1143 
+
+     * Check (point in poly) USCounties
+     * Get US County & State FIPs and County & State name
+     * Get CAN County & State FIPs and County & State name
+
+
 
            
 BISON 48 fields with contents from GBIF dump
