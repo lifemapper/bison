@@ -68,6 +68,24 @@ Process GBIF data, mostly as 2018, with changes
 
   * fill clean_provided_scientific_name from name LUT. 
   * Remove any temporary columns for final BISON 47 columns 
+  
+  
+New things 
+----------
+To be done on BISON 48, either from GBIF or data providers,
+process info at: https://my.usgs.gov/confluence/display/DEV/SAS+Development
+
+* Step 1/2: ITIS lookup 
+
+  * Using downloaded database?  https://www.itis.gov/downloads/index.html
+  * or API?
+  
+* Step 1/2: Geo resolution
+
+  * shapefiles from Shayne for point in polygons
+  * World_EEZ_v8_20140228_splitpolygons.zip, using attributes MRGID & EEZEEZ: https://my.usgs.gov/jira/browse/BISA-763 
+  * US Counties.zip for US and Canada: https://my.usgs.gov/jira/browse/BISA-1143 
+
            
 BISON 48 fields with contents from GBIF dump
 ----------------------------------------------
