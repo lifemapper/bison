@@ -96,70 +96,94 @@ Outputs:
 
 Process: (note LUT = lookup table)
 ==================================
-    * Process GBIF data, mostly as 2018, with changes
-        * Process GBIF download to CSV file of GBIF data.  Temp result = step1.csv
-        * Edit values for fields:
-            * Empty string --> null
-            * Correct/standardize data values
-            * If verbatimLocality is not null, BISON verbatim_locality = verbatimLocality
-              elif locality is not null, BISON verbatim_locality = locality
-              else BISON verbatim_locality = habitat
-              Question: Precedence b/w habitat/locality/verbatimLocality?
-        * Discard records that fail for X reason
-            * No scientificName or taxonKey
-            * Question:  BISON provider, identified by???
-        * Use ‘$’ delimiter in CSV output
-        * Generate 2 lists (no duplicates) during dataset processing: 
-            * Provider UUIDS 
-            * ScientificName/taxonKey
-        * Create 3 LUTs
-            * Provider: with GBIF API + provider UUID. Temp result: Provider LUT
-            * CanonicalName: from GBIF parser + scientificName or taxonKey + API. 
-              Temp result: sciName_or_taxonKey-canName LUT
-            * Resource: Temp result: Resource LUT
-                * Create list of dataset UUIDs from Dataset EML files
-                * Create LUT from GBIF API + dataset UUID
-        * Process edited step1.csv, replacing lookup values. 
-          Temp result = GBIFdata.step3.csv
-            * Fill Provider name, code, url, etc from Provider LUT 
-            * Fill Resource name, code, url, etc from Resource LUT 
-            * Overwrite ScientificName with CanonicalName in LUT
-            * Remove any temporary columns for final BISON 47 columns 
-    * Process BISON Provider data.  Temp result = updatedBISONprovider.csv 
-        * Note:
-            * New BISON provider data will be processed to same point as 1c above 
-              (GBIFdata.step3.csv)
-            * Old BISON provider data will have BISON 47 columns
-        * Step 4: Identify datasets in new BISON provider data by:
-            * ProviderID = 440 
-            * ResourceID = 1000xx
-            * ResourceURL like %bison.usgs.gov%
-        * Step 5: Delete datasets identified in step 4 from old BISON provider data 
-        * Step 6: Add new BISON provider data (BISON 47 columns) to edited old 
-          BISON provider data 
-    * Process All Data Load. Result: dataLoad.x.csv (multiple smaller files)
-        * ITIS lookup: 
-            * Find ITIS Name from ScientificName and ITIS API to get TSN, hierarchy, 
-              vernacular. Temp result: ITIS LUT 
-              (Scientific Name/TSN/hierarchy/vernacularName)
-            * Create TSN/vernacular lookup.  Result: Vernacular LUT
-        * Process all data, updating geo, marine, and names. Result: Geography LUT
-            * Update Geo: 
-                * Use existing geometries for 2019 data load
-                * Do attribute join to get upper level geo from lower level 
-                  (i.e. get state from county/fips)
-                * Fill in geo record values based on Liz decision tree, use 
-                  Python and GDAL
-                * Primary, secondary, tertiary changes depending on region
-                * Save/write LUT during processing.  
-                * Question: what values are retained from old BISON provider data?  
-                  Lat/long edited by Liz?
-            * Update Marine EEZ from Geo and EEZ file
-            * Update Names, fill in record values from ITIS lookup
-        * Process all data, updating EstablishmentMeans (EM): If TSN is in 
-          EstablishmentMeans table, update EM record value
-          elif scientificName is in EstablishmentMeans table (exact match), 
-          update EM record value
+* Process GBIF data, mostly as 2018, with changes
+
+  * Process GBIF download to CSV file of BISON fields of GBIF data and GBIF 
+    fields used in computing other values (i.e. habitat).  Temp result = step1.csv
+  * Edit values for fields:
+  
+    * Empty string --> null
+    * Correct/standardize data values
+    * If verbatimLocality is not null, BISON verbatim_locality = verbatimLocality
+      elif locality is not null, BISON verbatim_locality = locality
+      else BISON verbatim_locality = habitat
+      Question: Precedence b/w habitat/locality/verbatimLocality?
+      
+  * Discard records that fail for X reason
+  
+    * No scientificName and taxonKey
+    
+  * Use ‘$’ delimiter in CSV output
+  * Generate 2 lists (no duplicates) during dataset processing: 
+  
+    * Provider UUIDS 
+    * ScientificName/taxonKey
+    
+  * Create 3 LUTs
+  
+    * Provider: with GBIF API + provider UUID. Temp result: Provider LUT
+    * CanonicalName: from GBIF parser + scientificName or taxonKey + API. 
+      Temp result: sciName_or_taxonKey-canName LUT
+    * Resource: Temp result: Resource LUT
+    
+      * Create list of dataset UUIDs from Dataset EML files
+      * Create LUT from GBIF API + dataset UUID
+      
+  * Process edited step1.csv, replacing lookup values. 
+    Temp result = GBIFdata.step3.csv
+    
+    * Fill Provider name, code, url, etc from Provider LUT 
+    * Fill Resource name, code, url, etc from Resource LUT 
+    * Overwrite ScientificName with CanonicalName in LUT
+    * Remove any temporary columns for final BISON 47 columns
+     
+* Process BISON Provider data.  Temp result = updatedBISONprovider.csv 
+  * Note:
+  
+    * New BISON provider data will be processed to same point as 1c above 
+      (GBIFdata.step3.csv)
+    * Old BISON provider data will have BISON 47 columns
+
+  * Step 4: Identify datasets in new BISON provider data by:
+
+    * ProviderID = 440 
+    * ResourceID = 1000xx
+    * ResourceURL like %bison.usgs.gov%
+
+  * Step 5: Delete datasets identified in step 4 from old BISON provider data 
+  * Step 6: Add new BISON provider data (BISON 47 columns) to edited old 
+    BISON provider data 
+
+* Process All Data Load. Result: dataLoad.x.csv (multiple smaller files)
+
+  * ITIS lookup:
+
+    * Find ITIS Name from ScientificName and ITIS API to get TSN, hierarchy, 
+      vernacular. Temp result: ITIS LUT 
+      (Scientific Name/TSN/hierarchy/vernacularName)
+    * Create TSN/vernacular lookup.  Result: Vernacular LUT
+
+  * Process all data, updating geo, marine, and names. Result: Geography LUT
+
+    * Update Geo: 
+
+      * Use existing geometries for 2019 data load
+      * Do attribute join to get upper level geo from lower level 
+        (i.e. get state from county/fips)
+      * Fill in geo record values based on Liz decision tree, use 
+        Python and GDAL
+      * Primary, secondary, tertiary changes depending on region
+      * Save/write LUT during processing.  
+      * Question: what values are retained from old BISON provider data?  
+        Lat/long edited by Liz?
+        
+    * Update Marine EEZ from Geo and EEZ file
+    * Update Names, fill in record values from ITIS lookup
+
+  * Process all data, updating EstablishmentMeans (EM): If TSN is in 
+      EstablishmentMeans table, update EM record value
+      elif scientificName is in EstablishmentMeans table (exact match), 
+      update EM record value
 
 
 Actions
