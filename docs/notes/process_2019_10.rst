@@ -246,32 +246,5 @@ BISON 48 fields with contents from GBIF dump
 
    * Q: gbif license OR constant 'http://creativecommons.org/publicdomain/zero/1.0/legalcode'?
    
-   
 
-(layerid >= 1490121 and layerid <= 1490260) or (layerid  >= 3785572 and layerid < =  3785583)
-
-[root@yeti archive]# du -skh a*
-15G     aemelton
-3.3G    amelton
-19M     amritesh
-11M     anon
-17M     aramoscabr
-28M     asiel
-[root@yeti archive]# du -skh b*
-74M     beach53
-1.4G    botany_demo
-9.5K    bsenterre
-[root@yeti archive]# du -skh c*
-30M     camayal
-414M    cjgrady
-179M    cj_monday_tester
-1.4G    cj_tuesday_demo
-100M    cshl
-[root@yeti archive]# du -skh e*
-21M     ellienau
-[root@yeti archive]# du -skh D*
-16M     DANIELC
-[root@yeti archive]# du -skh d*
-17M     darunabas
-1.6G    demo_user
 
