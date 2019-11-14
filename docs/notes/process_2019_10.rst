@@ -73,11 +73,18 @@ To be done on BISON 48, either from GBIF or data providers,
 process info at: https://my.usgs.gov/confluence/display/DEV/SAS+Development
 
 * Step 1/2: ITIS lookup 
-
-  * Using downloaded database?  https://www.itis.gov/downloads/index.html
-  * or API?
   
-* Step 1/2: Geo resolution
+  * Lookup TSN from clean_provided_scientific_name to get:
+
+    * itis_common_name
+    * itis_tsn
+
+  * Process: 
+    * Use downloaded database?  From https://www.itis.gov/downloads/index.html
+      or provided by ITIS developers
+    * Use API?
+  
+* Step 1/2: Geo lookup
 
   * shapefiles from Shayne for point in polygons
   * World_EEZ_v8_20140228_splitpolygons.zip, using attributes MRGID & EEZEEZ: 
@@ -95,156 +102,209 @@ process info at: https://my.usgs.gov/confluence/display/DEV/SAS+Development
            
 BISON 48 fields with contents from GBIF dump
 ----------------------------------------------
+Note data comes from GBIF darwin core download, occurrence.txt file.  Fields
+reference gbif column names in included meta.xml file.  
+gbif = gbif column, gbif field definition
+gbif/dwc = gbif column, darwin core field definition
+gbif/dc = gbif column, dublin core field definition
+
 #. clean_provided_scientific_name
 
-   * Calc: 1) gbif name parser and scientificName OR 2) gbif species api and taxonKey
+   * Calc: 1) gbif name parser and scientificName OR 
+           2) gbif species api and taxonKey
+           
 #. itis_common_name
 
    * Calc: from ITIS lookup (of itis_tsn calc)
+   
 #. itis_tsn 
 
    * Calc: with ITIS lookup + clean_provided_scientific_name
+
 #. basis_of_record
 
-   * gbif basisOfRecord + controlled vocabulary 
+   * gbif/dwc basisOfRecord + controlled vocabulary 
+
 #. occurrence_date
 
-   * gbif eventDate - formatted to YYYY-MM-DD if full date, or YYYY
+   * gbif/dwc eventDate - formatted to YYYY-MM-DD if full date, or YYYY
+
 #. year 
 
-   * gbif year or pulled from occurrence_date calc
+   * gbif/dwc year or pulled from occurrence_date calc
+
 #. verbatim_event_date
 
-   * gbif verbatimEventDate
+   * gbif/dwc verbatimEventDate
+
 #. provider
 
-   * Q: 'BISON' constant or gbif institutionCode?
+   * Q? gbif/dwc institutionCode or title from gbif organization metadata?
+
 #. provider_url
 
-   * Q: 'https://bison.usgs.gov' constant or gbif institutionID from organization metadata
+   * Q? gbif/dwc institutionID or homepage from gbif organization metadata
+
 #. resource
 
-   * Calc: gbif dataset api + datasetKey, retrieve title (dataset name)
+   * Calc: dataset api + datasetKey, retrieve title (dataset name)
+
 #. resource_url (https://bison.usgs.gov/ipt/resource?r= or other link) (DwC: collectionID)
 
    * Calc: gbif dataset api + datasetKey, retrieve homepage (dataset url)
+   
 #. occurrence_url
 
-   * gbif occurrenceID
+   * gbif/dwc occurrenceID
+   
 #. catalog_number
 
-   * gbif catalogNumber
+   * gbif/dwc catalogNumber
+   
 #. collector
 
-   * gbif recordedBy
+   * gbif/dwc recordedBy
+   
 #. collector_number
 
-   * gbif recordNumber
+   * gbif/dwc recordNumber
+   
 #. valid_accepted_scientific_name
 
    * Calc
-   * Q: from ITIS lookup?
+   * Q? from ITIS lookup?
+
 #. valid_accepted_tsn
 
    * Calc:
-   * Q: from ITIS lookup? 
+   * Q? from ITIS lookup? 
+
 #. provided_scientific_name
 
-   * Q: scientificName OR taxonRemarks?
+   * Q? original gbif/dwc scientificName (AMS: later, check verbatim file)
+
 #. provided_tsn
 
-   * Calc:
-   * Q: from ITIS lookup? or use GBIF taxonKey?
+   * Double check Q?: use gbif/dwc taxonID
+
 #. latitude
 
-   * first pass: gbif decimalLatitude if exist and valid
-   * second pass if missing: Calc: Georeference from 
+   * first pass: gbif/dwc decimalLatitude if exist and valid
+   * second pass if missing: Calc: Geo lookup from ?
+
 #. longitude (DwC: decimalLongitude)
 
-   * first pass: gbif decimalLongitude if exist and valid
-   * second pass if missing: Calc: Georeference
+   * first pass: gbif/dwc decimalLongitude if exist and valid
+   * second pass if missing: Calc: Geo lookup ?
+   
 #. verbatim_elevation
 
-   * gbif verbatimElevation
+   * gbif/dwc verbatimElevation
+   
 #. verbatim_depth
 
-   * gbif verbatimDepth
+   * gbif/dwc verbatimDepth
+   
 #. calculated_county_name
 
-   * Calc: Georeference - coordinates + county polygons
+   * Calc: Geo lookup - coordinates + county polygons
+   
 #. calculated_fips
 
-   * Calc: Georeference - coordinates + fips polygons
+   * Calc: Geo lookup - coordinates + fips polygons
+   
 #. calculated_state_name
 
-   * Calc: Georeference - coordinates + state polygons
+   * Calc: Geo lookup - coordinates + state polygons
+   
 #. centroid
 
    * Calc: georeferenceRemarks + Controlled vocab e.g. county = county centroid; zip code = zip code centroid; etc.)
-   * Q: populate [only or also] if coordinates from Georeferencing to polygon?
+   * Q? populate [only or also] if coordinates from Georeferencing to polygon?
+   
 #. provided_county_name
 
-   * gbif county
+   * gbif/dwc county
+   
 #. provided_fips
 
-   * gbif higherGeographyID
+   * gbif/dwc higherGeographyID
+   
 #. provided_state_name
 
-   * gbif stateProvince
+   * gbif/dwc stateProvince
+   
 #. thumb_url
 
-   * Q: ???
+   * ignore
+   
 #. associated_media
 
-   * gbif associatedMedia
+   * not present in gbif/dwc file
+   
 #. associated_references
 
-   * gbif associatedReferences
+   * gbif/dwc associatedReferences
+   
 #. general_comments
 
-   * gbif eventRemarks
+   * gbif/dwc eventRemarks
+   
 #. id
 
-   * Calc: 1) gbif occurrenceID or 2) gbif recordNumber 
+   * Calc: 1) gbif/dwc occurrenceID or 2) gbif/dwc recordNumber 
+
 #. provider_id
 
    * Calc: gbif publishingOrganizationKey from retrieved gbif dataset metadata 
+   
 #. resource_id
 
    * gbif datasetKey
+   
 #. provided_common_name
 
-   * gbif vernacularName
+   * gbif/dwc vernacularName
+   
 #. kingdom
 
-   * Q: gbif kingdom gbif kingdomKey+API or from ITIS calc?
+   * Q? If gbif/dwc kingdom is blank, resolve with gbif kingdomKey+API or from ITIS calc?
+   
 #. geodetic_datum
 
-   * gbif geodeticDatum
+   * not present in GBIF file (AMS: later, parse from another field or get from verbatim)
+
 #. coordinate_precision
 
-   * gbif coordinatePrecision
+   * gbif/dwc coordinatePrecision
+   
 #. coordinate_uncertainty
 
-   * gbif coordinateUncertaintyInMeters
+   * gbif/dwc coordinateUncertaintyInMeters
+   
 #. verbatim_locality
 
-   * gbif verbatimLocality
+   * Calc: get first with data from gbif/dwc 1) verbatimLocality 2) locality 3) habitat
+   
 #. mrgid
 
-   * Calc: after Georeference, polygon + coordinates
+   * Calc: after Geo lookup, polygon + coordinates
+   
 #. calculated_waterbody 
 
-   * Calc: after Georeference geo, polygon + coordinates
+   * Calc: after Geo lookup geo, polygon + coordinates
+   
 #. establishment_means
 
    * Calc: after ITIS lookup, from establishmentMeans table + TSN
+   
 #. iso_country_code
 
    * gbif country
+   
 #. license
 
-   * Q: gbif license OR constant 'http://creativecommons.org/publicdomain/zero/1.0/legalcode'?
+   * gbif/dc license 
    
 
 
