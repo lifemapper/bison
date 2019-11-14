@@ -113,7 +113,7 @@ Note data comes from GBIF darwin core download, including:
   * gbif/dwc = gbif column, darwin core field definition
   * gbif/dc = gbif column, dublin core field definition
 
-* Not currently used: verbatim.txt file.  This data had errors previously, 
+* Not currently used: verbatim.txt file.  These data had errors previously, 
   they seem to be fixed now.  Next time, will pull some fields from these 
   records.
 
