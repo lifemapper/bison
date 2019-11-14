@@ -80,6 +80,7 @@ process info at: https://my.usgs.gov/confluence/display/DEV/SAS+Development
     * itis_tsn
 
   * Process: 
+  
     * Use downloaded database?  From https://www.itis.gov/downloads/index.html
       or provided by ITIS developers
     * Use API?
@@ -93,9 +94,9 @@ process info at: https://my.usgs.gov/confluence/display/DEV/SAS+Development
     overlap with the other layers"
   * US Counties.zip for US and Canada: https://my.usgs.gov/jira/browse/BISA-1143 
 
-     * Check (point in poly) USCounties
-     * Get US County & State FIPs and County & State name
-     * Get CAN County & State FIPs and County & State name
+    * Check (point in poly) USCounties
+    * Get US County & State FIPs and County & State name
+    * Get CAN County & State FIPs and County & State name
 
 GBIF data for BISON ingest
 --------------------------
@@ -108,9 +109,9 @@ Note data comes from GBIF darwin core download, including:
 * occurrence.txt file with records to ingest
 * Fields reference gbif column names in included meta.xml file.  
 
-    * gbif = gbif column, gbif field definition
-    * gbif/dwc = gbif column, darwin core field definition
-    * gbif/dc = gbif column, dublin core field definition
+  * gbif = gbif column, gbif field definition
+  * gbif/dwc = gbif column, darwin core field definition
+  * gbif/dc = gbif column, dublin core field definition
 
 * Not currently used: verbatim.txt file.  This data had errors previously, 
   they seem to be fixed now.  Next time, will pull some fields from these 
