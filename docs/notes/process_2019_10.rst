@@ -190,12 +190,14 @@ gbif/dc = gbif column, dublin core field definition
 #. latitude
 
    * first pass: gbif/dwc decimalLatitude if exist and valid
-   * second pass if missing: Calc: Geo lookup from ?
+   * second pass if missing: Calc: Geo lookup from centroids of smallest 
+     enclosing polygon in provided shapefiles
 
 #. longitude (DwC: decimalLongitude)
 
    * first pass: gbif/dwc decimalLongitude if exist and valid
-   * second pass if missing: Calc: Geo lookup ?
+   * second pass if missing: Calc: Geo lookup from centroids of smallest 
+     enclosing polygon in provided shapefiles
    
 #. verbatim_elevation
 
@@ -219,8 +221,9 @@ gbif/dc = gbif column, dublin core field definition
    
 #. centroid
 
-   * Calc: georeferenceRemarks + Controlled vocab e.g. county = county centroid; zip code = zip code centroid; etc.)
-   * Q? populate [only or also] if coordinates from Georeferencing to polygon?
+   * Calc: georeferenceRemarks + Controlled vocab (e.g. county = county centroid; 
+     zip code = zip code centroid; etc.)
+   * Q? populate only if coordinates calculated from Geo lookup to polygon?
    
 #. provided_county_name
 
