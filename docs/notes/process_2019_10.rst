@@ -101,20 +101,20 @@ GBIF data for BISON ingest
 --------------------------
 Note data comes from GBIF darwin core download, including:
 
-   * dataset eml files with datasetKeys (bison resource) for included data.
-     dataset files include providingOrganizationKeys (bison provider) for the 
-     dataset.  Use GBIF APIs with datasetKey and providingOrganizationKey
-     to populate bison resource and provider fields.
-   * occurrence.txt file with records to ingest
-   * Fields reference gbif column names in included meta.xml file.  
+* dataset eml files with datasetKeys (bison resource) for included data.
+  dataset files include providingOrganizationKeys (bison provider) for the 
+  dataset.  Use GBIF APIs with datasetKey and providingOrganizationKey
+  to populate bison resource and provider fields.
+* occurrence.txt file with records to ingest
+* Fields reference gbif column names in included meta.xml file.  
 
-       * gbif = gbif column, gbif field definition
-       * gbif/dwc = gbif column, darwin core field definition
-       * gbif/dc = gbif column, dublin core field definition
+    * gbif = gbif column, gbif field definition
+    * gbif/dwc = gbif column, darwin core field definition
+    * gbif/dc = gbif column, dublin core field definition
 
-   * Not currently used: verbatim.txt file.  This data had errors previously, 
-     they seem to be fixed now.  Next time, will pull some fields from these 
-     records.
+* Not currently used: verbatim.txt file.  This data had errors previously, 
+  they seem to be fixed now.  Next time, will pull some fields from these 
+  records.
 
            
 BISON 48 fields with contents from GBIF dump
