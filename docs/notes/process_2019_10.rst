@@ -109,7 +109,7 @@ Note data comes from GBIF darwin core download, including:
 * occurrence.txt file with records to ingest
 * Fields reference gbif column names in included meta.xml file.  
 
-  * gbif = gbif column, gbif field definition
+  * gbif/gbif = gbif column, gbif field definition
   * gbif/dwc = gbif column, darwin core field definition
   * gbif/dc = gbif column, dublin core field definition
 
@@ -255,7 +255,7 @@ BISON 48 fields with contents from GBIF dump
    
 #. associated_media
 
-   * not present in gbif/dwc file
+   * not present in gbif occurrence.txt (next, get from verbatim.txt)
    
 #. associated_references
 
@@ -275,7 +275,7 @@ BISON 48 fields with contents from GBIF dump
    
 #. resource_id
 
-   * gbif datasetKey
+   * gbif/gbif datasetKey
    
 #. provided_common_name
 
@@ -287,7 +287,8 @@ BISON 48 fields with contents from GBIF dump
    
 #. geodetic_datum
 
-   * not present in GBIF file (AMS: later, parse from another field or get from verbatim)
+   * not present in GBIF occurrence.txt (AMS: next, parse from another field 
+     which includes 'GEODETIC_DATUM_ASSUMED' or get from verbatim.txt)
 
 #. coordinate_precision
 
@@ -311,11 +312,13 @@ BISON 48 fields with contents from GBIF dump
    
 #. establishment_means
 
-   * Calc: after ITIS lookup, from establishmentMeans table + TSN
+   * Calc: after ITIS lookup, from establishmentMeans table + itis_tsn
+     (now or later? if not itis_tsn, calc from establishmentMeans table + 
+     clean_provided_scientific_name)
    
 #. iso_country_code
 
-   * gbif country
+   * gbif/dwc countryCode
    
 #. license
 
