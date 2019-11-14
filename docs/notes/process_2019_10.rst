@@ -118,8 +118,8 @@ Note data comes from GBIF darwin core download, including:
   records.
 
            
-BISON 48 fields with contents from GBIF dump
-----------------------------------------------
+BISON 48 fields with raw or calculated values for GBIF-provided data
+--------------------------------------------------------------------
 #. clean_provided_scientific_name
 
    * Calc: 1) gbif name parser and scientificName OR 
