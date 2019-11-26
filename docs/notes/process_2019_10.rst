@@ -113,13 +113,13 @@ Note data comes from GBIF darwin core download, including:
   * gbif/dwc = gbif column, darwin core field definition
   * gbif/dc = gbif column, dublin core field definition
 
-* Not currently used: verbatim.txt file.  This data had errors previously, 
+* Not currently used: verbatim.txt file.  These data had errors previously, 
   they seem to be fixed now.  Next time, will pull some fields from these 
   records.
 
            
-BISON 48 fields with contents from GBIF dump
-----------------------------------------------
+BISON 48 fields with raw or calculated values for GBIF-provided data
+--------------------------------------------------------------------
 #. clean_provided_scientific_name
 
    * Calc: 1) gbif name parser and scientificName OR 
