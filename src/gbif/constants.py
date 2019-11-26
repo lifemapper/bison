@@ -132,7 +132,8 @@ FillLater = (FillMethod.itis_tsn, FillMethod.georef, FillMethod.est_means,
              FillMethod.unknown)
     
 OCC_UUID_FLD = 'gbifID'
-DISCARD_FIELDS = ['taxonKey', 'occurrenceStatus', 'locality', 'habitat']
+DISCARD_FIELDS = ['occurrenceStatus', 'locality', 'habitat']
+DISCARD_AFTER_UPDATE = ['taxonKey']
 # 47 BISON fields - (+ gbifID and taxonKey)
 #     only those with matching GBIF data from 
 #         BISON DATA FIELDS (GDrive July 3.2018).xlsx
@@ -153,8 +154,10 @@ BISON_GBIF_MAP = [
     ('occurrence_date', NS.dwc + 'eventDate'),
     ('year', NS.dwc + 'year'),
     ('verbatim_event_date', NS.dwc + 'verbatimEventDate'),   
-    ('provider', FillMethod.gbif_meta), # ???(BISON) (DwC: institutionCode)
-    ('provider_url', FillMethod.gbif_meta), # ??? (https://bison.usgs.gov)(DwC: institutionID)   
+#     ('provider', FillMethod.gbif_meta),
+    ('provider', NS.dwc + 'institutionCode'),
+#     ('provider_url', FillMethod.gbif_meta),   
+    ('provider_url', NS.dwc + 'institutionID'),    
     ('resource', FillMethod.gbif_meta), # (dataset name) (DwC: collectionCode & datasetName)   
     ('resource_url', FillMethod.gbif_meta), # (https://bison.usgs.gov/ipt/resource?r= or other link) (DwC: collectionID)   
     ('occurrence_url', NS.dwc + 'occurrenceID'), # (DwC: occurrenceID or IPT: occurrenceDetails)   
@@ -164,7 +167,8 @@ BISON_GBIF_MAP = [
     ('valid_accepted_scientific_name', FillMethod.itis_tsn),   
     ('valid_accepted_tsn', FillMethod.itis_tsn),   
     ('provided_scientific_name', NS.dwc + 'scientificName'), #  taxonRemarks?
-    ('provided_tsn', FillMethod.itis_tsn),
+#     ('provided_tsn', FillMethod.itis_tsn),
+    ('provided_tsn', NS.dwc + 'taxonID'),
     ('latitude', NS.dwc +  'decimalLatitude'),
     ('longitude', NS.dwc + 'decimalLongitude'),
     ('verbatim_elevation', NS.dwc + 'verbatimElevation'),   
@@ -172,12 +176,12 @@ BISON_GBIF_MAP = [
     ('calculated_county_name', FillMethod.georef),   
     ('calculated_fips', FillMethod.georef),
     ('calculated_state_name', FillMethod.georef),
-    ('centroid', NS.dwc + 'georeferenceRemarks'),
+    ('centroid', FillMethod.georef),
     ('provided_county_name', NS.dwc + 'county'), 
     ('provided_fips', NS.dwc + 'higherGeographyID'),
     ('provided_state_name', NS.dwc + 'stateProvince'),
     ('thumb_url', FillMethod.unknown),
-    ('associated_media', NS.dwc + 'associatedMedia'),
+    ('associated_media', FillMethod.unknown), # dwc associatedMedia from verbatim file
     ('associated_references', NS.dwc + 'associatedReferences'),
     ('general_comments', NS.dwc + 'eventRemarks'),
     ('id', NS.dwc + 'occurrenceID'),
@@ -185,7 +189,7 @@ BISON_GBIF_MAP = [
     ('resource_id', NS.gbif + 'datasetKey'),
     ('provided_common_name', NS.dwc + 'vernacularName'),
     ('kingdom', NS.dwc + 'kingdom'),
-    ('geodetic_datum', NS.dwc + 'geodeticDatum'),
+    ('geodetic_datum', FillMethod.unknown), # dwc geodeticDatum from verbatim file
     ('coordinate_precision', NS.dwc + 'coordinatePrecision'),   
     ('coordinate_uncertainty',  NS.dwc + 'coordinateUncertaintyInMeters'),
     ('verbatim_locality', NS.dwc + 'verbatimLocality'),

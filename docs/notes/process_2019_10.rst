@@ -151,11 +151,11 @@ BISON 48 fields with contents from GBIF dump
 
 #. provider
 
-   * Q? gbif/dwc institutionCode or title from gbif organization metadata?
+   * gbif/dwc institutionCode (2018: title from gbif organization metadata?)
 
 #. provider_url
 
-   * Q? gbif/dwc institutionID or homepage from gbif organization metadata
+   * gbif/dwc institutionID (2018: homepage from gbif organization metadata?)
 
 #. resource
 
@@ -183,21 +183,19 @@ BISON 48 fields with contents from GBIF dump
    
 #. valid_accepted_scientific_name
 
-   * Calc
-   * Q? from ITIS lookup?
+   * Calc from ITIS lookup
 
 #. valid_accepted_tsn
 
-   * Calc:
-   * Q? from ITIS lookup? 
+   * Calc from ITIS lookup
 
 #. provided_scientific_name
 
-   * Q? original gbif/dwc scientificName (AMS: later, check verbatim file)
+   * original gbif/dwc scientificName (AMS: later, check verbatim file)
 
 #. provided_tsn
 
-   * Double check Q?: use gbif/dwc taxonID
+   * gbif/dwc taxonID
 
 #. latitude
 
@@ -233,9 +231,8 @@ BISON 48 fields with contents from GBIF dump
    
 #. centroid
 
-   * Calc: georeferenceRemarks + Controlled vocab (e.g. county = county centroid; 
-     zip code = zip code centroid; etc.)
-   * Q? populate only if coordinates calculated from Geo lookup to polygon?
+   * Calc: populate if coordinates calculated from Geo lookup to polygon
+   * Do not overwrite existing values in BISON-provided datasets
    
 #. provided_county_name
 
@@ -267,7 +264,7 @@ BISON 48 fields with contents from GBIF dump
    
 #. id
 
-   * Calc: 1) gbif/dwc occurrenceID or 2) gbif/dwc recordNumber 
+   * Calc: gbif/dwc 1) occurrenceID or 2) recordNumber 
 
 #. provider_id
 
@@ -283,7 +280,7 @@ BISON 48 fields with contents from GBIF dump
    
 #. kingdom
 
-   * Q? If gbif/dwc kingdom is blank, resolve with gbif kingdomKey+API or from ITIS calc?
+   * gbif/dwc kingdom is blank, resolve with ITIS calc
    
 #. geodetic_datum
 
@@ -300,7 +297,7 @@ BISON 48 fields with contents from GBIF dump
    
 #. verbatim_locality
 
-   * Calc: get first with data from gbif/dwc 1) verbatimLocality 2) locality 3) habitat
+   * Calc: gbif/dwc 1) verbatimLocality 2) locality 3) habitat
    
 #. mrgid
 

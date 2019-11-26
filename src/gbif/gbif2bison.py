@@ -21,16 +21,15 @@
              Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 
              02110-1301, USA.
 """
-import glob
+from osgeo import ogr
 import os
 import time
-import xml.etree.ElementTree as ET
 
 from gbif.constants import (IN_DELIMITER, OUT_DELIMITER, PROHIBITED_VALS, 
-                            INTERPRETED, TERM_CONVERT, ENCODING, META_FNAME,
+                            TERM_CONVERT, ENCODING, META_FNAME,
                             BISON_GBIF_MAP, OCC_UUID_FLD, DISCARD_FIELDS,
-                            CLIP_CHAR, FillLater, NAMESPACE, FillMethod,
-                            GBIF_UUID_KEY, GBIF_ORG_FOREIGN_KEY)
+                            CLIP_CHAR, FillMethod,GBIF_UUID_KEY)
+from gbif.metareader import GBIFMetaReader
 from gbif.tools import (getCSVReader, getCSVDictReader, 
                         getCSVWriter, getCSVDictWriter, getLine, getLogger)
 from gbif.gbifapi import GbifAPI
@@ -61,15 +60,17 @@ class GBIFReader(object):
                      https://www.gbif.org/occurrence/search
         @param outfname: Full filename for the output BISON CSV file
         """
-        self._meta_fname = None
+        # Remove any trailing /
+        self.basepath = basepath.rstrip(os.sep)
+        self.outpath = os.path.join(basepath, outdir)
+        self.tmppath = os.path.join(basepath, tmpdir)
+        self._dataset_pth = os.path.join(self.basepath, 'dataset')
         # Save these fields during processing to fill or compute from GBIF data
         self._save_flds = []
         # Ordered output fields
         self._bison_ordered_flds = []
         # Map of gbif fields to save onto bison fieldnames
         self._gbif_bison_map = {}
-        # Map of gbif fields to save onto column indexes
-        self._gbif_column_map = None
         # Fields to compute
         self._calc_pass1 = []
         
@@ -91,10 +92,6 @@ class GBIFReader(object):
         
         self._log = None
         self._files = []
-        self.inpath = basepath
-        self.outpath = os.path.join(basepath, outdir)
-        self.tmppath = os.path.join(basepath, tmpdir)
-        self._dataset_pth = os.path.join(self.inpath, 'dataset')
         
         # ....................
         self.interp_fname = None
@@ -103,18 +100,31 @@ class GBIFReader(object):
         self.nametaxa_fname = None
         self._nametaxa = {}
         
-        # Lookup tmp data
-        self.nametaxa_fname = os.path.join(self.tmppath, 'sciname_taxkey_list.csv')
-
         # Lookup table output files
-        self.dset_lut_fname = os.path.join(self.tmppath, 'dataset_lookup.csv')
+        self.ds_lut_fname = os.path.join(self.tmppath, 'ds_lookup.csv')
         self._ds_lut = {}
         self.org_lut_fname = os.path.join(self.tmppath, 'org_lookup.csv')
         self._org_lut = {}
-        self.name_lut_fname = os.path.join(self.tmppath, 'name_lookup.csv')
+        # Lookup tmp data
+        self.nametaxa_fname = os.path.join(self.tmppath, 'step3_sciname_taxkey_list.csv')
+        self.name_lut_fname = os.path.join(self.tmppath, 'step3_name_lookup.csv')
         self._name_lut = {}
         
     # ...............................................
+    def _discard_fields_from_output(self, fldlist):
+        newflds = self._bison_ordered_flds.copy()
+        for fld in fldlist:                
+            total = newflds.count(fld)
+            if total == 1:
+                newflds.remove(fld)
+            elif total == 0:
+                self._log.error('Field {} does not exist in expected output fields'
+                                .format(fld))
+            elif total > 0:
+                self._log.error('{} instances of field {} in expected output fields'
+                                .format(total, fld))
+        return newflds
+            
     # ...............................................
     def _rotate_logfile(self, logname=None):
         if self._log is None:
@@ -169,15 +179,15 @@ class GBIFReader(object):
             except:
                 self._log.warning('{} missing from organization LUT'.format(orgkey))
             else:
-                title = metavals['title']
+#                 title = metavals['title']
                 url = metavals['homepage']
                 if url.find('bison.org') >= 0:
                     self._log.info('Discard rec {}: org URL {}'
                                    .format(rec[OCC_UUID_FLD], url))
                     rec = None
-                else:    
-                    rec['provider'] = title
-                    rec['provider_url'] = url
+#                 else:    
+#                     rec['provider'] = title
+#                     rec['provider_url'] = url
         return rec
 
     # ...............................................
@@ -217,23 +227,32 @@ class GBIFReader(object):
         return rec
 
     # ...............................................
-    def _update_locality(self, rec):
+    def _update_second_choices(self, rec):
         """
-        @summary: Update the verbatim_locality, taking in order of preference,
-                  verbatimLocality, locality, habitat 
+        @summary: Update the verbatim_locality, with first non-blank of 
+                    verbatimLocality, locality, habitat
+                  Update id, with first non-blank of 
+                    occurrenceId/id, recordNumber/collector_number
         @param rec: dictionary of all fieldnames and values for this record
         @note: function modifies original dict
         """
-        gid = rec[OCC_UUID_FLD]
+#         gid = rec[OCC_UUID_FLD]
         # 1st choice 
-        locality = rec['verbatim_locality'] 
-        if locality is None:
+        if rec['verbatim_locality'] is None:
             # 2nd choice 
             locality = rec['locality'] 
             if locality is not None:
                 # 3rd choice 
                 locality = rec['habitat']
-        rec['verbatim_locality'] = locality                
+            rec['verbatim_locality'] = locality
+        
+        # Fill fields with secondary option if 1st is blank
+        # id = 1) gbif occurrenceID or 2) gbif recordNumber (aka bison collector_number)
+        # 1st choice 
+        if rec['id'] is None:
+            # 2nd choice 
+            rec['id'] = rec['collector_number']
+       
         return rec
 
     # ...............................................
@@ -328,19 +347,6 @@ class GBIFReader(object):
         if bor in TERM_CONVERT:
             rec['basis_of_record'] = TERM_CONVERT[bor]                
         return rec
-
-    # ...............................................
-    def _open_for_write(self, fname):
-        '''
-        @summary: Open for writing or appending. 
-        '''
-        fmode = 'w'        
-        if os.path.exists(fname):
-            fmode = 'a'
-        outf = open(fname, mode=fmode, encoding=self._encoding)
-        self._log.info('Opened file {}'.format(fname))
-
-        return outf
     
     # ...............................................
     def _read_name_taxa(self, fname):
@@ -405,7 +411,7 @@ class GBIFReader(object):
                   dictionary of record values
         '''
         self._rotate_logfile(logname=logname)        
-        lut_fname = self.dset_lut_fname
+        lut_fname = self.ds_lut_fname
         lut_key = GBIF_UUID_KEY
         lookup = self._read_lookup(lut_fname, lut_key)
         self._ds_lut = lookup
@@ -466,10 +472,6 @@ class GBIFReader(object):
         @summary: Read GBIF metadata, open GBIF interpreted data for reading, 
                   output file for writing
         '''
-        # Extract relevant GBIF metadata
-        self._log.info('Read metadata ...')
-        self._gbif_column_map = self.get_field_meta()
-
         # Open raw GBIF data
         self._log.info('Open raw GBIF input file {}'.format(self.interp_fname))
         rdr, inf = getCSVReader(self.interp_fname, self._gbif_delimiter, 
@@ -491,7 +493,7 @@ class GBIFReader(object):
         return rdr, wtr
             
     # ...............................................
-    def _open_update_files(self, inbasename, outbasename):
+    def _open_update_files(self, inbasename, outbasename, discard_fields=[]):
         '''
         @summary: Open BISON-created CSV data for reading, 
                   new output file for writing
@@ -506,11 +508,12 @@ class GBIFReader(object):
         drdr, inf = getCSVDictReader(infname, self._bison_delimiter,
                                      self._encoding)
         self._files.append(inf) 
-
+        
+        output_fields = self._discard_fields_from_output(discard_fields)
         # Open new BISON CSV file for output
         self._log.info('Open output file {}'.format(outfname))
         dwtr, outf = getCSVDictWriter(outfname, self._bison_delimiter, 
-                                      self._encoding, self._bison_ordered_flds)
+                                      self._encoding, output_fields)
         dwtr.writeheader()
         self._files.append(outf)
         return drdr, dwtr
@@ -537,52 +540,6 @@ class GBIFReader(object):
                 pass
 
     # ...............................................
-    def get_field_meta(self):
-        '''
-        @todo: Remove interpreted / verbatim file designations, interpreted cannot 
-                 be joined to verbatim file for additional info.
-        @summary: Read metadata for interpreted data file, and
-                     for fields we are interested in:
-                     extract column index for each file, add datatype. 
-                     Resulting metadata will look like:
-                            fields = {term: (columnIndex, dtype), 
-                                         ...
-                                         }
-        '''
-        tdwg = '{http://rs.tdwg.org/dwc/text/}'
-        fields = {}
-        tree = ET.parse(self._meta_fname)
-        root = tree.getroot()
-        # Child will reference INTERPRETED or VERBATIM file
-        for child in root:
-            # does this node of metadata reference INTERPRETED or VERBATIM?
-            fileElt = child.find('tdwg:files', NAMESPACE)
-            fnameElt= fileElt .find('tdwg:location', NAMESPACE)
-            meta4data = fnameElt.text
-
-            if meta4data.startswith(INTERPRETED):
-                flds = child.findall(tdwg+'field')
-                for fld in flds:
-                    # Get column num and short name
-                    idx = int(fld.get('index'))
-                    temp = fld.get('term')
-                    term = temp[temp.rfind(CLIP_CHAR)+1:]
-                    # Save only fields of interest
-                    if term in self._gbif_bison_map.keys():
-                        if not term in fields:
-                            fields[term] = idx
-                        else:
-                            self._log.info('Duplicate field {}, idxs {} and {}'
-                                           .format(term, fields[term], idx))
-#                     # Save all fields
-#                     if not term in fields:
-#                         fields[term] = idx
-#                     else:
-#                         self._log.info('Duplicate field {}, idxs {} and {}'
-#                                        .format(term, fields[term], idx))
-        return fields
-
-    # ...............................................
     def _test_for_discard(self, rec):
         """
         @summary: Remove record without name fields or with absence status
@@ -593,20 +550,46 @@ class GBIFReader(object):
             # Required fields exist 
             if (rec['provided_scientific_name'] is None 
                     and rec['taxonKey'] is None):
-                discard = True
+                rec = None
                 self._log.info('Discard rec {}: missing both sciname and taxkey'
                                .format(gid))
         if rec is not None:
             # remove records with occurrenceStatus = absence
             ostat = rec['occurrenceStatus']
             if ostat is not None and ostat.lower() == 'absent':
-                discard = True
+                rec = None
                 self._log.info('Discard rec {}: with occurrenceStatus absent'
                                .format(gid))
         return rec
 
+
     # ...............................................
-    def _gbifline_to_bisonrec(self, iline):
+    def _get_gbif_val(self, gbifid, iline, gfld, idx):
+        """
+        @summary: Create a list of values, ordered by BISON-requested fields in 
+                     ORDERED_OUT_FIELDS, with individual values and/or entire record
+                     modified according to BISON needs.
+        @param iline: A CSV record of GBIF-interpreted DarwinCore occurrence data
+        @return: list of ordered fields containing BISON-interpreted values for 
+                    a single GBIF occurrence record. 
+        """
+        # Check column existence
+        try:
+            tmpval = iline[idx]
+        except Exception:
+            self._log.warning('Rec {}: failed to get column {}/{}'
+                              .format(gbifid, idx, gfld))
+            val = None
+        else:
+            # Test each field/value
+            val = tmpval.strip()
+            # Replace N/A and empty string
+            if val.lower() in PROHIBITED_VALS:
+                val = None
+        return val
+
+    # ...............................................
+    def _gbifline_to_bisonrec(self, iline, gbif_column_map):
         """
         @summary: Create a list of values, ordered by BISON-requested fields in 
                      ORDERED_OUT_FIELDS, with individual values and/or entire record
@@ -628,28 +611,16 @@ class GBIFReader(object):
         rec[OCC_UUID_FLD] = gid
 
         # Find values for gbif fields of interest
-        for gfld, idx in self._gbif_column_map.items():
-            # Check column existence
-            try:
-                tmpval = iline[idx]
-            except Exception:
-                self._log.warning('Rec {}: failed to get column {}/{}'
-                                  .format(gid, idx, gfld))
-                val = None
-            else:
-                # Test each field/value
-                val = tmpval.strip()
-                # Replace N/A and empty string
-                if val.lower() in PROHIBITED_VALS:
-                    val = None
-                    
-            bfld = self._gbif_bison_map[gfld]
+        for gfld, bfld in self._gbif_bison_map.items():
+            # Find values for gbif fields of interest
+            idx = gbif_column_map[gfld]
+            val = self._get_gbif_val(gid, iline, gfld, idx)
             rec[bfld] = val
-
+            
         return rec
 
     # ...............................................
-    def _create_bisonrec_pass1(self, iline):
+    def _create_bisonrec_pass1(self, iline, gbif_column_map):
         """
         @summary: Create a list of values, ordered by BISON-requested fields in 
                      ORDERED_OUT_FIELDS, with individual values and/or entire record
@@ -659,7 +630,7 @@ class GBIFReader(object):
                     a single GBIF occurrence record. 
         """
         biline = []
-        rec = self._gbifline_to_bisonrec(iline)
+        rec = self._gbifline_to_bisonrec(iline, gbif_column_map)
         
         # Check full record
         rec = self._test_for_discard(rec)
@@ -669,8 +640,8 @@ class GBIFReader(object):
             
         if rec is not None:
             rec = self._control_vocabulary(rec)
-            # Fill verbatimLocality with anything available
-            rec = self._update_locality(rec)
+            # Fill some fields with best non-blank option
+            rec = self._update_second_choices(rec)
             # Format eventDate and fill missing year
             rec = self._update_dates(rec)
             # Modify lat/lon vals if necessary
@@ -686,8 +657,7 @@ class GBIFReader(object):
         return biline
     
     # ...............................................
-    def transform_gbif_to_bison(self, gbif_fname, meta_fname, outfname, 
-                            logname=None):
+    def transform_gbif_to_bison(self, gbif_fname, outfname, logname=None):
         """
         @summary: Create a CSV file containing GBIF occurrence records extracted 
                      from the interpreted occurrence file provided 
@@ -698,8 +668,7 @@ class GBIFReader(object):
                  GBIF download. 
         @note: Some fields will be filled in on subsequent processing.
         """
-        self.interp_fname = os.path.join(self.inpath, gbif_fname)
-        self._meta_fname = os.path.join(self.inpath, meta_fname)
+        self.interp_fname = os.path.join(self.basepath, gbif_fname)
         pass1_fname = os.path.join(self.tmppath, outfname)
 
         if self.is_open():
@@ -711,6 +680,11 @@ class GBIFReader(object):
         recno = 0
         try:
             reader, writer = self._open_pass1_files(pass1_fname)
+            # Extract relevant GBIF metadata
+            self._log.info('Read metadata ...')
+            gmetardr = GBIFMetaReader(self._log)
+            meta_fname = os.path.join(self.basepath, META_FNAME)
+            gbif_column_map = gmetardr.get_field_meta(meta_fname)
             
             # Pull the header row 
             header, recno = getLine(reader, recno)
@@ -725,7 +699,7 @@ class GBIFReader(object):
                     self._log.info('*** Record number {} ***'.format(recno))
                     
                 # Create new record or empty list
-                biline = self._create_bisonrec_pass1(line)
+                biline = self._create_bisonrec_pass1(line, gbif_column_map)
                 
                 # Write new record
                 if biline:
@@ -769,7 +743,8 @@ class GBIFReader(object):
 
             
     # ...............................................
-    def update_bison_names(self, infname, outfname, logname=None):
+    def update_bison_names(self, infname, outfname, 
+                           logname=None, discard_fields=[]):
         """
         @summary: Create a CSV file from pre-processed GBIF data, with
                   clean_provided_scientific_name resolved from 
@@ -782,7 +757,8 @@ class GBIFReader(object):
 
         recno = 0
         try:
-            dreader, dwriter = self._open_update_files(infname, outfname)
+            dreader, dwriter = self._open_update_files(infname, outfname, 
+                                                discard_fields=discard_fields)
             for rec in dreader:
                 recno += 1
                 clean_name = None
@@ -796,7 +772,6 @@ class GBIFReader(object):
                 except Exception as e:
                     self._log.info('Rec {}: No clean name for {} in LUT'
                                    .format(gid, verbatimname))
-                else:
                     try:
                         clean_name = self._name_lut[taxkey]
                     except Exception as e:
@@ -805,7 +780,13 @@ class GBIFReader(object):
                 if clean_name is not None:
                     self._log.info('Rec {}: Replace {}/{} with {} '
                                    .format(gid, verbatimname, taxkey, clean_name))
-                    rec['clean_provided_scientific_name'] = clean_name                    
+                    rec['clean_provided_scientific_name'] = clean_name
+                    for fld in discard_fields:               
+                        try:
+                            rec.pop(fld)
+                        except:
+                            raise Exception('Field {} is not present to discard!'
+                                            .format(fld))
                     dwriter.writerow(rec)
                     
                 if (recno % LOGINTERVAL) == 0:
@@ -816,6 +797,41 @@ class GBIFReader(object):
                             .format(recno, pass1_fname, e))                    
         finally:
             self.close()
+            
+    # ...............................................
+    def _fill_geofields(self, rec, polylyr, idx_fips, idx_cnty, idx_st):
+        slon = rec['longitude']
+        slat = rec['latitude']
+        try:
+            lon = float(slon)
+            lat = float(slat)
+        except:
+            pfips = rec['provided_fips']
+            pcounty = rec['provided_county_name']
+            pstate = rec['provided_state_name']
+            print('Unable to resolve coordinates {}, {}'.format(slon, slat))
+            if pfips != '' or pcounty != '' or pstate != '':
+                print('Provided fips {}, county {}, state {}'.format(pfips, pcounty, pstate))
+            
+        else:
+            pt = ogr.Geometry(ogr.wkbPoint)
+            pt.AddPoint(lon, lat)
+            polylyr.SetSpatialFilter(pt)
+            count = 0
+            print('Feature {}, {}:'.format(lon, lat))
+            for poly in polylyr:
+                count += 1
+                fips = poly.GetFieldAsString(idx_fips)
+                county = poly.GetFieldAsString(idx_cnty)
+                state = poly.GetFieldAsString(idx_st)
+#                 rec['calculated_fips'] = fips
+#                 rec['calculated_county_name'] = county
+#                 rec['calculated_state_name'] = state
+                print('  fips = {}, county={}, st={}'
+                .format(fips, county, state))
+            if count != 1:
+                print('  intersects {} polygons'.format(count))
+        return rec
 
     # ...............................................
     def update_bison_itis_geo(self, infname, outfname, logname=None):
@@ -827,7 +843,17 @@ class GBIFReader(object):
         if self.is_open():
             self.close()
         self._rotate_logfile(logname=logname)
-
+        
+        pth, _ = os.path.split(self.basepath)
+        polyfile = os.path.join(pth, 'ancillary/USCounties/USCounties.shp')
+        driver = ogr.GetDriverByName("ESRI Shapefile")
+        dataSource = driver.Open(polyfile, 0)
+        polylyr = dataSource.GetLayer()
+        poly_def = polylyr.GetLayerDefn()
+        idx_fips = poly_def.GetFieldIndex('FIPS')
+        idx_cnty = poly_def.GetFieldIndex('COUNTY_NAM')
+        idx_st = poly_def.GetFieldIndex('STATE_NAME')
+        
         recno = 0
         try:
             dreader, dwriter = self._open_update_files(infname, outfname)
@@ -835,10 +861,12 @@ class GBIFReader(object):
                 recno += 1
                 gid = rec[OCC_UUID_FLD]
                 
+                rec = self._fill_geofields(rec, polylyr, 
+                                           idx_fips, idx_cnty, idx_st)
                 # Fill ITIS 
                 # Compute geo: coordinates and polygons
                 
-                dwriter.writerow(rec)
+#                 dwriter.writerow(rec)
                     
                 if (recno % LOGINTERVAL) == 0:
                     self._log.info('*** Record number {} ***'.format(recno))
@@ -881,44 +909,6 @@ class GBIFReader(object):
             self.close()
 
     # ...............................................
-    def _get_dataset_uuids(self):
-        """
-        @summary: Get dataset UUIDs from downloaded dataset EML filenames.
-        """
-        uuids = []
-        dsfnames = glob.glob(os.path.join(self._dataset_pth, '*.xml'))
-        if dsfnames is not None:
-            start = len(self._dataset_pth)
-            if not self._dataset_pth.endswith(os.pathsep):
-                start += 1
-            stop = len('.xml')
-            for fn in dsfnames:
-                uuids.append(fn[start:-stop])
-        self._log.info('Read {} dataset UUIDs from filenames in {}'
-                       .format(len(uuids), self._dataset_pth))
-        return uuids
-    
-    # ...............................................
-    def _get_organization_uuids(self):
-        """
-        @summary: Get organization UUIDs from dataset metadata pulled from GBIF
-                  and written to the dset_lut_fname file
-        """
-        org_uuids = set()
-        try:
-            rdr, inf = getCSVDictReader(self.dset_lut_fname, OUT_DELIMITER, ENCODING)
-            for dset_data in rdr:
-                orgUUID = dset_data[GBIF_ORG_FOREIGN_KEY]
-                org_uuids.add(orgUUID) 
-        except Exception as e:
-            print('Failed read {} ({})'.format(self.dset_lut_fname, e))
-        finally:
-            inf.close()
-        self._log.info('Read {} unique organiziation UUIDs from datasets in {}'
-                       .format(len(org_uuids), self.dset_lut_fname))
-        return org_uuids
-
-    # ...............................................
     def write_dataset_org_lookup(self, logname=None):
         """
         @summary: Create lookup table for: 
@@ -928,86 +918,28 @@ class GBIFReader(object):
                            including publishingOrganization metadata 
                            for that dataset
         """
-        if os.path.exists(self.dset_lut_fname):
-            raise Exception('Output file {} exists!'.format(self.dset_lut_fname))
-        self._rotate_logfile(logname=logname)
-        gbifapi = GbifAPI()
-         
-        # --------------------------------------
-        # Gather dataset UUIDs from EML files downloaded with raw data
-        uuids = self._get_dataset_uuids()        
-        # Query/save dataset information
-        gbifapi.get_write_dataset_meta(self.dset_lut_fname, uuids)
-        self._log.info('Wrote dataset metadata to {}'
-                       .format(self.dset_lut_fname))
-        
-        if not os.path.exists(self.dset_lut_fname):
-            raise Exception('Dataset meta file {} does not exist'.format(self.dset_lut_fname))
+        if os.path.exists(self.ds_lut_fname):
+            raise Exception('Output file {} exists!'.format(self.ds_lut_fname))
         if os.path.exists(self.org_lut_fname):
-            if overwrite:
-                os.remove(self.org_lut_fname)
-            else:
-                raise Exception('Output file {} exists!'.format(self.org_lut_fname))
+            raise Exception('Output file {} exists!'.format(self.org_lut_fname))
+        self._rotate_logfile(logname=logname)
+        gmetardr = GBIFMetaReader(self._log)
+        # --------------------------------------
+        # Gather dataset and organization UUIDs from EML files downloaded with 
+        # raw data
+        uuids = gmetardr.get_dataset_uuids(self._dataset_pth)
+
+        # Query/save dataset information
+        gbifapi = GbifAPI()
+        gbifapi.get_write_dataset_meta(self.ds_lut_fname, uuids)
+        self._log.info('Wrote dataset metadata to {}'.format(self.ds_lut_fname))
+        
         # --------------------------------------
         # Gather organization UUIDs from dataset metadata assembled above
-        org_uuids = self._get_organization_uuids()
+        org_uuids = gmetardr.get_organization_uuids(self.ds_lut_fname)
         # Query/save organization information
         gbifapi.get_write_org_meta(self.org_lut_fname, org_uuids)
-        self._log.info('Wrote organization metadata to {}'
-                       .format(self.org_lut_fname))
-        
-    # ...............................................
-    def _write_resolved_taxkeys(self, name_fails, nametaxa, gbifapi):
-        """
-        @summary: Create lookup table for: 
-                  BISON canonicalName from GBIF scientificName and/or taxonKey
-        """                
-        csvwriter, f = getCSVWriter(self.name_lut_fname, OUT_DELIMITER, 
-                                        ENCODING, fmode='a')
-        count = 0
-        tax_resolved = []
-        try:
-            for badname in name_fails:
-                taxonkeys = nametaxa[badname]
-                for tk in taxonkeys:
-                    canonical = gbifapi.find_canonical(taxkey=tk)
-                    if canonical is not None:
-                        count += 1
-                        csvwriter.writerow([tk, canonical])
-                        self._log.info('Appended {} taxonKey/clean_provided_scientific_name to {}'
-                                       .format(count, self.name_lut_fname))
-                        tax_resolved.append(badname)
-                        break
-        except Exception as e:
-            pass
-        finally:
-            f.close()
-        self._log.info('Wrote {} taxkey/canonical pairs ({} failed) to {}'
-                       .format(len(tax_resolved), 
-                               len(name_fails) - len(tax_resolved), 
-                               self.name_lut_fname))                    
-        for tres in tax_resolved:
-            name_fails.remove(tres)        
-        return name_fails
-            
-    # ...............................................
-    def _write_parsed_names(self, namelst, gbifapi):
-        """
-        @summary: Create lookup table for: 
-                  BISON canonicalName from GBIF scientificName and/or taxonKey
-        """
-        tot = 1000 
-        name_fails = []
-        while namelst:
-            currnames = namelst[:tot]
-            namelst = namelst[tot:]
-            total, currfail = gbifapi.get_write_parsednames(currnames, 
-                                                 self.name_lut_fname)
-            name_fails.extend(currfail)
-            self._log.info('Wrote {} sciname/canonical pairs ({} failed) to {}'
-                           .format(total-len(currfail), len(currfail), 
-                                   self.name_lut_fname))        
-        return name_fails
+        self._log.info('Wrote organization metadata to {}'.format(self.org_lut_fname))
             
     # ...............................................
     def write_name_lookup(self, logname=None):
@@ -1024,10 +956,13 @@ class GBIFReader(object):
         # Read name/taxonIDs dictionary for name resolution
         nametaxa = self._read_name_taxa(self.nametaxa_fname)
         namelst = list(nametaxa.keys())
-        gbifapi = GbifAPI()
         
-        name_fails = self._write_parsed_names(namelst, gbifapi)        
-        name_fails = self._write_resolved_taxkeys(name_fails, nametaxa, gbifapi)
+        gmetardr = GBIFMetaReader(self._log)
+        name_fails = gmetardr.write_parsed_names(self.name_lut_fname, namelst)
+        name_fails = gmetardr.write_resolved_taxkeys(self.name_lut_fname, 
+                                                     name_fails, nametaxa)
+        self._log.info('{} scientificNames/taxonKeys unresolvable {}'
+                       .format(len(name_fails), name_fails))
         
         return name_fails
             
@@ -1047,7 +982,7 @@ if __name__ == '__main__':
                         are not present in the same directory as the raw data, 
                         they will be  created for temp and final output files.
                         """)
-    parser.add_argument('--step', type=int, default=1, choices=[1,2,3,4],
+    parser.add_argument('--step', type=int, default=1, choices=[1,2,3,4,5],
                         help="""
                         Step number for data processing:
                            1: Dataset/Provider lookup table assembly:
@@ -1057,15 +992,20 @@ if __name__ == '__main__':
                               * Query GBIF organization API + organizationKey for 
                                 organization info for BISON 'provider' fields'
                            2: GBIF record and field filter/transform.
+                              First pass of CSV records fills most bison fields.
+                              Resource and Organization values are filled in
+                              from lookup tables from Step1.
                               Names and UUIDs are saved in records for GBIF API 
-                              resolution in Step 2.
+                              resolution in Step 3.
                            3: Name lookup table assembly:
                               * Query GBIF parser + scientificName if available, 
                                 or GBIF species API + taxonKey for BISON 
                                 'clean_provided_scientific_name'.
-                           3: Field value replacements. Names, resource, and 
-                              provider values are replaced with resolved values
-                              saved in lookup tables.
+                           4: Field value replacements. Names are replaced with 
+                              resolved values saved in name lookup tables.
+                           5: Georeferencing, field value replacements. 
+                              Calculated FIPS, county, state values are filled 
+                              with resolved values from USCounties shapefile.
                         """)
     args = parser.parse_args()
     gbif_occ_file = args.gbif_occ_file
@@ -1100,25 +1040,26 @@ if __name__ == '__main__':
             gr.read_org_lookup()
             # Pass 1 of CSV transform, initial pull, standardize, 
             # FillMethod = gbif_meta, metadata fill
-            gr.transform_gbif_to_bison(gbif_fname, META_FNAME, pass1_fname)
+            gr.transform_gbif_to_bison(gbif_fname, pass1_fname)
             
         elif step == 3:
             # Reread output if missing gbif name/taxkey 
             gr.gather_name_input(pass1_fname)
-            gr.write_name_lookup(logname=outbase)
+            name_fails = gr.write_name_lookup(logname=outbase)
             
         elif step == 4:
             gr.read_name_lookup(logname=outbase)
             # Pass 2 of CSV transform
             # FillMethod = gbif_name, canonical name fill 
-            gr.update_bison_names(pass1_fname, pass2_fname)
+            gr.update_bison_names(pass1_fname, pass2_fname, 
+                                  discard_fields=['taxonKey'])
             
-#         elif step == 5:
-#             # Pass 3 of CSV transform
-#             gr.update_bison_itis_geo(pass2_fname, pass3_fname)
-#             # FillMethod = itis_tsn, ITIS lookup and 
-#             # FillMethod = georef, Georeference coordinates, political boundaries, waterbodies
-#             pass
+        elif step == 5:
+            # Pass 3 of CSV transform
+            gr.update_bison_itis_geo(pass2_fname, pass3_fname)
+            # FillMethod = itis_tsn, ITIS lookup and 
+            # FillMethod = georef, Georeference coordinates, political boundaries, waterbodies
+            pass
 #         
 #         elif step == 6:
 #             # Pass 4 of CSV transform
@@ -1133,5 +1074,71 @@ wc -l tmp/step1.csv
 1577732 tmp/step1.csv
 
 python3.6 /state/partition1/git/bison/src/gbif/gbif2bison.py 
+
+import os
+from osgeo import ogr 
+import time
+
+from gbif.constants import (IN_DELIMITER, OUT_DELIMITER, PROHIBITED_VALS, 
+                            TERM_CONVERT, ENCODING, META_FNAME,
+                            BISON_GBIF_MAP, OCC_UUID_FLD, DISCARD_FIELDS,
+                            CLIP_CHAR, FillMethod,GBIF_UUID_KEY)
+from gbif.metareader import GBIFMetaReader
+from gbif.tools import (getCSVReader, getCSVDictReader, 
+                        getCSVWriter, getCSVDictWriter, getLine, getLogger)
+from gbif.gbifapi import GbifAPI
+from pympler import asizeof
+
+ENCODING = 'utf-8'
+OUT_DELIMITER = '$'
+
+basepth = '/tank/data/bison/2019/AS'
+uppth, _ = os.path.split(basepth)
+recfile = os.path.join(basepth, 'tmp', 'step4_cleannames_occurrence.csv')
+polyfile = os.path.join(uppth, 'ancillary', 'USCounties', 'USCounties.shp')
+fips_fld = 'FIPS'
+cnty_fld = 'COUNTY_NAM'
+state_fld = 'STATE_NAME'
+
+driver = ogr.GetDriverByName("ESRI Shapefile")
+dataSource = driver.Open(polyfile, 0)
+polylyr = dataSource.GetLayer()
+poly_def = polylyr.GetLayerDefn()
+idx_fips = poly_def.GetFieldIndex('FIPS')
+idx_cnty = poly_def.GetFieldIndex('COUNTY_NAM')
+idx_st = poly_def.GetFieldIndex('STATE_NAME')
+
+
+drdr, inf = getCSVDictReader(recfile, OUT_DELIMITER, ENCODING)
+
+rec = next(drdr)
+
+try:
+    lon = float(rec['longitude'])
+    lat = float(rec['latitude'])
+except:
+    print('Unable to resolve coordinates {}, {}'
+          .format(rec['longitude'], rec['latitude']))
+else:
+    pt = ogr.Geometry(ogr.wkbPoint)
+    pt.AddPoint(lon, lat)
+    
+    polylyr.SetSpatialFilter(pt)
+    total = 0
+    
+    for poly in polylyr:
+        total +=1
+        fips = poly.GetFieldAsString(idx_fips)
+        county = poly.GetFieldAsString(idx_cnty)
+        state = poly.GetFieldAsString(idx_st)
+        rec['calculated_fips'] = fips
+        rec['calculated_county_name'] = county
+        rec['calculated_state_name'] = state
+        print('{}, {}: fips = {}, county={}, st={}'
+        .format(lon, lat, fips, county, state))
+
+    print('Feature {}, {} intersects {} polygons'.format(lon, lat, total))
+
+inf.close()
 
 """
