@@ -24,12 +24,13 @@
 import os
 import requests
 
+from common.constants import (BISON_DELIMITER, ENCODING, NEWLINE) 
+from common.tools import getCSVWriter
+
 from gbif.constants import (GBIF_DSET_KEYS, GBIF_ORG_KEYS, GBIF_URL,
                             GBIF_DATASET_URL, GBIF_ORGANIZATION_URL,
                             GBIF_BATCH_PARSER_URL, GBIF_SINGLE_PARSER_URL,
-                            GBIF_TAXON_URL,
-                            OUT_DELIMITER, ENCODING, URL_ESCAPES, NEWLINE)
-from gbif.tools import getCSVWriter
+                            GBIF_TAXON_URL, GBIF_URL_ESCAPES)
 
     
 # .............................................................................
@@ -178,7 +179,7 @@ class GbifAPI(object):
 
 # ...............................................
     def query_write_all_meta(self, apitype, outfname, header, reformat_keys,
-                             delimiter=OUT_DELIMITER):
+                             delimiter=BISON_DELIMITER):
         if apitype not in ('organization'):
             raise Exception('What kind of query is {}?'.format(apitype))
 
@@ -225,7 +226,7 @@ class GbifAPI(object):
 
 # ...............................................
     def query_write_some_meta(self, apitype, outfname, header, reformat_keys,
-                              UUIDs, delimiter=OUT_DELIMITER):
+                              UUIDs, delimiter=BISON_DELIMITER):
         if apitype not in ('species', 'dataset', 'organization'):
             raise Exception('What kind of query is {}?'.format(apitype))
         if not UUIDs:
@@ -250,14 +251,14 @@ class GbifAPI(object):
                     print('Failed to write row {}'.format(row))
 
 # # ...............................................
-#     def get_write_organization_meta(self, outfname, delimiter=OUT_DELIMITER):
+#     def get_write_organization_meta(self, outfname, delimiter=BISON_DELIMITER):
 #         self.query_write_all_meta(GBIF_ORG_KEYS.apitype, outfname,
 #                                   GBIF_ORG_KEYS.saveme,
 #                                   GBIF_ORG_KEYS.preserve_format,
 #                                   delimiter=delimiter)
 
 # ...............................................
-    def get_write_dataset_meta(self, outfname, uuids, delimiter=OUT_DELIMITER):
+    def get_write_dataset_meta(self, outfname, uuids, delimiter=BISON_DELIMITER):
         self.query_write_some_meta(GBIF_DSET_KEYS.apitype, outfname,
                                    GBIF_DSET_KEYS.saveme,
                                    GBIF_DSET_KEYS.preserve_format,
@@ -265,7 +266,7 @@ class GbifAPI(object):
                                    delimiter=delimiter)
 
     # ...............................................
-    def get_write_org_meta(self, outfname, uuids, delimiter=OUT_DELIMITER):
+    def get_write_org_meta(self, outfname, uuids, delimiter=BISON_DELIMITER):
         '''
         @summary: Read and populate dictionary if file exists
         '''
@@ -341,7 +342,7 @@ class GbifAPI(object):
             data = self._getDataFromUrl(url)
 
         elif sciname is not None:
-            for replaceStr, withStr in URL_ESCAPES:
+            for replaceStr, withStr in GBIF_URL_ESCAPES:
                 sciname = sciname.replace(replaceStr, withStr)
             url = GBIF_SINGLE_PARSER_URL + sciname
             data = self._getDataFromUrl(url)
@@ -391,7 +392,7 @@ class GbifAPI(object):
         return output
 
 # ...............................................
-    def get_write_parsednames(self, indata, outfname, delimiter=OUT_DELIMITER):
+    def get_write_parsednames(self, indata, outfname, delimiter=BISON_DELIMITER):
         name_fail = []
         if os.path.exists(outfname):
             fmode = 'a'

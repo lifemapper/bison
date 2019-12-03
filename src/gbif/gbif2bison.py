@@ -25,18 +25,17 @@ from osgeo import ogr
 import os
 import time
 
-from gbif.constants import (IN_DELIMITER, OUT_DELIMITER, PROHIBITED_VALS, 
-                            TERM_CONVERT, ENCODING, META_FNAME,
+from common.constants import (BISON_DELIMITER, ENCODING, LOGINTERVAL)
+from common.tools import (getCSVReader, getCSVDictReader, 
+                        getCSVWriter, getCSVDictWriter, getLine, getLogger)
+
+from gbif.constants import (GBIF_DELIMITER, PROHIBITED_VALS, 
+                            TERM_CONVERT, META_FNAME,
                             BISON_GBIF_MAP, OCC_UUID_FLD, DISCARD_FIELDS,
                             CLIP_CHAR, FillMethod,GBIF_UUID_KEY)
 from gbif.metareader import GBIFMetaReader
-from gbif.tools import (getCSVReader, getCSVDictReader, 
-                        getCSVWriter, getCSVDictWriter, getLine, getLogger)
 from gbif.gbifapi import GbifAPI
 from pympler import asizeof
-
-# Rough log of processing progress
-LOGINTERVAL = 1000000
         
 # .............................................................................
 class GBIFReader(object):
@@ -86,8 +85,8 @@ class GBIFReader(object):
                 gbiffld = fld_or_mthd[fld_or_mthd.rfind(CLIP_CHAR)+1:]
                 self._gbif_bison_map[gbiffld] = bisonfld
         
-        self._gbif_delimiter = IN_DELIMITER
-        self._bison_delimiter = OUT_DELIMITER
+        self._gbif_delimiter = GBIF_DELIMITER
+        self._bison_delimiter = BISON_DELIMITER
         self._encoding = ENCODING                
         
         self._log = None
@@ -824,13 +823,27 @@ class GBIFReader(object):
                 fips = poly.GetFieldAsString(idx_fips)
                 county = poly.GetFieldAsString(idx_cnty)
                 state = poly.GetFieldAsString(idx_st)
+            if count == 1:
+                print('  fips = {}, county={}, st={}'
+                .format(fips, county, state))
 #                 rec['calculated_fips'] = fips
 #                 rec['calculated_county_name'] = county
 #                 rec['calculated_state_name'] = state
-                print('  fips = {}, county={}, st={}'
-                .format(fips, county, state))
-            if count != 1:
+            else:
                 print('  intersects {} polygons'.format(count))
+        return rec
+
+    # ...............................................
+    def _fill_itisfields(self, rec, polylyr, idx_fips, idx_cnty, idx_st):
+        # input search term
+        name = rec['clean_provided_scientific_name']
+        # output: >= 0
+        common = rec['itis_common_name']
+        # output: >= 0
+        tsn = rec['itis_tsn']
+        rec['valid_accepted_scientific_name']
+        rec['valid_accepted_tsn']
+        rec['kingdom']
         return rec
 
     # ...............................................
@@ -1051,6 +1064,7 @@ if __name__ == '__main__':
             gr.read_name_lookup(logname=outbase)
             # Pass 2 of CSV transform
             # FillMethod = gbif_name, canonical name fill 
+            # TODO: create lookup table/list here?
             gr.update_bison_names(pass1_fname, pass2_fname, 
                                   discard_fields=['taxonKey'])
             
@@ -1079,18 +1093,18 @@ import os
 from osgeo import ogr 
 import time
 
-from gbif.constants import (IN_DELIMITER, OUT_DELIMITER, PROHIBITED_VALS, 
+from gbif.constants import (GBIF_DELIMITER, BISON_DELIMITER, PROHIBITED_VALS, 
                             TERM_CONVERT, ENCODING, META_FNAME,
                             BISON_GBIF_MAP, OCC_UUID_FLD, DISCARD_FIELDS,
                             CLIP_CHAR, FillMethod,GBIF_UUID_KEY)
 from gbif.metareader import GBIFMetaReader
-from gbif.tools import (getCSVReader, getCSVDictReader, 
+from common.tools import (getCSVReader, getCSVDictReader, 
                         getCSVWriter, getCSVDictWriter, getLine, getLogger)
 from gbif.gbifapi import GbifAPI
 from pympler import asizeof
 
 ENCODING = 'utf-8'
-OUT_DELIMITER = '$'
+BISON_DELIMITER = '$'
 
 basepth = '/tank/data/bison/2019/AS'
 uppth, _ = os.path.split(basepth)
@@ -1109,7 +1123,7 @@ idx_cnty = poly_def.GetFieldIndex('COUNTY_NAM')
 idx_st = poly_def.GetFieldIndex('STATE_NAME')
 
 
-drdr, inf = getCSVDictReader(recfile, OUT_DELIMITER, ENCODING)
+drdr, inf = getCSVDictReader(recfile, BISON_DELIMITER, ENCODING)
 
 rec = next(drdr)
 

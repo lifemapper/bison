@@ -3,8 +3,8 @@ import logging
 from logging.handlers import RotatingFileHandler
 from sys import maxsize
 
-from gbif.constants import (LOG_FORMAT, LOG_DATE_FORMAT, LOGFILE_MAX_BYTES,
-                       LOGFILE_BACKUP_COUNT)
+from common.constants import (LOG_FORMAT, LOG_DATE_FORMAT, LOGFILE_MAX_BYTES,
+                              LOGFILE_BACKUP_COUNT)
 
 # .............................................................................
 def getCSVReader(datafile, delimiter, encoding):
