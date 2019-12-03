@@ -25,13 +25,11 @@ import glob
 import os
 import xml.etree.ElementTree as ET
 
-from gbif.constants import (OUT_DELIMITER, INTERPRETED, ENCODING, CLIP_CHAR, 
-                            NAMESPACE, GBIF_UUID_KEY, GBIF_ORG_FOREIGN_KEY)
-from gbif.tools import (getCSVDictReader, getCSVWriter)
+from common.constants import (BISON_DELIMITER, ENCODING)
+from common.tools import (getCSVDictReader, getCSVWriter)
+                            
+from gbif.constants import (INTERPRETED, CLIP_CHAR, NAMESPACE, GBIF_ORG_FOREIGN_KEY)
 from gbif.gbifapi import GbifAPI
-
-# Rough log of processing progress
-LOGINTERVAL = 1000000
         
 # .............................................................................
 class GBIFMetaReader(object):
@@ -118,7 +116,7 @@ class GBIFMetaReader(object):
         """
         org_uuids = set()
         try:
-            rdr, inf = getCSVDictReader(dset_lut_fname, OUT_DELIMITER, ENCODING)
+            rdr, inf = getCSVDictReader(dset_lut_fname, BISON_DELIMITER, ENCODING)
             for dset_data in rdr:
                 orgUUID = dset_data[GBIF_ORG_FOREIGN_KEY]
                 org_uuids.add(orgUUID) 
@@ -137,7 +135,7 @@ class GBIFMetaReader(object):
         @summary: Create lookup table for: 
                   BISON canonicalName from GBIF scientificName and/or taxonKey
         """
-        csvwriter, f = getCSVWriter(lut_fname, OUT_DELIMITER, ENCODING, 
+        csvwriter, f = getCSVWriter(lut_fname, BISON_DELIMITER, ENCODING, 
                                     fmode='a')
         count = 0
         tax_resolved = []

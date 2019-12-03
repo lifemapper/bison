@@ -78,6 +78,9 @@ process info at: https://my.usgs.gov/confluence/display/DEV/SAS+Development
 
     * itis_common_name
     * itis_tsn
+    * valid_accepted_scientific_name
+    * valid_accepted_tsn
+    * if blank, get kingdom
 
   * Process: 
   
