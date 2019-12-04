@@ -25,7 +25,8 @@ import requests
 import xml.etree.ElementTree as ET
 
 from common.constants import (ITIS_SOLR_URL, ITIS_NAME_KEY, ITIS_TSN_KEY, 
-                              ITIS_VERNACULAR_QUERY, ITIS_URL_ESCAPES)
+                              ITIS_VERNACULAR_QUERY, ITIS_URL_ESCAPES, 
+                              ITIS_NAMESPACE, ITIS_DATA_NAMESPACE)
 
     
 # .............................................................................
@@ -101,43 +102,31 @@ class ITISSvc(object):
 
 # ...............................................
     def get_itis_vernacular(self, tsn):
-        data = None
+        common_names = []
         if tsn is not None:
             url = ITIS_VERNACULAR_QUERY + str(tsn)
-            data = self._getDataFromUrl(url, resp_type='xml')
-        else:
-            raise Exception('Must provide sciname')
+            root = self._getDataFromUrl(url, resp_type='xml')
         
-        try:
-            count = data['numFound']
-        except:
-            raise Exception('Failed to return numFound')
-        try:
-            docs = data['docs']
-        except:
-            raise Exception('Failed to return docs')
-        
-        for doc in docs:
-            usage = self._get_fld_value(doc, 'canonicalName')
-            if usage in ('accepted', 'valid'):
-                tsn = self._get_fld_value(doc, 'tsn')
-            else:
-                tsn = self._get_fld_value(doc, 'acceptedTSN')
-        return tsn
+            retElt = root.find('{}return'.format(ITIS_NAMESPACE))
+            if retElt is not None:
+                cnEltLst = retElt.findall('{}commonNames'.format(ITIS_DATA_NAMESPACE))
+                for cnElt in cnEltLst:
+                    nelt = cnElt.find('{}commonName'.format(ITIS_DATA_NAMESPACE))
+                    if nelt is not None and nelt.text is not None:
+                        common_names.append(nelt.text)
+#                 print('Returned {} names {} for tsn {}'.format(len(common_names), 
+#                                                                common_names, tsn))
+        return common_names
 
 # ...............................................
-    def get_itis_tsn(self, sciname):
-        data = None
-        escname = sciname
-        if escname is not None:
-            for replaceStr, withStr in ITIS_URL_ESCAPES:
-                escname = escname.replace(replaceStr, withStr)
-            url = '{}?q={}:{}&wt=json'.format(ITIS_SOLR_URL, ITIS_NAME_KEY, 
-                                              escname)
-            data = self._getDataFromUrl(url, resp_type='json')
-        else:
-            raise Exception('Must provide sciname')
-        
+    def get_itis_name(self, tsn):
+        accepted_name = kingdom = None
+        url = '{}?q={}:{}&wt=json'.format(ITIS_SOLR_URL, ITIS_TSN_KEY, tsn)
+        output = self._getDataFromUrl(url, resp_type='json')
+        try:
+            data = output['response']
+        except:
+            raise Exception('Failed to return response element')
         try:
             count = data['numFound']
         except:
@@ -146,16 +135,53 @@ class ITISSvc(object):
             docs = data['docs']
         except:
             raise Exception('Failed to return docs')
-        
+#         print('Reported/returned {}/{} docs for tsn {}'.format(count, len(docs), tsn))
         for doc in docs:
-            tsn = accepted_tsn = kingdom = None
             usage = doc['usage']
             if usage in ('accepted', 'valid'):
-                tsn = self._get_fld_value(doc, 'tsn')
+                accepted_name = self._get_fld_value(doc, 'nameWOInd')
                 kingdom = self._get_fld_value(doc, 'kingdom')
+#                 print('Returned accepted_name {} {}, for tsn {}'
+#                       .format(accepted_name, kingdom, tsn))
+#             else:
+#                 print('Returned {} values for tsn {}'.format(usage, tsn))
+        return accepted_name, kingdom
+
+# ...............................................
+    def get_itis_tsn(self, sciname):
+        tsn = accepted_name = kingdom = None
+        accepted_tsn_list = []
+        escname = sciname
+        for replaceStr, withStr in ITIS_URL_ESCAPES:
+            escname = escname.replace(replaceStr, withStr)
+        url = '{}?q={}:{}&wt=json'.format(ITIS_SOLR_URL, ITIS_NAME_KEY, 
+                                          escname)
+        output = self._getDataFromUrl(url, resp_type='json')
+        try:
+            data = output['response']
+        except:
+            raise Exception('Failed to return response element')
+        try:
+            count = data['numFound']
+        except:
+            print('No numFound value')
+        try:
+            docs = data['docs']
+        except:
+            raise Exception('Failed to return docs')
+#         print('Reported/returned {}/{} docs for name {}'.format(count, len(docs), sciname))
+        for doc in docs:
+            usage = doc['usage']
+            tsn = self._get_fld_value(doc, 'tsn')
+            if usage in ('accepted', 'valid'):
+                accepted_name = self._get_fld_value(doc, 'nameWOInd')
+                kingdom = self._get_fld_value(doc, 'kingdom')
+                break
             else:
-                accepted_tsn = self._get_fld_value(doc, 'acceptedTSN')
-        return tsn, kingdom, accepted_tsn
+                accepted_tsn_list = self._get_fld_value(doc, 'acceptedTSN')
+#             print('Returned tsn {} acceptedTSN list {}, {} for {} name {}'
+#                   .format(tsn, accepted_tsn_list, kingdom, usage, sciname))
+        return tsn, accepted_name, kingdom, accepted_tsn_list
 
 
 """
@@ -163,46 +189,19 @@ import requests
 import xml.etree.ElementTree as ET
 
 from common.constants import (ITIS_SOLR_URL, ITIS_NAME_KEY, ITIS_TSN_KEY, 
-                              ITIS_VERNACULAR_QUERY, ITIS_URL_ESCAPES)
+                              ITIS_VERNACULAR_QUERY, ITIS_URL_ESCAPES, 
+                              ITIS_NAMESPACE, W3_NAMESPACE)
 
-def _get_fld_value(doc, fldname):
-    try:
-        val = doc[fldname]
-    except:
-        val = None
-    return val
 
 sciname = 'Enteromorpha clathrata'
 tsn = 173441
+invalidname = 'Rana catesbeiana'
 
-escname = sciname
-for replaceStr, withStr in ITIS_URL_ESCAPES:
-    escname = escname.replace(replaceStr, withStr)
+itis_svc = ITISSvc()
 
-url = '{}?q={}:{}&wt=json'.format(ITIS_SOLR_URL, ITIS_NAME_KEY, 
-                                  escname)
+tsn, accepted_name, kingdom, accepted_tsn_list = itis_svc.get_itis_tsn(sciname)
+tsn, accepted_name, kingdom, accepted_tsn_list = itis_svc.get_itis_tsn(invalidname)
 
-response = requests.get(url)
-response.status_code 
-output = response.json()
-data = output['response']
-count = data['numFound']
-docs = data['docs']
-for doc in docs:
-    tsn = accepted_tsn = kingdom = None
-    usage = doc['usage']
-    if usage in ('accepted', 'valid'):
-        tsn = _get_fld_value(doc, 'tsn')
-        kingdom = _get_fld_value(doc, 'kingdom')
-    else:
-        accepted_tsn = _get_fld_value(doc, 'acceptedTSN')
-    print(sciname, tsn, kingdom, accepted_tsn)
-    
 
-url = ITIS_VERNACULAR_QUERY + str(tsn)
-response = requests.get(url)
-response.status_code 
-output = response.text
-data = ET.fromstring(output)
 
 """

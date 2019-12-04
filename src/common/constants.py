@@ -45,6 +45,9 @@ ITIS_NAME_KEY = 'nameWOInd'
 ITIS_TSN_KEY = 'tsn'
 ITIS_URL_ESCAPES = [ [" ", "\%20"] ]
 ITIS_VERNACULAR_QUERY = 'https://www.itis.gov/ITISWebService/services/ITISService/getCommonNamesFromTSN?tsn='
+ITIS_NAMESPACE = '{http://itis_service.itis.usgs.gov}'
+ITIS_DATA_NAMESPACE = '{http://data.itis_service.itis.usgs.gov/xsd}'
+W3_NAMESPACE =  '{http://www.w3.org/2001/XMLSchema-instance}'
 
 LICENSE =  '(http://creativecommons.org/publicdomain/zero/1.0/legalcode) (DwC: license)'
 

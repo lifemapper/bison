@@ -26,6 +26,7 @@ import os
 import time
 
 from common.constants import (BISON_DELIMITER, ENCODING, LOGINTERVAL)
+from common.itissvc import ITISSvc
 from common.tools import (getCSVReader, getCSVDictReader, 
                         getCSVWriter, getCSVDictWriter, getLine, getLogger)
 
@@ -49,7 +50,7 @@ class GBIFReader(object):
              where 1-5000 are lines to delete, and 10000 is the line on which to stop.
     """
     # ...............................................
-    def __init__(self, basepath, tmpdir, outdir):
+    def __init__(self, basepath, tmpdir, outdir, logname):
         """
         @summary: Constructor
         @param interpreted_fname: Full filename containing records from the GBIF 
@@ -90,23 +91,14 @@ class GBIFReader(object):
         self._encoding = ENCODING                
         
         self._log = None
+        self._rotate_logfile(logname=logname)
         self._files = []
-        
+                
         # ....................
-        self.interp_fname = None
-
         # Canonical lookup tmp data
-        self.nametaxa_fname = None
         self._nametaxa = {}
-        
-        # Lookup table output files
-        self.ds_lut_fname = os.path.join(self.tmppath, 'ds_lookup.csv')
         self._ds_lut = {}
-        self.org_lut_fname = os.path.join(self.tmppath, 'org_lookup.csv')
         self._org_lut = {}
-        # Lookup tmp data
-        self.nametaxa_fname = os.path.join(self.tmppath, 'step3_sciname_taxkey_list.csv')
-        self.name_lut_fname = os.path.join(self.tmppath, 'step3_name_lookup.csv')
         self._name_lut = {}
         
     # ...............................................
@@ -291,9 +283,9 @@ class GBIFReader(object):
         return rec
 
     # ...............................................
-    def _save_for_lookups(self, rec):
+    def save_namevals_for_lookup(self, rec):
         """
-        @summary: Save scientificName / taxonKey and publisher for parse or query 
+        @summary: Save scientificName / taxonKeys for parse or query 
         @param rec: dictionary of all fieldnames and values for this record
         @note: The GBIF name parser fails on unicode namestrings
         @note: Invalid records with no scientificName or taxonKey were 
@@ -319,17 +311,17 @@ class GBIFReader(object):
                     self._nametaxa[sciname] = [taxkey]
 
     # ...............................................
-    def _write_namevals_for_lookup(self):
+    def _write_namevals_for_lookup(self, nametaxa_fname):
         header=['scientificName', 'taxonKeys']
         # Write scientific names and taxonKeys found with them in raw data
         fmode = 'w'        
-        if os.path.exists(self.nametaxa_fname):
+        if os.path.exists(nametaxa_fname):
             fmode = 'a'
             
         try:
-            writer, outf = getCSVWriter(self.nametaxa_fname, self._bison_delimiter, 
+            writer, outf = getCSVWriter(nametaxa_fname, self._bison_delimiter, 
                                         self._encoding, fmode=fmode)
-            self._log.info('Opened name/taxa file {} for write'.format(self.nametaxa_fname))
+            self._log.info('Opened name/taxa file {} for write'.format(nametaxa_fname))
     
             if fmode == 'w' and header is not None:
                 writer.writerow(header)
@@ -352,6 +344,7 @@ class GBIFReader(object):
         '''
         @summary: Read and populate dictionary with key = name and 
                   value = one or more taxonids single or list of taxonif file exists
+        @note: header=['scientificName', 'taxonKeys']
         '''
         lookupDict = {}
         if os.path.exists(fname):
@@ -404,40 +397,34 @@ class GBIFReader(object):
         return lookup
 
     # ...............................................
-    def read_dataset_lookup(self, logname=None):
+    def read_dataset_lookup(self, dataset_lut_fname):
         '''
         @summary: Read and populate dictionary with key = uuid and 
                   dictionary of record values
         '''
-        self._rotate_logfile(logname=logname)        
-        lut_fname = self.ds_lut_fname
         lut_key = GBIF_UUID_KEY
-        lookup = self._read_lookup(lut_fname, lut_key)
+        lookup = self._read_lookup(dataset_lut_fname, lut_key)
         self._ds_lut = lookup
     
     # ...............................................
-    def read_org_lookup(self, logname=None):
+    def read_org_lookup(self, org_lut_fname):
         '''
         @summary: Read and populate dictionary with key = uuid and 
                   dictionary of record values
         '''
-        self._rotate_logfile(logname=logname)        
-        lut_fname = self.org_lut_fname
         lut_key = GBIF_UUID_KEY
-        lookup = self._read_lookup(lut_fname, lut_key)
+        lookup = self._read_lookup(org_lut_fname, lut_key)
         self._org_lut = lookup
 
     # ...............................................
-    def read_name_lookup(self, logname=None):
+    def read_name_lookup(self, name_lut_fname):
         '''
-        @summary: Read and populate dictionary with key = uuid and 
-                  dictionary of record values
+        @summary: Read and populate dictionary with key messyname = val cleanname 
         '''
-        self._rotate_logfile(logname=logname)        
         lookup = {}
-        if os.path.exists(self.name_lut_fname):
+        if os.path.exists(name_lut_fname):
             try:
-                reader, inf = getCSVReader(self.name_lut_fname, 
+                reader, inf = getCSVReader(name_lut_fname, 
                                         self._bison_delimiter, self._encoding)
                 recno = 0
                 line, recno = getLine(reader, recno)
@@ -455,25 +442,37 @@ class GBIFReader(object):
                     line, recno = getLine(reader, recno)
             except Exception as e:
                 self._log.error('Failed reading data in {}: {}'
-                                .format(self.name_lut_fname, e))
+                                .format(name_lut_fname, e))
             finally:
                 inf.close()
                 
             if lookup:
-                self._log.info('Lookup table size for {}:'.format(self.name_lut_fname))
+                self._log.info('Lookup table size for {}:'.format(name_lut_fname))
                 self._log.info(asizeof.asized(lookup).format())
         self._name_lut = lookup
 
-
     # ...............................................
-    def _open_pass1_files(self, pass1_fname):
+    def write_cleannames(self, cleanname_fname):
+        cleannames = set(self._name_lut.values())
+        try:
+            f = open(cleanname_fname, 'w', encoding=self._encoding)
+            for cname in cleannames:
+                f.write('{}\n'.format(cname))
+        except Exception as e:
+            raise Exception('Failed to read or open {}, ({})'
+                            .format(cleanname_fname, str(e)))
+        finally:
+            f.close()
+    
+    # ...............................................
+    def _open_pass1_files(self, gbif_interp_fname, pass1_fname, nametaxa_fname):
         '''
         @summary: Read GBIF metadata, open GBIF interpreted data for reading, 
                   output file for writing
         '''
         # Open raw GBIF data
-        self._log.info('Open raw GBIF input file {}'.format(self.interp_fname))
-        rdr, inf = getCSVReader(self.interp_fname, self._gbif_delimiter, 
+        self._log.info('Open raw GBIF input file {}'.format(gbif_interp_fname))
+        rdr, inf = getCSVReader(gbif_interp_fname, self._gbif_delimiter, 
                                 self._encoding)
         self._files.append(inf) 
         
@@ -485,9 +484,9 @@ class GBIFReader(object):
         wtr.writerow(self._bison_ordered_flds)
 
         # Read any existing values for lookup
-        if os.path.exists(self.nametaxa_fname):
+        if os.path.exists(nametaxa_fname):
             self._log.info('Read metadata ...')
-            self._nametaxa = self._read_name_taxa(self.nametaxa_fname)
+            self._nametaxa = self._read_name_taxa(nametaxa_fname)
             
         return rdr, wtr
             
@@ -656,7 +655,7 @@ class GBIFReader(object):
         return biline
     
     # ...............................................
-    def transform_gbif_to_bison(self, gbif_fname, outfname, logname=None):
+    def transform_gbif_to_bison(self, gbif_interp_fname, pass1_fname):
         """
         @summary: Create a CSV file containing GBIF occurrence records extracted 
                      from the interpreted occurrence file provided 
@@ -667,18 +666,14 @@ class GBIFReader(object):
                  GBIF download. 
         @note: Some fields will be filled in on subsequent processing.
         """
-        self.interp_fname = os.path.join(self.basepath, gbif_fname)
-        pass1_fname = os.path.join(self.tmppath, outfname)
-
         if self.is_open():
             self.close()
         if os.path.exists(pass1_fname):
             raise Exception('First pass output file {} exists!'.format(pass1_fname))            
-        self._rotate_logfile(logname=logname)        
 
         recno = 0
         try:
-            reader, writer = self._open_pass1_files(pass1_fname)
+            reader, writer = self._open_pass1_files(gbif_interp_fname, pass1_fname)
             # Extract relevant GBIF metadata
             self._log.info('Read metadata ...')
             gmetardr = GBIFMetaReader(self._log)
@@ -713,21 +708,19 @@ class GBIFReader(object):
         self._write_namevals_for_lookup()
 
     # ...............................................
-    def gather_name_input(self, inbasename, logname=None):
-        infname = os.path.join(self.tmppath, inbasename)
-        self._rotate_logfile(logname=logname)
-        
+    def gather_name_input(self, pass1_fname, nametaxa_fname):
         recno = 0
         try:
-            self._log.info('Open initial pre-processed BISON output file {}'.format(infname))
+            self._log.info('Open initial pre-processed BISON output file {}'.format(pass1_fname))
             # Open output BISON file 
-            dreader, inf = getCSVDictReader(infname, self._bison_delimiter,
-                                           self._encoding)
+            dreader, inf = getCSVDictReader(pass1_fname, self._bison_delimiter,
+                                            self._encoding)
             self._files.append(inf) 
             for rec in dreader:
                 recno += 1
                 # Save scientificName / TaxonID for later lookup and replace
-                self._save_for_lookups(rec)
+                self._save_namevals_for_lookup(rec)
+#                 self._save_for_lookups(rec)
                 # Show progress
                 if (recno % LOGINTERVAL) == 0:
                     self._log.info('*** Record number {} ***'.format(recno))
@@ -738,22 +731,21 @@ class GBIFReader(object):
             self.close()
 
         # Write all lookup values
-        self._write_namevals_for_lookup()
+        self._write_namevals_for_lookup(nametaxa_fname)
 
             
     # ...............................................
-    def update_bison_names(self, infname, outfname, 
-                           logname=None, discard_fields=[]):
+    def update_bison_names(self, infname, outfname, discard_fields=[]):
         """
         @summary: Create a CSV file from pre-processed GBIF data, with
                   clean_provided_scientific_name resolved from 
                   original scientificName or taxonKey. 
         @return: A CSV file of BISON-modified records from a GBIF download. 
+        @return: A text file of clean_provided_scientific_names values 
+        
         """
         if self.is_open():
             self.close()
-        self._rotate_logfile(logname=logname)
-
         recno = 0
         try:
             dreader, dwriter = self._open_update_files(infname, outfname, 
@@ -826,28 +818,79 @@ class GBIFReader(object):
             if count == 1:
                 print('  fips = {}, county={}, st={}'
                 .format(fips, county, state))
-#                 rec['calculated_fips'] = fips
-#                 rec['calculated_county_name'] = county
-#                 rec['calculated_state_name'] = state
+                rec['calculated_fips'] = fips
+                rec['calculated_county_name'] = county
+                rec['calculated_state_name'] = state
             else:
                 print('  intersects {} polygons'.format(count))
         return rec
 
     # ...............................................
-    def _fill_itisfields(self, rec, polylyr, idx_fips, idx_cnty, idx_st):
-        # input search term
-        name = rec['clean_provided_scientific_name']
-        # output: >= 0
-        common = rec['itis_common_name']
-        # output: >= 0
-        tsn = rec['itis_tsn']
-        rec['valid_accepted_scientific_name']
-        rec['valid_accepted_tsn']
-        rec['kingdom']
+    def _get_itisfields(self, name, itis_svc):
+        # Get tsn, acceptedTSN, accepted_name, kingdom
+        accepted_tsn = row = None
+        tsn, accepted_name, kingdom, accepted_tsn_list = itis_svc.get_itis_tsn(name)
+        if accepted_name is None:
+            for accepted_tsn in accepted_tsn_list:
+                accepted_name, kingdom = itis_svc.get_itis_name(accepted_tsn)
+                if accepted_name is not None:
+                    break
+        else:
+            accepted_tsn = tsn
+        
+        for v in (tsn, accepted_name, kingdom, accepted_tsn):
+            if v is not None:
+                row = [tsn, accepted_name, kingdom, accepted_tsn]
+                break
+        if row:
+            # Get common names
+            common_names = itis_svc.get_itis_vernacular(accepted_tsn)
+            common_names_str = ';'.join(common_names)
+            row.append(common_names_str)
+        return row
+
+    # ...............................................
+    def write_itis_lookup(self, cleanname_fname, itis_lut_fname):
+        if self.is_open():
+            self.close()
+        header = ['clean_provided_scientific_name', 'itis_tsn', 
+                  'valid_accepted_scientific_name', 'valid_accepted_tsn', 
+                  'kingdom', 'itis_common_name']
+        itis_svc = ITISSvc()
+        recno = 0
+        try:
+            inf = open(cleanname_fname, 'r', encoding=self._encoding)
+            csvwriter, outf = getCSVWriter(itis_lut_fname, BISON_DELIMITER, 
+                                           self._encoding, 'w')
+            self._files.extend([inf, outf])
+            csvwriter.writerow(header)
+            for line in inf:
+                recno += 1
+                cleanname = line.strip()
+                row = self._get_itisfields(cleanname, itis_svc)
+                if row is not None:
+                    row.insert(0, cleanname)
+                    csvwriter.writerow(row)
+        except Exception as e:
+            self._log.error('Failed reading from line {} {} or writing to {}; {}'
+                            .format(recno, cleanname_fname, itis_lut_fname, e))                    
+        finally:
+            self.close()            
+            
+    # ...............................................
+    def _fill_itisfields(self, rec, itis_lut):
+        try:
+            itis_vals = itis_lut(rec['clean_provided_scientific_name'])
+        except Exception as e:
+            pass
+        else:
+            for fld in ['itis_tsn', 'valid_accepted_scientific_name', 
+                        'valid_accepted_tsn', 'kingdom', 'itis_common_name']:
+                rec[fld] = itis_vals[fld]
         return rec
 
     # ...............................................
-    def update_bison_itis_geo(self, infname, outfname, logname=None):
+    def update_bison_itis_geo(self, infname, itis_lut_fname, outfname):
         """
         @summary: Create a CSV file from pre-processed BISON data and 
                   external ITIS and Georeferencing data.
@@ -855,8 +898,6 @@ class GBIFReader(object):
         """
         if self.is_open():
             self.close()
-        self._rotate_logfile(logname=logname)
-        
         pth, _ = os.path.split(self.basepath)
         polyfile = os.path.join(pth, 'ancillary/USCounties/USCounties.shp')
         driver = ogr.GetDriverByName("ESRI Shapefile")
@@ -867,31 +908,33 @@ class GBIFReader(object):
         idx_cnty = poly_def.GetFieldIndex('COUNTY_NAM')
         idx_st = poly_def.GetFieldIndex('STATE_NAME')
         
+        itis_lut = self._read_lookup(itis_lut_fname, 'clean_provided_scientific_name')
+
         recno = 0
         try:
             dreader, dwriter = self._open_update_files(infname, outfname)
             for rec in dreader:
                 recno += 1
-                gid = rec[OCC_UUID_FLD]
-                
+                gid = rec[OCC_UUID_FLD]                
+                # Compute geo: coordinates and polygons
                 rec = self._fill_geofields(rec, polylyr, 
                                            idx_fips, idx_cnty, idx_st)
                 # Fill ITIS 
-                # Compute geo: coordinates and polygons
-                
-#                 dwriter.writerow(rec)
-                    
+                rec = self._fill_itisfields(rec, itis_lut)
+                # Write updated record
+                dwriter.writerow(rec)
+                # Log progress occasionally
                 if (recno % LOGINTERVAL) == 0:
                     self._log.info('*** Record number {} ***'.format(recno))
                                     
         except Exception as e:
-            self._log.error('Failed reading data from line {} in {}: {}'
-                            .format(recno, pass1_fname, e))                    
+            self._log.error('Failed filling data from line {}: {}'
+                            .format(recno, e))                    
         finally:
             self.close()
 
     # ...............................................
-    def update_bison_estmeans(self, infname, outfname, logname=None):
+    def update_bison_estmeans(self, infname, outfname):
         """
         @summary: Create a CSV file from pre-processed BISON data containing
                   ITIS TSN and BISON EstablishmentMeans table.
@@ -899,8 +942,6 @@ class GBIFReader(object):
         """
         if self.is_open():
             self.close()
-        self._rotate_logfile(logname=logname)
-
         recno = 0
         try:
             dreader, dwriter = self._open_update_files(infname, outfname)
@@ -922,7 +963,7 @@ class GBIFReader(object):
             self.close()
 
     # ...............................................
-    def write_dataset_org_lookup(self, logname=None):
+    def write_dataset_org_lookup(self, dataset_lut_fname, org_lut_fname):
         """
         @summary: Create lookup table for: 
                   BISON resource and provider from 
@@ -931,11 +972,10 @@ class GBIFReader(object):
                            including publishingOrganization metadata 
                            for that dataset
         """
-        if os.path.exists(self.ds_lut_fname):
-            raise Exception('Output file {} exists!'.format(self.ds_lut_fname))
-        if os.path.exists(self.org_lut_fname):
-            raise Exception('Output file {} exists!'.format(self.org_lut_fname))
-        self._rotate_logfile(logname=logname)
+        if os.path.exists(dataset_lut_fname):
+            raise Exception('Output file {} exists!'.format(dataset_lut_fname))
+        if os.path.exists(org_lut_fname):
+            raise Exception('Output file {} exists!'.format(org_lut_fname))
         gmetardr = GBIFMetaReader(self._log)
         # --------------------------------------
         # Gather dataset and organization UUIDs from EML files downloaded with 
@@ -944,35 +984,34 @@ class GBIFReader(object):
 
         # Query/save dataset information
         gbifapi = GbifAPI()
-        gbifapi.get_write_dataset_meta(self.ds_lut_fname, uuids)
-        self._log.info('Wrote dataset metadata to {}'.format(self.ds_lut_fname))
+        gbifapi.get_write_dataset_meta(dataset_lut_fname, uuids)
+        self._log.info('Wrote dataset metadata to {}'.format(dataset_lut_fname))
         
         # --------------------------------------
         # Gather organization UUIDs from dataset metadata assembled above
-        org_uuids = gmetardr.get_organization_uuids(self.ds_lut_fname)
+        org_uuids = gmetardr.get_organization_uuids(dataset_lut_fname)
         # Query/save organization information
-        gbifapi.get_write_org_meta(self.org_lut_fname, org_uuids)
-        self._log.info('Wrote organization metadata to {}'.format(self.org_lut_fname))
+        gbifapi.get_write_org_meta(org_lut_fname, org_uuids)
+        self._log.info('Wrote organization metadata to {}'.format(org_lut_fname))
             
     # ...............................................
-    def write_name_lookup(self, logname=None):
+    def write_name_lookup(self, nametaxa_fname, name_lut_fname):
         """
         @summary: Create lookup table for: 
-                  BISON canonicalName from GBIF scientificName and/or taxonKey
+                  key GBIF scientificName or taxonKey, value clean_provided_scientific_name
         """
-        if not os.path.exists(self.nametaxa_fname):
-            raise Exception('Input file {} missing!'.format(self.nametaxa_fname))
-        if os.path.exists(self.name_lut_fname):
-            raise Exception('Output LUT file {} exists!'.format(self.name_lut_fname))
-        self._rotate_logfile(logname=logname)
+        if not os.path.exists(nametaxa_fname):
+            raise Exception('Input file {} missing!'.format(nametaxa_fname))
+        if os.path.exists(name_lut_fname):
+            raise Exception('Output LUT file {} exists!'.format(name_lut_fname))
         
         # Read name/taxonIDs dictionary for name resolution
-        nametaxa = self._read_name_taxa(self.nametaxa_fname)
+        nametaxa = self._read_name_taxa(nametaxa_fname)
         namelst = list(nametaxa.keys())
         
         gmetardr = GBIFMetaReader(self._log)
-        name_fails = gmetardr.write_parsed_names(self.name_lut_fname, namelst)
-        name_fails = gmetardr.write_resolved_taxkeys(self.name_lut_fname, 
+        name_fails = gmetardr.write_parsed_names(name_lut_fname, namelst)
+        name_fails = gmetardr.write_resolved_taxkeys(name_lut_fname, 
                                                      name_fails, nametaxa)
         self._log.info('{} scientificNames/taxonKeys unresolvable {}'
                        .format(len(name_fails), name_fails))
@@ -995,7 +1034,7 @@ if __name__ == '__main__':
                         are not present in the same directory as the raw data, 
                         they will be  created for temp and final output files.
                         """)
-    parser.add_argument('--step', type=int, default=1, choices=[1,2,3,4,5],
+    parser.add_argument('--step', type=int, default=1, choices=[1,2,3,4,5,6,7],
                         help="""
                         Step number for data processing:
                            1: Dataset/Provider lookup table assembly:
@@ -1016,18 +1055,20 @@ if __name__ == '__main__':
                                 'clean_provided_scientific_name'.
                            4: Field value replacements. Names are replaced with 
                               resolved values saved in name lookup tables.
-                           5: Georeferencing, field value replacements. 
+                           5: ITIS name lookup table assembly
+                           6: Georeferencing, field value replacements. 
                               Calculated FIPS, county, state values are filled 
                               with resolved values from USCounties shapefile.
+                           7: Establishment Means field replacement
                         """)
     args = parser.parse_args()
-    gbif_occ_file = args.gbif_occ_file
+    gbif_interp_file = args.gbif_occ_file
     step = args.step
 
     overwrite = True
     tmpdir = 'tmp'
     outdir = 'out'
-    inpath, gbif_fname = os.path.split(gbif_occ_file)
+    inpath, gbif_fname = os.path.split(gbif_interp_file)
     gbif_basefname, ext = os.path.splitext(gbif_fname)
 
     tmppath = os.path.join(inpath, tmpdir)
@@ -1035,33 +1076,42 @@ if __name__ == '__main__':
     os.makedirs(tmppath, mode=0o775, exist_ok=True)
     os.makedirs(outpath, mode=0o775, exist_ok=True)
     
-    outbase = 'step{}_{}'.format(step, gbif_basefname)   
-    pass1_fname = 'step2_bisonformat_{}.csv'.format(gbif_basefname)
-    pass2_fname = 'step4_cleannames_{}.csv'.format(gbif_basefname)
-    pass3_fname = 'step5_itis_geo_{}.csv'.format(gbif_basefname)
-    pass4_fname = 'step6_estmeans_{}.csv'.format(gbif_basefname)
+    # reference files for lookups
+    dataset_lut_fname = os.path.join(tmppath, 'dataset_lut.csv')
+    org_lut_fname = os.path.join(tmppath, 'organization_lut.csv')
+    nametaxa_fname = os.path.join(tmppath, 'step3_sciname_taxkey_list.csv')
+    name_lut_fname = os.path.join(tmppath, 'step3_name_lut.csv')
+    cleanname_fname = os.path.join(tmppath, 'step3_cleanname_list.txt')
+    itis_lut_fname = os.path.join(tmppath, 'step5_itis_lut.txt')
     
-    if not os.path.exists(gbif_occ_file):
-        raise Exception('Filename {} does not exist'.format(gbif_occ_file))
+    logbasename = 'step{}_{}'.format(step, gbif_basefname)   
+    pass1_fname = os.path.join(tmppath, 'step2_bisonformat_{}.csv'.format(gbif_basefname))
+    pass2_fname = os.path.join(tmppath, 'step4_cleannames_{}.csv'.format(gbif_basefname))
+    pass3_fname = os.path.join(tmppath, 'step6_itis_geo_{}.csv'.format(gbif_basefname))
+    pass4_fname = os.path.join(tmppath, 'step7_estmeans_{}.csv'.format(gbif_basefname))
+    
+    if not os.path.exists(gbif_interp_file):
+        raise Exception('Filename {} does not exist'.format(gbif_interp_file))
     else:
-        gr = GBIFReader(inpath, tmpdir, outdir)
+        gr = GBIFReader(inpath, tmpdir, outdir, logbasename)
         if step == 1:
-            gr.write_dataset_org_lookup(logname=outbase)
+            gr.write_dataset_org_lookup(dataset_lut_fname)
             
         elif step == 2:
-            gr.read_dataset_lookup(logname=outbase)
+            gr.read_dataset_lookup(dataset_lut_fname)
             gr.read_org_lookup()
             # Pass 1 of CSV transform, initial pull, standardize, 
             # FillMethod = gbif_meta, metadata fill
-            gr.transform_gbif_to_bison(gbif_fname, pass1_fname)
+            gr.transform_gbif_to_bison(gbif_interp_file, pass1_fname)
             
         elif step == 3:
             # Reread output if missing gbif name/taxkey 
-            gr.gather_name_input(pass1_fname)
-            name_fails = gr.write_name_lookup(logname=outbase)
+            gr.gather_name_input(pass1_fname, nametaxa_fname)
+            name_fails = gr.write_name_lookup(nametaxa_fname, name_lut_fname)
             
         elif step == 4:
-            gr.read_name_lookup(logname=outbase)
+            gr.read_name_lookup(name_lut_fname)
+            gr.write_cleannames(cleanname_fname)
             # Pass 2 of CSV transform
             # FillMethod = gbif_name, canonical name fill 
             # TODO: create lookup table/list here?
@@ -1069,17 +1119,20 @@ if __name__ == '__main__':
                                   discard_fields=['taxonKey'])
             
         elif step == 5:
+            # Resolve clean names to ITIS values
+            gr.write_itis_lookup(cleanname_fname, itis_lut_fname)
+
+        elif step == 6:
             # Pass 3 of CSV transform
-            gr.update_bison_itis_geo(pass2_fname, pass3_fname)
+            gr.update_bison_itis_geo(pass2_fname, itis_lut_fname, pass3_fname)
             # FillMethod = itis_tsn, ITIS lookup and 
             # FillMethod = georef, Georeference coordinates, political boundaries, waterbodies
-            pass
-#         
-#         elif step == 6:
-#             # Pass 4 of CSV transform
+         
+        elif step == 7:
+            # Pass 4 of CSV transform
 #             gr.update_bison_estmeans(pass3_fname, pass4_fname)
-#             # FillMethod = est_means, EstablishmentMeans fill
-#             pass
+            # FillMethod = est_means, EstablishmentMeans fill
+            pass
     
 """
 wc -l occurrence.txt 
