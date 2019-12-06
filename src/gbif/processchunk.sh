@@ -12,7 +12,7 @@
 
 usage () 
 {
-    echo "Usage: $0 <START_LINE>  <ITERATIONS>"
+    echo "Usage: $0 <SUBDIR>  <INFILE_BASENAME>"
     echo "This script is run on a subset of a GBIF occurrence download in Darwin Core format"
     echo "It will:"
     echo "     - process the data into BISON-acceptable CSV format "
@@ -24,60 +24,43 @@ usage ()
 
 ### Set variables 
 set_defaults() {
-    start=$1
-    count=$2
-    inc=1000000
-    pth=/state/partition1/data/bison/terr
-    base=occurrence
-    outbase=outBison
+    pth=/tank/data/bison/2019
+    SUBDIR=$1
+    DATANAME=$2
+    THISPTH=$pth/$SUBDIR/
+    INFILE=$THISPTH/$DATANAME.txt
+    echo 'Input = ' $INFILE
+    
+    PROCESS_CSV=/state/partition1/git/bison/gbif/convert2bison.py
 
-    echo $pth/$base$postfix.csv
-	
-    PROCESS_CSV=/state/partition1/workspace/bison/src/gbif/gbif2bison.py
-
+    
     THISNAME=`/bin/basename $0`
-
-    LOG=$pth/$THISNAME.log
+    LOG=$THISPTH/$THISNAME.log
     # Append to existing logfile
     touch $LOG
 }
 
 
-### Convert some data 
+### Convert chunk of GBIF data to BISON format
 convert_data() {
-    start=$1
-    stop=$2
-    postfix=_lines_$start-$stop
-	
-    infile=$pth/$base$postfix.csv
-    if [ -s $infile ]; then
-    	LogStuff "${infile} exists"
-    else
-    	LogStuff "${infile} is empty or does not exist"  
-    fi
-
-    outfile=$pth/$outbase$postfix.csv
-    if [ -s $outfile ]; then
-	LogStuff "${outfile} exists"
-    else
-	LogStuff "${outfile} does not exist"
-	TimeStamp "process into ${outfile}" >> $LOG
-	time python $PROCESS_CSV >> $LOG
-	TimeStamp ""
-    fi
+    stp=1
+    while [[ $stp -le 4 ]]
+    do 
+     	TimeStamp "Process ${DATANAME} with step ${stp}" >> $LOG
+       	time python $PROCESS_CSV $INFILE --step=$stp >> $LOG
+        TimeStamp "Step $stp complete"
+        let stp=stp+1
+    done
+       	TimeStamp ""
 }
 
+### Log progress
 TimeStamp () {
-    echo $1 `/bin/date`
     echo $1 `/bin/date` >> $LOG
 }
 
-LogStuff () {
-    echo $1
-    echo $1 >> $LOG
-}
 
-####### Main #######
+################################# Main #################################
 if [ $# -ne 2 ]; then
     usage
     exit 0
@@ -98,7 +81,7 @@ do
 	let c=c+1
 done
 TimeStamp "# End"
+################################# Main #################################
 
-# bash /state/partition1/workspace/bison/src/gbif/chunkfile.sh 7000000 1
 
  
