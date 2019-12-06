@@ -947,7 +947,7 @@ class GBIFReader(object):
             self.close()            
             
     # ...............................................
-    def _fill_itisfields(self, rec, itis_lut):
+    def _fill_itis_fields(self, rec, itis_lut):
         canonical = rec['clean_provided_scientific_name']
         try:
             itis_vals = itis_lut[canonical]
@@ -957,6 +957,22 @@ class GBIFReader(object):
             for fld in ['itis_tsn', 'valid_accepted_scientific_name', 
                         'valid_accepted_tsn', 'kingdom', 'itis_common_name']:
                 rec[fld] = itis_vals[fld]
+        return rec
+
+    # ...............................................
+    def _fill_estmeans_field(self, rec, estmeans_lut):
+        estmeans = None
+        tsn = rec['itis_tsn']
+        sname = rec['clean_provided_scientific_name']
+        try:
+            estmeans = estmeans_lut[tsn]
+        except:
+            try:
+                estmeans = estmeans[sname]
+            except:
+                self._log.info('Found NO establishment means for {} or {}'
+                               .format(tsn, sname))
+        rec['establishment_means'] = estmeans
         return rec
 
     # ...............................................
@@ -1030,9 +1046,9 @@ class GBIFReader(object):
                 
                 # Fill establishment_means from TSN or 
                 # clean_provided_scientific_name and establishment means table
-                rec = self._fill_estmeansfield(rec, estmeans_lut)
+                rec = self._fill_estmeans_field(rec, estmeans_lut)
                 # Fill Marine EEZ from georeference
-                rec = self._fill_geofields(rec, polylyr, idx_eez, idx_mg)
+                rec = self._fill_eezgeofields(rec, polylyr, idx_eez, idx_mg)
                 
                 dwriter.writerow(rec)
                     
@@ -1041,7 +1057,7 @@ class GBIFReader(object):
                                     
         except Exception as e:
             self._log.error('Failed reading data from line {} in {}: {}'
-                            .format(recno, pass1_fname, e))                    
+                            .format(recno, infname, e))                    
         finally:
             self.close()
 
