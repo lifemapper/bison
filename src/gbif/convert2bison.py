@@ -23,6 +23,7 @@
 """
 from osgeo import ogr
 import os
+from pympler import asizeof
 import time
 
 from common.constants import (BISON_DELIMITER, ENCODING, LOGINTERVAL)
@@ -36,7 +37,7 @@ from gbif.constants import (GBIF_DELIMITER, PROHIBITED_VALS,
                             CLIP_CHAR, FillMethod,GBIF_UUID_KEY)
 from gbif.metareader import GBIFMetaReader
 from gbif.gbifapi import GbifAPI
-from pympler import asizeof
+
         
 # .............................................................................
 class GBIFReader(object):

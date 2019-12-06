@@ -137,7 +137,6 @@ BISON_GBIF_MAP = [
     ('valid_accepted_scientific_name', FillMethod.itis_tsn),   
     ('valid_accepted_tsn', FillMethod.itis_tsn),   
     ('provided_scientific_name', NS.dwc + 'scientificName'), #  taxonRemarks?
-#     ('provided_tsn', FillMethod.itis_tsn),
     ('provided_tsn', NS.dwc + 'taxonID'),
     ('latitude', NS.dwc +  'decimalLatitude'),
     ('longitude', NS.dwc + 'decimalLongitude'),
