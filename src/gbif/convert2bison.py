@@ -833,63 +833,59 @@ class GBIFReader(object):
             self.close()
             
     # ...............................................
-    def _fill_geofields(self, rec, 
+    def _fill_geofields(self, rec, lon, lat,
                         terrlyr, idx_fips, idx_cnty, idx_st,
                         eezlyr, idx_eez, idx_mg):
         terrcount = 0
         marinecount = 0
-        slon = rec['longitude']
-        slat = rec['latitude']
-        try:
-            lon = float(slon)
-            lat = float(slat)
-        except:
-            pfips = rec['provided_fips']
-            pcounty = rec['provided_county_name']
-            pstate = rec['provided_state_name']
-            print('Unable to resolve coordinates {}, {}'.format(slon, slat))
-            if pfips != '' or pcounty != '' or pstate != '':
-                print('Provided fips {}, county {}, state {}'.format(pfips, pcounty, pstate))
-        else:
-            pt = ogr.Geometry(ogr.wkbPoint)
-            pt.AddPoint(lon, lat)
-            terrlyr.SetSpatialFilter(pt)
-            eezlyr.SetSpatialFilter(pt)
-            print('Feature {}, {}:'.format(lon, lat))
-            for poly in terrlyr:
-                terrcount += 1
-                fips = poly.GetFieldAsString(idx_fips)
-                county = poly.GetFieldAsString(idx_cnty)
-                state = poly.GetFieldAsString(idx_st)
-            for poly in eezlyr:
-                marinecount += 1
-                eez = poly.GetFieldAsString(idx_eez)
-                mrgid = poly.GetFieldAsString(idx_mg)
-#                 print('  eez = {}, mrgid={}'.format(eez, mrgid))
-            # Single terrestrial polygon takes precedence
-            if terrcount == 1:
-                # terrestrial intersect
-                rec['calculated_fips'] = fips
-                rec['calculated_county_name'] = county
-                rec['calculated_state_name'] = state
-                self._log.info('  fips = {}, county={}, st={}'
-                               .format(fips, county, state))
-            elif terrcount == 0:
-                # Single marine intersect is 2nd choice
-                if marinecount == 1:
-                    rec['calculated_waterbody'] = eez
-                    rec['mrgid'] = mrgid
-                    self._log.info('  calculated_waterbody = {}, mrgid={}'
-                                   .format(eez, mrgid))
-                # 0 or > 1 marine intersects
-                else:
-                    self._log.info('  Coordinate intersects no terrestrial, {} EEZ polygons'
-                                   .format(marinecount))
-            # terrcount > 1, multiple intersects
+        
+        pt = ogr.Geometry(ogr.wkbPoint)
+        pt.AddPoint(lon, lat)
+        terrlyr.SetSpatialFilter(pt)
+        eezlyr.SetSpatialFilter(pt)
+        print('Feature {}, {}:'.format(lon, lat))
+        for poly in terrlyr:
+            terrcount += 1
+            fips = poly.GetFieldAsString(idx_fips)
+            county = poly.GetFieldAsString(idx_cnty)
+            state = poly.GetFieldAsString(idx_st)
+        for poly in eezlyr:
+            marinecount += 1
+            eez = poly.GetFieldAsString(idx_eez)
+            mrgid = poly.GetFieldAsString(idx_mg)
+        # Single terrestrial polygon takes precedence
+        if terrcount == 1:
+            # terrestrial intersect
+            rec['calculated_fips'] = fips
+            rec['calculated_county_name'] = county
+            rec['calculated_state_name'] = state
+            self._log.info('  fips = {}, county={}, st={}'
+                           .format(fips, county, state))
+        elif terrcount == 0:
+            # Single marine intersect is 2nd choice
+            if marinecount == 1:
+                rec['calculated_waterbody'] = eez
+                rec['mrgid'] = mrgid
+                self._log.info('  calculated_waterbody = {}, mrgid={}'
+                               .format(eez, mrgid))
+            # 0 or > 1 marine intersects
             else:
-                self._log.info('  Coordinate intersects {} terrestrial, {} EEZ polygons'
-                               .format(terrcount, marinecount))
-        return rec
+                self._log.info('  Coordinate intersects no terrestrial, {} EEZ polygons'
+                               .format(marinecount))
+        # terrcount > 1, multiple intersects
+        else:
+            self._log.info('  Coordinate intersects {} terrestrial, {} EEZ polygons'
+                           .format(terrcount, marinecount))
+    return rec
+
+    # ...............................................
+    def _fill_with_centroids(self, rec, centroid_lut):
+        pfips = rec['provided_fips']
+        pcounty = rec['provided_county_name']
+        pstate = rec['provided_state_name']
+        if pfips != '' or pcounty != '' or pstate != '':
+            print('Provided fips {}, county {}, state {}'.format(pfips, pcounty, pstate))
+
 
     # ...............................................
     def _get_itisfields(self, name, itis_svc):
@@ -998,8 +994,20 @@ class GBIFReader(object):
         return rec
 
     # ...............................................
-    def update_bison_itis_geo(self, infname, itis2_lut_fname, 
-                              terr_geo_shpname, terr_geo_lut_fname, eez_shpname, 
+    def _get_coords(self, rec):
+        lon = lat = None
+        slon = rec['longitude']
+        slat = rec['latitude']
+        try:
+            lon = float(slon)
+            lat = float(slat)
+        except:
+            lon = lat = None
+        return lon, lat
+
+    # ...............................................
+    def update_bison_itis_geo(self, infname, itis2_lut_fname,
+                              terr_geo_shpname, centroid_lut_fname, eez_shpname, 
                               outfname):
         """
         @summary: Create a CSV file from pre-processed BISON data and 
@@ -1030,17 +1038,24 @@ class GBIFReader(object):
 #         # clean_provided_scientific_name, itis_tsn, valid_accepted_scientific_name, 
 #         # valid_accepted_tsn, kingdom, itis_common_name
 #         itis_lut = self._read_lookup(itis_lut_fname, 'clean_provided_scientific_name')
+        centroid_lut = self._read_centroid_lookup(centroid_lut_fname, delimiter=',')
 
         recno = 0
         try:
             dreader, dwriter = self._open_update_files(infname, outfname)
             for rec in dreader:
                 recno += 1
-                gid = rec[OCC_UUID_FLD]                
-                # Compute geo: coordinates and polygons
-                rec = self._fill_geofields(rec, 
-                                           terrlyr, idx_fips, idx_cnty, idx_st,
-                                           eezlyr, idx_eez, idx_mg)
+                gid = rec[OCC_UUID_FLD]
+                lon, lat = self._get_coords(rec)
+                
+                if lon is None:
+                    rec = self._fill_with_centroids(rec, centroid_lut)
+                    lon, lat = self._get_coords(rec)
+                if lon is not None:
+                    # Compute geo: coordinates and polygons
+                    rec = self._fill_geofields(rec, lon, lat,
+                                               terrlyr, idx_fips, idx_cnty, idx_st,
+                                               eezlyr, idx_eez, idx_mg)
                 # Fill ITIS 
                 rec = self._fill_itisfields(rec, itis_lut)
                 # Write updated record
@@ -1223,7 +1238,7 @@ if __name__ == '__main__':
     
     # ancillary data for record update
     terr_geo_shpname = os.path.join(ancillary_path, 'USCounties/USCounties.shp')
-    terr_geo_lut_fname = os.path.join(ancillary_path, 'bison_geography.csv')
+    centroid_lut_fname = os.path.join(ancillary_path, 'bison_geography.csv')
     estmeans_fname = os.path.join(ancillary_path, 'NonNativesIndex20190912.txt')
     eez_shpname = os.path.join(ancillary_path, 'World_EEZ_v8_20140228_splitpolygons/World_EEZ_v8_2014_HR.shp')
     itis2_lut_fname = os.path.join(ancillary_path, 'itis_lookup.csv')
@@ -1274,7 +1289,7 @@ if __name__ == '__main__':
             # FillMethod = itis_tsn, georef (terrestrial)
             # Use Derek D. generated ITIS lookup itis2_lut_fname
             gr.update_bison_itis_geo(pass2_fname, itis2_lut_fname, 
-                                     terr_geo_shpname, terr_geo_lut_fname, 
+                                     terr_geo_shpname, centroid_lut_fname, 
                                      eez_shpname, pass3_fname)
          
         elif step == 4:
