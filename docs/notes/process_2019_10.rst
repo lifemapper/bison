@@ -13,17 +13,17 @@ US Territories and Canada
   * http://www.gbif.org/occurrence/search?COUNTRY=AS&COUNTRY=CA&COUNTRY=FM&COUNTRY=GU&COUNTRY=MH&COUNTRY=MP&COUNTRY=PR&COUNTRY=PW&COUNTRY=UM&COUNTRY=VI 
   * GBIF.org (15 October 2019) GBIF Occurrence Download https://doi.org/10.15468/dl.5qoflq 
   * GBIF.org (06 December 2019) GBIF Occurrence Download https://doi.org/10.15468/dl.trksri 
-
-       * American Samoa 
-       * Canada 
-       * Micronesia, Federated States of 
-       * Guam 
-       * Marshall Islands 
-       * Northern Mariana Islands 
-       * Puerto Rico 
-       * Palau 
-       * United States Minor Outlying Islands 
-       * Virgin Islands, U.S. 
+  
+    * American Samoa 
+    * Canada 
+    * Micronesia, Federated States of 
+    * Guam 
+    * Marshall Islands 
+    * Northern Mariana Islands 
+    * Puerto Rico 
+    * Palau 
+    * United States Minor Outlying Islands 
+    * Virgin Islands, U.S. 
 
 Process: (LUT = lookup table)
 -----------------------------
