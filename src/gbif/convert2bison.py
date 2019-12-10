@@ -372,16 +372,17 @@ class GBIFReader(object):
         return lookupDict
     
     # ...............................................
-    def _read_lookup(self, fname, uuidkey):
+    def _read_lookup(self, fname, uuidkey, delimiter=None):
         '''
         @summary: Read and populate dictionary with key = uuid and 
                   dictionary of record values
         '''
+        if delimiter is None:
+            delimiter = self._bison_delimiter
         lookup = {}
         if os.path.exists(fname):
             try:
-                rdr, inf = getCSVDictReader(fname, self._bison_delimiter, 
-                                            self._encoding)
+                rdr, inf = getCSVDictReader(fname, delimiter, self._encoding)
                 for data in rdr:
                     uuid = data[uuidkey]
                     lookup[uuid] = data
@@ -426,7 +427,7 @@ class GBIFReader(object):
         '''
         lookup = {}
         delimiter = '\t'
-        sep = ';'
+        sep = ' '
         if os.path.exists(estmeans_fname):
             try:
                 drdr, inf = getCSVDictReader(estmeans_fname, delimiter, 
@@ -832,7 +833,11 @@ class GBIFReader(object):
             self.close()
             
     # ...............................................
-    def _fill_geofields(self, rec, polylyr, idx_fips, idx_cnty, idx_st):
+    def _fill_geofields(self, rec, 
+                        terrlyr, idx_fips, idx_cnty, idx_st,
+                        eezlyr, idx_eez, idx_mg):
+        terrcount = 0
+        marinecount = 0
         slon = rec['longitude']
         slat = rec['latitude']
         try:
@@ -845,53 +850,45 @@ class GBIFReader(object):
             print('Unable to resolve coordinates {}, {}'.format(slon, slat))
             if pfips != '' or pcounty != '' or pstate != '':
                 print('Provided fips {}, county {}, state {}'.format(pfips, pcounty, pstate))
-            
         else:
             pt = ogr.Geometry(ogr.wkbPoint)
             pt.AddPoint(lon, lat)
-            polylyr.SetSpatialFilter(pt)
-            count = 0
+            terrlyr.SetSpatialFilter(pt)
+            eezlyr.SetSpatialFilter(pt)
             print('Feature {}, {}:'.format(lon, lat))
-            for poly in polylyr:
-                count += 1
+            for poly in terrlyr:
+                terrcount += 1
                 fips = poly.GetFieldAsString(idx_fips)
                 county = poly.GetFieldAsString(idx_cnty)
                 state = poly.GetFieldAsString(idx_st)
-            if count == 1:
-                print('  fips = {}, county={}, st={}'
-                .format(fips, county, state))
+            for poly in eezlyr:
+                marinecount += 1
+                eez = poly.GetFieldAsString(idx_eez)
+                mrgid = poly.GetFieldAsString(idx_mg)
+#                 print('  eez = {}, mrgid={}'.format(eez, mrgid))
+            # Single terrestrial polygon takes precedence
+            if terrcount == 1:
+                # terrestrial intersect
                 rec['calculated_fips'] = fips
                 rec['calculated_county_name'] = county
                 rec['calculated_state_name'] = state
+                self._log.info('  fips = {}, county={}, st={}'
+                               .format(fips, county, state))
+            elif terrcount == 0:
+                # Single marine intersect is 2nd choice
+                if marinecount == 1:
+                    rec['calculated_waterbody'] = eez
+                    rec['mrgid'] = mrgid
+                    self._log.info('  calculated_waterbody = {}, mrgid={}'
+                                   .format(eez, mrgid))
+                # 0 or > 1 marine intersects
+                else:
+                    self._log.info('  Coordinate intersects no terrestrial, {} EEZ polygons'
+                                   .format(marinecount))
+            # terrcount > 1, multiple intersects
             else:
-                print('  intersects {} polygons'.format(count))
-        return rec
-
-    # ...............................................
-    def _fill_eezgeofields(self, rec, polylyr, idx_eez, idx_mg):
-        slon = rec['longitude']
-        slat = rec['latitude']
-        try:
-            lon = float(slon)
-            lat = float(slat)
-        except:
-            print('Unable to resolve coordinates {}, {}'.format(slon, slat))            
-        else:
-            pt = ogr.Geometry(ogr.wkbPoint)
-            pt.AddPoint(lon, lat)
-            polylyr.SetSpatialFilter(pt)
-            count = 0
-            print('Feature {}, {}:'.format(lon, lat))
-            for poly in polylyr:
-                count += 1
-                eez = poly.GetFieldAsString(idx_eez)
-                mrgid = poly.GetFieldAsString(idx_mg)
-                print('  eez = {}, mrgid={}'.format(eez, mrgid))
-            if count == 1:
-                rec['calculated_waterbody'] = eez
-                rec['mrgid'] = mrgid
-            else:
-                print('  intersects {} marine polygons'.format(count))
+                self._log.info('  Coordinate intersects {} terrestrial, {} EEZ polygons'
+                               .format(terrcount, marinecount))
         return rec
 
     # ...............................................
@@ -947,7 +944,12 @@ class GBIFReader(object):
             self.close()            
             
     # ...............................................
-    def _fill_itis_fields(self, rec, itis_lut):
+    def _fill_itisfields1(self, rec, itis_lut):
+        """
+        Aimee's LUT header
+        clean_provided_scientific_name, itis_tsn, valid_accepted_scientific_name, 
+        valid_accepted_tsn, kingdom, itis_common_name
+        """
         canonical = rec['clean_provided_scientific_name']
         try:
             itis_vals = itis_lut[canonical]
@@ -957,6 +959,26 @@ class GBIFReader(object):
             for fld in ['itis_tsn', 'valid_accepted_scientific_name', 
                         'valid_accepted_tsn', 'kingdom', 'itis_common_name']:
                 rec[fld] = itis_vals[fld]
+        return rec
+
+    # ...............................................
+    def _fill_itisfields2(self, rec, itis_lut):
+        """
+        Derek's LUT header
+        scientific_name, tsn, valid_accepted_scientific_name, valid_accepted_tsn,
+        hierarchy_string, common_name, amb
+        """
+        canonical = rec['clean_provided_scientific_name']
+        try:
+            itis_vals = itis_lut[canonical]
+        except Exception as e:
+            self._log.info('Found NO itis values for {}'.format(canonical))                    
+        else:
+            rec['itis_tsn'] = itis_vals['tsn']
+            rec['valid_accepted_scientific_name'] = itis_vals['valid_accepted_scientific_name']
+            rec['valid_accepted_tsn'] = itis_vals['valid_accepted_tsn']
+            rec['itis_common_name'] = itis_vals['common_name']
+#             rec['kingdom'] = itis_vals['kingdom']
         return rec
 
     # ...............................................
@@ -976,7 +998,9 @@ class GBIFReader(object):
         return rec
 
     # ...............................................
-    def update_bison_itis_geo(self, infname, itis_lut_fname, geo_fname, outfname):
+    def update_bison_itis_geo(self, infname, itis2_lut_fname, 
+                              terr_geo_shpname, terr_geo_lut_fname, eez_shpname, 
+                              outfname):
         """
         @summary: Create a CSV file from pre-processed BISON data and 
                   external ITIS and Georeferencing data.
@@ -985,14 +1009,27 @@ class GBIFReader(object):
         if self.is_open():
             self.close()
         driver = ogr.GetDriverByName("ESRI Shapefile")
-        dataSource = driver.Open(geo_fname, 0)
-        polylyr = dataSource.GetLayer()
-        poly_def = polylyr.GetLayerDefn()
-        idx_fips = poly_def.GetFieldIndex('FIPS')
-        idx_cnty = poly_def.GetFieldIndex('COUNTY_NAM')
-        idx_st = poly_def.GetFieldIndex('STATE_NAME')
+        terr_data_src = driver.Open(terr_geo_shpname, 0)
+        terrlyr = terr_data_src.GetLayer()
+        terr_def = terrlyr.GetLayerDefn()
+        idx_fips = terr_def.GetFieldIndex('FIPS')
+        idx_cnty = terr_def.GetFieldIndex('COUNTY_NAM')
+        idx_st = terr_def.GetFieldIndex('STATE_NAME')
         
-        itis_lut = self._read_lookup(itis_lut_fname, 'clean_provided_scientific_name')
+        eez_data_src = driver.Open(eez_shpname, 0)
+        eezlyr = eez_data_src.GetLayer()
+        eez_def = eezlyr.GetLayerDefn()
+        idx_eez = eez_def.GetFieldIndex('EEZ')
+        idx_mg = eez_def.GetFieldIndex('MRGID')
+
+        # Derek's LUT header
+        # scientific_name, tsn, valid_accepted_scientific_name, valid_accepted_tsn,
+        # hierarchy_string, common_name, amb
+        itis_lut = self._read_lookup(itis2_lut_fname, 'scientific_name', delimiter=',')
+#         # Aimee's LUT header
+#         # clean_provided_scientific_name, itis_tsn, valid_accepted_scientific_name, 
+#         # valid_accepted_tsn, kingdom, itis_common_name
+#         itis_lut = self._read_lookup(itis_lut_fname, 'clean_provided_scientific_name')
 
         recno = 0
         try:
@@ -1001,8 +1038,9 @@ class GBIFReader(object):
                 recno += 1
                 gid = rec[OCC_UUID_FLD]                
                 # Compute geo: coordinates and polygons
-                rec = self._fill_geofields(rec, polylyr, 
-                                           idx_fips, idx_cnty, idx_st)
+                rec = self._fill_geofields(rec, 
+                                           terrlyr, idx_fips, idx_cnty, idx_st,
+                                           eezlyr, idx_eez, idx_mg)
                 # Fill ITIS 
                 rec = self._fill_itisfields(rec, itis_lut)
                 # Write updated record
@@ -1018,8 +1056,7 @@ class GBIFReader(object):
             self.close()
 
     # ...............................................
-    def update_bison_estmeans_eez(self, infname, estmeans_fname, eez_fname, 
-                                  outfname):
+    def update_bison_estmeans_eez(self, infname, estmeans_fname, outfname):
         """
         @summary: Create a CSV file from pre-processed BISON data containing
                   ITIS TSN and BISON EstablishmentMeans table.
@@ -1030,12 +1067,12 @@ class GBIFReader(object):
         
         estmeans_lut = self._read_estmeans_lookup(estmeans_fname)
 
-        driver = ogr.GetDriverByName("ESRI Shapefile")
-        dataSource = driver.Open(eez_fname, 0)
-        polylyr = dataSource.GetLayer()
-        poly_def = polylyr.GetLayerDefn()
-        idx_eez = poly_def.GetFieldIndex('EEZ')
-        idx_mg = poly_def.GetFieldIndex('MRGID')
+#         driver = ogr.GetDriverByName("ESRI Shapefile")
+#         dataSource = driver.Open(eez_fname, 0)
+#         polylyr = dataSource.GetLayer()
+#         poly_def = polylyr.GetLayerDefn()
+#         idx_eez = poly_def.GetFieldIndex('EEZ')
+#         idx_mg = poly_def.GetFieldIndex('MRGID')
 
         recno = 0
         try:
@@ -1185,9 +1222,11 @@ if __name__ == '__main__':
     os.makedirs(outpath, mode=0o775, exist_ok=True)
     
     # ancillary data for record update
-    geo_fname = os.path.join(ancillary_path, 'USCounties/USCounties.shp')
+    terr_geo_shpname = os.path.join(ancillary_path, 'USCounties/USCounties.shp')
+    terr_geo_lut_fname = os.path.join(ancillary_path, 'bison_geography.csv')
     estmeans_fname = os.path.join(ancillary_path, 'NonNativesIndex20190912.txt')
-    eez_fname = os.path.join(ancillary_path, 'World_EEZ_v8_20140228_splitpolygons/World_EEZ_v8_2014_HR.shp')
+    eez_shpname = os.path.join(ancillary_path, 'World_EEZ_v8_20140228_splitpolygons/World_EEZ_v8_2014_HR.shp')
+    itis2_lut_fname = os.path.join(ancillary_path, 'itis_lookup.csv')
     
     # reference files for lookups
     dataset_lut_fname = os.path.join(tmppath, 'dataset_lut.csv')
@@ -1195,7 +1234,7 @@ if __name__ == '__main__':
     nametaxa_fname = os.path.join(tmppath, 'step1_sciname_taxkey_list.csv')
     name_lut_fname = os.path.join(tmppath, 'step2_name_lut.csv')
     cleanname_fname = os.path.join(tmppath, 'step2_cleanname_list.txt')
-    itis_lut_fname = os.path.join(tmppath, 'step3_itis_lut.txt')
+    itis1_lut_fname = os.path.join(tmppath, 'step3_itis_lut.txt')
     
     logbasename = 'step{}_{}'.format(step, gbif_basefname)
     # Output CSV files of all records after initial creation or field replacements
@@ -1229,17 +1268,19 @@ if __name__ == '__main__':
             
         elif step == 3:
             # Resolve clean names to ITIS values
-            gr.write_itis_lookup(cleanname_fname, itis_lut_fname)
+#             # Use ITIS Solr/REST APIs to generate ITIS table itis1_lut_fname
+#             gr.write_itis_lookup(cleanname_fname, itis1_lut_fname)
             # Pass 3 of CSV transform
             # FillMethod = itis_tsn, georef (terrestrial)
-            gr.update_bison_itis_geo(pass2_fname, itis_lut_fname, geo_fname, 
-                                     pass3_fname)
+            # Use Derek D. generated ITIS lookup itis2_lut_fname
+            gr.update_bison_itis_geo(pass2_fname, itis2_lut_fname, 
+                                     terr_geo_shpname, terr_geo_lut_fname, 
+                                     eez_shpname, pass3_fname)
          
         elif step == 4:
             # Pass 4 of CSV transform
             # FillMethod = est_means, georef (marine)
-            gr.update_bison_estmeans_eez(pass3_fname, estmeans_fname, eez_fname, 
-                                         pass4_fname)
+            gr.update_bison_estmeans(pass3_fname, estmeans_fname, pass4_fname)
             pass
     
 """

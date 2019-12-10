@@ -74,7 +74,7 @@ New things
 To be done on BISON 48, either from GBIF or data providers,
 process info at: https://my.usgs.gov/confluence/display/DEV/SAS+Development
 
-* Step 1/2: ITIS lookup 
+* ITIS lookup 
   
   * Lookup TSN from clean_provided_scientific_name to get:
 
@@ -82,28 +82,39 @@ process info at: https://my.usgs.gov/confluence/display/DEV/SAS+Development
     * itis_tsn
     * valid_accepted_scientific_name
     * valid_accepted_tsn
-    * if blank, get kingdom
+    * kingdom if provided field is blank
 
   * Process: 
   
-    * Use downloaded database?  From https://www.itis.gov/downloads/index.html
-      or provided by ITIS developers
-    * Use API?
+    * Use lookup table created from data ITIS developers provide to Denver
+    * Rejected options:
+    
+      * Use API?  No, Solr query is fast, but REST query for common names is slow
+      * Use downloaded database from https://www.itis.gov/downloads/index.html
+        No, data is not as current as version provided by ITIS developers
   
-* Step 1/2: Geo lookup
+* Geo lookup
 
-  * shapefiles from Shayne for point in polygons:
-
-    * US Counties.zip for US and Canada: https://my.usgs.gov/jira/browse/BISA-1143 
-    * World_EEZ_v8_20140228_splitpolygons.zip, using attributes MRGID & EEZEEZ: 
+  * On records with longitude/latitude
+   
+    * Do point-in-polygon query on shapefiles to fill 
+      calculated_state_name, calculated_county_name, calculated_fips from 
+      US Counties.zip for US and Canada: https://my.usgs.gov/jira/browse/BISA-1143
+    * Do point-in-polygon query on shapefiles to fill 
+      calculated_waterbody, mrgid from 
+      World_EEZ_v8_20140228_splitpolygons.zip, using attributes MRGID & EEZEEZ: 
       https://my.usgs.gov/jira/browse/BISA-763 
       Shayne says: "I think we will always need to check EEZ as there is some 
       overlap with the other layers"
-
-  * Process
-  
-    * Check (point in poly) USCounties to get US County, State, FIPs or CA values
-    * Check (point in poly) Marine EEZ for waterbody (buffered) names
+    * If point intersects with > 1 terrestrial or marine polygon, leave blank
+    * If point intersects with terrestrial AND marine polygons, leave blank      
+      
+  * On records with NO longitude/latitude, use geography lookup table for 
+    
+    * if provided_state_name + provided_county_name, fill longitude/latitude 
+      with county centroid coordinates, fill centroid with "county"
+    * if provided_fips, fill longitude/latitude 
+      with fips centroid coordinates, fill centroid with "county"
 
 GBIF data for BISON ingest
 --------------------------
