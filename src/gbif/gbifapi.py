@@ -434,6 +434,34 @@ class GbifAPI(object):
                 
         return total, name_fail
             
+# ...............................................
+    def get_parsednames(self, indata):
+        name_fail = []
+        parsed_names = {}
+        output = self._postJsonToParser(GBIF_BATCH_PARSER_URL, indata)
+        if output is not None:
+            for rec in output:
+                try:
+                    sciname = rec['scientificName']
+                except KeyError as e:
+                    print('Missing scientificName in output record')
+                except Exception as e:
+                    print('Failed reading scientificName in output record, err: {}'
+                          .format(str(e)))
+                else:
+                    if rec['parsed'] is True:
+                        try:
+                            canname = rec['canonicalName']
+                            parsed_names[sciname] = canname
+                        except KeyError as e:
+                            print('Missing canonicalName in output record')
+                        except Exception as e:
+                            print('Failed writing output record, err: {}'
+                                  .format(str(e)))
+                    else:
+                        name_fail.append(sciname)        
+        return parsed_names, name_fail
+            
 
 # ...............................................
 if __name__ == '__main__':

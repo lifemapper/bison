@@ -173,6 +173,7 @@ class GBIFMetaReader(object):
         name_fails = []
         gbifapi = GbifAPI()
         while namelst:
+            # Write first 1000, then delete first 1000
             currnames = namelst[:tot]
             namelst = namelst[tot:]
             total, currfail = gbifapi.get_write_parsednames(currnames, lut_fname)
