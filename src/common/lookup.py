@@ -116,7 +116,7 @@ class Lookup(dict):
                 finally:
                     inf.close()
         if self.data:
-            self.data._log.info('Lookup table size for {}:'.format(fname))
-            self.data._log.info(asizeof.asized(self.data).format())
+            print('Lookup table size for {}:'.format(fname))
+            print(asizeof.asized(self.data).format())
 
     

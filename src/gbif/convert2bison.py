@@ -37,6 +37,7 @@ from gbif.constants import (GBIF_DELIMITER, PROHIBITED_VALS,
                             CLIP_CHAR, FillMethod,GBIF_UUID_KEY)
 from gbif.metareader import GBIFMetaReader
 from gbif.gbifapi import GbifAPI
+from lib2to3.btm_utils import rec_test
 
         
 # .............................................................................
@@ -74,8 +75,6 @@ class GBIFReader(object):
         self._gbif_bison_map = {}
         # Fields to compute
         self._calc_pass1 = []
-        
-        self.lut = Lookup()
         
         for (bisonfld, fld_or_mthd) in BISON_GBIF_MAP:
             self._save_flds.append(bisonfld)
@@ -494,9 +493,11 @@ class GBIFReader(object):
             idx = gbif_column_map[gfld]
             val = self._get_gbif_val(gid, iline, gfld, idx)
             rec[bfld] = val
-
+        return rec
+    
     # ...............................................
-    def _create_bisonrec_pass1(self, iline, gbif_column_map, dataset_lut, org_lut):
+    def _create_bisonrec_pass1(self, iline, gbif_column_map, dataset_lut, 
+                               org_lut, nametaxa_lut):
         """
         @summary: Create a list of values, ordered by BISON-requested fields in 
                      ORDERED_OUT_FIELDS, with individual values and/or entire record
@@ -509,23 +510,22 @@ class GBIFReader(object):
         rec = self._gbifline_to_bisonrec(iline, gbif_column_map)
         
         # Check full record
-        rec = self._test_for_discard(rec)
+        self._test_for_discard(rec)
         # Fill resource (gbif dataset) then provider (gbif organization) values
         # Discard records with bison url for dataset or provider
-        rec = self._discard_bison_add_resource_provider(rec, dataset_lut, org_lut)
+        self._discard_bison_add_resource_provider(rec, dataset_lut, org_lut)
             
         if rec is not None:
-            rec = self._control_vocabulary(rec)
+            self._control_vocabulary(rec)
             # Fill some fields with best non-blank option
-            rec = self._update_second_choices(rec)
+            self._update_second_choices(rec)
             # Format eventDate and fill missing year
-            rec = self._update_dates(rec)
+            self._update_dates(rec)
             # Modify lat/lon vals if necessary
-            rec = self._update_point(rec)            
+            self._update_point(rec)            
             # Save scientificName / TaxonID for later lookup and replace
-            self.lut.save_to_lookup(rec['provided_scientific_name'], 
-                                        rec['taxonKey'], self._nametaxa, 
-                                        is_list=True)
+            nametaxa_lut.save_to_lookup(rec['provided_scientific_name'], 
+                                        rec['taxonKey'], is_list=True)
             # create the ordered row
             for fld in self._bison_ordered_flds:
                 if rec[fld] is None:
@@ -552,8 +552,11 @@ class GBIFReader(object):
         if os.path.exists(pass1_fname):
             raise Exception('First pass output file {} exists!'.format(pass1_fname))            
 
-        dataset_lut = self.lut.read_lookup(dataset_lut_fname, GBIF_UUID_KEY)
-        org_lut = self.lut.read_lookup(org_lut_fname, GBIF_UUID_KEY)
+        dataset_lut = Lookup()
+        dataset_lut.read_lookup(dataset_lut_fname, GBIF_UUID_KEY, BISON_DELIMITER)
+        org_lut = Lookup()
+        org_lut.read_lookup(org_lut_fname, GBIF_UUID_KEY, BISON_DELIMITER)
+        nametaxa_lut = Lookup()
 
         recno = 0
         try:
@@ -579,7 +582,8 @@ class GBIFReader(object):
                     
                 # Create new record or empty list
                 biline = self._create_bisonrec_pass1(line, gbif_column_map,
-                                                     dataset_lut, org_lut)
+                                                     dataset_lut, org_lut, 
+                                                     nametaxa_lut)
                 # Write new record
                 if biline:
                     writer.writerow(biline)
@@ -590,9 +594,8 @@ class GBIFReader(object):
             self.close()
 
         # Write all lookup values
-        self.lut.write_to_lookup(nametaxa_fname, 
-                                    ['scientificName', 'taxonKeys'], 
-                                    BISON_DELIMITER, isList=True)
+        nametaxa_lut.write_lookup(nametaxa_fname, ['scientificName', 'taxonKeys'], 
+                                  BISON_DELIMITER)
 
     # ...............................................
     def gather_name_input(self, pass1_fname, nametaxa_fname):
@@ -926,7 +929,7 @@ class GBIFReader(object):
             self.close()
 
     # ...............................................
-    def write_dataset_org_lookup(self, dataset_lut_fname, org_lut_fname):
+    def write_dataset_org_lookup(self, dataset_lut_fname, org_lut_fname, delimiter=BISON_DELIMITER):
         """
         @summary: Create lookup table for: 
                   BISON resource and provider from 
@@ -946,7 +949,7 @@ class GBIFReader(object):
             uuids = gmetardr.get_dataset_uuids(self._dataset_pth)
     
             # Query/save dataset information
-            gbifapi.get_write_dataset_meta(dataset_lut_fname, uuids)
+            gbifapi.get_write_dataset_meta(dataset_lut_fname, uuids, delimiter=delimiter)
             self._log.info('Wrote dataset metadata to {}'.format(dataset_lut_fname))
             
         if os.path.exists(org_lut_fname):
@@ -956,18 +959,18 @@ class GBIFReader(object):
             # Gather organization UUIDs from dataset metadata assembled above
             org_uuids = gmetardr.get_organization_uuids(dataset_lut_fname)
             # Query/save organization information
-            gbifapi.get_write_org_meta(org_lut_fname, org_uuids)
+            gbifapi.get_write_org_meta(org_lut_fname, org_uuids, delimiter=delimiter)
             self._log.info('Wrote organization metadata to {}'.format(org_lut_fname))
             
             
     # ...............................................
-    def _append_resolved_taxkeys(self, lut, lut_fname, name_fails, nametaxa):
+    def _append_resolved_taxkeys(self, lut, lut_fname, name_fails, nametaxa,
+                                 delimiter=BISON_DELIMITER):
         """
         @summary: Create lookup table for: 
                   BISON canonicalName from GBIF scientificName and/or taxonKey
         """
-        csvwriter, f = getCSVWriter(lut_fname, BISON_DELIMITER, ENCODING, 
-                                    fmode='a')
+        csvwriter, f = getCSVWriter(lut_fname, delimiter, ENCODING, fmode='a')
         count = 0
         names_resolved = []
         gbifapi = GbifAPI()
@@ -995,12 +998,11 @@ class GBIFReader(object):
                                len(name_fails), name_fails))                    
                         
     # ...............................................
-    def _write_parsed_names(self, lut_fname, namelst):
+    def _write_parsed_names(self, lut_fname, namelst, delimiter=BISON_DELIMITER):
         tot = 1000
         name_lut = {}
         name_fails = []
-        csvwriter, f = getCSVWriter(lut_fname, BISON_DELIMITER, ENCODING, 
-                                    fmode='w')
+        csvwriter, f = getCSVWriter(lut_fname, delimiter, ENCODING, fmode='w')
         header = ['provided_scientific_name_or_taxon_key', 'clean_provided_scientific_name']
         csvwriter.writerow(header)
         gbifapi = GbifAPI()
@@ -1020,7 +1022,8 @@ class GBIFReader(object):
             
             
     # ...............................................
-    def resolve_write_name_lookup(self, nametaxa_fname, name_lut_fname):
+    def resolve_write_name_lookup(self, nametaxa_fname, name_lut_fname, 
+                                  delimiter=BISON_DELIMITER):
         """
         @summary: Create lookup table for: 
                   key GBIF scientificName or taxonKey, value clean_provided_scientific_name
@@ -1031,10 +1034,11 @@ class GBIFReader(object):
             raise Exception('Output LUT file {} exists!'.format(name_lut_fname))
         
         # Read name/taxonIDs dictionary for name resolution
-        nametaxa = self.lut.read_lookup(nametaxa_fname, 'scientificName', 
-                                        BISON_DELIMITER)
+        nametaxa = self.lut.read_lookup(nametaxa_fname, 'scientificName', delimiter)
         # Create name LUT with messyname/canonical from GBIF parser and save to file
-        name_lut, name_fails = self._write_parsed_names(name_lut_fname, list(nametaxa.keys()))        
+        name_lut, name_fails = self._write_parsed_names(name_lut_fname, 
+                                                        list(nametaxa.keys()),
+                                                        delimiter=delimiter)
         # Append taxonkeys/canonical from GBIF taxonkey webservice to name LUT and file
         self._append_resolved_taxkeys(name_lut, name_lut_fname, 
                                       name_fails, nametaxa)
@@ -1107,7 +1111,8 @@ if __name__ == '__main__':
     os.makedirs(outpath, mode=0o775, exist_ok=True)
     
     # ancillary data for record update
-    terr_geo_shpname = os.path.join(ancillary_path, 'USCounties/USCounties.shp')
+#     terr_geo_shpname = os.path.join(ancillary_path, 'USCounties/USCounties.shp')
+    terr_geo_shpname = os.path.join(ancillary_path, 'US_CA_Counties_Centroids.shp')
     centroid_lut_fname = os.path.join(ancillary_path, 'bison_geography.csv')
     estmeans_fname = os.path.join(ancillary_path, 'NonNativesIndex20190912.txt')
     eez_shpname = os.path.join(ancillary_path, 'World_EEZ_v8_20140228_splitpolygons/World_EEZ_v8_2014_HR.shp')
@@ -1132,7 +1137,8 @@ if __name__ == '__main__':
     else:
         gr = GBIFReader(inpath, tmpdir, outdir, logbasename)
         if step == 1:
-            gr.write_dataset_org_lookup(dataset_lut_fname, org_lut_fname)
+            gr.write_dataset_org_lookup(dataset_lut_fname, org_lut_fname, 
+                                        delimiter=BISON_DELIMITER)
             # Pass 1 of CSV transform, initial pull, standardize, 
             # FillMethod = gbif_meta, metadata fill
             gr.transform_gbif_to_bison(gbif_interp_file, dataset_lut_fname, 
