@@ -6,13 +6,14 @@ from common.tools import (getCSVReader, getCSVDictReader, getCSVWriter, getLine)
 
 class VAL_TYPE:
     DICT = 1
-    LIST = 2
-#     FLOAT = 3
-#     INT = 4
-#     STRING = 5
+    SET = 2
+    TUPLE = 3
+    INT = 4
+    FLOAT = 5
+    STRING = 6
 
 # .............................................................................
-class Lookup(dict):
+class Lookup(object):
     """
     @summary: 
     @note: 
@@ -22,12 +23,33 @@ class Lookup(dict):
         """
         @summary: Constructor
         """
-        self.data = {}
+        self.lut = {}
         self.valtype = valtype
         self.encoding = encoding
         
     # ...............................................
-    def save_to_lookup(self, key, val, is_list=False):
+    @classmethod
+    def initFromDict(cls, lookupdict, valtype=VAL_TYPE.DICT, encoding=ENCODING):
+        """
+        @summary: Constructor
+        """
+        lookup = Lookup(valtype=valtype, encoding=encoding)
+        lookup.lut = lookupdict
+        return lookup
+
+    # ...............................................
+    @classmethod
+    def initFromFile(cls, lookup_fname, keyfld, delimiter, 
+                     valtype=VAL_TYPE.DICT, encoding=ENCODING):
+        """
+        @summary: Constructor
+        """
+        lookup = Lookup(valtype=valtype, encoding=encoding)
+        lookup.read_lookup(lookup_fname, keyfld, delimiter)
+        return lookup
+
+    # ...............................................
+    def save_to_lookup(self, key, val):
         """
         @summary: Save scientificName / taxonKeys for parse or query 
         @param rec: dictionary of all fieldnames and values for this record
@@ -38,44 +60,45 @@ class Lookup(dict):
                to avoid writing duplicates.  
         """
         if key is None and val is None:
-            self._log.warning('Missing key {} or value {}'.format(key, val))
+            print('Missing key {} or value {}'.format(key, val))
         else:
             try:
-                existingval = self[key]
+                existingval = self.lut[key]
             except KeyError:
-                if is_list:
-                    self.data[key] = [val]
+                if self.valtype == VAL_TYPE.SET:
+                    self.lut[key] = set([val])
                 else:
-                    self.data[key] = val
+                    self.lut[key] = val
             else:
-                if is_list:
-                    self.data[key] = existingval.append(val)
-                else:
+                if self.valtype == VAL_TYPE.SET:
+                    self.lut[key].add(val)
+                elif val != existingval:
                     raise Exception('Conflicting value for key {} and existing val {}')
                 
 
     # ...............................................
-    def write_lookup(self, fname, header, delimiter, encoding=ENCODING):
+    def write_lookup(self, fname, header, delimiter):
         # Write scientific names and taxonKeys found with them in raw data
         fmode = 'w'
         if os.path.exists(fname):
             fmode = 'a'
         try:
-            writer, outf = getCSVWriter(fname, delimiter, encoding, fmode=fmode)
-            self._log.info('Opened file {} for write'.format(fname))        
+            writer, outf = getCSVWriter(fname, delimiter, self.encoding, 
+                                        fmode=fmode)
+            print('Opened file {} for write'.format(fname))        
             if fmode == 'w' and header is not None:
                 writer.writerow(header)
-                for key, val in self.data.items():
-                    row = [k for k in val]
-                    row.insert(0, key)
-                    writer.writerow(row)
+            for key, val in self.lut.items():
+                row = [k for k in val]
+                row.insert(0, key)
+                writer.writerow(row)
         except Exception:
-            self._log.error('Failed to write data to {}'.format(fname))
+            print('Failed to write data to {}'.format(fname))
         finally:
             outf.close()
 
     # ...............................................
-    def read_lookup(self, fname, keyfld, delimiter, encoding=ENCODING):
+    def read_lookup(self, fname, keyfld, delimiter):
         '''
         @summary: Read and populate dictionary with key = uuid and 
                   val = dictionary of record values
@@ -83,21 +106,21 @@ class Lookup(dict):
         if os.path.exists(fname):
             if self.valtype == VAL_TYPE.DICT:
                 try:
-                    rdr, inf = getCSVDictReader(fname, delimiter, encoding)
+                    rdr, inf = getCSVDictReader(fname, delimiter, self.encoding)
                 except Exception as e:
-                    self._log.error('Failed reading data in {}: {}'
+                    print('Failed reading data in {}: {}'
                                     .format(fname, e))
                 else:
                     for data in rdr:
                         datakey = data.pop(keyfld)
-                        self.data[datakey] = data
+                        self.lut[datakey] = data
                 finally:
                     inf.close()
                     
-            elif self.valtype == VAL_TYPE.LIST:
+            elif self.valtype == VAL_TYPE.SET:
                 recno = 0
                 try:
-                    rdr, inf = getCSVReader(fname, delimiter, encoding)
+                    rdr, inf = getCSVReader(fname, delimiter, self.encoding)
                     # get header
                     line, recno = getLine(rdr, recno)
                     # read lookup vals into dictionary
@@ -106,17 +129,16 @@ class Lookup(dict):
                         if line and len(line) > 0:
                             try:
                                 # First item is scientificName, rest are taxonKeys
-                                self.data[line[0]] = list(line[1:])
+                                self.lut[line[0]] = set(line[1:])
                             except Exception:
-                                self._log.warn('Failed to parse line {} {}'
+                                print('Failed to parse line {} {}'
                                                .format(recno, line))
                 except Exception as e:
-                    self._log.error('Failed reading data in {}: {}'
+                    print('Failed reading data in {}: {}'
                                     .format(fname, e))
                 finally:
                     inf.close()
-        if self.data:
-            print('Lookup table size for {}:'.format(fname))
-            print(asizeof.asized(self.data).format())
+#         print('Lookup table size for {}:'.format(fname))
+#         print(asizeof.asized(self.lut).format())
 
     
