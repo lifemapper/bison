@@ -89,25 +89,6 @@ class GBIFMetaReader(object):
         return fields
 
     # ...............................................
-    def get_dataset_uuids(self, dataset_pth):
-        """
-        @summary: Get dataset UUIDs from downloaded dataset EML filenames.
-        @param dataset_pth: absolute path to the dataset EML files
-        """
-        uuids = []
-        dsfnames = glob.glob(os.path.join(dataset_pth, '*.xml'))
-        if dsfnames is not None:
-            start = len(dataset_pth)
-            if not dataset_pth.endswith(os.pathsep):
-                start += 1
-            stop = len('.xml')
-            for fn in dsfnames:
-                uuids.append(fn[start:-stop])
-        self._log.info('Read {} dataset UUIDs from filenames in {}'
-                       .format(len(uuids), dataset_pth))
-        return uuids
-    
-    # ...............................................
     def get_organization_uuids(self, dset_lut_fname):
         """
         @summary: Get organization UUIDs from dataset metadata pulled from GBIF

@@ -31,6 +31,9 @@ NAMESPACE = {'tdwg':   'http://rs.tdwg.org/dwc/text/',
              'xsi':    'http://www.w3.org/2001/XMLSchema-instance',
              'dublin': 'http://purl.org/dc/terms/'}
 
+
+BISON_ORG_UUID = 'c3ad790a-d426-4ac1-8e32-da61f81f0117'
+USDA_BEE_ORG_UUID = '1e26a630-7203-11dc-a0d8-b8a03c50a862'
 # .............................................................................
 class GBIF_ORG_KEYS(object):
     apitype = 'organization'
@@ -40,12 +43,19 @@ class GBIF_ORG_KEYS(object):
 
 # .............................................................................
 class GBIF_DSET_KEYS(object):
+    """
+    if Org key is BISON_ORG_UUID = 'c3ad790a-d426-4ac1-8e32-da61f81f0117'
+    and identifiers/(one of numbered children with 
+                     type=URL
+                     identifier=https://bison.usgs.gov/ipt/resource?r=*
+    """
     apitype = 'dataset'
     # First 'save' key is organization UUID
     saveme = ['key', 'publishingOrganizationKey', 'title', 'description', 
             'citation', 'rights', 'logoUrl', 'created', 'modified', 'homepage']
     preserve_format = ['title', 'rights', 'logoUrl', 'description', 'homepage']
 
+    
     
 GBIF_URL = 'http://api.gbif.org/v1'
 GBIF_DATASET_URL = '{}/{}/'.format(GBIF_URL, GBIF_DSET_KEYS.apitype)
@@ -59,7 +69,6 @@ GBIF_ORG_FOREIGN_KEY = 'publishingOrganizationKey'
 # http://api.gbif.org/v1/parser/name?name=quercus%20berberidifolia
 # http://api.gbif.org/v1/organization?identifier=362
 # http://api.gbif.org/v1/organization/c3ad790a-d426-4ac1-8e32-da61f81f0117
-BISON_UUID = 'c3ad790a-d426-4ac1-8e32-da61f81f0117'
 
 SUBDIRS = ('terr', 'us')
 DATASET_DIR = 'dataset'

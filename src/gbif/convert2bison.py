@@ -917,6 +917,27 @@ class GBIFReader(object):
             self.close()
 
     # ...............................................
+    def _get_dataset_uuids(self, dataset_pth):
+        """
+        @summary: Get dataset UUIDs from downloaded dataset EML filenames.
+        @param dataset_pth: absolute path to the dataset EML files
+        """
+        import glob
+        uuids = []
+        dsfnames = glob.glob(os.path.join(dataset_pth, '*.xml'))
+        if dsfnames is not None:
+            start = len(dataset_pth)
+            if not dataset_pth.endswith(os.pathsep):
+                start += 1
+            stop = len('.xml')
+            for fn in dsfnames:
+                uuids.append(fn[start:-stop])
+        self._log.info('Read {} dataset UUIDs from filenames in {}'
+                       .format(len(uuids), dataset_pth))
+        return uuids
+    
+
+    # ...............................................
     def write_dataset_org_lookup(self, dataset_lut_fname, org_lut_fname, delimiter=BISON_DELIMITER):
         """
         @summary: Create lookup table for: 
@@ -934,10 +955,18 @@ class GBIFReader(object):
             # --------------------------------------
             # Gather dataset and organization UUIDs from EML files downloaded with 
             # raw data
-            uuids = gmetardr.get_dataset_uuids(self._dataset_pth)
-    
+            datasets = Lookup(valtype=VAL_TYPE.DICT, encoding=ENCODING)
+            dsuuids = self._get_dataset_uuids(self._dataset_pth)
+            header = None
+            for uuid in dsuuids:
+                # query_for_dataset returns dictionary including UUID
+                rec = gbifapi.query_for_dataset(uuid)
+                if header is None and rec:
+                    header = rec.items[0][1].keys()
+                datasets.save_to_lookup(uuid, rec)
+            datasets.write_lookup(dataset_lut_fname, header, delimiter)
             # Query/save dataset information
-            gbifapi.get_write_dataset_meta(dataset_lut_fname, uuids, delimiter=delimiter)
+#             gbifapi.get_write_dataset_meta(dataset_lut_fname, uuids, delimiter=delimiter)
             self._log.info('Wrote dataset metadata to {}'.format(dataset_lut_fname))
             
         if os.path.exists(org_lut_fname):
