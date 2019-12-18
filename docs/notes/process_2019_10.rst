@@ -29,27 +29,33 @@ Process: (LUT = lookup table)
 -----------------------------
 Process GBIF data, mostly as 2018, with changes
 
-* Step 1: Create 2 LUTs prior to occ record processing
-
-  * Resource LUT
-    
+* Step 1: Create 2 lookup tables (LUTs) then initial process occ records from GBIF to BISON, 
+  
     * Create list of dataset UUIDs from Dataset EML files
-    * Create LUT and list of publishingOrganization UUIDs from 
-      GBIF API + dataset UUID
-  * Provider LUT: from GBIF API + provider UUID 
-    
-* Step 2: Process GBIF download to CSV file of GBIF data.  Temp result = step2_occ.csv
+    * Create Resource LUT and list of publishingOrganization UUIDs from 
+      GBIF dataset API + dataset UUID
+    * Create Provider LUT from GBIF publisher API + publishingOrganization UUID 
 
-  * Edit values for fields:
-    
+  * Fill Resource/Provider fields from LUTs and 
+
+    * Fill Resource name, code, url, and publishingOrganizationKey, discarding USGS records
+      from datasetKey and Resource LUT 
+    * Fill Provider name, code, url, etc 
+      from publishingOrganizationKey and Provider LUT 
+    * Discard records from BISON providers (Publisher: USGS, c3ad790a-d426-4ac1-8e32-da61f81f0117)
+     
+  * Replace some fields with controlled vocab, fill with alternate field values
+
     * NA, n/a, null --> ''
     * Correct/standardize data values
     * BISON verbatim_locality = either 1)verbatimLocality 2) locality or 3)habitat
-          
-  * Fill Resource name, code, url, and publishingOrganizationKey 
-    from datasetKey and Resource LUT 
-  * Fill Provider name, code, url, etc 
-    from publishingOrganizationKey and Provider LUT 
+
+  * Test for float values in longitude and latitude; if one is invalid, clear both
+  * Save provided_scientific_name and taxonKey to file for name parsing or key lookup
+
+* Step 2: Create name/taxonkey LUT for clean_provided_scientific_name, then 
+  process occ records to replace names
+
   * Discard records that fail for X reason
     
     * No scientificName or taxonKey

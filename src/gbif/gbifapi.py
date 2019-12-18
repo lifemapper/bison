@@ -30,7 +30,7 @@ from common.tools import getCSVWriter
 from gbif.constants import (GBIF_DSET_KEYS, GBIF_ORG_KEYS, GBIF_URL,
                             GBIF_DATASET_URL, GBIF_ORGANIZATION_URL,
                             GBIF_BATCH_PARSER_URL, GBIF_SINGLE_PARSER_URL,
-                            GBIF_TAXON_URL, GBIF_URL_ESCAPES)
+                            GBIF_TAXON_URL, GBIF_URL_ESCAPES, BISON_ORG_UUID)
 
     
 # .............................................................................
@@ -80,67 +80,73 @@ class GbifAPI(object):
                 else:
                     data = response.text
         return data
-                     
+             
+# ...............................................
+    def _get_val(self, data_dict, keylist, save_nl=True):
+        val = ''
+        child = data_dict
+        for key in keylist:
+            try:
+                child = child[key]
+            except:
+                raise ('Key {} of {} missing from output'.format(key, keylist))
+            else:
+                val = child
+        if val != '' and save_nl :
+            val = self._saveNLDelCR(val)
+        return val
+        
 # ...............................................
     def query_for_dataset(self, dsKey):
         dataDict = {}
-        # returns GBIF dataset
         if dsKey == '':
-            return dataDict
-        
+            return dataDict        
         url = GBIF_DATASET_URL + dsKey
         data = self._getDataFromUrl(url)
         if data is None:
             return dataDict
         
-        legacyid = 'NA'
-        orgkey = title = desc = citation = rights = logourl = homepage = ''
-        if 'key' in data:
-            if 'publishingOrganizationKey' in data:
-                orgkey = self._saveNLDelCR(data['publishingOrganizationKey'])
-                dataDict['publishingOrganizationKey'] = orgkey
-
-            if ('identifiers' in data
-                 and len(data['identifiers']) > 0 
-                 and data['identifiers'][0]['type'] == 'GBIF_PORTAL'):
-                legacyid = data['identifiers'][0]['identifier']
-                dataDict['legacyID'] = legacyid
+        key = self._get_val(data, ['key'], savenl=False)
+        if key == '':
+            print('Failed to resolve dataset with {}'.format(url))
+        else:
+            orgkey = self._get_val(data, ['publishingOrganizationKey'], savenl=True)
+            if orgkey == '':
+                print('Failed to find publishingOrganizationKey in {}'.format(url))
+            elif orgkey == BISON_ORG_UUID:
+                try:
+                    idents = data['identifiers']
+                except:
+                    pass
+                else:
+                    for child in idents:
+                        if child['type'] == 'URL':
+                            url = child['identifier']
+            if url != '':
+                url = self._get_toplevel_val(data, 'homepage', savenl=False)
             
-            if 'title' in data:
-                title = self._saveNLDelCR(data['title'])
-                dataDict['title'] = title
-
-            if 'description' in data:
-                desc = self._saveNLDelCR(data['description'])
-                dataDict['description'] = desc
+            title = self._get_val(data, ['title'], savenl=True)
+            desc = self._get_val(data, ['description'], savenl=True)
+            citation = self._get_val(data, ['citation', 'text'], savenl=True)
+            rights = self._get_val(data, ['rights'], savenl=True)
+            created = self._get_val(data, ['created'], savenl=False)
+            modified = self._get_val(data, ['modified'], savenl=False)
             
-            if 'citation' in data:
-                citation = self._saveNLDelCR(data['citation']['text'])
-                dataDict['citation'] = citation
-                
-            if 'rights' in data:
-                rights = self._saveNLDelCR(data['rights'])
-                dataDict['rights'] = rights
-
-            if 'logoUrl' in data:
-                logourl = data['logoUrl']
-                dataDict['logoUrl'] = logourl
-            
-            if 'homepage' in data:
-                homepage = data['homepage']
-                dataDict['homepage'] = homepage
-                
-            dataDict['key'] = data['key']
-            dataDict['created'] = data['created']
-            dataDict['modified'] = data['modified']
-
+            dataDict['publishingOrganizationKey'] = orgkey
+            dataDict['homepage'] = url
+            dataDict['title'] = title
+            dataDict['description'] = desc
+            dataDict['citation'] = citation
+            dataDict['rights'] = rights
+            dataDict['created'] = created
+            dataDict['modified'] = modified
         return dataDict
 
 # ...............................................
     def find_orguuid_from_dataset(self, dsKey):
-        row = self.query_for_dataset(dsKey)
+        dataDict = self.query_for_dataset(dsKey)
         try:
-            publishingOrgUUID = row[0]
+            publishingOrgUUID = dataDict['publishingOrganizationKey']
         except:
             print('No record for datasetKey {}'.format(dsKey))
         return publishingOrgUUID
