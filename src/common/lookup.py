@@ -85,13 +85,22 @@ class Lookup(object):
         try:
             writer, outf = getCSVWriter(fname, delimiter, self.encoding, 
                                         fmode=fmode)
-            print('Opened file {} for write'.format(fname))        
+            print('Opened file {} for write'.format(fname))
             if fmode == 'w' and header is not None:
                 writer.writerow(header)
-            for key, val in self.lut.items():
-                row = [k for k in val]
-                row.insert(0, key)
-                writer.writerow(row)
+            if self.valtype in (VAL_TYPE.SET, VAL_TYPE.TUPLE):
+                for key, val in self.lut.items():
+                    row = [k for k in val]
+                    row.insert(0, key)
+                    writer.writerow(row)
+            elif self.valtype == VAL_TYPE.DICT:
+                row = []
+                for key, ddict in self.lut.items():
+                    if header is None:
+                        header = ddict.keys()
+                for col in header:
+                    row.append(self.lut[col])
+                    writer.writerow(row)
         except Exception:
             print('Failed to write data to {}'.format(fname))
         finally:
