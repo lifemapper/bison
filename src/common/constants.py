@@ -23,6 +23,16 @@
 """
 from enum import Enum, auto
 
+# Test these against lowercase values
+PROHIBITED_VALS = ['na', '#na', 'n/a', '']
+
+PROHIBITED_CHARS = ['@', '&', '#', '~', 
+                    '*', '\t', '%', '|', '$', '-',]
+PROHIBITED_SNAME_CHARS = [',', '\'', '"', '.', '?', 
+                          '(', ')', '[', ']', '{', '}']
+PROHIBITED_RESOURCE_CHARS = []
+
+
 ENCODING = 'utf-8'
 BISON_DELIMITER = '$'
 
@@ -48,8 +58,15 @@ ITIS_VERNACULAR_QUERY = 'https://www.itis.gov/ITISWebService/services/ITISServic
 ITIS_NAMESPACE = '{http://itis_service.itis.usgs.gov}'
 ITIS_DATA_NAMESPACE = '{http://data.itis_service.itis.usgs.gov/xsd}'
 W3_NAMESPACE =  '{http://www.w3.org/2001/XMLSchema-instance}'
+ITIS_KINGDOMS = ['animalia', 'plantae', 'bacteria', 'fungi', 'protozofa', 
+                 'chromista', 'archaea', 'virus']
 
-LICENSE =  '(http://creativecommons.org/publicdomain/zero/1.0/legalcode) (DwC: license)'
+BISON_VALUES = {'provider': 'BISON',
+                'provider_url': 'https://bison.usgs.gov',
+                'provider_id': '440',
+                'license' : 'http://creativecommons.org/publicdomain/zero/1.0/legalcode) (DwC: license)',
+                }
+
 
 class FillMethod(Enum):
     gbif_meta = auto()

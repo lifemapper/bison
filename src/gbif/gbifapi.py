@@ -495,7 +495,6 @@ if __name__ == '__main__':
 
     infname = '/tank/data/bison/2019/AS/tmp/parser_in_10.txt'
     outfname = '/tank/data/bison/2019/AS/tmp/name_parser_10.csv'
-    import json
     
     gc = GbifAPI()
     if os.path.exists(infname):

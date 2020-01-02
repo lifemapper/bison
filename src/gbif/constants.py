@@ -101,9 +101,6 @@ TERM_CONVERT = {'FOSSIL_SPECIMEN': 'fossil',
                 'UNKNOWN': 'unknown'}
 
 
-# Test these against lowercase values
-PROHIBITED_VALS = ['na', '#na', 'n/a', '']
-
 class NS(object):
     dc = 'http://purl.org/dc/terms/'
     dwc = 'http://rs.tdwg.org/dwc/terms/'
@@ -111,8 +108,9 @@ class NS(object):
 
     
 OCC_UUID_FLD = 'gbifID'
+
 DISCARD_FIELDS = ['occurrenceStatus', 'locality', 'habitat']
-DISCARD_AFTER_UPDATE = ['taxonKey']
+DISCARD_AFTER_UPDATE = [OCC_UUID_FLD, 'taxonKey']
 # 47 BISON fields - (+ gbifID and taxonKey)
 #     only those with matching GBIF data from 
 #         BISON DATA FIELDS (GDrive July 3.2018).xlsx
