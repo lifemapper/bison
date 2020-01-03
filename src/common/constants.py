@@ -31,6 +31,7 @@ PROHIBITED_CHARS = ['@', '&', '#', '~',
 PROHIBITED_SNAME_CHARS = [',', '\'', '"', '.', '?', 
                           '(', ')', '[', ']', '{', '}']
 PROHIBITED_RESOURCE_CHARS = []
+BISON_SQUID_FLD = 'occurrence_url'
 
 
 ENCODING = 'utf-8'
@@ -50,6 +51,8 @@ LOG_DATE_FORMAT = '%d %b %Y %H:%M'
 LOGFILE_MAX_BYTES = 52000000 
 LOGFILE_BACKUP_COUNT = 5
 
+ITIS_KINGDOMS = ('animalia', 'plantae', 'bacteria', 'fungi', 'protozofa', 
+                 'chromista', 'archaea', 'virus')
 ITIS_SOLR_URL = 'https://services.itis.gov/'
 ITIS_NAME_KEY = 'nameWOInd'
 ITIS_TSN_KEY = 'tsn'
@@ -58,8 +61,6 @@ ITIS_VERNACULAR_QUERY = 'https://www.itis.gov/ITISWebService/services/ITISServic
 ITIS_NAMESPACE = '{http://itis_service.itis.usgs.gov}'
 ITIS_DATA_NAMESPACE = '{http://data.itis_service.itis.usgs.gov/xsd}'
 W3_NAMESPACE =  '{http://www.w3.org/2001/XMLSchema-instance}'
-ITIS_KINGDOMS = ['animalia', 'plantae', 'bacteria', 'fungi', 'protozofa', 
-                 'chromista', 'archaea', 'virus']
 
 BISON_VALUES = {'provider': 'BISON',
                 'provider_url': 'https://bison.usgs.gov',
@@ -67,6 +68,7 @@ BISON_VALUES = {'provider': 'BISON',
                 'license' : 'http://creativecommons.org/publicdomain/zero/1.0/legalcode) (DwC: license)',
                 }
 
+ISO_COUNTRY_CODES = ('AS', 'CA', 'FM', 'GU', 'MH', 'MP', 'PR', 'P', 'UM', 'US', 'VI')
 
 class FillMethod(Enum):
     gbif_meta = auto()

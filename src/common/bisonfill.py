@@ -28,7 +28,8 @@ import time
 from common.constants import (BISON_DELIMITER, ENCODING, LOGINTERVAL, 
                               PROHIBITED_CHARS, PROHIBITED_SNAME_CHARS, 
                               PROHIBITED_RESOURCE_CHARS, PROHIBITED_VALS,
-                              BISON_VALUES, ITIS_KINGDOMS)
+                              BISON_VALUES, BISON_SQUID_FLD, ITIS_KINGDOMS, 
+                              ISO_COUNTRY_CODES)
 from common.lookup import Lookup, VAL_TYPE
 from common.tools import (getCSVDictReader, getCSVDictWriter, getLogger)
 
@@ -44,12 +45,11 @@ class BisonFiller(object):
     or marine boundaries, and establishment_means.
     """
     # ...............................................
-    def __init__(self, infname, outfname):
+    def __init__(self, infname):
         """
         @summary: Constructor
         """
         self.infname = infname
-        self.outfname = outfname
         pth, _ = os.path.split(infname)
         
         nm, _ = os.path.splitext(os.path.basename(__file__))
@@ -151,7 +151,7 @@ class BisonFiller(object):
                 pass
             
     # ...............................................
-    def _open_files(self, infname, outfname):
+    def _open_files(self, infname, outfname=None):
         '''
         @summary: Open BISON-created CSV data for reading, 
                   new output file for writing
@@ -159,14 +159,20 @@ class BisonFiller(object):
         # Open incomplete BISON CSV file as input
         self._log.info('Open input file {}'.format(infname))
         drdr, inf = getCSVDictReader(infname, BISON_DELIMITER, ENCODING)
-        self._files.append(inf) 
-        
-        # Open new BISON CSV file for output
-        self._log.info('Open output file {}'.format(outfname))
-        dwtr, outf = getCSVDictWriter(outfname, BISON_DELIMITER, ENCODING, 
-                                      self._bison_ordered_flds)
-        dwtr.writeheader()
-        self._files.append(outf)
+        self._files.append(inf)
+        # Optional new BISON CSV output file  
+        dwtr = None
+        if outfname:
+            outfields = self._bison_ordered_flds.copy()
+            for fld in outfields:
+                if fld not in drdr.fieldnames:
+                    outfields.remove(fld)
+            self._bison_ordered_flds = outfields
+            self._log.info('Open output file {}'.format(outfname))
+            dwtr, outf = getCSVDictWriter(outfname, BISON_DELIMITER, ENCODING, 
+                                          self._bison_ordered_flds)
+            dwtr.writeheader()
+            self._files.append(outf)
         return drdr, dwtr
             
     # ...............................................
@@ -298,7 +304,7 @@ class BisonFiller(object):
             rec['valid_accepted_scientific_name'] = itis_vals['valid_accepted_scientific_name']
             rec['valid_accepted_tsn'] = itis_vals['valid_accepted_tsn']
             rec['itis_common_name'] = itis_vals['common_name']
-            if rec['kingdom'] is None:
+            if not rec['kingdom']:
                 rec['kingdom'] = itis_vals['kingdom']
 
     # ...............................................
@@ -329,7 +335,8 @@ class BisonFiller(object):
 
     # ...............................................
     def update_itis_geo_estmeans(self, itis2_lut_fname, terrestrial_shpname,  
-                                 marine_shpname, estmeans_fname):
+                                 marine_shpname, estmeans_fname, outfname, 
+                                 fromGbif=True):
         """
         @summary: Process a CSV file with 47 ordered BISON fields (and optional
                   gbifID field for GBIF provided data) to 
@@ -373,10 +380,10 @@ class BisonFiller(object):
 
         recno = 0
         try:
-            dreader, dwriter = self._open_files(self.infname, self.outfname)
+            dreader, dwriter = self._open_files(self.infname, outfname=outfname)
             for rec in dreader:
                 recno += 1
-                gid = rec[OCC_UUID_FLD]
+                squid = rec[BISON_SQUID_FLD]
                 # ..........................................
                 # Fill ITIS 
                 self._fill_itisfields(rec, itistsns)
@@ -388,8 +395,9 @@ class BisonFiller(object):
                 # Fill geo
                 centroid = rec['centroid']
                 lon, lat = self._get_coords(rec)
-                # Fill coordinates if missing
-                if lon is None or (centroid is not None and centroid == 'county'):
+                # Fill missing coordinates or 
+                #   refill previously computed to county centroid
+                if lon is None or (centroid and centroid == 'county'):
                     self._fill_centroids(rec, centroids)
                     lon, lat = self._get_coords(rec)
                 # Use coordinates to calc 
@@ -398,6 +406,8 @@ class BisonFiller(object):
                     self._fill_geofields(rec, lon, lat, 
                                          terrlyr, idx_fips, idx_cnty, idx_st, 
                                          eezlyr, idx_eez, idx_mg)
+                if not fromGbif:
+                    self._fill_bison_provider_fields(rec)
                 # Write updated record
                 dwriter.writerow(rec)
                 # Log progress occasionally
@@ -406,7 +416,7 @@ class BisonFiller(object):
                                     
         except Exception as e:
             self._log.error('Failed filling data from id {}, line {}: {}'
-                            .format(gid, recno, e))                    
+                            .format(squid, recno, e))                    
         finally:
             self.close()
             
@@ -417,12 +427,41 @@ class BisonFiller(object):
         if fips != '' and len(fips) != 5:
             self._log.error('Record {}, {}, has invalid fips field {}'
                             .format(recno, squid, fips))
-        # TODO: Capitalize in bison provider data
         king = rec['kingdom']
-        if king != '' and king.lower() not in ITIS_KINGDOMS:
+        if king and king.lower() not in ITIS_KINGDOMS:
             self._log.error('Record {}, {}, has invalid kingdom field {}'
                             .format(recno, squid, king))
 
+            
+    # ...............................................
+    def _test_bison_provider_dependent_fields(self, rec, recno, squid):
+        # Both required
+        if rec['itis_tsn']:
+            if (not rec['valid_accepted_scientific_name'] or 
+                not rec['valid_accepted_tsn']):
+                self._log.error("""Record {}, {}, has itis_tsn but missing
+                valid_accepted_scientific_name or valid_accepted_tsn"""
+                .format(recno, squid))
+        lat = rec['latitude'] 
+        lon = rec['longitude']
+        # Neither or both
+        if not ((lat and lon) or (not lat and not lon)):
+            self._log.error('Record {}, {}, has only one of latitude or longitude'
+            .format(recno, squid))
+        # Centroid indicates calculated lat/lon
+        elif rec['centroid'] and (not lat or not lon):
+            self._log.error('Record {}, {}, has centroid but missing lat or long'
+            .format(recno, squid))
+        # negative longitude (x), positive latitude (y)
+        elif (rec['iso_country_code'] in ('US', 'CA') and lat and lon):
+            if float(lon) > 0 or float(lat) < 0:
+                self._log.error("""Record {}, {}, from US or CA does not have 
+                negative longitude and positive latitude"""
+                .format(recno, squid))
+        # Neither or both
+        if rec['thumb_url'] and not rec['associated_media']:
+            self._log.error('Record {}, {}, has thumb_url but missing associated_media'
+            .format(recno, squid))
             
     # ...............................................
     def _test_bison_provider_fields(self, rec, recno, squid):
@@ -430,62 +469,84 @@ class BisonFiller(object):
             if rec[key] != val:
                 self._log.error('Record {}, {}, has bad BISON provider {} value {}'
                                 .format(recno, squid, key, val))
-        if rec['clean_provided_scientific_name'] == '':
-            self._log.error('Record {}, {}, has missing clean_provided_scientific_name field {}'
-                            .format(recno, squid))
-        if rec['provided_scientific_name'] == '':
-            self._log.error('Record {}, {}, has missing provided_scientific_name field {}'
-                            .format(recno, squid))
+        king = rec['kingdom']
+        if king: 
+            if not king.lower() in ITIS_KINGDOMS:
+                self._log.error('Record {}, {}, has bad kingdom value {}'
+                                .format(recno, squid, king))
+            elif king != king.capitalize():
+                self._log.error('Record {}, {}, has non-capitalized kingdom {}'
+                                .format(recno, squid, king))
+        ctry = rec['iso_country_code']
+        if ctry and ctry not in ISO_COUNTRY_CODES:
+            self._log.error('Record {}, {}, has invalid iso_country_code {}'
+                            .format(recno, squid, ctry))
         
-
+    # ...............................................
+    def _fill_bison_provider_fields(self, rec):
+        for key, val in BISON_VALUES:
+            rec[key] = val
+            
+        king = rec['kingdom']
+        if king and king.lower() in ITIS_KINGDOMS:
+            rec['kingdom'] = king.capitalize()
+        
     # ...............................................
     def _test_name(self, rec, recno, squid, bad_name_chars):
-        sname = rec['clean_provided_scientific_name']
-        didx = sname.find('  ')
-        if sname is None or sname == '':
-            self._log.error('Record {}, {}, has blank clean_provided_scientific_name'
+        cpsn = rec['clean_provided_scientific_name']
+        psn = rec['provided_scientific_name']
+        # Both required
+        if not psn:
+            self._log.error('Record {}, {}, has missing provided_scientific_name field {}'
                             .format(recno, squid))
+        if not cpsn:
+            self._log.error('Record {}, {}, has missing clean_provided_scientific_name field {}'
+                            .format(recno, squid))
+        # No bad chars, or leading, trailing, double spaces
         else:
-            ssname = sname.strip()
-            if len(ssname) < sname:
+            didx = cpsn.find('  ')
+            trm_cpsn = cpsn.strip()
+            if len(trm_cpsn) < cpsn:
                 self._log.error('Record {}, {}, has leading or trailing blank chars in clean_provided_scientific_name {}'
-                                .format(recno, squid, sname))
+                                .format(recno, squid, cpsn))
             elif didx >= 0:
                 self._log.error('Record {}, {}, has double spaces in clean_provided_scientific_name {}'
-                                .format(recno, squid, sname))
+                                .format(recno, squid, cpsn))
             else:
-                for ch in sname:
-                    if ch in bad_name_chars:
+                for ch in cpsn:
+                    if ch in bad_name_chars or ch.isdigit():
                         self._log.error('Record {}, {}, has prohibited characters in clean_provided_scientific_name {}'
-                                        .format(recno, squid, sname))
-                        break
-                    if ch.isdigit():
-                        self._log.error('Record {}, {}, has numeral(s) in clean_provided_scientific_name {}'
-                                        .format(recno, squid, sname))
+                                        .format(recno, squid, cpsn))
                         break
                         
     # ...............................................
     def _test_dates(self, rec, recno, squid, currdate=(2020, 1, 1)):
         yr = rec['year']
         odate = rec['occurrence_date']
-        parts = odate.split('-')
-        try:
-            for i in range(len(parts)):
-                int(parts[i])
-        except:
-            self._log.error('Record {}, {}, has non-date value'
+        if odate:
+            parts = odate.split('-')
+            try:
+                for i in range(len(parts)):
+                    int(parts[i])
+            except:
+                self._log.error('Record {}, {}, has non-date value'
+                                .format(recno, squid, odate))
+            else:
+                if len(parts) in (1, 3):
+                    if len(parts) == 3:
+                        interpyr = parts[2]
+                    elif len(parts) == 1:
+                        interpyr = parts[0]
+                    # Field dependency
+                    if not yr:
+                        self._log.error('Record {}, {}, has valid occurrence_date {} but no year'
                             .format(recno, squid, odate))
-        if len(parts) in (1, 3):
-            if len(parts) == 3:
-                interpyr = parts[2]
-            elif len(parts) == 1:
-                interpyr = parts[0]
-            if interpyr != yr:
-                self._log.error('Record {}, {}, has non-matching date {} and year {}'
-                                .format(recno, squid, odate, yr))
-        else:
-            self._log.error('Record {}, {}, has non- simple-date format'
-                            .format(recno, squid, odate))
+                    elif interpyr != yr:
+                        self._log.error('Record {}, {}, has non-matching date {} and year {}'
+                                        .format(recno, squid, odate, yr))
+                else:
+                    self._log.error('Record {}, {}, has non- simple-date format'
+                                    .format(recno, squid, odate))
             
         if yr is not None and yr != '':
             try:
@@ -494,8 +555,8 @@ class BisonFiller(object):
                     self._log.error('Record {}, {}, has low year {}'
                                     .format(recno, squid, yr))
             except:
-                    self._log.error('Record {}, {}, has invalid year {}'
-                        .format(recno, squid, yr))
+                self._log.error('Record {}, {}, has invalid year {}'
+                    .format(recno, squid, yr))
                 
         
     # ...............................................
@@ -507,8 +568,9 @@ class BisonFiller(object):
             self._log.error('Record {}, {}, has {} fields '
                             .format(recno, squid, count))
         # Invalid chars
-        for (key, val) in rec.iteritems():
+        for key in rec:
             if key not in test_elsewhere:
+                val = rec[key]
                 if val in PROHIBITED_VALS:
                     self._log.error('Record {}, {}, field {}, value {} is prohibited'
                                     .format(recno, squid, key, val))
@@ -532,22 +594,29 @@ class BisonFiller(object):
         bad_name_chars = PROHIBITED_CHARS.copy()
         bad_name_chars.extend(PROHIBITED_SNAME_CHARS)
             
-        bad_res_chars = PROHIBITED_CHARS.copy()
-        bad_res_chars.extend(PROHIBITED_RESOURCE_CHARS)
+#         bad_res_chars = PROHIBITED_CHARS.copy()
+#         bad_res_chars.extend(PROHIBITED_RESOURCE_CHARS)
         
         recno = 0
         try:
-            dreader, dwriter = self._open_files(self.infname, self.outfname)
+            dreader, _ = self._open_files(self.infname)
             for rec in dreader:
                 recno += 1
-                squid = rec['occurrence_url']
-                self._test_most_fields(rec, recno, squid)
+                squid = rec[BISON_SQUID_FLD]
                 
+                # ..........................................
+                # Test GBIF and bison provider datasets
+                self._test_most_fields(rec, recno, squid)
+                self._test_other_fields(rec, recno, squid)
                 self._test_name(rec, recno, squid, bad_name_chars)
                 self._test_dates(rec, recno, squid)
+                
+                # ..........................................
+                # Test bison provider datasets
                 if not fromGbif:
                     self._test_bison_provider_fields(rec, recno, squid)
-
+                    self._test_bison_provider_dependent_fields(rec, recno, squid)
+                    
                 # ..........................................
                 # Log progress occasionally
                 if (recno % LOGINTERVAL) == 0:
