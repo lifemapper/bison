@@ -26,7 +26,7 @@ import os
 from common.bisonfill import BisonFiller
 from common.constants import BISON_DELIMITER
 
-from gbif.constants import DISCARD_AFTER_UPDATE, OCC_UUID_FLD
+from gbif.constants import DISCARD_AFTER_UPDATE
 from gbif.gbifmodify import GBIFReader
             
 # ...............................................
@@ -45,7 +45,7 @@ if __name__ == '__main__':
                         are not present in the same directory as the raw data, 
                         they will be  created for temp and final output files.
                         """)
-    parser.add_argument('--step', type=int, default=1, choices=[1,2,3,4],
+    parser.add_argument('--step', type=int, default=1, choices=[1,2,3,10],
                         help="""
                         Step number for data processing:
                            1: Create lookup tables, transform and fill BISON
@@ -155,12 +155,19 @@ if __name__ == '__main__':
                                   discard_fields=DISCARD_AFTER_UPDATE)
             
         elif step == 3:
-            bf = BisonFiller(pass2_fname, pass3_fname)
+            bf = BisonFiller(pass2_fname)
             # Pass 3 of CSV transform
             # FillMethod = itis_tsn, georef (terrestrial)
             # Use Derek D. generated ITIS lookup itis2_lut_fname
             bf.update_itis_geo_estmeans(itis2_lut_fname, terrestrial_shpname, 
-                                        marine_shpname, estmeans_fname)
+                                        marine_shpname, estmeans_fname, 
+                                        pass3_fname, fromGbif=True)
+        elif step == 10:
+            bf = BisonFiller(pass3_fname)
+            # Pass 3 of CSV transform
+            # FillMethod = itis_tsn, georef (terrestrial)
+            # Use Derek D. generated ITIS lookup itis2_lut_fname
+            bf.test_bison_outfile(fromGbif=True)
 """
 wc -l occurrence.txt 
 71057978 occurrence.txt
