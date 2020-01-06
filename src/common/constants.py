@@ -108,3 +108,69 @@ class FillMethod(Enum):
             
 FillLater = (FillMethod.itis_tsn, FillMethod.georef, FillMethod.est_means, 
              FillMethod.unknown)
+
+# BISON provider data from solr core
+BISON_PROVIDER_UNIQUE_COLS=('provider', 'resource_id', 'resource_url') 
+BISON_PROVIDER_HEADER = (
+'dataset_key', 
+'catalogue_number', 
+'scientific_name', 
+'provided_scientific_name', 
+'longitude', 
+'latitude', 
+'iso_country_code', 
+'taxon_key', 
+'year', 
+'basis_of_record', 
+'provider', 
+'provider_id', 
+'resource', 
+'resource_id', 
+'occurrence_date', 
+'collector', 
+'county_original', 
+'state_original', 
+'countycomputedfips', 
+'statecomputedfips', 
+'centroid', 
+'hierarchy_string', 
+'tsns', 
+'amb', 
+'provided_tsn', 
+'collectornumber', 
+'valid_accepted_scientific_name', 
+'valid_accepted_tsn', 
+'provided_common_name', 
+'itis_common_name', 
+'kingdom', 'itis_tsn', 
+'geodetic_datum', 
+'coordinate_precision', 
+'coordinate_uncertainty', 
+'verbatim_elevation', 
+'verbatim_depth', 
+'verbatim_locality', 
+'verbatim_event_date', 
+'provided_fips', 
+'calculated_county_name', 
+'calculated_state_name', 
+'provider_url', 
+'resource_url', 
+'occurrence_url', 
+'thumb_url', 
+'associated_media', 
+'associated_references', 
+'general_comments', 
+'bison_id', 
+'license', 
+'calculated_mrgid', 
+'calculated_waterbody', 
+'establishment_means', 
+'id', 
+'tmpid'
+)
+
+
+
+
+
+

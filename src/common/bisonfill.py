@@ -125,6 +125,7 @@ class BisonFiller(object):
             tmp = centroid.lstrip('Point (').rstrip(')')
             lonstr, latstr = tmp.split(' ')
             datadict[key] = (lonstr, latstr)
+        terrlyr.ResetReading()
         if datadict:
             centroids = Lookup.initFromDict(datadict, valtype=VAL_TYPE.TUPLE)
         return centroids
@@ -179,38 +180,40 @@ class BisonFiller(object):
     def _fill_geofields(self, rec, lon, lat,
                         terrlyr, idx_fips, idx_cnty, idx_st, 
                         eezlyr, idx_eez, idx_mg):
-        terr_found_one = False
-        marine_found_one = False
+        terr_count = 0
+        marine_count = 0
         pt = ogr.Geometry(ogr.wkbPoint)
         pt.AddPoint(lon, lat)
         terrlyr.SetSpatialFilter(pt)
         eezlyr.SetSpatialFilter(pt)
         for poly in terrlyr:
-            if not terr_found_one:
-                terr_found_one = True
+            if terr_count == 0:
+                terr_count += 1
                 fips = poly.GetFieldAsString(idx_fips)
                 county = poly.GetFieldAsString(idx_cnty)
                 state = poly.GetFieldAsString(idx_st)
             else:
-                terr_found_one = False
+                terr_count += 1
                 break
+        terrlyr.ResetReading()
         # Single terrestrial polygon takes precedence
-        if terr_found_one:
+        if terr_count == 1:
             # terrestrial intersect
             rec['calculated_fips'] = fips
             rec['calculated_county_name'] = county
             rec['calculated_state_name'] = state
         # Single marine intersect is 2nd choice
-        else:
+        elif terr_count == 0:
             for poly in eezlyr:
-                if not marine_found_one:
-                    marine_found_one = True
+                if marine_count == 0:
+                    marine_count += 1
                     eez = poly.GetFieldAsString(idx_eez)
                     mrgid = poly.GetFieldAsString(idx_mg)
                 else:
-                    marine_found_one = False
+                    marine_count += 1
                     break
-            if marine_found_one:
+            eezlyr.ResetReading()
+            if marine_count == 1:
                 rec['calculated_waterbody'] = eez
                 rec['mrgid'] = mrgid
 

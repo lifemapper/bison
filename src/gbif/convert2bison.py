@@ -125,9 +125,9 @@ if __name__ == '__main__':
     
     logbasename = 'step{}_{}'.format(step, gbif_basefname)
     # Output CSV files of all records after initial creation or field replacements
-    pass1_fname = os.path.join(tmppath, 'step1_initialbison_{}.csv'.format(gbif_basefname))
-    pass2_fname = os.path.join(tmppath, 'step2_cleannames_{}.csv'.format(gbif_basefname))
-    pass3_fname = os.path.join(tmppath, 'step3_itis_geo_estmeans_{}.csv'.format(gbif_basefname))
+    pass1_fname = os.path.join(tmppath, 'step1_{}.csv'.format(gbif_basefname))
+    pass2_fname = os.path.join(tmppath, 'step2_{}.csv'.format(gbif_basefname))
+    pass3_fname = os.path.join(tmppath, 'step3_{}.csv'.format(gbif_basefname))
     
     if not os.path.exists(gbif_interp_file):
         raise Exception('Filename {} does not exist'.format(gbif_interp_file))
