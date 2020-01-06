@@ -9,24 +9,23 @@
 
 usage () 
 {
-    echo "Usage: $0 <SUBDIR>  <TOTAL_LINECOUNT>  <LINECOUNT_PER_CHUNK>"
-    echo "This script is run on a large GBIF occurrence download named"
-    echo "occurrence.txt in the <SUBDIR> subdirectory of /tank/data/bison/2019/"
-    echo "  and chunk it into files of LINECOUNT_PER_CHUNK lines or less"
+    echo "Usage: $0 <DATAFILE>  <TOTAL_LINECOUNT>  <LINECOUNT_PER_CHUNK>"
+    echo "This script is run on a large delimited text file named <DATAFILE> "
+    echo "  to chunk it into files of LINECOUNT_PER_CHUNK lines or less"
     echo "   "
 }
 
 ### Set variables 
 set_defaults() {
-    dataname=occurrence
-    pth=/tank/data/bison/2019
-    SUBDIR=$1
-    THISPTH=$pth/$SUBDIR
-    INFILE=$THISPTH/$dataname.txt
+    INFILE=$1
+    fname=`/usr/bin/basename $INFILE`
+    pth=`/usr/bin/dirname $INFILE`
+    dataname=${fname%.*}
+    
     echo 'Input = ' $INFILE
 	
     THISNAME=`/bin/basename $0`
-    LOG=$THISPTH/$THISNAME.log
+    LOG=$pth/$THISNAME.log
     # Append to existing logfile
     touch $LOG
 }
@@ -37,7 +36,7 @@ chunk_data() {
     stop=$2
     postfix=_lines_$start-$stop
 	
-    outfile=$THISPTH/$dataname$postfix.csv
+    outfile=$pth/$dataname$postfix.csv
     echo 'Output = ' $outfile
     
     if [ -s $outfile ]; then
@@ -85,6 +84,7 @@ done
 TimeStamp "# End"
 ################################# Main #################################
 
-# bash /state/partition1/workspace/bison/src/gbif/chunkfile.sh 7000000 1
+# bash /state/partition1/workspace/bison/src/gbif/chunkfile.sh /tank/data/bison/2019/Terr/occurrence.txt 7000000 1
 
+# bash /state/partition1/workspace/bison/src/gbif/chunkfile.sh /tank/data/bison/2019/ancillary/bison.csv 101996788 10000000 
  

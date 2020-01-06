@@ -985,24 +985,34 @@ itis1_lut_fname = os.path.join(tmppath, 'step3_itis_lut.txt')
 
 logbasename = 'step{}_{}'.format(step, gbif_basefname)
 # Output CSV files of all records after initial creation or field replacements
-pass1_fname = os.path.join(tmppath, 'step1_initialbison_{}.csv'.format(gbif_basefname))
-pass2_fname = os.path.join(tmppath, 'step2_cleannames_{}.csv'.format(gbif_basefname))
-pass3_fname = os.path.join(tmppath, 'step3_itis_geo_estmeans_{}.csv'.format(gbif_basefname))
+pass1_fname = os.path.join(tmppath, 'step1_{}.csv'.format(gbif_basefname))
+pass2_fname = os.path.join(tmppath, 'step2_{}.csv'.format(gbif_basefname))
+pass3_fname = os.path.join(tmppath, 'step3_{}.csv'.format(gbif_basefname))
 
 self = GBIFReader(inpath, tmpdir, outdir, logbasename)
 
 badids = [1698383484, 1698384023, 1698384140, 1698382703, 1698382992, 
           1698383171, 1698384206, 1698384305]
 
+
 self.open_gbif_for_search(gbif_interp_file)
 map = self._gbif_column_map
+self._gbif_line, self._gbif_recno = getLine(self._gbif_reader, self._gbif_recno)
+
+rec = self._create_rough_bisonrec(self._gbif_line, self._gbif_column_map)
+print(rec['longitude'], rec['latitude'])
+print(self._gbif_line[map['decimalLongitude']],self._gbif_line[map['decimalLatitude']]) 
+
+id = '1912805198'
+id = '1821774436'
+rec = self.find_gbif_record(id)
+print(rec['longitude'], rec['latitude'])
+print(self._gbif_line[map['decimalLongitude']],self._gbif_line[map['decimalLatitude']]) 
 
 for bad in badids:
     rec = self.find_gbif_record(str(bad))
     print('id {} len {}'.format(bad, len(self._gbif_line))
 
-self._gbif_line, self._gbif_recno = getLine(self._gbif_reader, self._gbif_recno)
-rec = self._create_rough_bisonrec(self._gbif_line, self._gbif_column_map)
 
 gr.close()
 
