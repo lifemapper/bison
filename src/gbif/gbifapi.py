@@ -30,8 +30,8 @@ from common.tools import getCSVWriter
 from gbif.constants import (GBIF_DSET_KEYS, GBIF_ORG_KEYS, GBIF_URL,
                             GBIF_DATASET_URL, GBIF_ORGANIZATION_URL,
                             GBIF_BATCH_PARSER_URL, GBIF_SINGLE_PARSER_URL,
-                            GBIF_TAXON_URL, GBIF_URL_ESCAPES, BISON_ORG_UUID)
-
+                            GBIF_TAXON_URL, GBIF_URL_ESCAPES, 
+                            BISON_ORG_UUID, BISON_IPT_PREFIX)
     
 # .............................................................................
 class GbifAPI(object):
@@ -67,6 +67,35 @@ class GbifAPI(object):
         return dateonly
     
 # ...............................................
+    def _parse_date(self, datestr):
+        datevals = []
+        dateonly = datestr.split('T')[0]
+        if dateonly != '':
+            parts = dateonly.split('-')
+            try:
+                for i in range(len(parts)):
+                    datevals.append(int(parts[i]))
+            except:
+                print('Invalid date {}'.format(datestr))
+                pass
+            else:
+                if len(datevals) not in (1, 3):
+                    print('Non one or three part date {}'.format(datevals))
+        return datevals
+    
+# ...............................................
+    def _first_newer(self, datevals1, datevals2):
+        for i in (0,1,2):
+            # only compare matching year/mo/day
+            if len(datevals1) > i and len(datevals2) > i:
+                if datevals1[i] > datevals2[i]:
+                    return True
+                elif datevals1[i] < datevals2[i]:
+                    return False
+        # if equal, return first_newer
+        return True
+
+# ...............................................
     def _getDataFromUrl(self, url, resp_type='json'):
         data = None
         try:
@@ -80,7 +109,26 @@ class GbifAPI(object):
                 else:
                     data = response.text
         return data
-             
+
+            
+# ...............................................
+    def _get_buried_url_val(self, data_dict, search_prefix=None):
+        url = ''
+        try:
+            idents = data_dict['identifiers']
+        except:
+            pass
+        else:
+            for child in idents:
+                if child['type'] == 'URL':
+                    url = child['identifier']
+                    # Return URL with desired prefix, else return last instance
+                    if search_prefix and url.startswith(search_prefix):
+                        break
+#             if url:
+#                 print('Found buried url {}'.format(url))
+        return url
+    
 # ...............................................
     def _get_val(self, data_dict, keylist, save_nl=True):
         val = ''
@@ -89,7 +137,8 @@ class GbifAPI(object):
             try:
                 child = child[key]
             except:
-                raise ('Key {} of {} missing from output'.format(key, keylist))
+                pass
+#                 print('Key {} of {} missing from output'.format(key, keylist))
             else:
                 val = child
         if val != '' and save_nl :
@@ -101,43 +150,40 @@ class GbifAPI(object):
         dataDict = {}
         if dsKey == '':
             return dataDict        
-        url = GBIF_DATASET_URL + dsKey
-        data = self._getDataFromUrl(url)
+        metaurl = GBIF_DATASET_URL + dsKey
+        data = self._getDataFromUrl(metaurl)
         if data is None:
             return dataDict
         
-        key = self._get_val(data, ['key'], savenl=False)
+        key = self._get_val(data, ['key'], save_nl=False)
         if key == '':
-            print('Failed to resolve dataset with {}'.format(url))
+            print('Failed to resolve dataset with {}'.format(metaurl))
         else:
-            orgkey = self._get_val(data, ['publishingOrganizationKey'], savenl=True)
+            orgkey = self._get_val(data, ['publishingOrganizationKey'], save_nl=True)
+            url = None
             if orgkey == '':
-                print('Failed to find publishingOrganizationKey in {}'.format(url))
+                print('Failed to find publishingOrganizationKey in {}'.format(metaurl))
             elif orgkey == BISON_ORG_UUID:
-                try:
-                    idents = data['identifiers']
-                except:
-                    pass
-                else:
-                    for child in idents:
-                        if child['type'] == 'URL':
-                            url = child['identifier']
-            if url != '':
-                url = self._get_toplevel_val(data, 'homepage', savenl=False)
+                url = self._get_buried_url_val(data, search_prefix=BISON_IPT_PREFIX)
+            if not url :
+                url = self._get_val(data, ['homepage'], save_nl=False)
+                if not url:
+                    url = self._get_buried_url_val(data)
             
-            title = self._get_val(data, ['title'], savenl=True)
-            desc = self._get_val(data, ['description'], savenl=True)
-            citation = self._get_val(data, ['citation', 'text'], savenl=True)
-            rights = self._get_val(data, ['rights'], savenl=True)
-            created = self._get_val(data, ['created'], savenl=False)
-            modified = self._get_val(data, ['modified'], savenl=False)
+            title = self._get_val(data, ['title'], save_nl=True)
+            desc = self._get_val(data, ['description'], save_nl=True)
+            citation = self._get_val(data, ['citation', 'text'], save_nl=True)
+#             rights = self._get_val(data, ['rights'], save_nl=True)
+            created = self._get_val(data, ['created'], save_nl=False)
+            modified = self._get_val(data, ['modified'], save_nl=False)
             
+            dataDict['key'] = key
             dataDict['publishingOrganizationKey'] = orgkey
             dataDict['homepage'] = url
             dataDict['title'] = title
             dataDict['description'] = desc
             dataDict['citation'] = citation
-            dataDict['rights'] = rights
+#             dataDict['rights'] = rights
             dataDict['created'] = created
             dataDict['modified'] = modified
         return dataDict

@@ -32,7 +32,8 @@ from common.tools import (getCSVReader, getCSVDictReader, getCSVWriter,
 
 from gbif.constants import (GBIF_DELIMITER, TERM_CONVERT, META_FNAME, 
                             BISON_GBIF_MAP, OCC_UUID_FLD, DISCARD_FIELDS, 
-                            CLIP_CHAR, FillMethod,GBIF_UUID_KEY)
+                            CLIP_CHAR, FillMethod, GBIF_UUID_KEY,
+                            BISON_ORG_UUID, BISON_IPT_PREFIX)
 from gbif.gbifmeta import GBIFMetaReader
 from gbif.gbifapi import GbifAPI
 
@@ -150,11 +151,16 @@ class GBIFReader(object):
 
                     title = metavals['title']
                     url = metavals['homepage']
-                    if url.find('bison.') >= 0:
+                    if (orgkey == BISON_ORG_UUID and 
+                        url.startswith(BISON_IPT_PREFIX) >= 0):
                         self._log.info('Discard rec {}: dataset URL {}'
                                        .format(rec[OCC_UUID_FLD], url))
                         rec = None
-                    else:    
+                    else:
+                        # Note other bison urls
+                        if url.find('bison.') >= 0:
+                            self._log.info('In rec {}, found provider {} url {}'
+                                           .format(rec[OCC_UUID_FLD], orgkey, url))
                         rec['provider_id'] = orgkey    
                         rec['resource'] = title
                         rec['resource_url'] = url
@@ -816,10 +822,10 @@ class GBIFReader(object):
                            for that dataset
         """
         gbifapi = GbifAPI()
+        gmetardr = GBIFMetaReader(self._log)
         if os.path.exists(dataset_lut_fname):
             self._log.info('Output file {} exists!'.format(dataset_lut_fname))
         else:
-            gmetardr = GBIFMetaReader(self._log)
             # --------------------------------------
             # Gather dataset and organization UUIDs from EML files downloaded with 
             # raw data
@@ -830,19 +836,26 @@ class GBIFReader(object):
                 # query_for_dataset returns dictionary including UUID
                 rec = gbifapi.query_for_dataset(uuid)
                 if header is None and rec:
-                    header = rec.items[0][1].keys()
+                    header = list(rec.keys())
                 datasets.save_to_lookup(uuid, rec)
             datasets.write_lookup(dataset_lut_fname, header, delimiter)
             # Query/save dataset information
-#             gbifapi.get_write_dataset_meta(dataset_lut_fname, uuids, delimiter=delimiter)
             self._log.info('Wrote dataset metadata to {}'.format(dataset_lut_fname))
             
         if os.path.exists(org_lut_fname):
             self._log.info('Output file {} exists!'.format(org_lut_fname))
         else:
             # --------------------------------------
-            # Gather organization UUIDs from dataset metadata assembled above
-            org_uuids = gmetardr.get_organization_uuids(dataset_lut_fname)
+            # Gather organization UUIDs from dataset metadata assembled (LUT or file)
+            org_uuids = set()
+            try:
+                for key, ddict in datasets.lut.items():
+                    try:
+                        org_uuids.add(ddict['publishingOrganizationKey'])
+                    except Exception as e:
+                        print('No publishingOrganizationKey in record {}'.format(rec))
+            except Exception as e:             
+                org_uuids = gmetardr.get_organization_uuids(dataset_lut_fname)
             # Query/save organization information
             gbifapi.get_write_org_meta(org_lut_fname, org_uuids, delimiter=delimiter)
             self._log.info('Wrote organization metadata to {}'.format(org_lut_fname))
@@ -1015,5 +1028,16 @@ for bad in badids:
 
 
 gr.close()
+
+gmetardr = GBIFMetaReader(self._log)
+datasets = Lookup(valtype=VAL_TYPE.DICT, encoding=ENCODING)
+dsuuids = self._get_dataset_uuids(self._dataset_pth)
+header = None
+for uuid in dsuuids:
+    rec = gbifapi.query_for_dataset(uuid)
+    if header is None and rec:
+        header = rec.items[0][1].keys()
+    datasets.save_to_lookup(uuid, rec)
+
 
 """

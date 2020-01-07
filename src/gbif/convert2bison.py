@@ -25,6 +25,7 @@ import os
 
 from common.bisonfill import BisonFiller
 from common.constants import BISON_DELIMITER
+from common.tools import getLogger
 
 from gbif.constants import DISCARD_AFTER_UPDATE
 from gbif.gbifmodify import GBIFReader
@@ -118,12 +119,13 @@ if __name__ == '__main__':
     # reference files for lookups
     dataset_lut_fname = os.path.join(tmppath, 'dataset_lut.csv')
     org_lut_fname = os.path.join(tmppath, 'organization_lut.csv')
-    nametaxa_fname = os.path.join(tmppath, 'step1_sciname_taxkey_list.csv')
-    name_lut_fname = os.path.join(tmppath, 'step2_name_lut.csv')
-    cleanname_fname = os.path.join(tmppath, 'step2_cleanname_list.txt')
     itis1_lut_fname = os.path.join(tmppath, 'step3_itis_lut.txt')
     
     logbasename = 'step{}_{}'.format(step, gbif_basefname)
+    # Files of lookups and lists for their creation 
+    nametaxa_fname = os.path.join(tmppath, 'step1_{}_sciname_taxkey_list.csv'.format(gbif_basefname))
+    name_lut_fname = os.path.join(tmppath, 'step2_{}_name_lut.csv'.format(gbif_basefname))
+    cleanname_fname = os.path.join(tmppath, 'step2_{}_cleanname_list.txt'.format(gbif_basefname))
     # Output CSV files of all records after initial creation or field replacements
     pass1_fname = os.path.join(tmppath, 'step1_{}.csv'.format(gbif_basefname))
     pass2_fname = os.path.join(tmppath, 'step2_{}.csv'.format(gbif_basefname))
@@ -155,7 +157,9 @@ if __name__ == '__main__':
                                   discard_fields=DISCARD_AFTER_UPDATE)
             
         elif step == 3:
-            bf = BisonFiller(pass2_fname)
+            logfname = os.path.join(tmppath, '{}.log'.format(logbasename))
+            log = getLogger(logbasename, logfname)
+            bf = BisonFiller(pass2_fname, log=log)
             # Pass 3 of CSV transform
             # FillMethod = itis_tsn, georef (terrestrial)
             # Use Derek D. generated ITIS lookup itis2_lut_fname
@@ -163,7 +167,9 @@ if __name__ == '__main__':
                                         marine_shpname, estmeans_fname, 
                                         pass3_fname, fromGbif=True)
         elif step == 10:
-            bf = BisonFiller(pass3_fname)
+            logfname = os.path.join(tmppath, '{}.log'.format(logbasename))
+            log = getLogger(logbasename, logfname)
+            bf = BisonFiller(pass3_fname, log=log)
             # Pass 3 of CSV transform
             # FillMethod = itis_tsn, georef (terrestrial)
             # Use Derek D. generated ITIS lookup itis2_lut_fname
@@ -174,7 +180,7 @@ wc -l occurrence.txt
 wc -l tmp/step1.csv 
 1577732 tmp/step1.csv
 
-python3.6 /state/partition1/git/bison/src/gbif/gbif2bison.py 
+python3.6 /state/partition1/git/bison/src/gbif/convert2bison.py /tank/data/bison/2019/Terr/occurrence_lines_1-10000001.csv --step=1
 
 import os
 from osgeo import ogr 
