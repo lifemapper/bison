@@ -291,12 +291,12 @@ class Sorter(object):
 #         self._log.info('Wrote {} values to {}'.format(len(sortvals), outfname))
                         
     # ...............................................
-    def _get_provider_file(self, resource_id, unique_providers):
+    def _get_provider_file(self, resource_id, resource_url, unique_providers):
         """
         @summary: Sort file
         """
         try:
-            writer, outf = unique_providers[resource_id]
+            writer, outf = unique_providers[(resource_id, resource_url)]
         except:
             outfname = os.path.join(self.pth, resource_id.replace(',', '_')+'.csv')
             if os.path.exists(outfname):

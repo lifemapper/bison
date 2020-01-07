@@ -27,7 +27,7 @@ import time
 
 from common.constants import (BISON_DELIMITER, ENCODING, LOGINTERVAL, 
                               PROHIBITED_CHARS, PROHIBITED_SNAME_CHARS, 
-                              PROHIBITED_RESOURCE_CHARS, PROHIBITED_VALS,
+                              PROHIBITED_VALS,
                               BISON_VALUES, BISON_SQUID_FLD, ITIS_KINGDOMS, 
                               ISO_COUNTRY_CODES)
 from common.lookup import Lookup, VAL_TYPE
@@ -45,18 +45,20 @@ class BisonFiller(object):
     or marine boundaries, and establishment_means.
     """
     # ...............................................
-    def __init__(self, infname):
+    def __init__(self, infname, log=None):
         """
         @summary: Constructor
         """
         self.infname = infname
         pth, _ = os.path.split(infname)
         
-        nm, _ = os.path.splitext(os.path.basename(__file__))
-        logname = '{}.{}'.format(nm, int(time.time()))
-        logfname = os.path.join(pth, '{}.log'.format(logname))
-        self._log = getLogger(logname, logfname)
-
+        if not log:
+            nm, _ = os.path.splitext(os.path.basename(__file__))
+            logname = '{}.{}'.format(nm, int(time.time()))
+            logfname = os.path.join(pth, '{}.log'.format(logname))
+            log = getLogger(logname, logfname)
+        self._log = log
+        
         # Ordered output fields
         self._bison_ordered_flds = []
         discards = DISCARD_FIELDS.copy().extend(DISCARD_AFTER_UPDATE)

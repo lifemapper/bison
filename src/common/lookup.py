@@ -1,8 +1,8 @@
 import os
-from pympler import asizeof
 
 from common.constants import ENCODING
-from common.tools import (getCSVReader, getCSVDictReader, getCSVWriter, getLine)
+from common.tools import (getCSVDictReader, getCSVDictWriter, 
+                          getCSVReader, getCSVWriter, getLine)
 
 class VAL_TYPE:
     DICT = 1
@@ -83,24 +83,26 @@ class Lookup(object):
         if os.path.exists(fname):
             fmode = 'a'
         try:
-            writer, outf = getCSVWriter(fname, delimiter, self.encoding, 
-                                        fmode=fmode)
-            print('Opened file {} for write'.format(fname))
-            if fmode == 'w' and header is not None:
-                writer.writerow(header)
-            if self.valtype in (VAL_TYPE.SET, VAL_TYPE.TUPLE):
-                for key, val in self.lut.items():
-                    row = [k for k in val]
-                    row.insert(0, key)
-                    writer.writerow(row)
-            elif self.valtype == VAL_TYPE.DICT:
+            if self.valtype == VAL_TYPE.DICT:
+                writer, outf = getCSVDictWriter(fname, delimiter, self.encoding, 
+                                                header, fmode=fmode)
+                print('Opened file {} for write'.format(fname))
+                if fmode == 'w':
+                    writer.writeheader()
                 row = []
                 for key, ddict in self.lut.items():
-                    if header is None:
-                        header = ddict.keys()
-                for col in header:
-                    row.append(self.lut[col])
-                    writer.writerow(row)
+                    writer.writerow(ddict)
+            else:
+                writer, outf = getCSVWriter(fname, delimiter, self.encoding, 
+                                            fmode=fmode)
+                print('Opened file {} for write'.format(fname))
+                if fmode == 'w' and header is not None:
+                    writer.writerow(header)
+                if self.valtype in (VAL_TYPE.SET, VAL_TYPE.TUPLE):
+                    for key, val in self.lut.items():
+                        row = [k for k in val]
+                        row.insert(0, key)
+                        writer.writerow(row)
         except Exception:
             print('Failed to write data to {}'.format(fname))
         finally:
