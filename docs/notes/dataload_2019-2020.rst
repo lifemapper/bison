@@ -1,105 +1,82 @@
+
+.. highlight:: rest
+
 BISON data load Oct 2019
 =======================
+.. contents::  
 
-Download Data from GBIF 
------------------------
+.. _GBIF Data Processing: docs/notes/gbif_process.rst
+.. _BISON Data Provider Dataset Processing: docs/notes/provider_dataset_process.rst
 
-US
-  * http://www.gbif.org/occurrence/search?COUNTRY=US
-       * GBIF.org (15 October 2019) GBIF Occurrence Download https://doi.org/10.15468/dl.zqo0nh 
+Overview Process
+-----------------
 
+GBIF Data Load
+~~~~~~~~~~~~~~
+#. Process a portion (~10 million records) of a GBIF data download for a "smoke test" 
+   and provide to Denver for data load into BISON staging. 
+   For GBIF-specific data processing see `GBIF Data Processing`_
+#. After confirmation that the smoke-test data loads into the BISON staging 
+   system correctly, re-download GBIF US and Canada/US Territories datasets, and 
+   process.  Provide processed data to Denver for ingest.
+   
+BISON Data Provider Data Load
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-US Territories and Canada
-  * http://www.gbif.org/occurrence/search?COUNTRY=AS&COUNTRY=CA&COUNTRY=FM&COUNTRY=GU&COUNTRY=MH&COUNTRY=MP&COUNTRY=PR&COUNTRY=PW&COUNTRY=UM&COUNTRY=VI 
-  * GBIF.org (15 October 2019) GBIF Occurrence Download https://doi.org/10.15468/dl.5qoflq 
-  * GBIF.org (06 December 2019) GBIF Occurrence Download https://doi.org/10.15468/dl.trksri 
-  
-    * American Samoa 
-    * Canada 
-    * Micronesia, Federated States of 
-    * Guam 
-    * Marshall Islands 
-    * Northern Mariana Islands 
-    * Puerto Rico 
-    * Palau 
-    * United States Minor Outlying Islands 
-    * Virgin Islands, U.S. 
+#. Process/sort the current-BISON-provider-records provided by Denver from the BISON 
+   production system, to be used as input for BISON provider dataset processing.
+#. Copy current-BISON-provider-records into a new file for editing: 
+   updated-BISON-provider-records
+#. Download all available, new, individual BISON provider datasets from Jira tickets.
+#. Merge individual BISON provider datasets into updated-BISON-provider-records 
+   into a new updated-BISON-provider-records
 
-Process: (LUT = lookup table)
------------------------------
-Process GBIF data, mostly as 2018, with changes
+   * For datasets that do not exist in the current-BISON-provider-records, add 
+     all records to the new updated-BISON-provider-records
+   * For datasets that do exist in current-BISON-provider-records, replace - 
+     **remove** all records for that dataset from updated-BISON-provider-records, and 
+     and **add** all records from the individual BISON provider 
 
-* Step 1: Create 2 lookup tables (LUTs) then initial process occ records from GBIF to BISON, 
-  
-    * Create list of dataset UUIDs from Dataset EML files
-    * Create Resource LUT and list of publishingOrganization UUIDs from 
-      GBIF dataset API + dataset UUID
-    * Create Provider LUT from GBIF publisher API + publishingOrganization UUID 
+#. Process the merged updated-BISON-provider-records, (also step 3 of GBIF processing)
 
-  * Fill Resource/Provider fields from LUTs and 
+   * fill ITIS fields: itis_tsn, valid_accepted_scientific_name, valid_accepted_tsn, itis_common_names, and if blank, kingdom
+   * fill establishment means using itis_tsn or clean_provided_scientific_name
+   * georeference
 
-    * Fill Resource name, code, url, and publishingOrganizationKey, discarding USGS records
-      from datasetKey and Resource LUT 
-    * Fill Provider name, code, url, etc 
-      from publishingOrganizationKey and Provider LUT 
-    * Discard records from BISON providers (Publisher: USGS, c3ad790a-d426-4ac1-8e32-da61f81f0117)
-     
-  * Replace some fields with controlled vocab, fill with alternate field values
+     * if no lat/lon, calculate lat/lon from centroids of provided state/county/fips
+     * calculate enclosing terrestrial (state, county, fips) or marine (eez, mrgid) polygons
 
-    * NA, n/a, null --> ''
-    * Correct/standardize data values
-    * BISON verbatim_locality = either 1)verbatimLocality 2) locality or 3)habitat
+#. Provide the updated-BISON-provider-records to Derek for ingest
 
-  * Test for float values in longitude and latitude; if one is invalid, clear both
-  * Save provided_scientific_name and taxonKey to file for name parsing or key lookup
-
-* Step 2: Create name/taxonkey LUT for clean_provided_scientific_name, then 
-  process occ records to replace names
-
-  * Discard records that fail for X reason
-    
-    * No scientificName or taxonKey
-    * BISON provider or resource with url containing 'bison.' 
-    * QUESTION: discard with url like bison.ornl.gov?
-        
-  * Use ‘$’ delimiter in CSV output
-  * Generate ScientificName/taxonKey list during data processing: 
-    
-* Step 3: Create Name LUT after to occ record processing
-
-  * CanonicalName: from GBIF parser + scientificName or taxonKey + API. 
-    
-* Step 4: Process edited step2_occ CSV file
-
-  * fill clean_provided_scientific_name from name LUT. 
-  * Remove any temporary columns for final BISON 47 columns 
   
   
-New things 
-----------
+GBIF and BISON provider common processing
+-------------------------------------------
 To be done on BISON 48, either from GBIF or data providers,
 process info at: https://my.usgs.gov/confluence/display/DEV/SAS+Development
 
 * ITIS lookup 
   
-  * Lookup TSN from clean_provided_scientific_name to get:
+  * Prep: get updated lookup table created by ITIS developers provided by Denver
+
+      * Rejected options:
+    
+        * Use API?  No, Solr query is fast, but REST query for common names is slow
+        * Use downloaded database from https://www.itis.gov/downloads/index.html
+          No, data is not as current as version provided by ITIS developers
+
+  * Lookup TSN from clean_provided_scientific_name to fill fields:
 
     * itis_common_name
     * itis_tsn
     * valid_accepted_scientific_name
     * valid_accepted_tsn
     * kingdom if provided field is blank
-
-  * Process: 
-  
-    * Use lookup table created from data ITIS developers provide to Denver
-    * Rejected options:
-    
-      * Use API?  No, Solr query is fast, but REST query for common names is slow
-      * Use downloaded database from https://www.itis.gov/downloads/index.html
-        No, data is not as current as version provided by ITIS developers
   
 * Geo lookup
+
+  * Prep: compute centroids for all polygons in US Counties shapefile, add to 
+    polygon attributes, create a LUT for faster lookup.
 
   * On records with longitude/latitude
    
@@ -122,28 +99,15 @@ process info at: https://my.usgs.gov/confluence/display/DEV/SAS+Development
     * if provided_fips, fill longitude/latitude 
       with fips centroid coordinates, fill centroid with "county"
 
-GBIF data for BISON ingest
---------------------------
-Note data comes from GBIF darwin core download, including:
-
-* dataset eml files with datasetKeys (bison resource) for included data.
-  dataset files include providingOrganizationKeys (bison provider) for the 
-  dataset.  Use GBIF APIs with datasetKey and providingOrganizationKey
-  to populate bison resource and provider fields.
-* occurrence.txt file with records to ingest
-* Fields reference gbif column names in included meta.xml file.  
-
-  * gbif/gbif = gbif column, gbif field definition
-  * gbif/dwc = gbif column, darwin core field definition
-  * gbif/dc = gbif column, dublin core field definition
-
-* Not currently used: verbatim.txt file.  These data had errors previously, 
-  they seem to be fixed now.  Next time, will pull some fields from these 
-  records.
-
            
-BISON 48 fields with raw or calculated values for GBIF-provided data
---------------------------------------------------------------------
+BISON 48 (fields with raw or calculated values)
+-----------------------------------------------
+For GBIF data load, field values will be pulled from named GBIF field or 
+calculated according to rules laid out in `GBIF Data Processing`_.
+
+For BISON provider data processing, the data should already be correctly 
+populated, we will test it for contents, format, etc.
+
 #. clean_provided_scientific_name
 
    * Calc: 1) gbif name parser and scientificName OR 
@@ -346,4 +310,8 @@ BISON 48 fields with raw or calculated values for GBIF-provided data
    * gbif/dc license 
    
 
+
+Misc Notes:
+-------------
+  * Use ‘$’ delimiter in CSV output
 

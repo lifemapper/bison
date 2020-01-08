@@ -403,6 +403,7 @@ class BisonFiller(object):
                 # Fill missing coordinates or 
                 #   refill previously computed to county centroid
                 if lon is None or (centroid and centroid == 'county'):
+                    self._log.info('Compute centroid for {} ...'.format(recno))
                     self._fill_centroids(rec, centroids)
                     lon, lat = self._get_coords(rec)
                 # Use coordinates to calc 
@@ -415,8 +416,9 @@ class BisonFiller(object):
                     self._fill_bison_provider_fields(rec)
                 # Write updated record
                 dwriter.writerow(rec)
-                # Log progress occasionally
-                if (recno % LOGINTERVAL) == 0:
+                # Log progress occasionally, this process is very time-consuming
+                # so show progress at shorter intervals to ensure it is moving
+                if (recno % (LOGINTERVAL/10)) == 0:
                     self._log.info('*** Record number {} ***'.format(recno))
                                     
         except Exception as e:
