@@ -46,7 +46,7 @@ if __name__ == '__main__':
                         are not present in the same directory as the raw data, 
                         they will be  created for temp and final output files.
                         """)
-    parser.add_argument('--step', type=int, default=1, choices=[1,2,3,10],
+    parser.add_argument('--step', type=int, default=1, choices=[1,2,3,4,10],
                         help="""
                         Step number for data processing:
                            1: Create lookup tables, transform and fill BISON
@@ -75,19 +75,21 @@ if __name__ == '__main__':
                               - establishment_means - resolve with establishment
                                 means lookup and ITIS TSN or 
                                 clean_provided_scientific_name
-                              - geo fields - resolve with (1st) terrestrial 
-                                shapefile US_CA_Counties_Centroids 
-                                or (2nd) marine shapefile 
-                                World_EEZ_v8_20140228_splitpolygons
+                              - geo fields - 
                                 - lon/lat and centroid for records without
                                   lon/lat and with state+county or fips
                                   from terrestrial centroid coordinates
-                                - calculated state, county, FIPS, county  
-                                  fields for records with new or existing 
-                                  lon/lat 
-                                - EEZ and mrgid (marine) for records with 
-                                  lon/lat - only if terrestrial georef returns 
-                                  nothing
+                           4: Fill fields:
+                              - geo fields: calculate point-in-polygon for 
+                                records with new or existing lon/lat 
+                                - resolve 1st with terrestrial 
+                                  shapefile US_CA_Counties_Centroids, filling 
+                                  calculated_state, calculated_county, 
+                                  calculated_fips
+                                - or resolve second with marine shapefile 
+                                  World_EEZ_v8_20140228_splitpolygons
+                                  filling calculated_waterbody and mrgid - only 
+                                  if terrestrial georef returns 0 or > 1 result
                            10: Test data:
                               - ITIS fields - resolve with ITIS lookup and
                         """)
@@ -130,6 +132,7 @@ if __name__ == '__main__':
     pass1_fname = os.path.join(tmppath, 'step1_{}.csv'.format(gbif_basefname))
     pass2_fname = os.path.join(tmppath, 'step2_{}.csv'.format(gbif_basefname))
     pass3_fname = os.path.join(tmppath, 'step3_{}.csv'.format(gbif_basefname))
+    pass4_fname = os.path.join(tmppath, 'step4_{}.csv'.format(gbif_basefname))
     
     if not os.path.exists(gbif_interp_file):
         raise Exception('Filename {} does not exist'.format(gbif_interp_file))
@@ -163,9 +166,16 @@ if __name__ == '__main__':
             # Pass 3 of CSV transform
             # FillMethod = itis_tsn, georef (terrestrial)
             # Use Derek D. generated ITIS lookup itis2_lut_fname
-            bf.update_itis_geo_estmeans(itis2_lut_fname, terrestrial_shpname, 
-                                        marine_shpname, estmeans_fname, 
-                                        pass3_fname, fromGbif=True)
+            bf.update_itis_estmeans_centroid(itis2_lut_fname, estmeans_fname, 
+                                             terrestrial_shpname, pass3_fname, 
+                                             fromGbif=True)
+        elif step == 4:
+            logfname = os.path.join(tmppath, '{}.log'.format(logbasename))
+            log = getLogger(logbasename, logfname)
+            bf = BisonFiller(pass3_fname, log=log)
+            # Pass 4 of CSV transform, final step, point-in-polygon intersection
+            bf.update_point_in_polygons(terrestrial_shpname, marine_shpname, 
+                                        pass4_fname)
         elif step == 10:
             logfname = os.path.join(tmppath, '{}.log'.format(logbasename))
             log = getLogger(logbasename, logfname)

@@ -207,15 +207,15 @@ populated, we will test it for contents, format, etc.
    
 #. calculated_county_name
 
-   * Calc: Geo lookup - coordinates + county polygons
+   * Calc: Point-in-polygon terrestrial - coordinates + county polygons
    
 #. calculated_fips
 
-   * Calc: Geo lookup - coordinates + fips polygons
+   * Calc: Point-in-polygon terrestrial - coordinates + fips polygons
    
 #. calculated_state_name
 
-   * Calc: Geo lookup - coordinates + state polygons
+   * Calc: Point-in-polygon terrestrial - coordinates + state polygons
    
 #. centroid
 
@@ -272,8 +272,7 @@ populated, we will test it for contents, format, etc.
    
 #. geodetic_datum
 
-   * not present in GBIF occurrence.txt (AMS: next, parse from another field 
-     which includes 'GEODETIC_DATUM_ASSUMED' or get from verbatim.txt)
+   * not present in GBIF occurrence.txt (AMS: next time, use from verbatim.txt)
 
 #. coordinate_precision
 
@@ -289,11 +288,11 @@ populated, we will test it for contents, format, etc.
    
 #. mrgid
 
-   * Calc: after Geo lookup, polygon + coordinates
+   * Calc: Point-in-polygon marine, polygon + coordinates
    
 #. calculated_waterbody 
 
-   * Calc: after Geo lookup geo, polygon + coordinates
+   * Calc: Point-in-polygon marine (use EEZ), polygon + coordinates
    
 #. establishment_means
 
