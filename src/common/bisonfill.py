@@ -109,13 +109,21 @@ class BisonFiller(object):
         return estmeans
         
     # ...............................................
-    def _read_centroid_lookup(self, terrlyr, idx_fips, idx_cnty, idx_st, 
-                              idx_centroid):
+    def _read_centroid_lookup(self, terrestrial_shpname):
         '''
         @summary: Read and populate dictionary with key = concatenated string of 
                   state name, county name, fips code and value = 
                   tuple of centroid longitude and latitude.
         '''
+        driver = ogr.GetDriverByName("ESRI Shapefile")
+        terr_data_src = driver.Open(terrestrial_shpname, 0)
+        terrlyr = terr_data_src.GetLayer()
+        terr_def = terrlyr.GetLayerDefn()
+        idx_fips = terr_def.GetFieldIndex('FIPS')
+        idx_cnty = terr_def.GetFieldIndex('COUNTY_NAM')
+        idx_st = terr_def.GetFieldIndex('STATE_NAME')
+        idx_centroid = terr_def.GetFieldIndex('centroid')
+
         centroids = None
         datadict = {}
         for poly in terrlyr:
@@ -339,9 +347,74 @@ class BisonFiller(object):
         return lon, lat
 
     # ...............................................
-    def update_itis_geo_estmeans(self, itis2_lut_fname, terrestrial_shpname,  
-                                 marine_shpname, estmeans_fname, outfname, 
-                                 fromGbif=True):
+    def update_itis_estmeans_centroid(self, itis2_lut_fname, estmeans_fname, 
+                                      terrestrial_shpname, outfname, 
+                                      fromGbif=True):
+        """
+        @summary: Process a CSV file with 47 ordered BISON fields (and optional
+                  gbifID field for GBIF provided data) to 
+                  1) fill itis_tsn, valid_accepted_scientific_name, 
+                     valid_accepted_tsn, itis_common_name, kingdom (if blank) 
+                     with ITIS values based on clean_provided_scientific_name, 
+                  2) georeference records without coordinates or re-georeference 
+                     records previously georeferenced to county centroid, 
+                  3) fill terrestrial (state/county/fips) or marine (EEZ) fields
+                     for reported/computed coordinates
+                  4) fill 'establishment_means' field for species non-native 
+                     to Alaska, Hawaii, or Lower 48 based on itis_tsn or 
+                     clean_provided_scientific_name
+        @return: A CSV file of BISON-modified records  
+        """
+        if self.is_open():
+            self.close()        
+        # Derek's LUT header
+        # scientific_name, tsn, valid_accepted_scientific_name, valid_accepted_tsn,
+        # hierarchy_string, common_name, amb, kingdom
+        itistsns = Lookup.initFromFile(itis2_lut_fname, 'scientific_name', ',', 
+                                       valtype=VAL_TYPE.DICT, encoding=ENCODING)
+        estmeans = self._read_estmeans_lookup(estmeans_fname)
+        centroids = self._read_centroid_lookup(terrestrial_shpname)
+
+        recno = 0
+        try:
+            dreader, dwriter = self._open_files(self.infname, outfname=outfname)
+            for rec in dreader:
+                recno += 1
+                squid = rec[BISON_SQUID_FLD]
+                # ..........................................
+                # Fill ITIS 
+                self._fill_itisfields(rec, itistsns)
+                # ..........................................
+                # Fill establishment_means from TSN or 
+                # clean_provided_scientific_name and establishment means table
+                self._fill_estmeans_field(rec, estmeans)
+                # ..........................................
+                # Fill geo
+                centroid = rec['centroid']
+                lon, lat = self._get_coords(rec)
+                # Fill missing coordinates or 
+                #   refill previously computed to county centroid
+                if lon is None or (centroid and centroid == 'county'):
+                    self._fill_centroids(rec, centroids)
+                    lon, lat = self._get_coords(rec)
+
+                if not fromGbif:
+                    self._fill_bison_provider_fields(rec)
+                # Write updated record
+                dwriter.writerow(rec)
+                # Log progress occasionally
+                if (recno % LOGINTERVAL) == 0:
+                    self._log.info('*** Record number {} ***'.format(recno))
+                                    
+        except Exception as e:
+            self._log.error('Failed filling data from id {}, line {}: {}'
+                            .format(squid, recno, e))                    
+        finally:
+            self.close()
+            
+    # ...............................................
+    def update_point_in_polygons(self, terrestrial_shpname, marine_shpname, 
+                                 outfname):
         """
         @summary: Process a CSV file with 47 ordered BISON fields (and optional
                   gbifID field for GBIF provided data) to 
@@ -366,7 +439,6 @@ class BisonFiller(object):
         idx_fips = terr_def.GetFieldIndex('FIPS')
         idx_cnty = terr_def.GetFieldIndex('COUNTY_NAM')
         idx_st = terr_def.GetFieldIndex('STATE_NAME')
-        idx_centroid = terr_def.GetFieldIndex('centroid')
         
         eez_data_src = driver.Open(marine_shpname, 0)
         eezlyr = eez_data_src.GetLayer()
@@ -374,46 +446,19 @@ class BisonFiller(object):
         idx_eez = eez_def.GetFieldIndex('EEZ')
         idx_mg = eez_def.GetFieldIndex('MRGID')
 
-        # Derek's LUT header
-        # scientific_name, tsn, valid_accepted_scientific_name, valid_accepted_tsn,
-        # hierarchy_string, common_name, amb, kingdom
-        itistsns = Lookup.initFromFile(itis2_lut_fname, 'scientific_name', ',', 
-                                       valtype=VAL_TYPE.DICT, encoding=ENCODING)
-        estmeans = self._read_estmeans_lookup(estmeans_fname)
-        centroids = self._read_centroid_lookup(terrlyr, idx_fips, idx_cnty, 
-                                               idx_st, idx_centroid)
-
         recno = 0
         try:
             dreader, dwriter = self._open_files(self.infname, outfname=outfname)
             for rec in dreader:
                 recno += 1
                 squid = rec[BISON_SQUID_FLD]
-                # ..........................................
-                # Fill ITIS 
-                self._fill_itisfields(rec, itistsns)
-                # ..........................................
-                # Fill establishment_means from TSN or 
-                # clean_provided_scientific_name and establishment means table
-                self._fill_estmeans_field(rec, estmeans)
-                # ..........................................
-                # Fill geo
-                centroid = rec['centroid']
                 lon, lat = self._get_coords(rec)
-                # Fill missing coordinates or 
-                #   refill previously computed to county centroid
-                if lon is None or (centroid and centroid == 'county'):
-                    self._log.info('Compute centroid for {} ...'.format(recno))
-                    self._fill_centroids(rec, centroids)
-                    lon, lat = self._get_coords(rec)
                 # Use coordinates to calc 
                 if lon is not None:
                     # Compute geo: coordinates and polygons
                     self._fill_geofields(rec, lon, lat, 
                                          terrlyr, idx_fips, idx_cnty, idx_st, 
                                          eezlyr, idx_eez, idx_mg)
-                if not fromGbif:
-                    self._fill_bison_provider_fields(rec)
                 # Write updated record
                 dwriter.writerow(rec)
                 # Log progress occasionally, this process is very time-consuming
