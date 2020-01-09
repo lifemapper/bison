@@ -174,11 +174,12 @@ class BisonFiller(object):
         # Optional new BISON CSV output file  
         dwtr = None
         if outfname:
-            outfields = self._bison_ordered_flds.copy()
-            for fld in outfields:
+            deleteme = []
+            for fld in self._bison_ordered_flds:
                 if fld not in drdr.fieldnames:
-                    outfields.remove(fld)
-            self._bison_ordered_flds = outfields
+                    deleteme.append(fld)
+            for fld in deleteme:
+                self._bison_ordered_flds.remove(fld)
             self._log.info('Open output file {}'.format(outfname))
             dwtr, outf = getCSVDictWriter(outfname, BISON_DELIMITER, ENCODING, 
                                           self._bison_ordered_flds)
@@ -519,8 +520,9 @@ class BisonFiller(object):
     def _test_bison_provider_fields(self, rec, recno, squid):
         for key, val in BISON_VALUES:
             if rec[key] != val:
-                self._log.error('Record {}, {}, has bad BISON provider {} value {}'
-                                .format(recno, squid, key, val))
+                self._log.error('Editing Record {}, {}, from bad BISON {} value {} to {}'
+                                .format(recno, squid, key, rec[key], val))
+                rec[key] = val
         king = rec['kingdom']
         if king: 
             if not king.lower() in ITIS_KINGDOMS:
