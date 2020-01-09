@@ -65,7 +65,7 @@ W3_NAMESPACE =  '{http://www.w3.org/2001/XMLSchema-instance}'
 BISON_VALUES = {'provider': 'BISON',
                 'provider_url': 'https://bison.usgs.gov',
                 'provider_id': '440',
-                'license' : 'http://creativecommons.org/publicdomain/zero/1.0/legalcode) (DwC: license)',
+                'license' : 'http://creativecommons.org/publicdomain/zero/1.0/legalcode',
                 }
 
 ISO_COUNTRY_CODES = ('AS', 'CA', 'FM', 'GU', 'MH', 'MP', 'PR', 'P', 'UM', 'US', 'VI')

@@ -44,6 +44,40 @@ Python dependencies
         OUTFILE=$ARCHIVENAME-$VERSION.tar.gz
         wget --output-document=$OUTFILE $SRC_URL
         
+    * geos 0.2.2
+        ARCHIVENAME=geos
+        VERSION=0.2.2
+        SRC_URL=https://files.pythonhosted.org/packages/11/9b/a190f02fb92f465a7640b9ee7da732d91610415a1102f6e9bb08125a3fef/$ARCHIVENAME-$VERSION.tar.gz
+        tar -xzvf $ARCHIVENAME-$VERSION.tar.gz
+        cd $ARCHIVENAME-$VERSION
+        module load opt-python
+        python3.6 setup.py install
+        
+    * gdal 
+        ARCHIVENAME=gdal
+        VERSION=1.11.4
+        tar xzfv gdal-1.11.4.tar.gz 
+        cd gdal-1.11.4/
+        module load opt-python
+        ./configure --with-python=/opt/python/bin/python3.6 --with-ogr --with-proj --with-geos --prefix=/usr
+        
+    * rtree 0.9.3
+        ARCHIVENAME=Rtree
+        VERSION=0.9.3        
+        SRC_URL=https://files.pythonhosted.org/packages/11/1d/42d6904a436076df813d1df632575529991005b33aa82f169f01750e39e4/$ARCHIVENAME-$VERSION.tar.gz
+        wget $SRC_URL
+        tar -xzvf $ARCHIVENAME-$VERSION.tar.gz
+        cd $ARCHIVENAME-$VERSION
+        module load opt-python
+        python3.6 setup.py install
+        
+        
+        
+      * https://pypi.org/project/Rtree/
+    
+      * requires libspatialindex (install from yum below)
+
+        
     * Pypmpler 0.7 (for memory logging)
     
         pip3 install pympler
@@ -66,14 +100,51 @@ libaec-devel-1.0.4-1.el7.x86_64
 hdf5-1.8.12-11.el7.x86_64
 hdf5-devel-1.8.12-11.el7.x86_64
 proj-4.8.0-4.el7.x86_64.rpm
-yum install --enablerepo epel geos
 
-ldconfig /usr/lib64
+yum install --enablerepo epel spatialindex (installs 1.8.5)
+yum install --enablerepo epel geos (installs 3.4.2-2.el7.x86_64)
+yum install --enablerepo epel geos-devel
+yum install --enablerepo epel geos-python
 
-tar xzfv gdal-1.11.4.tar.gz 
-cd gdal-1.11.4/
-module load opt-python
-./configure --with-python=/opt/python/bin/python3.6 --with-ogr --with-proj --with-geos --prefix=/usr
+geos-python-3.4.2-2.el7.x86_64
+geos-3.4.2-2.el7.x86_64
+geos-devel-3.4.2-2.el7.x86_64
+
+This may be unnecessary as we make from source below.  But dependencies that it 
+brings in may be needed
+# yum install --enablerepo epel gdal
+# yum install --enablerepo epel gdal-devel
+Installing:
+ gdal-devel                                                      x86_64                                                 1.11.4-3.el7                                                          epel                                                      130 k
+Installing for dependencies:
+ CharLS                                                          x86_64                                                 1.0-5.el7                                                             epel                                                       63 k
+ SuperLU                                                         x86_64                                                 5.2.0-5.el7                                                           epel                                                      180 k
+ armadillo                                                       x86_64                                                 8.600.1-2.el7                                                         epel                                                       29 k
+ arpack                                                          x86_64                                                 3.1.3-2.el7                                                           epel                                                      101 k
+ atlas                                                           x86_64                                                 3.10.1-12.el7                                                         Rocks-7.0                                                 4.5 M
+ blas                                                            x86_64                                                 3.4.2-8.el7                                                           Rocks-7.0                                                 399 k
+ cfitsio                                                         x86_64                                                 3.370-10.el7                                                          epel                                                      528 k
+ freexl                                                          x86_64                                                 1.0.5-1.el7                                                           epel                                                       32 k
+ gdal-libs                                                       x86_64                                                 1.11.4-3.el7                                                          epel                                                      4.4 M
+ lapack                                                          x86_64                                                 3.4.2-8.el7                                                           Rocks-7.0                                                 5.4 M
+ libdap                                                          x86_64                                                 3.13.1-2.el7                                                          epel                                                      423 k
+ libgeotiff                                                      x86_64                                                 1.2.5-14.el7                                                          epel                                                      545 k
+ libgta                                                          x86_64                                                 1.0.4-1.el7                                                           epel                                                       32 k
+ netcdf                                                          x86_64                                                 4.3.3.1-5.el7                                                         epel                                                      693 k
+ ogdi                                                            x86_64                                                 3.2.0-0.19.beta2.el7                                                  epel                                                      248 k
+ openblas-openmp                                                 x86_64                                                 0.3.3-2.el7                                                           epel                                                      4.4 M
+ openjpeg2                                                       x86_64                                                 2.3.1-1.el7                                                           epel                                                      153 k
+ postgresql-libs                                                 x86_64                                                 9.2.24-1.el7_5                                                        Rocks-7.0                                                 234 k
+ unixODBC                                                        x86_64                                                 2.3.1-11.el7                                                          Rocks-7.0                                                 413 k
+ xerces-c                                                        x86_64                                                 3.1.1-9.el7                                                           Rocks-7.0                                                 878 k
+
+# ldconfig /usr/lib64
+
+Install gdal for python from source, otherwise yum forces it to 2.7.5 in /usr/bin/python
+# tar xzfv gdal-1.11.4.tar.gz 
+# cd gdal-1.11.4/
+# module load opt-python
+# ./configure --with-python=/opt/python/bin/python3.6 --with-ogr --with-proj --with-geos --prefix=/usr
 
 GDAL is now configured for x86_64-unknown-linux-gnu
 
@@ -135,7 +206,7 @@ GDAL is now configured for x86_64-unknown-linux-gnu
   SpatiaLite support:        no
   DWGdirect support          no
   INFORMIX DataBlade support:no
-  GEOS support:              no
+  GEOS support:              yes
   Poppler support:           no
   Podofo support:            no
   OpenCL support:            no
@@ -152,11 +223,11 @@ GDAL is now configured for x86_64-unknown-linux-gnu
   enable POSIX iconv support:yes
   hide internal symbols:     no
 
-make prefix=/usr ROOT=/ install
 
-cd swig/python/
-python3.6 setup.py build
-python3.6 setup.py install
+# make prefix=/usr ROOT=/ install
+# cd swig/python/
+# python3.6 setup.py build
+# python3.6 setup.py install
 
 [astewart@badenov git]$ python3.6
 Python 3.6.2 (default, Dec  1 2017, 22:03:46) 
