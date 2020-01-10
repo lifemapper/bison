@@ -68,6 +68,16 @@ BISON_VALUES = {'provider': 'BISON',
                 'license' : 'http://creativecommons.org/publicdomain/zero/1.0/legalcode',
                 }
 
+ANCILLARY_FILES = {'terrestrial': {'file': 'US_CA_Counties_Centroids.shp',
+                                   'fields': (('FIPS', 'calculated_fips'), 
+                                              ('COUNTY_NAM', 'calculated_county'),
+                                              ('STATE_NAME', 'calculated_state'))},
+                   'marine': {'file': 'World_EEZ_v8_20140228_splitpolygons/World_EEZ_v8_2014_HR.shp',
+                              'fields': (('EEZ', 'calculated_waterbody'), 
+                                         ('MRGID', 'mrgid'))},
+                   'establishment_means': {'file': 'NonNativesIndex20190912.txt'},
+                   'itis': {'file': 'itis_lookup.csv'}}
+
 ISO_COUNTRY_CODES = ('AS', 'CA', 'FM', 'GU', 'MH', 'MP', 'PR', 'P', 'UM', 'US', 'VI')
 
 class FillMethod(Enum):

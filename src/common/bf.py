@@ -3,7 +3,7 @@ import os
 import rtree
 import time
 
-from common.constants import (BISON_DELIMITER, ENCODING,BISON_SQUID_FLD)
+from common.constants import (BISON_DELIMITER, ENCODING, GEOREFERENCE_FILES)
 from common.bisonfill import BisonFiller
 from common.tools import (getCSVDictReader, getCSVDictWriter, getLogger)
 

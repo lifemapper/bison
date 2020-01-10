@@ -174,8 +174,7 @@ if __name__ == '__main__':
             log = getLogger(logbasename, logfname)
             bf = BisonFiller(pass3_fname, log=log)
             # Pass 4 of CSV transform, final step, point-in-polygon intersection
-            bf.update_point_in_polygons(terrestrial_shpname, marine_shpname, 
-                                        pass4_fname)
+            bf.update_point_in_polygons(ancillary_path, pass4_fname)
         elif step == 10:
             logfname = os.path.join(tmppath, '{}.log'.format(logbasename))
             log = getLogger(logbasename, logfname)
