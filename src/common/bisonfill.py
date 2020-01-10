@@ -23,11 +23,12 @@
 """
 from osgeo import ogr
 import os
+import rtree
 import time
 
 from common.constants import (BISON_DELIMITER, ENCODING, LOGINTERVAL, 
                               PROHIBITED_CHARS, PROHIBITED_SNAME_CHARS, 
-                              PROHIBITED_VALS,
+                              PROHIBITED_VALS, ANCILLARY_FILES,
                               BISON_VALUES, BISON_SQUID_FLD, ITIS_KINGDOMS, 
                               ISO_COUNTRY_CODES)
 from common.lookup import Lookup, VAL_TYPE
@@ -188,45 +189,42 @@ class BisonFiller(object):
         return drdr, dwtr
             
     # ...............................................
-    def _fill_geofields(self, rec, lon, lat,
-                        terrlyr, idx_fips, idx_cnty, idx_st, 
-                        eezlyr, idx_eez, idx_mg):
+    def _fill_geofields(self, rec, lon, lat, 
+                        terrindex, terrfeats, terr_bison_fldnames,
+                        marindex, marfeats, mar_bison_fldnames):
+        fldvals = {}
         terr_count = 0
         marine_count = 0
         pt = ogr.Geometry(ogr.wkbPoint)
         pt.AddPoint(lon, lat)
-        terrlyr.SetSpatialFilter(pt)
-        eezlyr.SetSpatialFilter(pt)
-        for poly in terrlyr:
-            if terr_count == 0:
-                terr_count += 1
-                fips = poly.GetFieldAsString(idx_fips)
-                county = poly.GetFieldAsString(idx_cnty)
-                state = poly.GetFieldAsString(idx_st)
-            else:
-                terr_count += 1
-                break
-        terrlyr.ResetReading()
+        
+        for tfid in list(terrindex.intersection((lon, lat))):
+    #         feat = terrfeats[tfid]['feature']
+    #         geom = feat.GetGeometryRef()
+            geom = terrfeats[tfid]['geom']
+            if pt.Within(geom):
+                if terr_count == 0:
+                    terr_count += 1
+                    for fn in terr_bison_fldnames:
+                        fldvals[fn] = terrfeats[tfid][fn]
+                else:
+                    terr_count = 0
+                    fldvals = {}
+                    break     
         # Single terrestrial polygon takes precedence
-        if terr_count == 1:
-            # terrestrial intersect
-            rec['calculated_fips'] = fips
-            rec['calculated_county_name'] = county
-            rec['calculated_state_name'] = state
-        # Single marine intersect is 2nd choice
-        elif terr_count == 0:
-            for poly in eezlyr:
+        if terr_count == 0:
+            for mfid in list(marindex.intersection((lon, lat))):
                 if marine_count == 0:
                     marine_count += 1
-                    eez = poly.GetFieldAsString(idx_eez)
-                    mrgid = poly.GetFieldAsString(idx_mg)
+                    for fn in mar_bison_fldnames:
+                        fldvals[fn] = marfeats[mfid][fn]
                 else:
-                    marine_count += 1
+                    marine_count = 0
+                    fldvals = {}
                     break
-            eezlyr.ResetReading()
-            if marine_count == 1:
-                rec['calculated_waterbody'] = eez
-                rec['mrgid'] = mrgid
+        # Update record with resolved values for intersecting polygons
+        for name, val in fldvals:
+            rec[name] = val
 
     # ...............................................
     def _fill_centroids(self, rec, centroids):
@@ -235,8 +233,6 @@ class BisonFiller(object):
         pstate = rec['provided_state_name']
         if ((pcounty not in (None, '') and pstate not in (None, '')) 
             or pfips not in (None, '')):
-#             self._log.info('Provided county {}, state {}, fips {}'
-#                            .format(pcounty, pstate, pfips))
             key = ';'.join((pstate, pcounty, pfips))
             try:
                 lon, lat = centroids.lut[key]
@@ -413,9 +409,32 @@ class BisonFiller(object):
         finally:
             self.close()
             
+    # ...............................................    
+    def _create_spatial_index(self, geodata, lyr):
+        terr_def = lyr.GetLayerDefn()
+        fldindexes = []
+        bisonfldnames = []
+        for geofld, bisonfld in geodata['fields']:
+            geoidx = terr_def.GetFieldIndex(geofld)
+            fldindexes.append((bisonfld, geoidx))
+            bisonfldnames.append(bisonfld)
+            
+        spindex = rtree.index.Index(interleaved=False)
+        spfeats = {}
+        for fid in range(0, lyr.GetFeatureCount()):
+            feat = lyr.GetFeature(fid)
+            geom = feat.GetGeometryRef()
+            xmin, xmax, ymin, ymax = geom.GetEnvelope()
+            spindex.insert(fid, (xmin, xmax, ymin, ymax))
+            spfeats[fid] = {'feature': feat, 
+                            'geom': geom}
+            for name, idx in fldindexes:
+                spfeats[fid][name] = feat.GetFieldAsString(idx)
+        return spindex, spfeats, bisonfldnames
+
+            
     # ...............................................
-    def update_point_in_polygons(self, terrestrial_shpname, marine_shpname, 
-                                 outfname):
+    def update_point_in_polygons(self, ancillary_path, outfname):
         """
         @summary: Process a CSV file with 47 ordered BISON fields (and optional
                   gbifID field for GBIF provided data) to 
@@ -434,18 +453,20 @@ class BisonFiller(object):
         if self.is_open():
             self.close()
         driver = ogr.GetDriverByName("ESRI Shapefile")
+
+        terr_geodata = ANCILLARY_FILES['terrestrial']
+        terrestrial_shpname = os.path.join(ancillary_path, terr_geodata['file'])
         terr_data_src = driver.Open(terrestrial_shpname, 0)
         terrlyr = terr_data_src.GetLayer()
-        terr_def = terrlyr.GetLayerDefn()
-        idx_fips = terr_def.GetFieldIndex('FIPS')
-        idx_cnty = terr_def.GetFieldIndex('COUNTY_NAM')
-        idx_st = terr_def.GetFieldIndex('STATE_NAME')
+        terrindex, terrfeats, terr_bison_fldnames = \
+            self._create_spatial_index(terr_geodata, terrlyr)
         
+        marine_geodata = ANCILLARY_FILES['marine']
+        marine_shpname = os.path.join(ancillary_path, marine_geodata['file'])
         eez_data_src = driver.Open(marine_shpname, 0)
         eezlyr = eez_data_src.GetLayer()
-        eez_def = eezlyr.GetLayerDefn()
-        idx_eez = eez_def.GetFieldIndex('EEZ')
-        idx_mg = eez_def.GetFieldIndex('MRGID')
+        marindex, marfeats, mar_bison_fldnames = \
+            self._create_spatial_index(marine_geodata, eezlyr)
 
         recno = 0
         try:
@@ -458,8 +479,8 @@ class BisonFiller(object):
                 if lon is not None:
                     # Compute geo: coordinates and polygons
                     self._fill_geofields(rec, lon, lat, 
-                                         terrlyr, idx_fips, idx_cnty, idx_st, 
-                                         eezlyr, idx_eez, idx_mg)
+                                         terrindex, terrfeats, terr_bison_fldnames,
+                                         marindex, marfeats, mar_bison_fldnames)
                 # Write updated record
                 dwriter.writerow(rec)
                 # Log progress occasionally, this process is very time-consuming
@@ -739,10 +760,12 @@ if __name__ == '__main__':
     os.makedirs(outpath, mode=0o775, exist_ok=True)
     
     # ancillary data for record update
-    terrestrial_shpname = os.path.join(ancillary_path, 'US_CA_Counties_Centroids.shp')
     estmeans_fname = os.path.join(ancillary_path, 'NonNativesIndex20190912.txt')
-    marine_shpname = os.path.join(ancillary_path, 'World_EEZ_v8_20140228_splitpolygons/World_EEZ_v8_2014_HR.shp')
     itis2_lut_fname = os.path.join(ancillary_path, 'itis_lookup.csv')
+    terrestrial_shpname = os.path.join(ancillary_path, 
+                                       GEOREFERENCE_FILES['terrestrial']['file'])
+    marine_shpname = os.path.join(ancillary_path, 
+                                  GEOREFERENCE_FILES['marine']['file'])
     
 #     itis1_lut_fname = os.path.join(tmppath, 'step3_itis_lut.txt')
     
