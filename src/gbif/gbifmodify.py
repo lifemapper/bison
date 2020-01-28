@@ -151,7 +151,10 @@ class GBIFReader(object):
                         self._log.warning('No organization key found for dataset {}'
                                             .format(dskey))
                     title = ds_metavals['title']
-                    url = ds_metavals['homepage']
+                    if ds_metavals['homepage'] != '':
+                        url = ds_metavals['homepage']
+                    else:
+                        url = ds_metavals['url']
                     legacy_dataset_id = ds_metavals['legacyid']
                     if (orgkey == BISON_ORG_UUID and 
                         url.startswith(BISON_IPT_PREFIX) >= 0):
@@ -175,7 +178,10 @@ class GBIFReader(object):
                 self._log.warning('{} missing from organization LUT'.format(orgkey))
             else:
                 title = org_metavals['title']
-                url = org_metavals['homepage']
+                if org_metavals['homepage'] != '':
+                    url = org_metavals['homepage']
+                else:
+                    url = org_metavals['url']
                 legacy_org_id = org_metavals['legacyid']
                 if url.find('bison.org') >= 0:
                     self._log.info('Discard rec {}: org URL {}'
@@ -349,6 +355,25 @@ class GBIFReader(object):
         if datadict:
             centroids = Lookup.initFromDict(datadict, valtype=VAL_TYPE.TUPLE)
         return centroids
+
+    # ...............................................
+    def _read_name_lookup(self, name_lut_fname):
+        """
+        @summary: Create lookup table for: 
+                  BISON canonicalName from GBIF scientificName and/or taxonKey
+        """
+        if not os.path.exists(name_lut_fname):
+            raise Exception('Input file {} missing!'.format(name_lut_fname))
+        try:
+            drdr, inf = getCSVReader(name_lut_fname, BISON_DELIMITER, 
+                                     ENCODING)
+            for name_or_key, canonical in drdr:
+                self._nametaxa[name_or_key]= canonical
+        except Exception as e:
+            self._log.error('Failed to interpret row {} {}, {}'
+                            .format(name_or_key, canonical, e))
+        finally:
+            inf.close()
     
     # ...............................................
     def _open_pass1_files(self, gbif_interp_fname, pass1_fname, nametaxa_fname):
@@ -370,7 +395,8 @@ class GBIFReader(object):
         # Read any existing values for lookup
         if os.path.exists(nametaxa_fname):
             self._log.info('Read metadata ...')
-            self._nametaxa = self._read_name_taxa(nametaxa_fname)
+#             self._nametaxa = self._read_name_taxa(nametaxa_fname)
+            self._nametaxa = self._read_name_lookup(nametaxa_fname)
             
         return rdr, wtr
             
@@ -484,10 +510,12 @@ class GBIFReader(object):
         gid = iline[0]
         rec = {}
         
-        if len(iline) < len(self._save_flds):
+        valcount = len(iline)
+        if (valcount < len(self._save_flds) or
+            valcount > len(self._gbif_column_map)):
             self._log.warning("""Data misalignment? 
-            Only {} of {} expected fields for rec {}"""
-                  .format(len(iline), len(self._save_flds), gid))
+            Received {} of {} expected fields for rec {}"""
+                  .format(valcount, len(self._gbif_column_map), gid))
         
         for bfld in self._save_flds:
             rec[bfld] = None
@@ -641,10 +669,6 @@ class GBIFReader(object):
                 rec = self._create_rough_bisonrec(line, gbif_column_map)
                 biline = self._complete_bisonrec_pass1(rec, datasets, orgs,  
                                                        nametaxas)
-#                 # Create new record or empty list
-#                 biline = self._create_bisonrec_pass1(line, gbif_column_map,
-#                                                      datasets, orgs, 
-#                                                      nametaxas)
                 # Write new record
                 if biline:
                     writer.writerow(biline)
@@ -1001,6 +1025,17 @@ class GBIFReader(object):
             namelst = namelst[tot:]
             # Get, write parsed names
             parsed_names, currfail = gbifapi.get_parsednames(currnames)
+            # If > 10% fail, test for BOLD or pause
+            fail_rate = len(currfail) / tot
+            if fail_rate > 0.1:
+                non_sn_count = 0
+                for sn in currfail:
+                    if sn.find(':') >= 0:
+                        non_sn_count += 1
+                non_sn_rate = non_sn_count / len(currfail)
+                if non_sn_rate < 0.8:
+                    time.sleep(10)
+                    parsed_names, currfail = gbifapi.get_parsednames(currnames)
             name_fails.extend(currfail)
             for sciname, canonical in parsed_names.items():
                 name_dict[sciname] = canonical
@@ -1019,25 +1054,77 @@ class GBIFReader(object):
         """
         if not os.path.exists(nametaxa_fname):
             raise Exception('Input file {} missing!'.format(nametaxa_fname))
-        if os.path.exists(name_lut_fname):
-            raise Exception('Output LUT file {} exists!'.format(name_lut_fname))
         
-        # Read name/taxonIDs dictionary for name resolution
-        nametaxa = Lookup.initFromFile(nametaxa_fname, 'scientificName', 
-                                       delimiter, valtype=VAL_TYPE.SET)
-        # Create name LUT with messyname/canonical from GBIF parser and save to file
-        name_dict, name_fails = self._write_parsed_names(name_lut_fname, 
-                                                        list(nametaxa.lut.keys()),
-                                                        delimiter=delimiter)
-        # Append taxonkeys/canonical from GBIF taxonkey webservice to name LUT and file
-        self._append_resolved_taxkeys(name_dict, name_lut_fname, 
-                                      name_fails, nametaxa)
-        names = Lookup.initFromDict(name_dict, valtype=VAL_TYPE.STRING, 
-                                    encoding=ENCODING)
+        if os.path.exists(name_lut_fname):
+            self._log.info('Output LUT file {} exists'.format(name_lut_fname))
+            self._read_name_lookup(name_lut_fname)
+            names = Lookup.initFromDict(self._nametaxa, valtype=VAL_TYPE.STRING, 
+                                        encoding=ENCODING)
+        else:
+            # Read name/taxonIDs dictionary for name resolution
+            nametaxa = Lookup.initFromFile(nametaxa_fname, 'scientificName', 
+                                           delimiter, valtype=VAL_TYPE.SET)
+            # Create name LUT with messyname/canonical from GBIF parser and save to file
+            name_dict, name_fails = self._write_parsed_names(name_lut_fname, 
+                                                            list(nametaxa.lut.keys()),
+                                                            delimiter=delimiter)
+            # Append taxonkeys/canonical from GBIF taxonkey webservice to name LUT and file
+            self._append_resolved_taxkeys(name_dict, name_lut_fname, 
+                                          name_fails, nametaxa)
+            names = Lookup.initFromDict(name_dict, valtype=VAL_TYPE.STRING, 
+                                        encoding=ENCODING)
         
         return names
-            
+
+
 # ...............................................
+if __name__ == '__main__':
+    import argparse
+    parser = argparse.ArgumentParser(
+                description=("""Find a GBIF occurrence record from a dataset downloaded
+                                     from the GBIF occurrence web service in
+                                     Darwin Core format into BISON format.  
+                                 """))
+    parser.add_argument('gbif_occ_file', type=str, 
+                        help="""
+                        Absolute pathname of the input GBIF occurrence file 
+                        for data transform.  Path contain downloaded GBIF data 
+                        and metadata.  If the subdirectories 'tmp' and 'out' 
+                        are not present in the same directory as the raw data, 
+                        they will be  created for temp and final output files.
+                        """)
+    parser.add_argument('gbifid', type=str, 
+                        help="""
+                        GBIF identifier for the record to find.
+                        """)
+    args = parser.parse_args()
+    gbif_interp_file = args.gbif_occ_file
+    gbifid = args.gbifid
+
+    overwrite = True
+    tmpdir = 'tmp'
+    outdir = 'out'
+    inpath, gbif_fname = os.path.split(gbif_interp_file)
+
+    gr = GBIFReader(inpath, tmpdir, outdir, 'test')
+
+    gr.open_gbif_for_search(gbif_interp_file)
+    map = gr._gbif_column_map    
+    badids = []
+
+#     id = '1325646994'
+    rec = gr.find_gbif_record(gbifid)
+    
+    print(rec['longitude'], rec['latitude'])
+    print(gr._gbif_line[map['decimalLongitude']],gr._gbif_line[map['decimalLatitude']])
+    
+    
+    badids.append(id)
+    for bad in badids:
+        rec = gr.find_gbif_record(str(bad))
+        print('id {} len {}'.format(bad, len(gr._gbif_line)))
+
+    gr.close()
 """
 import os
 import time
@@ -1112,7 +1199,7 @@ id = '1821774436'
 rec = self.find_gbif_record(id)
 print(rec['longitude'], rec['latitude'])
 print(self._gbif_line[map['decimalLongitude']],self._gbif_line[map['decimalLatitude']]) 
-
+id = '1325646994'
 for bad in badids:
     rec = self.find_gbif_record(str(bad))
     print('id {} len {}'.format(bad, len(self._gbif_line))

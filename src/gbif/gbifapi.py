@@ -153,6 +153,7 @@ class GbifAPI(object):
             return dataDict        
         metaurl = GBIF_DATASET_URL + dsKey
         legacyid = LEGACY_ID_DEFAULT
+        homepage = url = ''
         data = self._getDataFromUrl(metaurl)
         if data is None:
             return dataDict
@@ -162,21 +163,23 @@ class GbifAPI(object):
             print('Failed to resolve dataset with {}'.format(metaurl))
         else:
             orgkey = self._get_val(data, ['publishingOrganizationKey'], save_nl=True)
-            url = None
             if orgkey == '':
                 print('Failed to find publishingOrganizationKey in {}'.format(metaurl))
             elif orgkey == BISON_ORG_UUID:
                 url = self._get_buried_url_val(data, search_prefix=BISON_IPT_PREFIX)
-            if not url :
-                url = self._get_val(data, ['homepage'], save_nl=False)
-                if not url:
-                    url = self._get_buried_url_val(data)
+            if url == '': 
+                url = self._get_buried_url_val(data)
+                        
+            if 'homepage' in data:
+                homepage = data['homepage']
+                if ((isinstance(homepage, list) or isinstance(homepage, tuple))
+                    and len(homepage) > 0):
+                    homepage = homepage[0]                
 
             if ('identifiers' in data
                  and len(data['identifiers']) > 0 
                  and data['identifiers'][0]['type'] == 'GBIF_PORTAL'):
                 legacyid = data['identifiers'][0]['identifier']
-            dataDict['legacyid'] = legacyid
             
             title = self._get_val(data, ['title'], save_nl=True)
             desc = self._get_val(data, ['description'], save_nl=True)
@@ -185,8 +188,10 @@ class GbifAPI(object):
             modified = self._get_val(data, ['modified'], save_nl=False)
             
             dataDict['key'] = key
+            dataDict['legacyid'] = legacyid
             dataDict['publishingOrganizationKey'] = orgkey
-            dataDict['homepage'] = url
+            dataDict['homepage'] = homepage
+            dataDict['url'] = url
             dataDict['title'] = title
             dataDict['description'] = desc
             dataDict['citation'] = citation
