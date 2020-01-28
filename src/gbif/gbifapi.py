@@ -24,7 +24,8 @@
 import os
 import requests
 
-from common.constants import (BISON_DELIMITER, ENCODING, NEWLINE) 
+from common.constants import (BISON_DELIMITER, ENCODING, NEWLINE, 
+                              LEGACY_ID_DEFAULT) 
 from common.tools import getCSVWriter
 
 from gbif.constants import (GBIF_DSET_KEYS, GBIF_ORG_KEYS, GBIF_URL,
@@ -151,6 +152,7 @@ class GbifAPI(object):
         if dsKey == '':
             return dataDict        
         metaurl = GBIF_DATASET_URL + dsKey
+        legacyid = LEGACY_ID_DEFAULT
         data = self._getDataFromUrl(metaurl)
         if data is None:
             return dataDict
@@ -169,11 +171,16 @@ class GbifAPI(object):
                 url = self._get_val(data, ['homepage'], save_nl=False)
                 if not url:
                     url = self._get_buried_url_val(data)
+
+            if ('identifiers' in data
+                 and len(data['identifiers']) > 0 
+                 and data['identifiers'][0]['type'] == 'GBIF_PORTAL'):
+                legacyid = data['identifiers'][0]['identifier']
+            dataDict['legacyid'] = legacyid
             
             title = self._get_val(data, ['title'], save_nl=True)
             desc = self._get_val(data, ['description'], save_nl=True)
             citation = self._get_val(data, ['citation', 'text'], save_nl=True)
-#             rights = self._get_val(data, ['rights'], save_nl=True)
             created = self._get_val(data, ['created'], save_nl=False)
             modified = self._get_val(data, ['modified'], save_nl=False)
             
@@ -183,7 +190,6 @@ class GbifAPI(object):
             dataDict['title'] = title
             dataDict['description'] = desc
             dataDict['citation'] = citation
-#             dataDict['rights'] = rights
             dataDict['created'] = created
             dataDict['modified'] = modified
         return dataDict
@@ -340,49 +346,40 @@ class GbifAPI(object):
         if data is None:
             return dataDict
 
-        legacyid = 'NA'
-        orgkey = title = desc = citation = rights = logourl = homepage = ''
+        legacyid = LEGACY_ID_DEFAULT
+        url = homepage = ''
         if 'key' in data:
-            if 'publishingOrganizationKey' in data:
-                orgkey = self._saveNLDelCR(data['publishingOrganizationKey'])
-                dataDict['publishingOrganizationKey'] = orgkey
-
+            key = data['key']
+            
             if ('identifiers' in data
                  and len(data['identifiers']) > 0 
                  and data['identifiers'][0]['type'] == 'GBIF_PORTAL'):
                 legacyid = data['identifiers'][0]['identifier']
-                dataDict['legacyID'] = legacyid
+                dataDict['legacyid'] = legacyid
+                
+            title = self._get_val(data, ['title'], save_nl=True)
+            desc = self._get_val(data, ['description'], save_nl=True)
+            citation = self._get_val(data, ['citation', 'text'], save_nl=True)
+            created = self._get_val(data, ['created'], save_nl=False)
+            modified = self._get_val(data, ['modified'], save_nl=False)
             
-            if 'title'in data:
-                title = self._saveNLDelCR(data['title'])                
-                dataDict['title'] = title
-
-            if 'description' in data:
-                desc = self._saveNLDelCR(data['description'])
-                dataDict['description'] = desc
-            
-            if 'citation' in data:
-                citation = self._saveNLDelCR(data['citation']['text'])
-                dataDict['citation'] = citation
-
-            if 'rights' in data:
-                rights = self._saveNLDelCR(data['rights'])
-                dataDict['rights'] = rights
-
-            if 'logoUrl' in data:
-                logourl = data['logoUrl']
-                dataDict['logoUrl'] = logourl
-            
+            url = self._get_buried_url_val(data)            
             if 'homepage' in data:
                 homepage = data['homepage']
-                dataDict['homepage'] = homepage
+                if ((isinstance(homepage, list) or isinstance(homepage, tuple))
+                    and len(homepage) > 0):
+                    homepage = homepage[0]                
                 
-            dataDict['key'] = data['key']
-            dataDict['created'] = data['created']
-            dataDict['modified'] = data['modified']
+            dataDict['key'] = key
+            dataDict['title'] = title
+            dataDict['description'] = desc
+            dataDict['citation'] = citation
+            dataDict['created'] = created
+            dataDict['modified'] = modified
+            dataDict['homepage'] = homepage
+            dataDict['url'] = url
+            dataDict['legacyid'] = legacyid
 
-#             row = [orgkey, legacyid, data['key'], title, desc, citation, rights, logourl,
-#                      data['created'], data['modified'], homepage]
         return dataDict
 
 # ...............................................

@@ -117,10 +117,15 @@ if __name__ == '__main__':
     estmeans_fname = os.path.join(ancillary_path, 'NonNativesIndex20190912.txt')
     marine_shpname = os.path.join(ancillary_path, 'World_EEZ_v8_20140228_splitpolygons/World_EEZ_v8_2014_HR.shp')
     itis2_lut_fname = os.path.join(ancillary_path, 'itis_lookup.csv')
+    resource_lut_fname = os.path.join(ancillary_path, 'resourcestable.csv')
+    provider_lut_fname = os.path.join(ancillary_path, 'providerstable.csv')
     
-    # reference files for lookups
+    # reference files for dataset(gbif) resource(bison) lookups
     dataset_lut_fname = os.path.join(tmppath, 'dataset_lut.csv')
+
+    # reference files for organization(gbif) provider(bison) lookups
     org_lut_fname = os.path.join(tmppath, 'organization_lut.csv')
+
     itis1_lut_fname = os.path.join(tmppath, 'step3_itis_lut.txt')
     
     logbasename = 'step{}_{}'.format(step, gbif_basefname)
@@ -139,12 +144,14 @@ if __name__ == '__main__':
     else:
         if step == 1:
             gr = GBIFReader(inpath, tmpdir, outdir, logbasename)
-            gr.write_dataset_org_lookup(dataset_lut_fname, org_lut_fname, 
-                                        delimiter=BISON_DELIMITER)
+            gr.write_dataset_org_lookup(dataset_lut_fname, resource_lut_fname, 
+                                        org_lut_fname, provider_lut_fname, 
+                                        outdelimiter=BISON_DELIMITER)
             # Pass 1 of CSV transform, initial pull, standardize, 
             # FillMethod = gbif_meta, metadata fill
             gr.transform_gbif_to_bison(gbif_interp_file, dataset_lut_fname, 
-                                       org_lut_fname, nametaxa_fname, pass1_fname)
+                                       org_lut_fname, nametaxa_fname, 
+                                       pass1_fname)
             
         elif step == 2:
             gr = GBIFReader(inpath, tmpdir, outdir, logbasename)
