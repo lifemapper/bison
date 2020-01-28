@@ -62,6 +62,7 @@ class Lookup(object):
         if key is None and val is None:
             print('Missing key {} or value {}'.format(key, val))
         else:
+            print('Saving key {}'.format(key))
             try:
                 existingval = self.lut[key]
             except KeyError:
@@ -73,7 +74,8 @@ class Lookup(object):
                 if self.valtype == VAL_TYPE.SET:
                     self.lut[key].add(val)
                 elif val != existingval:
-                    raise Exception('Conflicting value for key {} and existing val {}')
+                    print('Ignore conflicting value for key {}, new val {} and existing val {}'
+                          .format(key, val, existingval))
                 
 
     # ...............................................
@@ -89,7 +91,6 @@ class Lookup(object):
                 print('Opened file {} for write'.format(fname))
                 if fmode == 'w':
                     writer.writeheader()
-                row = []
                 for key, ddict in self.lut.items():
                     writer.writerow(ddict)
             else:

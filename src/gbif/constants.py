@@ -129,6 +129,7 @@ BISON_GBIF_MAP = [
     ('clean_provided_scientific_name', FillMethod.gbif_name),
     ('itis_common_name', FillMethod.itis_tsn),
     ('itis_tsn', FillMethod.itis_tsn),
+    ('tsn_hierarchy_string', FillMethod.itis_tsn),
     ('basis_of_record', NS.dwc + 'basisOfRecord'),
     ('occurrence_date', NS.dwc + 'eventDate'),
     ('year', NS.dwc + 'year'),

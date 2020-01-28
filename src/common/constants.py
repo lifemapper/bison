@@ -35,9 +35,11 @@ BISON_SQUID_FLD = 'occurrence_url'
 
 
 ENCODING = 'utf-8'
+ANCILLARY_DELIMITER = ','
 BISON_DELIMITER = '$'
 
 NEWLINE = '\n'
+LEGACY_ID_DEFAULT = -9999
 
 # Rough log of processing progress
 LOGINTERVAL = 1000000
@@ -64,14 +66,14 @@ W3_NAMESPACE =  '{http://www.w3.org/2001/XMLSchema-instance}'
 
 BISON_VALUES = {'provider': 'BISON',
                 'provider_url': 'https://bison.usgs.gov',
-                'provider_id': '440',
+#                 'provider_id': '440',
                 'license' : 'http://creativecommons.org/publicdomain/zero/1.0/legalcode',
                 }
 
 ANCILLARY_FILES = {'terrestrial': {'file': 'US_CA_Counties_Centroids.shp',
                                    'fields': (('FIPS', 'calculated_fips'), 
-                                              ('COUNTY_NAM', 'calculated_county'),
-                                              ('STATE_NAME', 'calculated_state'))},
+                                              ('COUNTY_NAM', 'calculated_county_name'),
+                                              ('STATE_NAME', 'calculated_state_name'))},
                    'marine': {'file': 'World_EEZ_v8_20140228_splitpolygons/World_EEZ_v8_2014_HR.shp',
                               'fields': (('EEZ', 'calculated_waterbody'), 
                                          ('MRGID', 'mrgid'))},

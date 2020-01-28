@@ -223,7 +223,7 @@ class BisonFiller(object):
                     fldvals = {}
                     break
         # Update record with resolved values for intersecting polygons
-        for name, val in fldvals:
+        for name, val in fldvals.items():
             rec[name] = val
 
     # ...............................................
@@ -311,6 +311,7 @@ class BisonFiller(object):
 #             self._log.info('Found NO itis values for {}'.format(canonical))                    
         else:
             rec['itis_tsn'] = itis_vals['tsn']
+            rec['hierarchy_string'] = itis_vals['hierarchy_string']
             rec['valid_accepted_scientific_name'] = itis_vals['valid_accepted_scientific_name']
             rec['valid_accepted_tsn'] = itis_vals['valid_accepted_tsn']
             rec['itis_common_name'] = itis_vals['common_name']
@@ -763,9 +764,9 @@ if __name__ == '__main__':
     estmeans_fname = os.path.join(ancillary_path, 'NonNativesIndex20190912.txt')
     itis2_lut_fname = os.path.join(ancillary_path, 'itis_lookup.csv')
     terrestrial_shpname = os.path.join(ancillary_path, 
-                                       GEOREFERENCE_FILES['terrestrial']['file'])
+                                       ANCILLARY_FILES['terrestrial']['file'])
     marine_shpname = os.path.join(ancillary_path, 
-                                  GEOREFERENCE_FILES['marine']['file'])
+                                  ANCILLARY_FILES['marine']['file'])
     
 #     itis1_lut_fname = os.path.join(tmppath, 'step3_itis_lut.txt')
     
