@@ -21,11 +21,10 @@
              Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 
              02110-1301, USA.
 """
-import glob
 import os
 import xml.etree.ElementTree as ET
 
-from common.constants import (BISON_DELIMITER, ENCODING, LEGACY_ID_DEFAULT)
+from common.constants import (BISON_DELIMITER, ENCODING)
 from common.tools import (getCSVDictReader, getCSVWriter)
                             
 from gbif.constants import (INTERPRETED, CLIP_CHAR, NAMESPACE, GBIF_ORG_FOREIGN_KEY)
