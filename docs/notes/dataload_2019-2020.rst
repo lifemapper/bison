@@ -100,8 +100,8 @@ process info at: https://my.usgs.gov/confluence/display/DEV/SAS+Development
       with fips centroid coordinates, fill centroid with "county"
 
            
-BISON 48 (fields with raw or calculated values)
------------------------------------------------
+BISON 49 (48 database fields + tsn_hierarchy_string for Solr)
+-------------------------------------------------------------------
 For GBIF data load, field values will be pulled from named GBIF field or 
 calculated according to rules laid out in `GBIF Data Processing`_.
 
@@ -115,23 +115,27 @@ populated, we will test it for contents, format, etc.
            
 #. itis_common_name
 
-   * Calc: from ITIS lookup (of itis_tsn calc)
+   * Calc: from ITIS lookup
    
 #. itis_tsn 
 
    * Calc: with ITIS lookup + clean_provided_scientific_name
+   
+#. hierarchy_string
+
+   * Calc: from ITIS lookup
 
 #. basis_of_record
 
-   * gbif/dwc basisOfRecord + controlled vocabulary 
+   * Calc: gbif/dwc basisOfRecord + controlled vocabulary 
 
 #. occurrence_date
 
-   * gbif/dwc eventDate - formatted to YYYY-MM-DD if full date, or YYYY
+   * Calc: gbif/dwc eventDate - formatted to YYYY-MM-DD if full date, or YYYY
 
 #. year 
 
-   * gbif/dwc year or pulled from occurrence_date calc
+   * Calc: gbif/dwc year or pulled from occurrence_date calc
 
 #. verbatim_event_date
 
@@ -139,19 +143,24 @@ populated, we will test it for contents, format, etc.
 
 #. provider
 
-   * gbif/dwc institutionCode (2018: title from gbif organization metadata?)
+   * Calc: organization key from dataset metadata, then GBIF organization 
+     API metadata: 'title' (??institutionCode)
 
 #. provider_url
 
-   * gbif/dwc institutionID (2018: homepage from gbif organization metadata?)
+   * Calc: organization key from dataset metadata, then lookup from saved BISON 
+     provider table or GBIF organization API metadata: 'homepage' or 
+     'identifiers/identifier/' where type = 'URL' (??institutionID)
 
 #. resource
 
-   * Calc: dataset api + datasetKey, retrieve title (dataset name)
+   * Calc: dataset key then GBIF dataset API metadata: 'title'
 
-#. resource_url (https://bison.usgs.gov/ipt/resource?r= or other link) (DwC: collectionID)
+#. resource_url  
 
-   * Calc: gbif dataset api + datasetKey, retrieve homepage (dataset url)
+   * Calc: dataset key then GBIF dataset API metadata: 'homepage' or 
+     'identifiers/identifier/' where type = 'URL'.  Remove record if 
+     provider UUID is BISON UUID and resource_url = https://bison.usgs.gov/ipt/resource?r=*)
    
 #. occurrence_url
 
@@ -171,15 +180,15 @@ populated, we will test it for contents, format, etc.
    
 #. valid_accepted_scientific_name
 
-   * Calc from ITIS lookup
+   * Calc: ITIS lookup
 
 #. valid_accepted_tsn
 
-   * Calc from ITIS lookup
+   * Calc: ITIS lookup
 
 #. provided_scientific_name
 
-   * original gbif/dwc scientificName (AMS: later, check verbatim file)
+   * gbif/dwc scientificName (AMS: later, check verbatim file)
 
 #. provided_tsn
 
@@ -256,11 +265,13 @@ populated, we will test it for contents, format, etc.
 
 #. provider_id
 
-   * Calc: gbif publishingOrganizationKey from retrieved gbif dataset metadata 
+   * Calc: lookup legacyid from saved BISON provider table or GBIF organization 
+     API metadata: 'legacyid'
    
 #. resource_id
 
-   * gbif/gbif datasetKey
+   * Calc: lookup legacyid from saved BISON resource table or GBIF dataset 
+     API metadata: 'legacyid'
    
 #. provided_common_name
 
@@ -268,7 +279,7 @@ populated, we will test it for contents, format, etc.
    
 #. kingdom
 
-   * gbif/dwc kingdom is blank, resolve with ITIS calc
+   * Calc: gbif/dwc kingdom or, if blank, resolve with ITIS calc
    
 #. geodetic_datum
 
@@ -296,9 +307,8 @@ populated, we will test it for contents, format, etc.
    
 #. establishment_means
 
-   * Calc: after ITIS lookup, from establishmentMeans table + itis_tsn
-     (now or later? if not itis_tsn, calc from establishmentMeans table + 
-     clean_provided_scientific_name)
+   * Calc: after ITIS lookup, lookup from establishmentMeans table with
+     itis_tsn (1st) or with clean_provided_scientific_name 
    
 #. iso_country_code
 

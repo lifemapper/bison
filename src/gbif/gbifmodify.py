@@ -98,7 +98,9 @@ class GBIFReader(object):
         self._gbif_reader = None
         self._gbif_recno = 0
         self._gbif_line = None
-        self._gbif_column_map = None
+        meta_fname = os.path.join(self.basepath, META_FNAME)
+        gmetardr = GBIFMetaReader(self._log)
+        self._gbif_column_map = gmetardr.get_field_meta(meta_fname)
         
     # ...............................................
     def _discard_fields_from_output(self, fldlist):
@@ -729,10 +731,9 @@ class GBIFReader(object):
         self._gbif_reader, inf = getCSVReader(gbif_interp_fname, GBIF_DELIMITER, ENCODING)
         self._files.append(inf) 
         # Extract relevant GBIF metadata
-        self._log.info('Read metadata ...')
-        gmetardr = GBIFMetaReader(self._log)
-        meta_fname = os.path.join(self.basepath, META_FNAME)
-        self._gbif_column_map = gmetardr.get_field_meta(meta_fname)
+#         self._log.info('Read metadata ...')
+#         gmetardr = GBIFMetaReader(self._log)
+#         meta_fname = os.path.join(self.basepath, META_FNAME)
         
         # Pull the header row 
         self._gbif_line, self._gbif_recno = getLine(self._gbif_reader, 0)

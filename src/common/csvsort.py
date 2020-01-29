@@ -1,9 +1,7 @@
 import os
-import sys
 
-from common.constants import ENCODING, BISON_PROVIDER_HEADER
+from common.constants import ENCODING #, BISON_PROVIDER_HEADER
 from common.tools import getLogger, getCSVReader, getCSVWriter
-from gbif.constants import GBIF_DELIMITER
 
 # ...............................................
 def usage():
@@ -307,41 +305,41 @@ class Sorter(object):
             self._files[outfname] = outf
         return writer
 
-    # ...............................................
-    def split_bison_by_sortvals(self, outfname):
-        """
-        @summary: Sort file
-        """
-        sort_cols=['resource_id', 'resource_url'] 
-        self.header=BISON_PROVIDER_HEADER
-        
-        self._log.info('Gathering unique sort values from file {}'.format(self.messyfile))
-        reader, inf = getCSVReader(self.messyfile, self.delimiter, ENCODING)        
-
-        rid_idx, rurl_idx = self._get_sortidxs(reader, ['resource_id', 'resource_url'])
-
-        unique_providers = {}
-        try:  
-            for row in reader:
-                rid = row[rid_idx]
-#                 rurl = row[rurl_idx]
-                writer = self._get_provider_file(rid, unique_providers)
-                writer.writerow(row)
-        except Exception as e:
-            self._log.error('Exception reading infile {}: {}'
-                           .format(self.messyfile, e))
-        finally:
-            inf.close()
-
-        writer, outf = getCSVWriter(outfname, self.delimiter, ENCODING, fmode)
-        try:
-            for vals in sortvals:
-                writer.writerow(vals)
-        except Exception as e:
-            self._log.error('Exception writing outfile {}: {}'.format(outfname, e))
-        finally:
-            outf.close()
-        self._log.info('Wrote {} values to {}'.format(len(sortvals), outfname))
+#     # ...............................................
+#     def split_bison_by_sortvals(self, outfname):
+#         """
+#         @summary: Sort file
+#         """
+#         sort_cols=['resource_id', 'resource_url'] 
+#         self.header=BISON_PROVIDER_HEADER
+#         
+#         self._log.info('Gathering unique sort values from file {}'.format(self.messyfile))
+#         reader, inf = getCSVReader(self.messyfile, self.delimiter, ENCODING)        
+# 
+#         rid_idx, rurl_idx = self._get_sortidxs(reader, ['resource_id', 'resource_url'])
+# 
+#         unique_providers = {}
+#         try:  
+#             for row in reader:
+#                 rid = row[rid_idx]
+# #                 rurl = row[rurl_idx]
+#                 writer = self._get_provider_file(rid, unique_providers)
+#                 writer.writerow(row)
+#         except Exception as e:
+#             self._log.error('Exception reading infile {}: {}'
+#                            .format(self.messyfile, e))
+#         finally:
+#             inf.close()
+# 
+#         writer, outf = getCSVWriter(outfname, self.delimiter, ENCODING, fmode)
+#         try:
+#             for vals in sortvals:
+#                 writer.writerow(vals)
+#         except Exception as e:
+#             self._log.error('Exception writing outfile {}: {}'.format(outfname, e))
+#         finally:
+#             outf.close()
+#         self._log.info('Wrote {} values to {}'.format(len(sortvals), outfname))
 #     # ...............................................
 #     def group(self, outfname):
 #         """
@@ -447,9 +445,9 @@ if __name__ == "__main__":
                 gf.split()
             elif cmd  == 'gather_bison':
                 outfname = os.path.join(pth, 'unique_bison_providers.txt')
-                gf.gather_bison_sortvals(outfname, 
-                                         sort_cols=['provider', 'resource_id', 'resource_url'], 
-                                         header=BISON_PROVIDER_HEADER)
+#                 gf.gather_bison_sortvals(outfname, 
+#                                          sort_cols=['provider', 'resource_id', 'resource_url'], 
+#                                          header=BISON_PROVIDER_HEADER)
             elif cmd  == 'split_bison':
                 outfname = os.path.join(pth, 'unique_bison_providers.txt')
                 gf.split_bison_by_sortvals()

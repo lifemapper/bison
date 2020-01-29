@@ -123,6 +123,8 @@ FillLater = (FillMethod.itis_tsn, FillMethod.georef, FillMethod.est_means,
 
 # BISON provider data from solr core
 BISON_PROVIDER_UNIQUE_COLS=('provider', 'resource_id', 'resource_url') 
+
+"""
 BISON_PROVIDER_HEADER = (
 'dataset_key', 
 'catalogue_number', 
@@ -180,9 +182,4 @@ BISON_PROVIDER_HEADER = (
 'id', 
 'tmpid'
 )
-
-
-
-
-
-
+"""
