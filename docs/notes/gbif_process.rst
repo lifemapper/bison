@@ -61,33 +61,36 @@ Resource and Provider LUT preparation, before Iteration 1
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #. Create 2 lookup tables (LUTs) then initial process occ records from GBIF to BISON, 
   
-    * Create list of dataset UUIDs from Dataset EML files
-    * Create Resource LUT and list of publishingOrganization UUIDs from 
-      GBIF dataset API + dataset UUID
-    * Create Provider LUT from GBIF publisher API + publishingOrganization UUID 
+   * Get existing provider and resource tables from BISON database
+   * Create list of dataset UUIDs from Dataset EML files
+   * Create Resource LUT and list of publishingOrganization UUIDs from 
+     GBIF dataset API + dataset UUID.  Fill legacyid from existing resource 
+     table or dataset metadata.
+   * Create Provider LUT from GBIF publisher API + publishingOrganization UUID.
+     Fill legacyid from existing provider table or organization metadata. 
 
 Process Records Iteration 1
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 #. Fill Resource/Provider fields from LUTs and 
 
-    * Fill Resource name, code, url, and publishingOrganizationKey, discarding USGS records
-      from datasetKey and Resource LUT 
-    * Fill Provider name, code, url, etc 
-      from publishingOrganizationKey and Provider LUT 
-    * Discard records from BISON providers 
-      Publisher: USGS, publishingOrganizationKey=c3ad790a-d426-4ac1-8e32-da61f81f0117 
-      AND
-      resource_url (from organization metadata) starts with https://bison.usgs.gov/ipt/resource?r=
+   * Fill resource, resource_url, resource_id with dataset title, homepage/url,
+     and legacyid from datasetKey and Resource LUT 
+   * Fill provider, provider_url, provider_id with organization title, 
+     homepage/url from publishingOrganizationKey and Provider LUT 
+   * Discard records from BISON providers 
+     Publisher: USGS, publishingOrganizationKey=c3ad790a-d426-4ac1-8e32-da61f81f0117 
+     AND
+     resource_url (from organization metadata) starts with https://bison.usgs.gov/ipt/resource?r=
      
 #. Discard records with no scientificName or taxonKey
-        
+#. Discard records with occurrenceStatus = absent
 #. Replace some fields with controlled vocab, fill with alternate field values
 
-    * NA, n/a, null --> ''
-    * Correct/standardize basis_of_record to BISON controlled vocabulary
-    * BISON verbatim_locality = either 1)verbatimLocality 2) locality or 3)habitat
-    * BISON id = either 1) id or 2) collector_number
+   * NA, n/a, null --> ''
+   * Correct/standardize basis_of_record to BISON controlled vocabulary
+   * BISON verbatim_locality = either 1)verbatimLocality 2) locality or 3)habitat
+   * BISON id = either 1) id or 2) collector_number
 
 #. Test for float values in longitude and latitude; if one is invalid, clear both
 #. Convert gbif eventDate to BISON occurrence_date in ISO 8601, ex: 2018-08-01 or 2018

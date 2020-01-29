@@ -59,11 +59,11 @@ process info at: https://my.usgs.gov/confluence/display/DEV/SAS+Development
   
   * Prep: get updated lookup table created by ITIS developers provided by Denver
 
-      * Rejected options:
+    * Rejected options:
     
-        * Use API?  No, Solr query is fast, but REST query for common names is slow
-        * Use downloaded database from https://www.itis.gov/downloads/index.html
-          No, data is not as current as version provided by ITIS developers
+      * Use API?  No, Solr query is fast, but REST query for common names is slow
+      * Use downloaded database from https://www.itis.gov/downloads/index.html
+        No, data is not as current as version provided by ITIS developers
 
   * Lookup TSN from clean_provided_scientific_name to fill fields:
 
@@ -322,5 +322,6 @@ populated, we will test it for contents, format, etc.
 
 Misc Notes:
 -------------
-  * Use ‘$’ delimiter in CSV output
+
+* Use ‘$’ delimiter in CSV output
 
