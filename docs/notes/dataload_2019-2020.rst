@@ -100,7 +100,7 @@ process info at: https://my.usgs.gov/confluence/display/DEV/SAS+Development
       with fips centroid coordinates, fill centroid with "county"
 
            
-BISON 49 (48 database fields + tsn_hierarchy_string for Solr)
+BISON 49 (48 database fields + hierarchy_string for Solr)
 -------------------------------------------------------------------
 For GBIF data load, field values will be pulled from named GBIF field or 
 calculated according to rules laid out in `GBIF Data Processing`_.
