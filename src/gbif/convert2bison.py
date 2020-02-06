@@ -27,7 +27,7 @@ from common.bisonfill import BisonFiller
 from common.constants import BISON_DELIMITER
 from common.tools import getLogger
 
-from gbif.constants import DISCARD_AFTER_UPDATE
+from gbif.constants import GBIF_NAMEKEY_TEMP_FIELD
 from gbif.gbifmodify import GBIFReader
             
 # ...............................................
@@ -120,19 +120,21 @@ if __name__ == '__main__':
     resource_lut_fname = os.path.join(ancillary_path, 'resourcestable.csv')
     provider_lut_fname = os.path.join(ancillary_path, 'providerstable.csv')
     
-    # reference files for dataset(gbif) resource(bison) lookups
+    # filename for dataset(gbif) resource(bison) lookup
     dataset_lut_fname = os.path.join(tmppath, 'dataset_lut.csv')
-
-    # reference files for organization(gbif) provider(bison) lookups
+    # filename for organization(gbif) provider(bison) lookup
     org_lut_fname = os.path.join(tmppath, 'organization_lut.csv')
+    # filename for scientificname or taxonkey to canonical (clean_provided_scientific_name) lookup
+    # for multipart datasets, do a single lut
+#     canonical_lut_fname = os.path.join(tmppath, 'canonical_lut.csv')
+    canonical_lut_fname = os.path.join(tmppath, 'step2_{}_canonical_lut.csv'.format(gbif_basefname))
 
     itis1_lut_fname = os.path.join(tmppath, 'step3_itis_lut.txt')
     
     logbasename = 'step{}_{}'.format(step, gbif_basefname)
     # Files of lookups and lists for their creation 
     nametaxa_fname = os.path.join(tmppath, 'step1_{}_sciname_taxkey_list.csv'.format(gbif_basefname))
-    name_lut_fname = os.path.join(tmppath, 'step2_{}_name_lut.csv'.format(gbif_basefname))
-    cleanname_fname = os.path.join(tmppath, 'step2_{}_cleanname_list.txt'.format(gbif_basefname))
+#     cleanname_fname = os.path.join(tmppath, 'step2_{}_cleanname_list.txt'.format(gbif_basefname))
     # Output CSV files of all records after initial creation or field replacements
     pass1_fname = os.path.join(tmppath, 'step1_{}.csv'.format(gbif_basefname))
     pass2_fname = os.path.join(tmppath, 'step2_{}.csv'.format(gbif_basefname))
@@ -159,12 +161,11 @@ if __name__ == '__main__':
             if not os.path.exists(nametaxa_fname):
                 gr.gather_name_input(pass1_fname, nametaxa_fname)
                 
-            names = gr.resolve_write_name_lookup(nametaxa_fname, 
-                                                 name_lut_fname)
+            canonical_lut = gr.get_canonical_lookup(nametaxa_fname, 
+                                                    canonical_lut_fname)
             # Pass 2 of CSV transform
             # FillMethod = gbif_name, canonical name fill
-            gr.update_bison_names(pass1_fname, pass2_fname, names, 
-                                  discard_fields=DISCARD_AFTER_UPDATE)
+            gr.update_bison_names(pass1_fname, pass2_fname, canonical_lut)
             
         elif step == 3:
             logfname = os.path.join(tmppath, '{}.log'.format(logbasename))
@@ -181,7 +182,8 @@ if __name__ == '__main__':
             log = getLogger(logbasename, logfname)
             bf = BisonFiller(pass3_fname, log=log)
             # Pass 4 of CSV transform, final step, point-in-polygon intersection
-            bf.update_point_in_polygons(ancillary_path, pass4_fname)
+            bf.update_point_in_polygons(ancillary_path, pass4_fname, fromGbif=True)
+            
         elif step == 10:
             logfname = os.path.join(tmppath, '{}.log'.format(logbasename))
             log = getLogger(logbasename, logfname)

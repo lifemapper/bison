@@ -35,23 +35,23 @@ class Sorter(object):
             self.sort_idx = None
         self.header = []
 
-        basepath, _ = os.path.splitext(inputFilename)
-        pth, dataname = os.path.split(basepath)
+        tmp, _ = os.path.splitext(self.messyfile)
+        self._basepath, self._dataname = os.path.split(tmp)
 
         logfname = os.path.join(pth, '{}.log'.format(logname))
         self._log = getLogger(logname, logfname)
                 
         self.pth = pth
-        self.splitBase = os.path.join(pth, 'split_{}'.format(dataname))
-        self.tidyfile = os.path.join(pth, 'tidy_{}.csv'.format(dataname))
+        self.splitBase = os.path.join(pth, 'split_{}'.format(self._dataname))
+        self.tidyfile = os.path.join(pth, 'tidy_{}.csv'.format(self._dataname))
         self._files = {}
         
     
     # ...............................................
     def close(self):
-        for fname, f in self._files:
+        for fname, f in self._files.items():
             f.close()
-            self._files.pop(fname)
+        self._files = {}
         
     # ...............................................
     def closeOne(self, fname):
@@ -59,6 +59,12 @@ class Sorter(object):
         self._files.pop(fname)
         
     # ...............................................
+    def _get_group_file(self, grpval):
+        basefname = '{}_{}.csv'.format(self._dataname, grpval)
+        grp_fname = os.path.join(self._basepath, basefname)
+        writer, outf = getCSVWriter(grp_fname, self.delimiter, ENCODING)
+        self._files[grp_fname] = outf
+        return writer
 
     # ...............................................
     def _switchOutput(self, currname, basename, idx):
@@ -69,25 +75,109 @@ class Sorter(object):
         # Get writer and save open file for later closing
         writer, outf = getCSVWriter(newname, self.delimiter, ENCODING, 
                                     doAppend=True)
-        self._openfiles[newname] = outf
+        self._files[newname] = outf
 
         return writer, newname, idx
 
     # ...............................................
-    def split(self):
+    def gather_groupvals(self, fname):
         """
-        @summary: Split original data file into multiple sorted files.
+        @summary: Split original data file with chunks of sorted data into 
+                  multiple sorted files.
         @note: Replicate the original header on each smaller sorted file
         """
-        reader, outf = getCSVReader(self.messyfile, self.delimiter, ENCODING)
-        self._openfiles[self.messyfile] = outf
+        try:
+            reader, inf = getCSVReader(self.messyfile, self.delimiter, ENCODING)
+            header = next(reader)
+            groups = {}
+    
+            grpval = None
+            grpcount = 0
+            for row in reader:
+                try:
+                    currval = row[self.sort_idx]
+                except Exception as e:
+                    self._log.warn('Failed to get column {} from record {}'
+                                      .format(self.sort_idx, reader.line_num))
+                else:
+                    if grpval is None:
+                        grpval = currval
+                    if currval != grpval:
+                        self._log.info('Start new group {} on record {}'
+                                       .format(currval, reader.line_num))
+                        try:
+                            groups[grpval] += grpcount
+                        except:
+                            groups[grpval] = grpcount
+                        grpcount = 1
+                        grpval = currval
+                    else:
+                        grpcount += 1
+        except Exception as e:
+            pass
+        finally:
+            inf.close()
+            
+        try:
+            writer, outf = getCSVWriter(fname, self.delimiter, ENCODING)
+            writer.writerow(['groupvalue', 'count'])
+            for grpval, grpcount in groups.items():
+                writer.writerow([grpval, grpcount])
+        except Exception as e:
+            pass
+        finally:
+            outf.close()
+            
+    # ...............................................
+    def write_group_files(self):
+        """
+        @summary: Split large file into multiple files, each containing a header
+                  and records of a single group value. 
+        @note: The number of group files must be small enough for the system to 
+               have them all open at the same time.
+        @note: Use "gather" to evaluate the dataset first.
+        """
+        try:
+            reader, inf = getCSVReader(self.messyfile, self.delimiter, ENCODING)
+            header = next(reader)
+            # {groupval: csvwriter}
+            groupfiles = {}
+            for row in reader:
+                try:
+                    grpval = row[self.sort_idx]
+                except Exception as e:
+                    self._log.warn('Failed to get column {} from record {}'
+                                      .format(self.sort_idx, reader.line_num))
+                else:
+                    try:
+                        wtr = groupfiles[grpval]
+                    except:
+                        wtr = self._get_group_file(grpval)
+                        groupfiles[grpval] = wtr
+                        wtr.writerow(header)
+                    
+                    wtr.writerow(row)
+        except Exception as e:
+            raise
+        finally:
+            inf.close()
+            
+
+    # ...............................................
+    def split_sorted(self):
+        """
+        @summary: Split original data file with chunks of sorted data into 
+                  multiple sorted files.
+        @note: Replicate the original header on each smaller sorted file
+        """
+        reader, inf = getCSVReader(self.messyfile, self.delimiter, ENCODING)
+        self._files[self.messyfile] = inf
         header = next(reader)
 
         splitIdx = 0
         splitname = '{}_{}.csv'.format(self.splitBase, splitIdx)
-        writer, outf = getCSVWriter(splitname, self.delimiter, ENCODING, 
-                                    doAppend=True)
-        self._openfiles[splitname] = outf        
+        writer, outf = getCSVWriter(splitname, self.delimiter, ENCODING)
+        self._files[splitname] = outf        
         writer.writerow(header)
 
         currid = -1
@@ -122,7 +212,7 @@ class Sorter(object):
         splitname = '{}_{}.csv'.format(self.splitBase, idx)
         while os.path.exists(splitname):
             reader, outf = getCSVReader(splitname, self.delimiter, ENCODING)
-            self._openfiles[splitname] = outf
+            self._files[splitname] = outf
             row = next(reader)
             # If header is present, first field will not be an integer, 
             # so move to the next record
@@ -159,7 +249,7 @@ class Sorter(object):
             try:
                 newrec = smRdr.next()
             except StopIteration:
-                self._openfiles[smFname].close()
+                self._files[smFname].close()
                 rdrRecs.pop(smFname)
             else:
                 rdrRecs[smFname] = (smRdr, newrec)
@@ -172,7 +262,7 @@ class Sorter(object):
         """
         rdrRecs = self._getSplitReadersFirstRecs()
         writer, outf = getCSVWriter(self.tidyfile, self.delimiter)
-        self._openfiles[self.tidyfile] = outf
+        self._files[self.tidyfile] = outf
 
         rec = self._getHeader()
         while rec is not None:
@@ -354,7 +444,7 @@ class Sorter(object):
 #         else:
 #             fmode = 'w'
 #         writer, outf = getCSVWriter(outfname, self.delimiter, ENCODING, 'w')
-#         self._openfiles[self.mfile] = outf
+#         self._files[self.mfile] = outf
 #         if has_header:
 #             header = next(reader)
 #             self._log.info('Sort index {} in first line contains {}'
@@ -377,7 +467,7 @@ class Sorter(object):
         self._log.info('Testing file {}'.format(self.tidyfile))
         reccount = 0
         reader, outf = getCSVReader(self.tidyfile, self.delimiter, ENCODING)
-        self._openfiles[self.tidyfile] = outf
+        self._files[self.tidyfile] = outf
         header = next(reader)
         if header[self.sort_idx] != 'gbifID':
             self._log.error('Bad header in {}'.format(self.tidyfile))
@@ -407,16 +497,21 @@ if __name__ == "__main__":
     # inputFilename, delimiter, sort_index, logname)
     import argparse
     parser = argparse.ArgumentParser(
-                description=("""Sort a CSV dataset on a given field"""))
+                description=("""Group or sort a CSV dataset on a given field"""))
     parser.add_argument('unsorted_file', type=str, 
                         help='Absolute pathname of the input delimited text file' )
     parser.add_argument('command', type=str, 
                         help="""Processing stage:
-                        - Split (only used for GBIF downloads with a file 
+                        - gather: gather unique sort/group values in a summary
+                          file to identify how best to proceed.
+                        - group: Split large file into multiple files,
+                          each containing only records of a single group value. 
+                          The number of group files must be small enough for the
+                          system to have them all open at the same time.
+                          Use "gather" to evaluate the dataset first.
+                        - split (only used for GBIF downloads with a file 
                           containing multiple sorted sections)
-                        - Gather: gather unique sort values to identify how best
-                          to proceed.
-                        - Merge: merge multiple sorted files into a single 
+                        - merge: merge multiple sorted files into a single 
                           sorted file.
                         """ )
     parser.add_argument('--delimiter', type=str, default=',',
@@ -442,17 +537,12 @@ if __name__ == "__main__":
          
         try:
             if cmd  == 'split':
-                gf.split()
-            elif cmd  == 'gather_bison':
-                outfname = os.path.join(pth, 'unique_bison_providers.txt')
-#                 gf.gather_bison_sortvals(outfname, 
-#                                          sort_cols=['provider', 'resource_id', 'resource_url'], 
-#                                          header=BISON_PROVIDER_HEADER)
-            elif cmd  == 'split_bison':
-                outfname = os.path.join(pth, 'unique_bison_providers.txt')
-                gf.split_bison_by_sortvals()
-            elif cmd  == 'group':
-                gf.sort()
+                gf.split_sorted()
+            elif cmd  == 'gather':
+                outfname = os.path.join(pth, 'summary_'+dataname+ext)
+                gf.gather_groupvals(outfname)
+            elif cmd == 'group':
+                gf.write_group_files()
             elif cmd  == 'merge':
                 gf.merge()
             elif cmd  == 'test':
@@ -467,5 +557,23 @@ python3.6 /state/partition1/git/bison/src/common/csvsort.py \
           /tank/data/bison/2019/ancillary/bison_lines_1-10000001.csv \
           sort
           --delimiter=$
-          --sort_index=10
+          --sort_index=13
+
+import os
+from common.constants import ENCODING 
+from common.tools import getLogger, getCSVReader, getCSVWriter
+
+sort_idx = 13
+messyfile = 'bison.csv'
+reader, outf = getCSVReader(messyfile, delimiter, ENCODING)
+header = next(reader)
+
+splitIdx = 0
+
+row = next(reader)
+
+
+
+
+
 """

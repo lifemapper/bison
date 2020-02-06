@@ -26,15 +26,18 @@ import time
 
 from common.constants import (ANCILLARY_DELIMITER, BISON_DELIMITER, 
                               ENCODING, LOGINTERVAL, PROHIBITED_VALS,
-                              LEGACY_ID_DEFAULT)
+                              LEGACY_ID_DEFAULT, BISON_ORDERED_DATALOAD_FIELDS,
+                              EXTRA_VALS_KEY)
 from common.lookup import Lookup, VAL_TYPE
 from common.tools import (getCSVReader, getCSVDictReader, getCSVWriter, 
-                          getCSVDictWriter, getLine, getLogger)
+                          open_csv_files, getLine, getLogger)
 
 from gbif.constants import (GBIF_DELIMITER, TERM_CONVERT, META_FNAME, 
-                            BISON_GBIF_MAP, OCC_UUID_FLD, DISCARD_FIELDS, 
-                            CLIP_CHAR, FillMethod, GBIF_UUID_KEY,
-                            BISON_ORG_UUID, BISON_IPT_PREFIX)
+                            BISON_GBIF_MAP, OCC_UUID_FLD,  
+                            CLIP_CHAR, GBIF_UUID_KEY,
+                            BISON_ORG_UUID, BISON_IPT_PREFIX, 
+                            GBIF_CONVERT_TEMP_FIELDS, GBIF_NAMEKEY_TEMP_FIELD, 
+                            GBIF_ORIG_DATA_TEMP_FIELD)
 from gbif.gbifmeta import GBIFMetaReader
 from gbif.gbifapi import GbifAPI
 
@@ -67,26 +70,19 @@ class GBIFReader(object):
         self.tmppath = os.path.join(basepath, tmpdir)
         self._dataset_pth = os.path.join(self.basepath, 'dataset')
         # Save these fields during processing to fill or compute from GBIF data
-        self._save_flds = []
-        # Ordered output fields
-        self._bison_ordered_flds = []
+        # Individual steps may add/remove temporary fields for input/output
+        self._infields = BISON_ORDERED_DATALOAD_FIELDS.copy()
+        # Write these fields after processing for next step
+        self._outfields = BISON_ORDERED_DATALOAD_FIELDS.copy()
         # Map of gbif fields to save onto bison fieldnames
         self._gbif_bison_map = {}
-        # Fields to compute
-        self._calc_pass1 = []
         
-        for (bisonfld, fld_or_mthd) in BISON_GBIF_MAP:
-            self._save_flds.append(bisonfld)
-            if bisonfld not in DISCARD_FIELDS:
-                self._bison_ordered_flds.append(bisonfld)
             
-            if fld_or_mthd == FillMethod.pass1():
-                self._calc_pass1.append(bisonfld)
-            elif not FillMethod.is_calc(fld_or_mthd):
-                # remove namespace designation
-                gbiffld = fld_or_mthd[fld_or_mthd.rfind(CLIP_CHAR)+1:]
-                self._gbif_bison_map[gbiffld] = bisonfld
-        
+        for bfld, gfld in BISON_GBIF_MAP.items():
+            # remove namespace designation
+            gbiffld = gfld[gfld.rfind(CLIP_CHAR)+1:]
+            self._gbif_bison_map[gbiffld] = bfld
+            
         logfname = os.path.join(self.tmppath, '{}.log'.format(logname))
         self._log = getLogger(logname, logfname)
 
@@ -97,26 +93,23 @@ class GBIFReader(object):
         # Used only for reading from open gbif file to test bison transform
         self._gbif_reader = None
         self._gbif_recno = 0
-        self._gbif_line = None
-        meta_fname = os.path.join(self.basepath, META_FNAME)
-        gmetardr = GBIFMetaReader(self._log)
-        self._gbif_column_map = gmetardr.get_field_meta(meta_fname)
         
+#         meta_fname = os.path.join(self.basepath, META_FNAME)
+#         gmetardr = GBIFMetaReader(self._log)
+#         self._gbif_column_map, self._gbif_header = \
+#                         gmetardr.get_field_index_list(meta_fname)
+#         self._gbif_column_map = gmetardr.get_field_meta(meta_fname)
+
     # ...............................................
-    def _discard_fields_from_output(self, fldlist):
-        newflds = self._bison_ordered_flds.copy()
-        for fld in fldlist:                
-            total = newflds.count(fld)
-            if total == 1:
-                newflds.remove(fld)
-            elif total == 0:
-                self._log.error('Field {} does not exist in expected output fields'
-                                .format(fld))
-            elif total > 0:
-                self._log.error('{} instances of field {} in expected output fields'
-                                .format(total, fld))
-        return newflds
-            
+    def _makerow(self, rec):
+        row = []
+        for fld in self._outfields:
+            if not rec[fld]:
+                row.append('')
+            else:
+                row.append(rec[fld])
+        return row
+        
     # ...............................................
     def _rotate_logfile(self, logname=None):
         if self._log is None:
@@ -141,6 +134,7 @@ class GBIFReader(object):
             # GBIF Dataset maps to BISON resource, values from GBIF dataset API 
             # query + UUID and BISON resource table with legacyID
             dskey = rec['resource_id']
+            orig_res_url = rec['resource_url']
             if dskey is not None:                    
                 try:
                     ds_metavals = datasets.lut[dskey]
@@ -152,25 +146,34 @@ class GBIFReader(object):
                     if not orgkey:
                         self._log.warning('No organization key found for dataset {}'
                                             .format(dskey))
+
                     title = ds_metavals['title']
-                    if ds_metavals['homepage'] != '':
-                        url = ds_metavals['homepage']
-                    else:
-                        url = ds_metavals['url']
                     legacy_dataset_id = ds_metavals['legacyid']
-                    if (orgkey == BISON_ORG_UUID and 
-                        url.startswith(BISON_IPT_PREFIX) >= 0):
-                        self._log.info('Discard rec {}: dataset URL {}'
-                                       .format(rec[OCC_UUID_FLD], url))
-                        rec = None
+                    
+                    if ds_metavals['homepage'] != '':
+                        ds_meta_url = ds_metavals['homepage']
+                    else:
+                        ds_meta_url = ds_metavals['url']
+                    
+                    if orgkey == BISON_ORG_UUID:
+                        if (orig_res_url is not None 
+                            and orig_res_url.startswith(BISON_IPT_PREFIX)):
+                            self._log.info('Discard rec {}: resource_url {}'
+                                           .format(rec[OCC_UUID_FLD], orig_res_url))
+                            rec = None
+                        elif (ds_meta_url is not None 
+                              and ds_meta_url.startswith(BISON_IPT_PREFIX)):
+                            self._log.info('Discard rec {}: dataset URL {}'
+                                           .format(rec[OCC_UUID_FLD], ds_meta_url))
+                            rec = None
                     else:
                         # Note other bison urls
-                        if url.find('bison.') >= 0:
+                        if ds_meta_url.find('bison.') >= 0:
                             self._log.info('In rec {}, found provider {} url {}'
-                                           .format(rec[OCC_UUID_FLD], orgkey, url))
+                                           .format(rec[OCC_UUID_FLD], orgkey, ds_meta_url))
                         rec['resource_id'] = legacy_dataset_id
                         rec['resource'] = title
-                        rec['resource_url'] = url
+                        rec['resource_url'] = ds_meta_url
         # GBIF Organization maps to BISON provider, retrieved from dataset 
         # above + gbif organization API query and BISON provider table with legacyID
         if rec is not None and orgkey is not None:
@@ -195,23 +198,23 @@ class GBIFReader(object):
                     rec['provider_url'] = url
 
     # ...............................................
-    def _update_point(self, rec):
+    def _update_point(self, brec):
         """
         @summary: Update the decimal longitude and latitude, replacing 0,0 with 
                      None, None and ensuring that US points have a negative longitude.
-        @param rec: dictionary of all fieldnames and values for this record
+        @param brec: dictionary of all fieldnames and values for this record
         @note: function modifies original dict
         @note: record must have lat/lon or countryCode but GBIF query is on countryCode so
                that will never be blank.
         """
-        ctry = rec['iso_country_code']
+        ctry = brec['iso_country_code']
         lat = lon = None
         try:
-            lat = float(rec['latitude'])
+            lat = float(brec['latitude'])
         except:
             pass
         try:
-            lon = float(rec['longitude']) 
+            lon = float(brec['longitude']) 
         except:
             pass
 
@@ -223,57 +226,57 @@ class GBIFReader(object):
         elif (ctry in ('US', 'CA') and lon and lon > 0):
             lon = lon * -1 
             self._log.info('Rec {}: negated {} longitude to {}'
-                           .format(rec[OCC_UUID_FLD], ctry, lon))
+                           .format(brec[OCC_UUID_FLD], ctry, lon))
             
         # Replace values in dictionary
-        rec['latitude'] = lat
-        rec['longitude'] = lon
+        brec['latitude'] = lat
+        brec['longitude'] = lon
 
     # ...............................................
-    def _update_second_choices(self, rec):
+    def _update_second_choices(self, brec):
         """
         @summary: Update the verbatim_locality, with first non-blank of 
                     verbatimLocality, locality, habitat
                   Update id, with first non-blank of 
                     occurrenceId/id, recordNumber/collector_number
-        @param rec: dictionary of all fieldnames and values for this record
+        @param brec: dictionary of all fieldnames and values for this record
         @note: function modifies original dict
         """
         # 1st choice 
-        if not rec['verbatim_locality']:
+        if not brec['verbatim_locality']:
             # 2nd choice 
-            locality = rec['locality'] 
+            locality = brec['locality'] 
             if not locality:
                 # 3rd choice 
-                locality = rec['habitat']
-            rec['verbatim_locality'] = locality
+                locality = brec['habitat']
+            brec['verbatim_locality'] = locality
         
         # Fill fields with secondary option if 1st is blank
         # id = 1) gbif occurrenceID or 2) gbif recordNumber (aka bison collector_number)
         # 1st choice 
-        if not rec['id']:
+        if not brec['id']:
             # 2nd choice 
-            rec['id'] = rec['collector_number']
+            brec['id'] = brec['collector_number']
 
     # ...............................................
-    def _update_dates(self, rec):
+    def _update_dates(self, brec):
         """
         @summary: Make sure that eventDate is parsable into integers and update 
                      missing year value by extracting from the eventDate.
-        @param rec: dictionary of all fieldnames and values for this record
+        @param brec: dictionary of all fieldnames and values for this record
         @note: BISON eventDate should be ISO 8601, ex: 2018-08-01 or 2018
                  GBIF combines with time (and here UTC time zone), ex: 2018-08-01T14:19:56+00:00
         """
-        gid = rec[OCC_UUID_FLD]
+        gid = brec[OCC_UUID_FLD]
         fillyr = False
         # Test year field
         try:
-            rec['year'] = int(rec['year'])
+            brec['year'] = int(brec['year'])
         except:
             fillyr = True
             
         # Test eventDate field
-        tmp = rec['occurrence_date']
+        tmp = brec['occurrence_date']
         if tmp is not None:
             dateonly = tmp.split('T')[0]
             if dateonly != '':
@@ -283,18 +286,18 @@ class GBIFReader(object):
                         int(parts[i])
                 except:
                     self._log.info('Rec {}: invalid occurrence_date (gbif eventDate) {}'
-                                      .format(gid, rec['occurrence_date']))
+                                      .format(gid, brec['occurrence_date']))
                     pass
                 else:
-                    rec['occurrence_date'] = dateonly
+                    brec['occurrence_date'] = dateonly
                     if fillyr:
-                        rec['year'] = parts[0]
+                        brec['year'] = parts[0]
 
     # ...............................................
-    def _control_vocabulary(self, rec):
-        bor = rec['basis_of_record']
+    def _control_vocabulary(self, brec):
+        bor = brec['basis_of_record']
         if bor in TERM_CONVERT:
-            rec['basis_of_record'] = TERM_CONVERT[bor]                
+            brec['basis_of_record'] = TERM_CONVERT[bor]                
 
     # ...............................................
     def _read_estmeans_lookup(self, estmeans_fname):
@@ -376,7 +379,7 @@ class GBIFReader(object):
                             .format(name_or_key, canonical, e))
         finally:
             inf.close()
-    
+                
     # ...............................................
     def _open_pass1_files(self, gbif_interp_fname, pass1_fname, nametaxa_fname):
         '''
@@ -392,40 +395,38 @@ class GBIFReader(object):
         self._log.info('Open step1 BISON output file {}'.format(pass1_fname))
         wtr, outf = getCSVWriter(pass1_fname, BISON_DELIMITER, ENCODING)
         self._files.append(outf)
-        wtr.writerow(self._bison_ordered_flds)
+        wtr.writerow(self._outfields)
 
         # Read any existing values for lookup
         if os.path.exists(nametaxa_fname):
             self._log.info('Read metadata ...')
-#             self._nametaxa = self._read_name_taxa(nametaxa_fname)
             self._nametaxa = self._read_name_lookup(nametaxa_fname)
             
         return rdr, wtr
             
-    # ...............................................
-    def _open_update_files(self, inbasename, outbasename):
-        '''
-        @summary: Open BISON-created CSV data for reading, 
-                  new output file for writing
-        '''
-        infname = os.path.join(self.tmppath, inbasename)
-        outfname = os.path.join(self.tmppath, outbasename)
-
-        if not os.path.exists(infname):
-            raise Exception('Input file {} missing!'.format(infname))
-        # Open incomplete BISON CSV file as input
-        self._log.info('Open input file {}'.format(infname))
-        drdr, inf = getCSVDictReader(infname, BISON_DELIMITER, ENCODING)
-        self._files.append(inf) 
-        
-#         output_fields = self._discard_fields_from_output(discard_fields)
-        # Open new BISON CSV file for output
-        self._log.info('Open output file {}'.format(outfname))
-        dwtr, outf = getCSVDictWriter(outfname, BISON_DELIMITER, ENCODING, 
-                                      self._bison_ordered_flds)
-        dwtr.writeheader()
-        self._files.append(outf)
-        return drdr, dwtr
+#     # ...............................................
+#     def _open_update_files(self, inbasename, outbasename):
+#         '''
+#         @summary: Open BISON-created CSV data for reading, 
+#                   new output file for writing
+#         '''
+#         infname = os.path.join(self.tmppath, inbasename)
+#         outfname = os.path.join(self.tmppath, outbasename)
+# 
+#         if not os.path.exists(infname):
+#             raise Exception('Input file {} missing!'.format(infname))
+#         # Open incomplete BISON CSV file as input
+#         self._log.info('Open input file {}'.format(infname))
+#         drdr, inf = getCSVDictReader(infname, BISON_DELIMITER, ENCODING)
+#         self._files.append(inf) 
+#         
+#         # Open new BISON CSV file for output, DictWriter does not order fields
+#         self._log.info('Open output file {}'.format(outfname))
+#         dwtr, outf = getCSVDictWriter(outfname, BISON_DELIMITER, ENCODING, 
+#                                       self._outfields)
+#         dwtr.writeheader()
+#         self._files.append(outf)
+#         return drdr, dwtr
 
     # ...............................................
     def is_open(self):
@@ -451,47 +452,42 @@ class GBIFReader(object):
         self._gbif_reader = None
         self._gbif_recno = 0
         self._gbif_line = None
-        self._gbif_column_map = None
 
     # ...............................................
-    def _test_for_discard(self, rec):
+    def _test_for_discard(self, brec):
         """
         @summary: Remove record without name fields or with absence status
-        @param rec: current record dictionary
+        @param brec: current record dictionary
         """
-        if rec is not None:
-            gid = rec[OCC_UUID_FLD]
+        if brec is not None:
+            gid = brec[OCC_UUID_FLD]
             # Required fields exist 
-            if (not rec['provided_scientific_name'] and not rec['taxonKey']):
-                rec = None
-                self._log.info('Discard rec {}: missing both sciname and taxkey'
+            if (not brec['provided_scientific_name'] and not brec['taxonKey']):
+                brec = None
+                self._log.info('Discard brec {}: missing both sciname and taxkey'
                                .format(gid))
-        if rec is not None:
+        if brec is not None:
             # remove records with occurrenceStatus = absence
-            ostat = rec['occurrenceStatus']
+            ostat = brec['occurrenceStatus']
             if ostat and ostat.lower() == 'absent':
-                rec = None
-                self._log.info('Discard rec {}: with occurrenceStatus absent'
+                brec = None
+                self._log.info('Discard brec {}: with occurrenceStatus absent'
                                .format(gid))
 
     # ...............................................
-    def _get_gbif_val(self, gbifid, iline, gfld, idx):
+    def _get_gbif_val(self, grec, gfld):
         """
         @summary: Create a list of values, ordered by BISON-requested fields in 
                      ORDERED_OUT_FIELDS, with individual values and/or entire record
                      modified according to BISON needs.
-        @param iline: A CSV record of GBIF-interpreted DarwinCore occurrence data
-        @return: list of ordered fields containing BISON-interpreted values for 
-                    a single GBIF occurrence record. 
+        @param grec: A dictionary record of GBIF-interpreted occurrence data
+        @param gfld: A GBIF fieldname for the desired value
+        @return: a value for one column of a GBIF occurrence record. 
         """
+        val = None
         # Check column existence
-        try:
-            tmpval = iline[idx]
-        except Exception:
-            self._log.warning('Rec {}: failed to get column {}/{}'
-                              .format(gbifid, idx, gfld))
-            val = None
-        else:
+        tmpval = grec[gfld]
+        if tmpval is not None:
             # Test each field/value
             val = tmpval.strip()
             # Replace N/A and empty string
@@ -500,7 +496,7 @@ class GBIFReader(object):
         return val
 
     # ...............................................
-    def _gbifline_to_bisonrec(self, iline, gbif_column_map):
+    def _gbif_to_bison(self, grec):
         """
         @summary: Create a list of values, ordered by BISON-requested fields in 
                      ORDERED_OUT_FIELDS, with individual values and/or entire record
@@ -509,69 +505,29 @@ class GBIFReader(object):
         @return: list of ordered fields containing BISON-interpreted values for 
                     a single GBIF occurrence record. 
         """
-        gid = iline[0]
-        rec = {}
+        gid = grec[OCC_UUID_FLD]
+        brec = {}
         
-        valcount = len(iline)
-        if (valcount < len(self._save_flds) or
-            valcount > len(self._gbif_column_map)):
+        try:
+            extravals = grec[EXTRA_VALS_KEY]
+        except Exception as e:
+            pass
+        else:
             self._log.warning("""Data misalignment? 
-            Received {} of {} expected fields for rec {}"""
-                  .format(valcount, len(self._gbif_column_map), gid))
+            Received {} extra fields ({}) for brec {}"""
+                  .format(len(extravals), extravals, gid))
         
-        for bfld in self._save_flds:
-            rec[bfld] = None
-        rec[OCC_UUID_FLD] = gid
+        # Initialize record
+        for bfld in self._infields:
+            brec[bfld] = None
 
-        # Find values for gbif fields of interest
+        # Fill values for gbif fields of interest
         for gfld, bfld in self._gbif_bison_map.items():
-            # Find values for gbif fields of interest
-            idx = gbif_column_map[gfld]
-            val = self._get_gbif_val(gid, iline, gfld, idx)
-            rec[bfld] = val
-        return rec
-    
-#     # ...............................................
-#     def _create_bisonrec_pass1(self, iline, gbif_column_map, 
-#                                datasets, orgs, nametaxas):
-#         """
-#         @summary: Create a list of values, ordered by BISON-requested fields in 
-#                      ORDERED_OUT_FIELDS, with individual values and/or entire record
-#                      modified according to BISON needs.
-#         @param iline: A CSV record of GBIF-interpreted DarwinCore occurrence data
-#         @return: list of ordered fields containing BISON-interpreted values for 
-#                     a single GBIF occurrence record. 
-#         """
-#         biline = []
-#         rec = self._gbifline_to_bisonrec(iline, gbif_column_map)
-#         
-#         # Check full record
-#         self._test_for_discard(rec)
-#         # Fill resource (gbif dataset) then provider (gbif organization) values
-#         # Discard records with bison url for dataset or provider
-#         self._discard_bison_add_resource_provider(rec, datasets, orgs)
-#             
-#         if rec is not None:
-#             self._control_vocabulary(rec)
-#             # Fill some fields with best non-blank option
-#             self._update_second_choices(rec)
-#             # Format eventDate and fill missing year
-#             self._update_dates(rec)
-#             # Modify lat/lon vals if necessary
-#             self._update_point(rec)            
-#             # Save scientificName / TaxonID for later lookup and replace
-#             nametaxas.save_to_lookup(rec['provided_scientific_name'], 
-#                                      rec['taxonKey'])
-#             # create the ordered row
-#             for fld in self._bison_ordered_flds:
-#                 if not rec[fld]:
-#                     biline.append('')
-#                 else:
-#                     biline.append(rec[fld])
-#         return biline
+            brec[bfld] = self._get_gbif_val(grec, gfld)
+        return brec
     
     # ...............................................
-    def _complete_bisonrec_pass1(self, rec, datasets, orgs, nametaxas):
+    def _complete_bisonrec_pass1(self, brec, datasets, orgs, nametaxas):
         """
         @summary: Create a list of values, ordered by BISON-requested fields in 
                      ORDERED_OUT_FIELDS, with individual values and/or entire record
@@ -583,41 +539,41 @@ class GBIFReader(object):
         biline = []
         # Fill resource (gbif dataset) then provider (gbif organization) values
         # Discard records with bison url for dataset or provider
-        self._discard_bison_add_resource_provider(rec, datasets, orgs)
+        self._discard_bison_add_resource_provider(brec, datasets, orgs)
             
-        if rec is not None:
+        if brec is not None:
             # Save scientificName / TaxonID for later lookup and replace
-            nametaxas.save_to_lookup(rec['provided_scientific_name'], 
-                                     rec['taxonKey'])
+            nametaxas.save_to_lookup(brec['provided_scientific_name'], 
+                                     brec['taxonKey'])
             # create the ordered row
-            for fld in self._bison_ordered_flds:
-                if not rec[fld]:
+            for fld in self._outfields:
+                if not brec[fld]:
                     biline.append('')
                 else:
-                    biline.append(rec[fld])
+                    biline.append(brec[fld])
         return biline
     
     # ...............................................
-    def _create_rough_bisonrec(self, iline, gbif_column_map):
+    def _create_rough_bisonrec(self, orig_rec):
         """
         @summary: Create a dictionary with individual values and/or entire record
                   modified according to BISON needs.
-        @param line: A CSV record of GBIF-interpreted DarwinCore occurrence data
-        @return: list of ordered fields containing BISON-interpreted values for 
-                 a single GBIF occurrence record. 
+        @param orig_rec: dictionary of a GBIF DarwinCore occurrence record
+        @return: dictionary of BISON-interpreted values for a single GBIF 
+                 occurrence record. 
         """
-        rec = self._gbifline_to_bisonrec(iline, gbif_column_map)        
+        brec = self._gbif_to_bison(orig_rec)        
         # Check full record
-        self._test_for_discard(rec)
-        if rec is not None:
-            self._control_vocabulary(rec)
+        self._test_for_discard(brec)
+        if brec is not None:
+            self._control_vocabulary(brec)
             # Fill some fields with best non-blank option
-            self._update_second_choices(rec)
+            self._update_second_choices(brec)
             # Format eventDate and fill missing year
-            self._update_dates(rec)
+            self._update_dates(brec)
             # Modify lat/lon vals if necessary
-            self._update_point(rec)            
-        return rec
+            self._update_point(brec)            
+        return brec
 
     # ...............................................
     def transform_gbif_to_bison(self, gbif_interp_fname, 
@@ -638,6 +594,14 @@ class GBIFReader(object):
         if os.path.exists(pass1_fname):
             raise Exception('First pass output file {} exists!'.format(pass1_fname))            
 
+        meta_fname = os.path.join(self.basepath, META_FNAME)
+        gm_rdr = GBIFMetaReader(self._log)
+        gbif_header = gm_rdr.get_field_list(meta_fname)
+
+        self._infields.extend(GBIF_CONVERT_TEMP_FIELDS) 
+        self._infields.extend([GBIF_NAMEKEY_TEMP_FIELD, GBIF_ORIG_DATA_TEMP_FIELD])
+        self._outfields.extend([GBIF_NAMEKEY_TEMP_FIELD, GBIF_ORIG_DATA_TEMP_FIELD])
+
         datasets = Lookup.initFromFile(dataset_lut_fname, GBIF_UUID_KEY, 
                                        BISON_DELIMITER, valtype=VAL_TYPE.DICT, 
                                        encoding=ENCODING)
@@ -647,29 +611,27 @@ class GBIFReader(object):
 
         recno = 0
         try:
-            reader, writer = self._open_pass1_files(gbif_interp_fname, 
-                                                    pass1_fname, nametaxa_fname)
-            # Extract relevant GBIF metadata
-            self._log.info('Read metadata ...')
-            gmetardr = GBIFMetaReader(self._log)
-            meta_fname = os.path.join(self.basepath, META_FNAME)
-            gbif_column_map = gmetardr.get_field_meta(meta_fname)
+            dict_reader, inf, writer, outf = open_csv_files(gbif_interp_fname, 
+                                             GBIF_DELIMITER, ENCODING, 
+                                             infields=gbif_header,
+                                             outfname=pass1_fname, 
+                                             outfields=self._outfields,
+                                             outdelimiter=BISON_DELIMITER)
+            # Read any existing values for lookup
+            if os.path.exists(nametaxa_fname):
+                self._log.info('Read name metadata ...')
+                self._nametaxa = self._read_name_lookup(nametaxa_fname)
             
-            # Pull the header row 
-            header, recno = getLine(reader, recno)
-            line = header
-            while (line is not None):
-                
-                # Get interpreted record
-                line, recno = getLine(reader, recno)
-                if line is None:
+            for orig_rec in dict_reader:
+                recno += 1
+                if orig_rec is None:
                     break
                 elif (recno % LOGINTERVAL) == 0:
                     self._log.info('*** Record number {} ***'.format(recno))
                     
                 # Create new record or empty list
-                rec = self._create_rough_bisonrec(line, gbif_column_map)
-                biline = self._complete_bisonrec_pass1(rec, datasets, orgs,  
+                brec = self._create_rough_bisonrec(orig_rec)
+                biline = self._complete_bisonrec_pass1(brec, datasets, orgs,  
                                                        nametaxas)
                 # Write new record
                 if biline:
@@ -678,65 +640,62 @@ class GBIFReader(object):
         except Exception as e:
             self._log.error('Failed on line {}, exception {}'.format(recno, e))
         finally:
-            self.close()
+            inf.close()
+            outf.close()
 
-        # Write all lookup values
-        nametaxas.write_lookup(nametaxa_fname, ['scientificName', 'taxonKeys'], 
-                               BISON_DELIMITER)
-
-    # ...............................................
-    def find_gbif_record(self, gbifid):
-        """
-        @summary: Find a GBIF occurrence record identified by provided gbifID.
-        """
-        if (not self._gbif_reader or 
-            not self._gbif_line or 
-            not self._gbif_column_map):
-            raise Exception('Use open_gbif_for_search before searching')
-
-        rec = None
-        try:
-            while (not rec and self._gbif_line is not None):                
-                # Get interpreted record
-                self._gbif_line, self._gbif_recno = getLine(self._gbif_reader, 
-                                                            self._gbif_recno)
-
-                if self._gbif_line is None:
-                    break
-                else:
-                    if self._gbif_line[0] == gbifid:
-                        # Create new record or empty list
-                        rec = self._create_rough_bisonrec(self._gbif_line, 
-                                                          self._gbif_column_map)
-                    # Where are we
-                    if (self._gbif_recno % LOGINTERVAL) == 0:
-                        self._log.info('*** Record number {} ***'.format(self._gbif_recno))
-            if (not rec and self._gbif_line is None):
-                self._log.error('Failed to find {} in remaining records'.format(gbifid))
-                self.close()
-        except Exception as e:
-            self._log.error('Failed on line {}, exception {}'.format(self._gbif_recno, e))
-        return rec
-    
-    # ...............................................
-    def open_gbif_for_search(self, gbif_interp_fname):
-        """
-        @summary: Open a CSV file containing GBIF occurrence records extracted 
-                     from the interpreted occurrence file provided 
-                     from an Occurrence Download, in Darwin Core format.   
-        """
-        if self.is_open():
-            self.close()
-        # Open raw GBIF data
-        self._gbif_reader, inf = getCSVReader(gbif_interp_fname, GBIF_DELIMITER, ENCODING)
-        self._files.append(inf) 
-        # Extract relevant GBIF metadata
-#         self._log.info('Read metadata ...')
-#         gmetardr = GBIFMetaReader(self._log)
-#         meta_fname = os.path.join(self.basepath, META_FNAME)
+        if len(nametaxas.lut) > 0:
+            # Write all lookup values
+            nametaxas.write_lookup(nametaxa_fname, ['scientificName', 'taxonKeys'], 
+                                   BISON_DELIMITER)            
         
-        # Pull the header row 
-        self._gbif_line, self._gbif_recno = getLine(self._gbif_reader, 0)
+
+#     # ...............................................
+#     def find_gbif_record(self, gbifid):
+#         """
+#         @summary: Find a GBIF occurrence record identified by provided gbifID.
+#         """
+#         if (not self._gbif_reader or 
+#             not self._gbif_line):
+#             raise Exception('Use open_gbif_for_search before searching')
+# 
+#         rec = None
+#         try:
+#             while (not rec and self._gbif_line is not None):                
+#                 # Get interpreted record
+#                 self._gbif_line, self._gbif_recno = getLine(self._gbif_reader, 
+#                                                             self._gbif_recno)
+# 
+#                 if self._gbif_line is None:
+#                     break
+#                 else:
+#                     if self._gbif_line[0] == gbifid:
+#                         # Create new record or empty list
+#                         rec = self._create_rough_bisonrec(self._gbif_line, 
+#                                                           self._gbif_column_map)
+#                     # Where are we
+#                     if (self._gbif_recno % LOGINTERVAL) == 0:
+#                         self._log.info('*** Record number {} ***'.format(self._gbif_recno))
+#             if (not rec and self._gbif_line is None):
+#                 self._log.error('Failed to find {} in remaining records'.format(gbifid))
+#                 self.close()
+#         except Exception as e:
+#             self._log.error('Failed on line {}, exception {}'.format(self._gbif_recno, e))
+#         return rec
+#     
+#     # ...............................................
+#     def open_gbif_for_search(self, gbif_interp_fname):
+#         """
+#         @summary: Open a CSV file containing GBIF occurrence records extracted 
+#                      from the interpreted occurrence file provided 
+#                      from an Occurrence Download, in Darwin Core format.   
+#         """
+#         if self.is_open():
+#             self.close()
+#         # Open raw GBIF data
+#         self._gbif_reader, inf = getCSVReader(gbif_interp_fname, GBIF_DELIMITER, ENCODING)
+#         self._files.append(inf) 
+#         # Pull the header row 
+#         self._gbif_line, self._gbif_recno = getLine(self._gbif_reader, 0)
 
 
     # ...............................................
@@ -768,7 +727,7 @@ class GBIFReader(object):
                                   BISON_DELIMITER)
             
     # ...............................................
-    def update_bison_names(self, infname, outfname, names, discard_fields=[]):
+    def update_bison_names(self, infname, outfname, names):
         """
         @summary: Create a CSV file from pre-processed GBIF data, with
                   clean_provided_scientific_name resolved from 
@@ -777,11 +736,16 @@ class GBIFReader(object):
         @return: A text file of clean_provided_scientific_names values 
         
         """
-        self._bison_ordered_flds = self._discard_fields_from_output(discard_fields)
+        self._infields.extend([GBIF_ORIG_DATA_TEMP_FIELD, GBIF_NAMEKEY_TEMP_FIELD])
+        self._outfields.append(GBIF_ORIG_DATA_TEMP_FIELD)
         recno = 0
         try:
-            dreader, dwriter = self._open_update_files(infname, outfname)
-            for rec in dreader:
+#             dreader, dwriter = self._open_update_files(infname, outfname)
+            dict_reader, inf, writer, outf = open_csv_files(infname, 
+                                             BISON_DELIMITER, ENCODING, 
+                                             outfname=outfname, 
+                                             outfields=self._outfields)
+            for rec in dict_reader:
                 recno += 1
                 clean_name = None
                 gid = rec[OCC_UUID_FLD]
@@ -793,7 +757,7 @@ class GBIFReader(object):
                 except Exception as e:
                     self._log.info('Rec {}: No clean name for {} in LUT'
                                    .format(gid, verbatimname))
-                    taxkey = rec['taxonKey']
+                    taxkey = rec[GBIF_NAMEKEY_TEMP_FIELD]
                     try:
                         clean_name = names.lut[taxkey]
                     except Exception as e:
@@ -801,15 +765,8 @@ class GBIFReader(object):
                                           .format(gid, taxkey))
                 if clean_name is not None:
                     rec['clean_provided_scientific_name'] = clean_name
-#                     self._log.info('Rec {}: Replace {} with {} '
-#                                    .format(gid, verbatimname, clean_name))
-                    for fld in discard_fields:               
-                        try:
-                            rec.pop(fld)
-                        except:
-                            raise Exception('Field {} is not present to discard!'
-                                            .format(fld))
-                    dwriter.writerow(rec)
+                    row = self._makerow(rec)
+                    writer.writerow(row)
                     
                 if (recno % LOGINTERVAL) == 0:
                     self._log.info('*** Record number {} ***'.format(recno))
@@ -818,7 +775,8 @@ class GBIFReader(object):
             self._log.error('Failed reading data from line {} in {}: {}'
                             .format(recno, infname, e))                    
         finally:
-            self.close()
+            inf.close()
+            outf.close()
             
     # ...............................................
     def _get_dataset_uuids(self, dataset_pth):
@@ -1047,7 +1005,7 @@ class GBIFReader(object):
             
             
     # ...............................................
-    def resolve_write_name_lookup(self, nametaxa_fname, name_lut_fname, 
+    def get_canonical_lookup(self, nametaxa_fname, name_lut_fname, 
                                   delimiter=BISON_DELIMITER):
         """
         @summary: Create lookup table for: 
@@ -1057,10 +1015,12 @@ class GBIFReader(object):
             raise Exception('Input file {} missing!'.format(nametaxa_fname))
         
         if os.path.exists(name_lut_fname):
+            # Read existing lookup
             self._log.info('Output LUT file {} exists'.format(name_lut_fname))
             self._read_name_lookup(name_lut_fname)
-            names = Lookup.initFromDict(self._nametaxa, valtype=VAL_TYPE.STRING, 
-                                        encoding=ENCODING)
+            canonical_lut = Lookup.initFromDict(self._nametaxa, 
+                                                valtype=VAL_TYPE.STRING, 
+                                                encoding=ENCODING)
         else:
             # Read name/taxonIDs dictionary for name resolution
             nametaxa = Lookup.initFromFile(nametaxa_fname, 'scientificName', 
@@ -1072,10 +1032,11 @@ class GBIFReader(object):
             # Append taxonkeys/canonical from GBIF taxonkey webservice to name LUT and file
             self._append_resolved_taxkeys(name_dict, name_lut_fname, 
                                           name_fails, nametaxa)
-            names = Lookup.initFromDict(name_dict, valtype=VAL_TYPE.STRING, 
-                                        encoding=ENCODING)
+            canonical_lut = Lookup.initFromDict(name_dict, 
+                                                valtype=VAL_TYPE.STRING, 
+                                                encoding=ENCODING)
         
-        return names
+        return canonical_lut
 
 
 # ...............................................
@@ -1110,14 +1071,13 @@ if __name__ == '__main__':
     gr = GBIFReader(inpath, tmpdir, outdir, 'test')
 
     gr.open_gbif_for_search(gbif_interp_file)
-    map = gr._gbif_column_map    
     badids = []
 
 #     id = '1325646994'
     rec = gr.find_gbif_record(gbifid)
     
-    print(rec['longitude'], rec['latitude'])
-    print(gr._gbif_line[map['decimalLongitude']],gr._gbif_line[map['decimalLatitude']])
+#     print(rec['longitude'], rec['latitude'])
+#     print(gr._gbif_line[map['decimalLongitude']],gr._gbif_line[map['decimalLatitude']])
     
     
     badids.append(id)
@@ -1171,9 +1131,7 @@ itis2_lut_fname = os.path.join(ancillary_path, 'itis_lookup.csv')
 dataset_lut_fname = os.path.join(tmppath, 'dataset_lut.csv')
 org_lut_fname = os.path.join(tmppath, 'organization_lut.csv')
 nametaxa_fname = os.path.join(tmppath, 'step1_sciname_taxkey_list.csv')
-name_lut_fname = os.path.join(tmppath, 'step2_name_lut.csv')
-cleanname_fname = os.path.join(tmppath, 'step2_cleanname_list.txt')
-itis1_lut_fname = os.path.join(tmppath, 'step3_itis_lut.txt')
+canonical_lut_fname = os.path.join(tmppath, 'canonical_lut.csv')
 
 logbasename = 'step{}_{}'.format(step, gbif_basefname)
 # Output CSV files of all records after initial creation or field replacements
