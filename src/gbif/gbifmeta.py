@@ -88,6 +88,45 @@ class GBIFMetaReader(object):
         return fields
 
     # ...............................................
+    def get_field_list(self, meta_fname):
+        '''
+        @todo: Remove interpreted / verbatim file designations, interpreted cannot 
+                 be joined to verbatim file for additional info.
+        @summary: Read metadata for interpreted data file, and return a 
+                  dictionary of short fieldnames and column indexes, and an 
+                  ordered list of short fieldnames.
+        '''
+        fldident = '{http://rs.tdwg.org/dwc/text/}field'
+        field_index = {}
+        ordered_field_names = []
+        tree = ET.parse(meta_fname)
+        root = tree.getroot()
+        # Child will reference INTERPRETED or VERBATIM file
+        for child in root:
+            # does this node of metadata reference INTERPRETED or VERBATIM?
+            fileElt = child.find('tdwg:files', NAMESPACE)
+            fnameElt= fileElt .find('tdwg:location', NAMESPACE)
+            meta4data = fnameElt.text
+
+            if meta4data.startswith(INTERPRETED):
+                flds = child.findall(fldident)
+                for fld in flds:
+                    # Get column num and short name
+                    idx = int(fld.get('index'))
+                    temp = fld.get('term')
+                    term = temp[temp.rfind(CLIP_CHAR)+1:]
+                    # Save all fields
+                    try:
+                        field_index[term]
+                        
+                        self._log.info('Duplicate field {}, idxs {} and {}'
+                                       .format(term, field_index[term], idx))
+                    except:
+                        field_index[term] = idx
+                        ordered_field_names.append(term)
+        return ordered_field_names
+
+    # ...............................................
     def get_organization_uuids(self, dset_lut_fname):
         """
         @summary: Get organization UUIDs from dataset metadata pulled from GBIF

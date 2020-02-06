@@ -30,12 +30,11 @@ from common.constants import (BISON_DELIMITER, ENCODING, LOGINTERVAL,
                               PROHIBITED_CHARS, PROHIBITED_SNAME_CHARS, 
                               PROHIBITED_VALS, ANCILLARY_FILES,
                               BISON_VALUES, BISON_SQUID_FLD, ITIS_KINGDOMS, 
-                              ISO_COUNTRY_CODES)
+                              ISO_COUNTRY_CODES, BISON_ORDERED_DATALOAD_FIELDS)
 from common.lookup import Lookup, VAL_TYPE
-from common.tools import (getCSVDictReader, getCSVDictWriter, getLogger)
+from common.tools import (getCSVDictReader, open_csv_files, getLogger)
 
-from gbif.constants import (BISON_GBIF_MAP, OCC_UUID_FLD, DISCARD_FIELDS, 
-                            DISCARD_AFTER_UPDATE)
+from gbif.constants import GBIF_ORIG_DATA_TEMP_FIELD
 
 
 # .............................................................................
@@ -61,15 +60,28 @@ class BisonFiller(object):
         self._log = log
         
         # Ordered output fields
-        self._bison_ordered_flds = []
-        discards = DISCARD_FIELDS.copy().extend(DISCARD_AFTER_UPDATE)
-        
-        for (bisonfld, _) in BISON_GBIF_MAP:
-            if bisonfld not in DISCARD_FIELDS:
-                self._bison_ordered_flds.append(bisonfld)
+        # Individual steps may add/remove temporary fields for input/output
+        self._infields = BISON_ORDERED_DATALOAD_FIELDS.copy()
+        # Write these fields after processing for next step
+        self._outfields = BISON_ORDERED_DATALOAD_FIELDS.copy()
+#         discards = DISCARD_FIELDS.copy().extend(DISCARD_AFTER_UPDATE)
+#         
+#         for (bisonfld, _) in BISON_GBIF_MAP:
+#             if bisonfld not in DISCARD_FIELDS:
+#                 self._bison_ordered_flds.append(bisonfld)
 
         self._files = []
                 
+    # ...............................................
+    def _makerow(self, rec):
+        row = []
+        for fld in self._outfields:
+            if not rec[fld]:
+                row.append('')
+            else:
+                row.append(rec[fld])
+        return row
+
     # ...............................................
     def _read_estmeans_lookup(self, estmeans_fname):
         '''
@@ -162,32 +174,25 @@ class BisonFiller(object):
             except Exception:
                 pass
             
-    # ...............................................
-    def _open_files(self, infname, outfname=None):
-        '''
-        @summary: Open BISON-created CSV data for reading, 
-                  new output file for writing
-        '''
-        # Open incomplete BISON CSV file as input
-        self._log.info('Open input file {}'.format(infname))
-        drdr, inf = getCSVDictReader(infname, BISON_DELIMITER, ENCODING)
-        self._files.append(inf)
-        # Optional new BISON CSV output file  
-        dwtr = None
-        if outfname:
-            deleteme = []
-            for fld in self._bison_ordered_flds:
-                if fld not in drdr.fieldnames:
-                    deleteme.append(fld)
-            for fld in deleteme:
-                self._bison_ordered_flds.remove(fld)
-            self._log.info('Open output file {}'.format(outfname))
-            dwtr, outf = getCSVDictWriter(outfname, BISON_DELIMITER, ENCODING, 
-                                          self._bison_ordered_flds)
-            dwtr.writeheader()
-            self._files.append(outf)
-        return drdr, dwtr
-            
+#     # ...............................................
+#     def _open_files(self, infname, outfname=None):
+#         '''
+#         @summary: Open BISON-created CSV data for reading, 
+#                   new output file for writing
+#         '''
+#         # Open incomplete BISON CSV file as input
+#         self._log.info('Open input file {}'.format(infname))
+#         drdr, inf = getCSVDictReader(infname, BISON_DELIMITER, ENCODING)
+#         self._files.append(inf)
+#         # Optional new BISON CSV output file
+#         dwtr = None
+#         if outfname:
+#             self._log.info('Open output file {}'.format(outfname))
+#             dwtr, outf = getCSVWriter(outfname, BISON_DELIMITER, ENCODING)
+#             dwtr.writerow(self._outfields)
+#             self._files.append(outf)
+#         return drdr, dwtr
+#             
     # ...............................................
     def _fill_geofields(self, rec, lon, lat, 
                         terrindex, terrfeats, terr_bison_fldnames,
@@ -312,6 +317,7 @@ class BisonFiller(object):
         else:
             rec['itis_tsn'] = itis_vals['tsn']
             rec['hierarchy_string'] = itis_vals['hierarchy_string']
+            rec['amb'] = itis_vals['amb']
             rec['valid_accepted_scientific_name'] = itis_vals['valid_accepted_scientific_name']
             rec['valid_accepted_tsn'] = itis_vals['valid_accepted_tsn']
             rec['itis_common_name'] = itis_vals['common_name']
@@ -364,7 +370,11 @@ class BisonFiller(object):
         @return: A CSV file of BISON-modified records  
         """
         if self.is_open():
-            self.close()        
+            self.close()
+        if fromGbif:
+            self._infields.append(GBIF_ORIG_DATA_TEMP_FIELD)
+            self._outfields.append(GBIF_ORIG_DATA_TEMP_FIELD)
+        
         # Derek's LUT header
         # scientific_name, tsn, valid_accepted_scientific_name, valid_accepted_tsn,
         # hierarchy_string, common_name, amb, kingdom
@@ -375,8 +385,12 @@ class BisonFiller(object):
 
         recno = 0
         try:
-            dreader, dwriter = self._open_files(self.infname, outfname=outfname)
-            for rec in dreader:
+#             dreader, dwriter = self._open_files(self.infname, outfname=outfname)
+            dict_reader, inf, writer, outf = open_csv_files(self.infname, 
+                                             BISON_DELIMITER, ENCODING, 
+                                             outfname=outfname, 
+                                             outfields=self._outfields)
+            for rec in dict_reader:
                 recno += 1
                 squid = rec[BISON_SQUID_FLD]
                 # ..........................................
@@ -399,7 +413,8 @@ class BisonFiller(object):
                 if not fromGbif:
                     self._fill_bison_provider_fields(rec)
                 # Write updated record
-                dwriter.writerow(rec)
+                row = self._makerow(rec)
+                writer.writerow(row)
                 # Log progress occasionally
                 if (recno % LOGINTERVAL) == 0:
                     self._log.info('*** Record number {} ***'.format(recno))
@@ -408,7 +423,8 @@ class BisonFiller(object):
             self._log.error('Failed filling data from id {}, line {}: {}'
                             .format(squid, recno, e))                    
         finally:
-            self.close()
+            inf.close()
+            outf.close()
             
     # ...............................................    
     def _create_spatial_index(self, geodata, lyr):
@@ -435,7 +451,7 @@ class BisonFiller(object):
 
             
     # ...............................................
-    def update_point_in_polygons(self, ancillary_path, outfname):
+    def update_point_in_polygons(self, ancillary_path, outfname, fromGbif=True):
         """
         @summary: Process a CSV file with 47 ordered BISON fields (and optional
                   gbifID field for GBIF provided data) to 
@@ -453,6 +469,8 @@ class BisonFiller(object):
         """
         if self.is_open():
             self.close()
+        if fromGbif:
+            self._infields.append(GBIF_ORIG_DATA_TEMP_FIELD)
         driver = ogr.GetDriverByName("ESRI Shapefile")
 
         terr_geodata = ANCILLARY_FILES['terrestrial']
@@ -471,8 +489,12 @@ class BisonFiller(object):
 
         recno = 0
         try:
-            dreader, dwriter = self._open_files(self.infname, outfname=outfname)
-            for rec in dreader:
+            dict_reader, inf, writer, outf = open_csv_files(self.infname, 
+                                             BISON_DELIMITER, ENCODING, 
+                                             outfname=outfname, 
+                                             outfields=self._outfields)
+#             dreader, dwriter = self._open_files(self.infname, outfname=outfname)
+            for rec in dict_reader:
                 recno += 1
                 squid = rec[BISON_SQUID_FLD]
                 lon, lat = self._get_coords(rec)
@@ -483,7 +505,8 @@ class BisonFiller(object):
                                          terrindex, terrfeats, terr_bison_fldnames,
                                          marindex, marfeats, mar_bison_fldnames)
                 # Write updated record
-                dwriter.writerow(rec)
+                row = self._makerow(rec)
+                writer.writerow(row)
                 # Log progress occasionally, this process is very time-consuming
                 # so show progress at shorter intervals to ensure it is moving
                 if (recno % (LOGINTERVAL/10)) == 0:
@@ -493,7 +516,8 @@ class BisonFiller(object):
             self._log.error('Failed filling data from id {}, line {}: {}'
                             .format(squid, recno, e))                    
         finally:
-            self.close()
+            inf.close()
+            outf.close()
             
             
     # ...............................................
@@ -669,14 +693,12 @@ class BisonFiller(object):
             
         bad_name_chars = PROHIBITED_CHARS.copy()
         bad_name_chars.extend(PROHIBITED_SNAME_CHARS)
-            
-#         bad_res_chars = PROHIBITED_CHARS.copy()
-#         bad_res_chars.extend(PROHIBITED_RESOURCE_CHARS)
         
         recno = 0
         try:
-            dreader, _ = self._open_files(self.infname)
-            for rec in dreader:
+            dict_reader, inf, _, _ = open_csv_files(self.infname, 
+                                                    BISON_DELIMITER, ENCODING)
+            for rec in dict_reader:
                 recno += 1
                 squid = rec[BISON_SQUID_FLD]
                 
@@ -702,7 +724,7 @@ class BisonFiller(object):
             self._log.error('Failed filling data from id {}, line {}: {}'
                             .format(squid, recno, e))                    
         finally:
-            self.close()
+            inf.close()
             
 # ...............................................
 if __name__ == '__main__':
