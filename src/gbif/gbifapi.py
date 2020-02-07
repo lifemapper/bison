@@ -33,6 +33,7 @@ from gbif.constants import (GBIF_DSET_KEYS, GBIF_ORG_KEYS, GBIF_URL,
                             GBIF_BATCH_PARSER_URL, GBIF_SINGLE_PARSER_URL,
                             GBIF_TAXON_URL, GBIF_URL_ESCAPES, 
                             BISON_ORG_UUID, BISON_IPT_PREFIX)
+from old.gbifProviderAll import legacyid
     
 # .............................................................................
 class GbifAPI(object):
@@ -126,8 +127,6 @@ class GbifAPI(object):
                     # Return URL with desired prefix, else return last instance
                     if search_prefix and url.startswith(search_prefix):
                         break
-#             if url:
-#                 print('Found buried url {}'.format(url))
         return url
     
 # ...............................................
@@ -152,8 +151,6 @@ class GbifAPI(object):
         if dsKey == '':
             return dataDict        
         metaurl = GBIF_DATASET_URL + dsKey
-        legacyid = LEGACY_ID_DEFAULT
-        homepage = url = ''
         data = self._getDataFromUrl(metaurl)
         if data is None:
             return dataDict
@@ -169,18 +166,9 @@ class GbifAPI(object):
                 url = self._get_buried_url_val(data, search_prefix=BISON_IPT_PREFIX)
             if url == '': 
                 url = self._get_buried_url_val(data)
-                        
-            if 'homepage' in data:
-                homepage = data['homepage']
-                if ((isinstance(homepage, list) or isinstance(homepage, tuple))
-                    and len(homepage) > 0):
-                    homepage = homepage[0]                
+            homepage = self._get_val_or_first_of_list(data, 'homepage')
+            legacyid = self._get_legacyid(data)
 
-            if ('identifiers' in data
-                 and len(data['identifiers']) > 0 
-                 and data['identifiers'][0]['type'] == 'GBIF_PORTAL'):
-                legacyid = data['identifiers'][0]['identifier']
-            
             title = self._get_val(data, ['title'], save_nl=True)
             desc = self._get_val(data, ['description'], save_nl=True)
             citation = self._get_val(data, ['citation', 'text'], save_nl=True)
@@ -339,7 +327,28 @@ class GbifAPI(object):
                                    uuids,
                                    delimiter=delimiter)
 
-# ...............................................
+    # ...............................................
+    def _get_val_or_first_of_list(self, data, key):
+        val = ''
+        if key in data:
+            val = data[key]
+            if isinstance(val, list) or isinstance(val, tuple):
+                if len(val) > 0:
+                    val = val[0]
+                else:
+                    val = ''
+        return val
+    
+    # ...............................................
+    def _get_legacyid(self, data):
+        legacyid = LEGACY_ID_DEFAULT
+        if ('identifiers' in data
+             and len(data['identifiers']) > 0 
+             and data['identifiers'][0]['type'] == 'GBIF_PORTAL'):
+            legacyid = data['identifiers'][0]['identifier']
+        return legacyid
+        
+    # ...............................................
     def query_for_organization(self, orgUUID):
         # returns GBIF providerId
         dataDict = {}
@@ -351,29 +360,19 @@ class GbifAPI(object):
         if data is None:
             return dataDict
 
-        legacyid = LEGACY_ID_DEFAULT
         url = homepage = ''
         if 'key' in data:
             key = data['key']
             
-            if ('identifiers' in data
-                 and len(data['identifiers']) > 0 
-                 and data['identifiers'][0]['type'] == 'GBIF_PORTAL'):
-                legacyid = data['identifiers'][0]['identifier']
-                dataDict['legacyid'] = legacyid
-                
             title = self._get_val(data, ['title'], save_nl=True)
             desc = self._get_val(data, ['description'], save_nl=True)
             citation = self._get_val(data, ['citation', 'text'], save_nl=True)
             created = self._get_val(data, ['created'], save_nl=False)
             modified = self._get_val(data, ['modified'], save_nl=False)
             
-            url = self._get_buried_url_val(data)            
-            if 'homepage' in data:
-                homepage = data['homepage']
-                if ((isinstance(homepage, list) or isinstance(homepage, tuple))
-                    and len(homepage) > 0):
-                    homepage = homepage[0]                
+            legacyid = self._get_legacyid(data)
+            url = self._get_buried_url_val(data)
+            homepage = self._get_val_or_first_of_list(data, 'homepage')
                 
             dataDict['key'] = key
             dataDict['title'] = title
@@ -541,17 +540,22 @@ if __name__ == '__main__':
 #     name_infile = args.name_infile
 #     dataset_path = args.dataset_path
 
+    org_uuid = '898ba450-1627-11df-bd84-b8a03c50a862'
+
     infname = '/tank/data/bison/2019/AS/tmp/parser_in_10.txt'
     outfname = '/tank/data/bison/2019/AS/tmp/name_parser_10.csv'
     
-    gc = GbifAPI()
-    if os.path.exists(infname):
-        names = []
-        with open(infname, 'r', encoding='utf-8') as f:
-            for line in f:
-                names.append(line.strip())
-#         jnames = json.dumps(names)
-        gc.get_write_parsednames(names, outfname)
+    gbifapi = GbifAPI()
+    
+#     if os.path.exists(infname):
+#         names = []
+#         with open(infname, 'r', encoding='utf-8') as f:
+#             for line in f:
+#                 names.append(line.strip())
+# #         jnames = json.dumps(names)
+#         gbifapi.get_write_parsednames(names, outfname)
+        
+    rec = gbifapi.query_for_organization(org_uuid)
         
 """
 
