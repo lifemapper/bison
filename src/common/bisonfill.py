@@ -34,9 +34,6 @@ from common.constants import (BISON_DELIMITER, ENCODING, LOGINTERVAL,
 from common.lookup import Lookup, VAL_TYPE
 from common.tools import (getCSVDictReader, open_csv_files, getLogger)
 
-from gbif.constants import GBIF_ORIG_DATA_TEMP_FIELD
-
-
 # .............................................................................
 class BisonFiller(object):
     """
@@ -302,6 +299,15 @@ class BisonFiller(object):
 #             
 
     # ...............................................
+    def _clean_kingdom(self, rec):
+        kingdom = rec['kingdom']
+        if kingdom is not None:
+            if kingdom.lower() not in ITIS_KINGDOMS:
+                rec['kingdom'] = None
+            else:
+                rec['kingdom'] = kingdom.capitalize()
+
+    # ...............................................
     def _fill_itisfields(self, rec, itistsns):
         """
         Derek-provided LUT header:
@@ -313,7 +319,6 @@ class BisonFiller(object):
             itis_vals = itistsns.lut[canonical]
         except Exception as e:
             pass
-#             self._log.info('Found NO itis values for {}'.format(canonical))                    
         else:
             rec['itis_tsn'] = itis_vals['tsn']
             rec['hierarchy_string'] = itis_vals['hierarchy_string']
@@ -321,8 +326,8 @@ class BisonFiller(object):
             rec['valid_accepted_scientific_name'] = itis_vals['valid_accepted_scientific_name']
             rec['valid_accepted_tsn'] = itis_vals['valid_accepted_tsn']
             rec['itis_common_name'] = itis_vals['common_name']
-            if not rec['kingdom']:
-                rec['kingdom'] = itis_vals['kingdom']
+            # replace field with ITIS value
+            rec['kingdom'] = itis_vals['kingdom']
 
     # ...............................................
     def _fill_estmeans_field(self, rec, estmeans):
@@ -371,9 +376,6 @@ class BisonFiller(object):
         """
         if self.is_open():
             self.close()
-        if fromGbif:
-            self._infields.append(GBIF_ORIG_DATA_TEMP_FIELD)
-            self._outfields.append(GBIF_ORIG_DATA_TEMP_FIELD)
         
         # Derek's LUT header
         # scientific_name, tsn, valid_accepted_scientific_name, valid_accepted_tsn,
@@ -393,8 +395,10 @@ class BisonFiller(object):
             for rec in dict_reader:
                 recno += 1
                 squid = rec[BISON_SQUID_FLD]
+                
                 # ..........................................
-                # Fill ITIS 
+                # Clean kingdom value, Fill ITIS
+                self._clean_kingdom(rec) 
                 self._fill_itisfields(rec, itistsns)
                 # ..........................................
                 # Fill establishment_means from TSN or 
@@ -469,8 +473,6 @@ class BisonFiller(object):
         """
         if self.is_open():
             self.close()
-        if fromGbif:
-            self._infields.append(GBIF_ORIG_DATA_TEMP_FIELD)
         driver = ogr.GetDriverByName("ESRI Shapefile")
 
         terr_geodata = ANCILLARY_FILES['terrestrial']
@@ -493,7 +495,6 @@ class BisonFiller(object):
                                              BISON_DELIMITER, ENCODING, 
                                              outfname=outfname, 
                                              outfields=self._outfields)
-#             dreader, dwriter = self._open_files(self.infname, outfname=outfname)
             for rec in dict_reader:
                 recno += 1
                 squid = rec[BISON_SQUID_FLD]
@@ -784,20 +785,18 @@ if __name__ == '__main__':
     
     # ancillary data for record update
     estmeans_fname = os.path.join(ancillary_path, 'NonNativesIndex20190912.txt')
+#     itis1_lut_fname = os.path.join(tmppath, 'step3_itis_lut.txt')
     itis2_lut_fname = os.path.join(ancillary_path, 'itis_lookup.csv')
     terrestrial_shpname = os.path.join(ancillary_path, 
                                        ANCILLARY_FILES['terrestrial']['file'])
     marine_shpname = os.path.join(ancillary_path, 
                                   ANCILLARY_FILES['marine']['file'])
-    
-#     itis1_lut_fname = os.path.join(tmppath, 'step3_itis_lut.txt')
-    
+        
     logbasename = 'bisonfill_{}'.format()
 #     pass3_fname = os.path.join(tmppath, 'step3_itis_geo_estmeans_{}.csv'.format(gbif_basefname))
     
     gr = BisonFiller(infile, outfile)            
     # Pass 3 of CSV transform
-    # FillMethod = itis_tsn, georef (terrestrial)
     # Use Derek D. generated ITIS lookup itis2_lut_fname
     gr.update_itis_geo_estmeans(itis2_lut_fname, terrestrial_shpname, 
                                 marine_shpname, estmeans_fname)
@@ -815,8 +814,8 @@ import time
 
 from gbif.constants import (GBIF_DELIMITER, BISON_DELIMITER, PROHIBITED_VALS, 
                             TERM_CONVERT, ENCODING, META_FNAME,
-                            BISON_GBIF_MAP, OCC_UUID_FLD, DISCARD_FIELDS,
-                            CLIP_CHAR, FillMethod,GBIF_UUID_KEY)
+                            BISON_GBIF_MAP, OCC_ID_FLD, DISCARD_FIELDS,
+                            CLIP_CHAR, GBIF_UUID_KEY)
 from gbif.gbifmeta import GBIFMetaReader
 from common.tools import (getCSVReader, getCSVDictReader, 
                         getCSVWriter, getCSVDictWriter, getLine, getLogger)
