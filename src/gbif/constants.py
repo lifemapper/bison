@@ -29,7 +29,6 @@ NAMESPACE = {'tdwg':   'http://rs.tdwg.org/dwc/text/',
 
 
 BISON_ORG_UUID = 'c3ad790a-d426-4ac1-8e32-da61f81f0117'
-BISON_IPT_PREFIX = 'https://bison.usgs.gov/ipt/resource?r='
 
 USDA_BEE_ORG_UUID = '1e26a630-7203-11dc-a0d8-b8a03c50a862'
 
