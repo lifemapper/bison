@@ -147,24 +147,29 @@ populated, we will test it for contents, format, etc.
 
 #. provider
 
-   * Calc: organization key from dataset metadata, then GBIF organization 
-     API metadata: 'title' (??institutionCode)
+   * Calc: 'title' from provider lookup table (LUT).
+     LUT combines provider table from BISON-Denver and 
+     GBIF organization API + organization key (from dataset metadata)
 
 #. provider_url
 
-   * Calc: organization key from dataset metadata, then lookup from saved BISON 
-     provider table or GBIF organization API metadata: 'homepage' or 
-     'identifiers/identifier/' where type = 'URL' (??institutionID)
+   * Calc: 'homepage' or 'url' from provider lookup table (LUT).
+     LUT combines provider table from BISON-Denver and 
+     GBIF organization API + organization key (from dataset metadata)
 
 #. resource
 
-   * Calc: dataset key then GBIF dataset API metadata: 'title'
+   * Calc: 'title' from resource lookup table (LUT).
+     LUT combines resource table from BISON Denver and 
+     GBIF dataset API + dataset key
 
 #. resource_url  
 
-   * Calc: dataset key then GBIF dataset API metadata: 'homepage' or 
-     'identifiers/identifier/' where type = 'URL'.  Remove record if 
-     provider UUID is BISON UUID and resource_url = https://bison.usgs.gov/ipt/resource?r=*)
+   * Calc: 'homepage' or 'url' from resource lookup table (LUT).  
+     LUT combines resource table from BISON Denver and 
+     GBIF dataset API + dataset key.  Remove record if 
+     provider UUID = BISON UUID and 
+     resource_url = https://bison.usgs.gov/ipt/resource?r=*
    
 #. occurrence_url
 
@@ -265,25 +270,29 @@ populated, we will test it for contents, format, etc.
    
 #. id
 
-   * Calc: gbif/dwc 1) occurrenceID or 2) recordNumber 
+   * gbif/dwc gbifID 
 
 #. provider_id
 
-   * Calc: lookup legacyid from saved BISON provider table or GBIF organization 
-     API metadata: 'legacyid'
+   * Calc: 'legacyid' from provider lookup table (LUT).
+     LUT combines provider table from BISON Denver and
+     GBIF organization API + publishing organization key (from dataset metadata)
    
 #. resource_id
 
-   * Calc: lookup legacyid from saved BISON resource table or GBIF dataset 
-     API metadata: 'legacyid'
-   
+   * Calc: 'legacyid' from resource lookup table (LUT).
+     LUT combines resource table from BISON Denver and
+     GBIF dataset API + dataset key
+    
 #. provided_common_name
 
    * gbif/dwc vernacularName
    
 #. kingdom
 
-   * Calc: gbif/dwc kingdom or, if blank, resolve with ITIS calc
+   * Calc: gbif/dwc kingdom if in ['Animalia', 'Plantae', 'Bacteria', 'Fungi', 
+     'Protozoa', 'Chromista', 'Archaea', 'Virus'].  
+     If itis_tsn resolves, replace from ITIS lookup.  
    
 #. geodetic_datum
 
