@@ -27,7 +27,6 @@ from common.bisonfill import BisonFiller
 from common.constants import BISON_DELIMITER
 from common.tools import getLogger
 
-from gbif.constants import GBIF_NAMEKEY_TEMP_FIELD
 from gbif.gbifmodify import GBIFReader
             
 # ...............................................
@@ -38,18 +37,20 @@ if __name__ == '__main__':
                                      from the GBIF occurrence web service in
                                      Darwin Core format into BISON format.  
                                  """))
-    parser.add_argument('gbif_occ_file', type=str, 
+    parser.add_argument('occ_file', type=str, 
                         help="""
-                        Absolute pathname of the input GBIF occurrence file 
-                        for data transform.  Path contain downloaded GBIF data 
-                        and metadata.  If the subdirectories 'tmp' and 'out' 
+                        Absolute pathname of the input occurrence file 
+                        for data transform.  Path contains downloaded GBIF data 
+                        and metadata or BISON provider data.  
+                        If the subdirectories 'tmp' and 'out' 
                         are not present in the same directory as the raw data, 
                         they will be  created for temp and final output files.
                         """)
     parser.add_argument('--step', type=int, default=1, choices=[1,2,3,4,10],
                         help="""
                         Step number for data processing:
-                           1: Create lookup tables, transform and fill BISON
+                           1: Only for GBIF data files. 
+                              Create lookup tables, transform and fill BISON
                               records from GBIF data and lookup tables:
                               * Resource/Provider lookup
                                 * Query GBIF dataset API + datasetKey for 
@@ -63,7 +64,8 @@ if __name__ == '__main__':
                               * Name info (provided_scientific_name, taxonKey)
                                 and UUIDs are saved in records for GBIF API 
                                 resolution in Step 2.
-                           2: Create name lookup table, update BISON
+                           2: Only for GBIF data files.
+                              Create name lookup table, update BISON
                               records from name lookup table:
                               * Query GBIF parser + scientificName if available, 
                                 or GBIF species API + taxonKey --> name lookup
@@ -94,18 +96,18 @@ if __name__ == '__main__':
                               - ITIS fields - resolve with ITIS lookup and
                         """)
     args = parser.parse_args()
-    gbif_interp_file = args.gbif_occ_file
+    occ_fname = args.occ_file
     step = args.step
 
     overwrite = True
     tmpdir = 'tmp'
     outdir = 'out'
-    inpath, gbif_fname = os.path.split(gbif_interp_file)
+    inpath, basefname_wext = os.path.split(occ_fname)
     # one level up
 
     datapth, _ = os.path.split(inpath)
     ancillary_path = os.path.join(datapth, 'ancillary')
-    gbif_basefname, ext = os.path.splitext(gbif_fname)
+    basefname, ext = os.path.splitext(basefname_wext)
 
     tmppath = os.path.join(inpath, tmpdir)
     outpath = os.path.join(inpath, outdir)
@@ -127,22 +129,22 @@ if __name__ == '__main__':
     # filename for scientificname or taxonkey to canonical (clean_provided_scientific_name) lookup
     # for multipart datasets, do a single lut
 #     canonical_lut_fname = os.path.join(tmppath, 'canonical_lut.csv')
-    canonical_lut_fname = os.path.join(tmppath, 'step2_{}_canonical_lut.csv'.format(gbif_basefname))
+    canonical_lut_fname = os.path.join(tmppath, 'step2_{}_canonical_lut.csv'.format(basefname))
 
     itis1_lut_fname = os.path.join(tmppath, 'step3_itis_lut.txt')
     
-    logbasename = 'step{}_{}'.format(step, gbif_basefname)
+    logbasename = 'step{}_{}'.format(step, basefname)
     # Files of lookups and lists for their creation 
-    nametaxa_fname = os.path.join(tmppath, 'step1_{}_sciname_taxkey_list.csv'.format(gbif_basefname))
+    nametaxa_fname = os.path.join(tmppath, 'step1_{}_sciname_taxkey_list.csv'.format(basefname))
 #     cleanname_fname = os.path.join(tmppath, 'step2_{}_cleanname_list.txt'.format(gbif_basefname))
     # Output CSV files of all records after initial creation or field replacements
-    pass1_fname = os.path.join(tmppath, 'step1_{}.csv'.format(gbif_basefname))
-    pass2_fname = os.path.join(tmppath, 'step2_{}.csv'.format(gbif_basefname))
-    pass3_fname = os.path.join(tmppath, 'step3_{}.csv'.format(gbif_basefname))
-    pass4_fname = os.path.join(tmppath, 'step4_{}.csv'.format(gbif_basefname))
+    pass1_fname = os.path.join(tmppath, 'step1_{}.csv'.format(basefname))
+    pass2_fname = os.path.join(tmppath, 'step2_{}.csv'.format(basefname))
+    pass3_fname = os.path.join(tmppath, 'step3_{}.csv'.format(basefname))
+    pass4_fname = os.path.join(tmppath, 'step4_{}.csv'.format(basefname))
     
-    if not os.path.exists(gbif_interp_file):
-        raise Exception('Filename {} does not exist'.format(gbif_interp_file))
+    if not os.path.exists(occ_fname):
+        raise Exception('Filename {} does not exist'.format(occ_fname))
     else:
         if step == 1:
             gr = GBIFReader(inpath, tmpdir, outdir, logbasename)
@@ -150,8 +152,7 @@ if __name__ == '__main__':
                                         org_lut_fname, provider_lut_fname, 
                                         outdelimiter=BISON_DELIMITER)
             # Pass 1 of CSV transform, initial pull, standardize, 
-            # FillMethod = gbif_meta, metadata fill
-            gr.transform_gbif_to_bison(gbif_interp_file, dataset_lut_fname, 
+            gr.transform_gbif_to_bison(occ_fname, dataset_lut_fname, 
                                        org_lut_fname, nametaxa_fname, 
                                        pass1_fname)
             
@@ -164,7 +165,6 @@ if __name__ == '__main__':
             canonical_lut = gr.get_canonical_lookup(nametaxa_fname, 
                                                     canonical_lut_fname)
             # Pass 2 of CSV transform
-            # FillMethod = gbif_name, canonical name fill
             gr.update_bison_names(pass1_fname, pass2_fname, canonical_lut)
             
         elif step == 3:
@@ -172,7 +172,6 @@ if __name__ == '__main__':
             log = getLogger(logbasename, logfname)
             bf = BisonFiller(pass2_fname, log=log)
             # Pass 3 of CSV transform
-            # FillMethod = itis_tsn, georef (terrestrial)
             # Use Derek D. generated ITIS lookup itis2_lut_fname
             bf.update_itis_estmeans_centroid(itis2_lut_fname, estmeans_fname, 
                                              terrestrial_shpname, pass3_fname, 
@@ -189,7 +188,6 @@ if __name__ == '__main__':
             log = getLogger(logbasename, logfname)
             bf = BisonFiller(pass3_fname, log=log)
             # Pass 3 of CSV transform
-            # FillMethod = itis_tsn, georef (terrestrial)
             # Use Derek D. generated ITIS lookup itis2_lut_fname
             bf.test_bison_outfile(fromGbif=True)
 """
@@ -206,8 +204,8 @@ import time
 
 from gbif.constants import (GBIF_DELIMITER, BISON_DELIMITER, PROHIBITED_VALS, 
                             TERM_CONVERT, ENCODING, META_FNAME,
-                            BISON_GBIF_MAP, OCC_UUID_FLD, DISCARD_FIELDS,
-                            CLIP_CHAR, FillMethod,GBIF_UUID_KEY)
+                            BISON_GBIF_MAP, OCC_ID_FLD, DISCARD_FIELDS,
+                            CLIP_CHAR, GBIF_UUID_KEY)
 from gbif.gbifmeta import GBIFMetaReader
 from common.tools import (getCSVReader, getCSVDictReader, 
                         getCSVWriter, getCSVDictWriter, getLine, getLogger)

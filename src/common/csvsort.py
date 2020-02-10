@@ -536,11 +536,18 @@ if __name__ == "__main__":
         gf = Sorter(unsorted_file, delimiter, sort_col, logname)
          
         try:
+            # Use 'split' to to write records into individual files, with  
+            # each file sorted on desired grouping value.  This command assumes
+            # that the input file has chunks of pre-sorted data.
             if cmd  == 'split':
                 gf.split_sorted()
+            # Use 'gather' to identify the number and placement of records for 
+            # desired grouping value
             elif cmd  == 'gather':
                 outfname = os.path.join(pth, 'summary_'+dataname+ext)
                 gf.gather_groupvals(outfname)
+            # Use 'group' to write records into individual files, with name and 
+            # contents of each file based on the same grouping value 
             elif cmd == 'group':
                 gf.write_group_files()
             elif cmd  == 'merge':

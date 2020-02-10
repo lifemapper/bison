@@ -55,7 +55,7 @@ LOG_DATE_FORMAT = '%d %b %Y %H:%M'
 LOGFILE_MAX_BYTES = 52000000 
 LOGFILE_BACKUP_COUNT = 5
 
-ITIS_KINGDOMS = ('animalia', 'plantae', 'bacteria', 'fungi', 'protozofa', 
+ITIS_KINGDOMS = ('animalia', 'plantae', 'bacteria', 'fungi', 'protozoa', 
                  'chromista', 'archaea', 'virus')
 ITIS_SOLR_URL = 'https://services.itis.gov/'
 ITIS_NAME_KEY = 'nameWOInd'
@@ -84,51 +84,29 @@ ANCILLARY_FILES = {'terrestrial': {'file': 'US_CA_Counties_Centroids.shp',
 
 ISO_COUNTRY_CODES = ('AS', 'CA', 'FM', 'GU', 'MH', 'MP', 'PR', 'P', 'UM', 'US', 'VI')
 
-class FillMethod(Enum):
-    gbif_meta = auto()
-    gbif_name = auto()
-    itis_tsn = auto()
-    georef = auto()
-    est_means = auto()
+class ProviderActions(Enum):
+    replace = auto()
+    add = auto()
     unknown = auto()
 
-    @staticmethod
-    def is_calc(mtype):
-        if mtype in (FillMethod.gbif_meta,
-                     FillMethod.gbif_name,
-                     FillMethod.itis_tsn, 
-                     FillMethod.georef, 
-                     FillMethod.est_means, 
-                     FillMethod.unknown):
-            return True
-        else:
-            return False
-
-    @staticmethod
-    def in_pass1(mtype):
-        if mtype in (FillMethod.gbif_name,
-                     FillMethod.itis_tsn, 
-                     FillMethod.georef, 
-                     FillMethod.est_means, 
-                     FillMethod.unknown):
-            return False
-        else:
-            return True
-
-    @classmethod
-    def pass1(cls):
-        return cls.gbif_meta
-    
-            
-FillLater = (FillMethod.itis_tsn, FillMethod.georef, FillMethod.est_means, 
-             FillMethod.unknown)
+#     @staticmethod
+#     def is_calc(mtype):
+#         if mtype in (FillMethod.gbif_meta,
+#                      FillMethod.gbif_name,
+#                      FillMethod.itis_tsn, 
+#                      FillMethod.georef, 
+#                      FillMethod.est_means, 
+#                      FillMethod.unknown):
+#             return True
+#         else:
+#             return False
 
 BISON_ORDERED_DATALOAD_FIELDS = [
     'clean_provided_scientific_name', 
     'itis_common_name',
     'itis_tsn',
-    'hierarchy_string',
-    'amb',
+    'hierarchy_string',                 # New field
+    'amb',                              # New field
     'basis_of_record',
     'occurrence_date',
     'year',
@@ -160,6 +138,7 @@ BISON_ORDERED_DATALOAD_FIELDS = [
     'associated_media',
     'associated_references',
     'general_comments',
+    'occurrence_id',                    # New field
     'id',
     'provider_id',
     'resource_id',
@@ -248,4 +227,22 @@ BISONPROVIDER_BISON_MAP = [
 ('id', None), 
 ('tmpid', None)
 ]
+
+
+BISON_PROVIDER = {
+    '440,100012': 
+    ('action': ProviderActions.replace, 
+     'resource': 'USGS PWRC - Native Bee Inventory and Monitoring Lab (BIML)',
+     'resource_url': 'https://bison.usgs.gov/ipt/resource?r=usgs-pwrc-biml',
+     'filename': 'FINALusgspwrc-nativebeeinventoryandmonitoringlab-25Nov2019.txt'),
+    '':
+    ('action': ProviderActions.add,
+     'resource': 'NPS - US National Park Lichens - 2013 (NPLichens)'
+     'resource_url': 'https://bison.usgs.gov/ipt/resource?r=nplichens',
+     'filename': 'FINAL-NPLichens03Dec2019.txt')
+    }
+
+
+
+
 

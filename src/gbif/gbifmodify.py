@@ -30,14 +30,13 @@ from common.constants import (ANCILLARY_DELIMITER, BISON_DELIMITER,
                               EXTRA_VALS_KEY)
 from common.lookup import Lookup, VAL_TYPE
 from common.tools import (getCSVReader, getCSVDictReader, getCSVWriter, 
-                          open_csv_files, getLine, getLogger)
+                          open_csv_files, getLogger)
 
 from gbif.constants import (GBIF_DELIMITER, TERM_CONVERT, META_FNAME, 
-                            BISON_GBIF_MAP, OCC_UUID_FLD,  
+                            BISON_GBIF_MAP, OCC_ID_FLD,
                             CLIP_CHAR, GBIF_UUID_KEY,
                             BISON_ORG_UUID, BISON_IPT_PREFIX, 
-                            GBIF_CONVERT_TEMP_FIELDS, GBIF_NAMEKEY_TEMP_FIELD, 
-                            GBIF_ORIG_DATA_TEMP_FIELD)
+                            GBIF_CONVERT_TEMP_FIELDS, GBIF_NAMEKEY_TEMP_FIELD)
 from gbif.gbifmeta import GBIFMetaReader
 from gbif.gbifapi import GbifAPI
 
@@ -118,6 +117,49 @@ class GBIFReader(object):
                 logname = '{}.{}'.format(nm, int(time.time()))
             logfname = os.path.join(self.tmppath, '{}.log'.format(logname))
             self._log = getLogger(logname, logfname)
+            
+    # ...............................................
+    def _replace_resource_vals(self, rec, datasets):
+        # GBIF Dataset maps to BISON resource, values from datasets LUT  
+        # LUT = BISON resource table + GBIF dataset API
+        dskey = rec['resource_id']
+        res_title = res_meta_url = ''
+        legacy_dataset_id = LEGACY_ID_DEFAULT
+        orgkey = None
+        if dskey is not None:                    
+            try:
+                ds_metavals = datasets.lut[dskey]
+            except:
+                self._log.warning('{} missing from dataset LUT'.format(dskey))
+            else:
+                # Get organization UUID from dataset metadata
+                orgkey = ds_metavals['publishingOrganizationKey']
+                if orgkey is None:
+                    self._log.warning('No orgkey found for dataset {}'.format(dskey))
+                res_title = ds_metavals['title']
+                legacy_dataset_id = ds_metavals['legacyid']
+                if ds_metavals['homepage'] != '':
+                    res_meta_url = ds_metavals['homepage']
+                else:
+                    res_meta_url = ds_metavals['url']
+                    
+                if orgkey == BISON_ORG_UUID:
+                    if (res_meta_url is not None 
+                          and res_meta_url.startswith(BISON_IPT_PREFIX)):
+                        self._log.info('Discard rec {}: dataset URL {}'
+                                       .format(rec[OCC_ID_FLD], res_meta_url))
+                        rec = None
+                else:
+                    # Log other bison urls
+                    if res_meta_url.find('bison.') >= 0:
+                        self._log.info('In rec {}, found provider {} url {}'
+                                       .format(rec[OCC_ID_FLD], orgkey, res_meta_url))
+        if rec is not None:
+            rec['resource_id'] = legacy_dataset_id
+            rec['resource'] = res_title
+            rec['resource_url'] = res_meta_url
+            
+        return orgkey
 
     # ...............................................
     def _discard_bison_add_resource_provider(self, rec, datasets, orgs):
@@ -129,73 +171,32 @@ class GBIFReader(object):
                   homepage.
         @note: function modifies or deletes original dict
         """
-        orgkey = None
         if rec is not None:
-            # GBIF Dataset maps to BISON resource, values from GBIF dataset API 
-            # query + UUID and BISON resource table with legacyID
-            dskey = rec['resource_id']
-            orig_res_url = rec['resource_url']
-            if dskey is not None:                    
+            legacy_org_id = LEGACY_ID_DEFAULT
+            title = url = ''
+            orgkey = self._replace_resource_vals(rec, datasets)     
+            # GBIF Organization maps to BISON provider, retrieved from dataset 
+            # above + gbif organization API query and BISON provider table with legacyID
+            if orgkey is not None:
                 try:
-                    ds_metavals = datasets.lut[dskey]
+                    org_metavals = orgs.lut[orgkey]
                 except:
-                    self._log.warning('{} missing from dataset LUT'.format(dskey))
+                    self._log.warning('{} missing from organization LUT'.format(orgkey))
                 else:
-                    # Get organization UUID from dataset metadata
-                    orgkey = ds_metavals['publishingOrganizationKey']
-                    if not orgkey:
-                        self._log.warning('No organization key found for dataset {}'
-                                            .format(dskey))
-
-                    title = ds_metavals['title']
-                    legacy_dataset_id = ds_metavals['legacyid']
-                    
-                    if ds_metavals['homepage'] != '':
-                        ds_meta_url = ds_metavals['homepage']
+                    title = org_metavals['title']
+                    if org_metavals['homepage'] != '':
+                        url = org_metavals['homepage']
                     else:
-                        ds_meta_url = ds_metavals['url']
-                    
-                    if orgkey == BISON_ORG_UUID:
-                        if (orig_res_url is not None 
-                            and orig_res_url.startswith(BISON_IPT_PREFIX)):
-                            self._log.info('Discard rec {}: resource_url {}'
-                                           .format(rec[OCC_UUID_FLD], orig_res_url))
-                            rec = None
-                        elif (ds_meta_url is not None 
-                              and ds_meta_url.startswith(BISON_IPT_PREFIX)):
-                            self._log.info('Discard rec {}: dataset URL {}'
-                                           .format(rec[OCC_UUID_FLD], ds_meta_url))
-                            rec = None
-                    else:
-                        # Note other bison urls
-                        if ds_meta_url.find('bison.') >= 0:
-                            self._log.info('In rec {}, found provider {} url {}'
-                                           .format(rec[OCC_UUID_FLD], orgkey, ds_meta_url))
-                        rec['resource_id'] = legacy_dataset_id
-                        rec['resource'] = title
-                        rec['resource_url'] = ds_meta_url
-        # GBIF Organization maps to BISON provider, retrieved from dataset 
-        # above + gbif organization API query and BISON provider table with legacyID
-        if rec is not None and orgkey is not None:
-            try:
-                org_metavals = orgs.lut[orgkey]
-            except:
-                self._log.warning('{} missing from organization LUT'.format(orgkey))
-            else:
-                title = org_metavals['title']
-                if org_metavals['homepage'] != '':
-                    url = org_metavals['homepage']
-                else:
-                    url = org_metavals['url']
-                legacy_org_id = org_metavals['legacyid']
-                if url.find('bison.org') >= 0:
-                    self._log.info('Discard rec {}: org URL {}'
-                                   .format(rec[OCC_UUID_FLD], url))
-                    rec = None
-                else:
-                    rec['provider_id'] = legacy_org_id
-                    rec['provider'] = title
-                    rec['provider_url'] = url
+                        url = org_metavals['url']
+                    legacy_org_id = org_metavals['legacyid']
+                    if url.find('bison.org') >= 0:
+                        self._log.info('Discard rec {}: org URL {}'
+                                       .format(rec[OCC_ID_FLD], url))
+                        rec = None
+        if rec is not None:
+            rec['provider_id'] = legacy_org_id
+            rec['provider'] = title
+            rec['provider_url'] = url
 
     # ...............................................
     def _update_point(self, brec):
@@ -226,7 +227,7 @@ class GBIFReader(object):
         elif (ctry in ('US', 'CA') and lon and lon > 0):
             lon = lon * -1 
             self._log.info('Rec {}: negated {} longitude to {}'
-                           .format(brec[OCC_UUID_FLD], ctry, lon))
+                           .format(brec[OCC_ID_FLD], ctry, lon))
             
         # Replace values in dictionary
         brec['latitude'] = lat
@@ -267,7 +268,7 @@ class GBIFReader(object):
         @note: BISON eventDate should be ISO 8601, ex: 2018-08-01 or 2018
                  GBIF combines with time (and here UTC time zone), ex: 2018-08-01T14:19:56+00:00
         """
-        gid = brec[OCC_UUID_FLD]
+        gid = brec[OCC_ID_FLD]
         fillyr = False
         # Test year field
         try:
@@ -460,7 +461,7 @@ class GBIFReader(object):
         @param brec: current record dictionary
         """
         if brec is not None:
-            gid = brec[OCC_UUID_FLD]
+            gid = brec[OCC_ID_FLD]
             # Required fields exist 
             if (not brec['provided_scientific_name'] and not brec['taxonKey']):
                 brec = None
@@ -505,7 +506,7 @@ class GBIFReader(object):
         @return: list of ordered fields containing BISON-interpreted values for 
                     a single GBIF occurrence record. 
         """
-        gid = grec[OCC_UUID_FLD]
+        gid = grec[OCC_ID_FLD]
         brec = {}
         
         try:
@@ -599,8 +600,8 @@ class GBIFReader(object):
         gbif_header = gm_rdr.get_field_list(meta_fname)
 
         self._infields.extend(GBIF_CONVERT_TEMP_FIELDS) 
-        self._infields.extend([GBIF_NAMEKEY_TEMP_FIELD, GBIF_ORIG_DATA_TEMP_FIELD])
-        self._outfields.extend([GBIF_NAMEKEY_TEMP_FIELD, GBIF_ORIG_DATA_TEMP_FIELD])
+        self._infields.append(GBIF_NAMEKEY_TEMP_FIELD)
+        self._outfields.append(GBIF_NAMEKEY_TEMP_FIELD)
 
         datasets = Lookup.initFromFile(dataset_lut_fname, GBIF_UUID_KEY, 
                                        BISON_DELIMITER, valtype=VAL_TYPE.DICT, 
@@ -736,11 +737,9 @@ class GBIFReader(object):
         @return: A text file of clean_provided_scientific_names values 
         
         """
-        self._infields.extend([GBIF_ORIG_DATA_TEMP_FIELD, GBIF_NAMEKEY_TEMP_FIELD])
-        self._outfields.append(GBIF_ORIG_DATA_TEMP_FIELD)
+        self._infields.append(GBIF_NAMEKEY_TEMP_FIELD)
         recno = 0
         try:
-#             dreader, dwriter = self._open_update_files(infname, outfname)
             dict_reader, inf, writer, outf = open_csv_files(infname, 
                                              BISON_DELIMITER, ENCODING, 
                                              outfname=outfname, 
@@ -748,7 +747,7 @@ class GBIFReader(object):
             for rec in dict_reader:
                 recno += 1
                 clean_name = None
-                gid = rec[OCC_UUID_FLD]
+                gid = rec[OCC_ID_FLD]
                 # Update record
                 verbatimname = rec['provided_scientific_name']
                 # Update record
@@ -1097,8 +1096,8 @@ from common.tools import (getCSVReader, getCSVDictReader, getCSVWriter,
                           getCSVDictWriter, getLine, getLogger)
 
 from gbif.constants import (GBIF_DELIMITER, TERM_CONVERT, META_FNAME, 
-                            BISON_GBIF_MAP, OCC_UUID_FLD, DISCARD_FIELDS, 
-                            CLIP_CHAR, FillMethod,GBIF_UUID_KEY)
+                            BISON_GBIF_MAP, OCC_ID_FLD, DISCARD_FIELDS, 
+                            CLIP_CHAR, GBIF_UUID_KEY)
 from gbif.gbifmeta import GBIFMetaReader
 from gbif.gbifapi import GbifAPI
 from gbif.gbifmodify import GBIFReader
