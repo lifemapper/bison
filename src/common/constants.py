@@ -66,6 +66,7 @@ ITIS_NAMESPACE = '{http://itis_service.itis.usgs.gov}'
 ITIS_DATA_NAMESPACE = '{http://data.itis_service.itis.usgs.gov/xsd}'
 W3_NAMESPACE =  '{http://www.w3.org/2001/XMLSchema-instance}'
 
+BISON_IPT_PREFIX = 'https://bison.usgs.gov/ipt/resource?r='
 BISON_VALUES = {'provider': 'BISON',
                 'provider_url': 'https://bison.usgs.gov',
 #                 'provider_id': '440',
@@ -86,7 +87,10 @@ ISO_COUNTRY_CODES = ('AS', 'CA', 'FM', 'GU', 'MH', 'MP', 'PR', 'P', 'UM', 'US', 
 
 class ProviderActions(Enum):
     replace = auto()
+    rename = auto()
+    replace_rename = auto()
     add = auto()
+    wait = auto()
     unknown = auto()
 
 #     @staticmethod
@@ -228,18 +232,109 @@ BISONPROVIDER_BISON_MAP = [
 ('tmpid', None)
 ]
 
-
+# ProviderAction
 BISON_PROVIDER = {
+    # my.usgs.gov/jira/browse/BISON-832
     '440,100012': 
-    ('action': ProviderActions.replace, 
+    {'action': ProviderActions.replace, 
      'resource': 'USGS PWRC - Native Bee Inventory and Monitoring Lab (BIML)',
-     'resource_url': 'https://bison.usgs.gov/ipt/resource?r=usgs-pwrc-biml',
-     'filename': 'FINALusgspwrc-nativebeeinventoryandmonitoringlab-25Nov2019.txt'),
+     'resource_url': BISON_IPT_PREFIX + 'usgs-pwrc-biml',
+     'filename': 'FINALusgspwrc-nativebeeinventoryandmonitoringlab-25Nov2019.txt',
+    },
+    # my.usgs.gov/jira/browse/BISON-402
     '':
-    ('action': ProviderActions.add,
-     'resource': 'NPS - US National Park Lichens - 2013 (NPLichens)'
-     'resource_url': 'https://bison.usgs.gov/ipt/resource?r=nplichens',
-     'filename': 'FINAL-NPLichens03Dec2019.txt')
+    {'action': ProviderActions.add,
+     'resource': 'NPS - US National Park Lichens - 2013 (NPLichens)',
+     'resource_url': BISON_IPT_PREFIX + 'nplichens',
+     'filename': 'FINAL-NPLichens03Dec2019.txt',
+    },
+    # my.usgs.gov/jira/browse/BISON-895
+    '':
+    {'action': ProviderActions.wait,
+     'resource': 'USGS PWRC - Amphibian Research and Monitoring Initiative (ARMI) - NEast Region',
+     'resource_url': BISON_IPT_PREFIX + 'usgs-pwrc-amphibian-research-monitoring-initiative',
+     'filename': None
+     },
+    # my.usgs.gov/jira/browse/BISON-976
+    '':
+    {'action': ProviderActions.add,
+     'resource': 'CO State University - Natural Resource Ecology Lab - CO River Basin - Tamarix - 2014 and 2017',
+     'resource_url': BISON_IPT_PREFIX + 'csu-nrel-co-riverbasin-tamarix',
+     'filename': 'FINAL-CSU-NREL-CO-Riverbasin-Tamarix_20191126es.txt'
+     },
+    # my.usgs.gov/jira/browse/BISON-978
+    '440, 100061':
+    {'action': ProviderActions.replace,
+     'resource': 'BugGuide',
+     'resource_url': BISON_IPT_PREFIX + 'bugguide',
+     'filename': 'FINAL-bugguide19Dec2019.txt'},
+    # my.usgs.gov/jira/browse/BISON-979
+    '440,100068':
+    {'action': ProviderActions.replace,
+     'resource': 'Xerces Society - Bumble Bee Watch',
+     'resource_url': BISON_IPT_PREFIX + 'bugguide https://bison.usgs.gov/ipt/resource?r=xerces-bumblebeewatch',
+     'filename': 'xerces-bumblebeewatch_FINAL14Aug2019.txt'},
+    # my.usgs.gov/jira/browse/BISON-986
+    '440,100071':
+    {'action': ProviderActions.replace,
+     'resource': 'Monarch Watch',
+     'resource_url': BISON_IPT_PREFIX + 'monarchwatch',
+     'filename': 'FINALmonarchwatch_2019Nov19.txt'},
+    # my.usgs.gov/jira/browse/BISON-987
+    '440,100028':
+    {'action': ProviderActions.replace,
+     'resource': 'USFS - Forest Inventory and Analysis - Trees (Public Lands)',
+     'resource_url': BISON_IPT_PREFIX + 'usfs-fia-trees-public-lands',
+     'filename': 'bison_fiapub_2019-03-25.txt', 
+    # my.usgs.gov/jira/browse/BISON-988
+    '440,100042':
+    {'action': ProviderActions.wait, # will be replace
+     'resource': 'USFS - Forest Inventory and Analysis - Trees (Private Lands)',
+     'resource_url': BISON_IPT_PREFIX + 'usfs-fia-trees-private-lands',
+     'filename': 'https://doimspp.sharepoint.com/sites/BISON-Data/Shared%20Documents/General/bison_fiapriv_2019-03-25.zip'},
+    # my.usgs.gov/jira/browse/BISON-989
+    '440,100058':
+    {'action': ProviderActions.replace_rename,
+     'resource': 'New York City Tree Census - 2015',
+     'resource_url': BISON_IPT_PREFIX + 'nycity-tree-census',
+     'filename': 'FINAL-nycitytreecensus-2015-05Dec2019.txt'},
+    # my.usgs.gov/jira/browse/BISON-
+    '':
+    {'action': ProviderActions.unknown,
+     'resource': '',
+     'resource_url': BISON_IPT_PREFIX + '',
+     'filename': 'None'},
+    # my.usgs.gov/jira/browse/BISON-
+    '':
+    {'action': ProviderActions.unknown,
+     'resource': '',
+     'resource_url': BISON_IPT_PREFIX + '',
+     'filename': 'None'},
+    # my.usgs.gov/jira/browse/BISON-
+    '':
+    {'action': ProviderActions.unknown,
+     'resource': '',
+     'resource_url': BISON_IPT_PREFIX + '',
+     'filename': 'None'},
+    # my.usgs.gov/jira/browse/BISON-
+    '':
+    {'action': ProviderActions.unknown,
+     'resource': '',
+     'resource_url': BISON_IPT_PREFIX + '',
+     'filename': 'None'},
+    # my.usgs.gov/jira/browse/BISON-
+    '':
+    {'action': ProviderActions.unknown,
+     'resource': '',
+     'resource_url': BISON_IPT_PREFIX + '',
+     'filename': 'None'},
+    # my.usgs.gov/jira/browse/BISON-
+    '':
+    {'action': ProviderActions.unknown,
+     'resource': '',
+     'resource_url': BISON_IPT_PREFIX + '',
+     'filename': 'None'},
+
     }
 
 
