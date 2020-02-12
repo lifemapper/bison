@@ -39,6 +39,7 @@ EXTRA_VALS_KEY = 'rest'
 ENCODING = 'utf-8'
 ANCILLARY_DELIMITER = ','
 BISON_DELIMITER = '$'
+PROVIDER_DELIMITER = '\t'
 
 NEWLINE = '\n'
 LEGACY_ID_DEFAULT = -9999
@@ -86,24 +87,12 @@ ANCILLARY_FILES = {'terrestrial': {'file': 'US_CA_Counties_Centroids.shp',
 ISO_COUNTRY_CODES = ('AS', 'CA', 'FM', 'GU', 'MH', 'MP', 'PR', 'P', 'UM', 'US', 'VI')
 
 class ProviderActions(Enum):
-    replace = auto()
-    rename = auto()
-    replace_rename = auto()
     add = auto()
+    rename = auto()
+    replace = auto()
+    replace_rename = auto()
     wait = auto()
     unknown = auto()
-
-#     @staticmethod
-#     def is_calc(mtype):
-#         if mtype in (FillMethod.gbif_meta,
-#                      FillMethod.gbif_name,
-#                      FillMethod.itis_tsn, 
-#                      FillMethod.georef, 
-#                      FillMethod.est_means, 
-#                      FillMethod.unknown):
-#             return True
-#         else:
-#             return False
 
 BISON_ORDERED_DATALOAD_FIELDS = [
     'clean_provided_scientific_name', 
@@ -234,6 +223,7 @@ BISONPROVIDER_BISON_MAP = [
 
 # ProviderAction
 BISON_PROVIDER = {
+    
     # my.usgs.gov/jira/browse/BISON-832
     '440,100012': 
     {'action': ProviderActions.replace, 
@@ -241,6 +231,7 @@ BISON_PROVIDER = {
      'resource_url': BISON_IPT_PREFIX + 'usgs-pwrc-biml',
      'filename': 'FINALusgspwrc-nativebeeinventoryandmonitoringlab-25Nov2019.txt',
     },
+    
     # my.usgs.gov/jira/browse/BISON-402
     'nplichens':
     {'action': ProviderActions.add,
@@ -248,6 +239,7 @@ BISON_PROVIDER = {
      'resource_url': BISON_IPT_PREFIX + 'nplichens',
      'filename': 'FINAL-NPLichens03Dec2019.txt',
     },
+    
     # my.usgs.gov/jira/browse/BISON-895
     'usgs-pwrc-amphibian-research-monitoring-initiative':
     {'action': ProviderActions.wait, # add,
@@ -255,6 +247,7 @@ BISON_PROVIDER = {
      'resource_url': BISON_IPT_PREFIX + 'usgs-pwrc-amphibian-research-monitoring-initiative',
      'filename': None
      },
+    
     # my.usgs.gov/jira/browse/BISON-976
     'csu-nrel-co-riverbasin-tamarix':
     {'action': ProviderActions.add,
@@ -262,66 +255,77 @@ BISON_PROVIDER = {
      'resource_url': BISON_IPT_PREFIX + 'csu-nrel-co-riverbasin-tamarix',
      'filename': 'FINAL-CSU-NREL-CO-Riverbasin-Tamarix_20191126es.txt'
      },
+    
     # my.usgs.gov/jira/browse/BISON-978
-    '440, 100061':
+    '440,100061':
     {'action': ProviderActions.replace,
      'resource': 'BugGuide',
      'resource_url': BISON_IPT_PREFIX + 'bugguide',
      'filename': 'FINAL-bugguide19Dec2019.txt'},
+    
     # my.usgs.gov/jira/browse/BISON-979
     '440,100068':
     {'action': ProviderActions.replace,
      'resource': 'Xerces Society - Bumble Bee Watch',
      'resource_url': BISON_IPT_PREFIX + 'bugguide https://bison.usgs.gov/ipt/resource?r=xerces-bumblebeewatch',
      'filename': 'xerces-bumblebeewatch_FINAL14Aug2019.txt'},
+    
     # my.usgs.gov/jira/browse/BISON-986
     '440,100071':
     {'action': ProviderActions.replace,
      'resource': 'Monarch Watch',
      'resource_url': BISON_IPT_PREFIX + 'monarchwatch',
      'filename': 'FINALmonarchwatch_2019Nov19.txt'},
+    
     # my.usgs.gov/jira/browse/BISON-987
     '440,100028':
     {'action': ProviderActions.replace,
      'resource': 'USFS - Forest Inventory and Analysis - Trees (Public Lands)',
      'resource_url': BISON_IPT_PREFIX + 'usfs-fia-trees-public-lands',
      'filename': 'bison_fiapub_2019-03-25.txt'}, 
+    
     # my.usgs.gov/jira/browse/BISON-988
     '440,100042':
     {'action': ProviderActions.replace,
      'resource': 'USFS - Forest Inventory and Analysis - Trees (Private Lands)',
      'resource_url': BISON_IPT_PREFIX + 'usfs-fia-trees-private-lands',
      'filename': 'bison_fiapriv_2019-03-25.txt'},
+    
     # my.usgs.gov/jira/browse/BISON-989
     '440,100058':
     {'action': ProviderActions.replace_rename,
      'resource': 'New York City Tree Census - 2015',
      'resource_url': BISON_IPT_PREFIX + 'nycity-tree-census',
      'filename': 'FINAL-nycitytreecensus-2015-05Dec2019.txt'},
+    
     # my.usgs.gov/jira/browse/BISON-993
     'usgs-warc-suwanneemoccasinshell':
     {'action': ProviderActions.add,
      'resource': 'USGS WARC - Florida and Georgia - Suwannee moccasinshell - 1916-2015',
      'resource_url': BISON_IPT_PREFIX + 'usgs-warc-suwanneemoccasinshell',
      'filename': 'revised_BISON_USGS_WARC_suwanneemoccasinshell.txt'},
+    
     # my.usgs.gov/jira/browse/BISON-994
     '440,100046':
-    {'action': ProviderActions.wait, # will be replace,
+    {'action': ProviderActions.replace,
      'resource': 'USGS PWRC - Bird Banding Lab - US State Centroid',
      'resource_url': BISON_IPT_PREFIX + 'usgs-pwrc-bbl-us-state',
-     'filename': None},
+     'filename': 'bison_bbl_state_ordered_final_2019-02-22.txt'},
+    
     # my.usgs.gov/jira/browse/BISON-995
     '440,100008':
-    {'action': ProviderActions.wait, # replace, missing Dropbox file
+    {'action': ProviderActions.replace, 
      'resource': 'USGS PWRC - Bird Banding Lab - US 10min Block',
      'resource_url': BISON_IPT_PREFIX + 'usgs-pwrc-bbl-us-10minblock',
-     'filename': None},
+     'filename': 'bison_bbl_10min_ordered_final_2019-02-21.txt'},
+    
     # my.usgs.gov/jira/browse/BISON-996
     '440,100052':
     {'action': ProviderActions.replace,  
      'resource': 'USGS PWRC - Bird Banding Lab - Canada Province Centroid',
      'resource_url': BISON_IPT_PREFIX + 'usgs-pwrc-bbl-canada-province',
      'filename': 'bison_bbl_ca_province_ordered_final_2019-02-26.txt'},
+    
     # my.usgs.gov/jira/browse/BISON-998
     # No IPT url?
     '440,1066':
@@ -329,48 +333,56 @@ BISON_PROVIDER = {
      'resource': 'USDA - PLANTS Database',
      'resource_url': 'http://plants.usda.gov/java/citePlants',
      'filename': 'bison_USDA_Plants_2019-12-19.txt'},
+    
     # my.usgs.gov/jira/browse/BISON-1001
-    '':
-    {'action': ProviderActions.wait, # add,
+    'nps-nisims':
+    {'action': ProviderActions.add,
      'resource': 'NPS - National Invasive Species Information Management System - Plants',
      'resource_url': BISON_IPT_PREFIX + 'nps-nisims',
      'filename': 'NPS-NISIMS-Plants_20190325.txt'},
+    
     # my.usgs.gov/jira/browse/BISON-1002
     '440,100032':
     {'action': ProviderActions.replace_rename, 
      'resource': 'BLM - National Invasive Species Information Management System - Plants',
      'resource_url': BISON_IPT_PREFIX + 'blm_nisims',
      'filename': 'BLM-NISIMS_20190325.txt'},
+    
     # my.usgs.gov/jira/browse/BISON-1003
     '440,100060':
     {'action': ProviderActions.replace, 
      'resource': 'iMapInvasives - Plants - New York',
      'resource_url': BISON_IPT_PREFIX + 'imapinvasives-natureserve-ny',
      'filename': 'iMap_NY_plants-replace20190307.txt'},
+    
     # my.usgs.gov/jira/browse/BISON-1005
     '440,100043':
     {'action': ProviderActions.replace_rename, 
      'resource': 'USGS PWRC - North American Breeding Bird Survey',
      'resource_url': BISON_IPT_PREFIX + 'usgs_pwrc_north_american_breeding_bird_survey',
      'filename': 'bbsfifty_processed_2019-03-14.txt'},
+    
     # my.usgs.gov/jira/browse/BISON-1012
     'cdc-arbonet-mosquitoes':
     {'action': ProviderActions.add, 
      'resource': 'CDC - ArboNET - Mosquitoes',
      'resource_url': BISON_IPT_PREFIX + 'cdc-arbonet-mosquitoes',
      'filename': 'CDC-ArboNET-Mosquitoes_20190315.txt'},
+    
     # my.usgs.gov/jira/browse/BISON-1018
     'emammal':
     {'action': ProviderActions.add, 
      'resource': 'eMammal',
      'resource_url': BISON_IPT_PREFIX + 'emammal',
      'filename': 'bison_emammal_2019-09-18.txt'},
+    
     # my.usgs.gov/jira/browse/BISON-1051
     'usfws-waterfowl-survey':
     {'action': ProviderActions.add,
      'resource': '     USFWS - Waterfowl Breeding Population and Habitat Survey',
      'resource_url': BISON_IPT_PREFIX + 'usfws-waterfowl-survey',
      'filename': 'USFWS - Waterfowl Breeding Population and Habitat Survey 11Jul2019.txt'},
+    
     # my.usgs.gov/jira/browse/BISON-1053
     # old name = USGS PIERC - Hawaii Forest Bird Survey Database 
     '440,100050':
@@ -378,6 +390,7 @@ BISON_PROVIDER = {
      'resource': 'USGS PIERC - Hawaii Forest Bird Survey - Plants',
      'resource_url': BISON_IPT_PREFIX + 'usgs_pierc_hfbs1',
      'filename': None},
+    
     # my.usgs.gov/jira/browse/BISON-1075
     # old name = USGS PIERC - Hawaii Forest Bird Survey Database 
     '440,100075':
@@ -385,6 +398,7 @@ BISON_PROVIDER = {
      'resource': 'USGS PIERC - Hawaii Forest Bird Survey - Birds',
      'resource_url': BISON_IPT_PREFIX + 'usgs-pierc-hfbs-birds',
      'filename': None},
+    
 #     # my.usgs.gov/jira/browse/BISON-
 #     '':
 #     {'action': ProviderActions.wait, 

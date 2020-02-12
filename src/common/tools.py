@@ -1,7 +1,9 @@
 import csv
 import logging
 from logging.handlers import RotatingFileHandler
+import os
 from sys import maxsize
+import time
 
 from common.constants import (LOG_FORMAT, LOG_DATE_FORMAT, LOGFILE_MAX_BYTES,
                               LOGFILE_BACKUP_COUNT, EXTRA_VALS_KEY)
@@ -74,6 +76,16 @@ def getLogger(name, fname):
         fh.setLevel(logging.DEBUG)
         fh.setFormatter(formatter)
         log.addHandler(fh)
+    return log
+
+# ...............................................
+def rotate_logfile(log, logpath, logname=None):
+    if log is None:
+        if logname is None:
+            nm, _ = os.path.splitext(os.path.basename(__file__))
+            logname = '{}.{}'.format(nm, int(time.time()))
+        logfname = os.path.join(logpath, '{}.log'.format(logname))
+        log = getLogger(logname, logfname)
     return log
 
 # ...............................................

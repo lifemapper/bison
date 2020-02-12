@@ -202,7 +202,7 @@ class GBIFMetaReader(object):
         return name_fails
             
     # ...............................................
-    def write_name_lookup(self, logname=None):
+    def write_name_lookup(self):
         """
         @summary: Create lookup table for: 
                   BISON canonicalName from GBIF scientificName and/or taxonKey
@@ -211,7 +211,6 @@ class GBIFMetaReader(object):
             raise Exception('Input file {} missing!'.format(self.nametaxa_fname))
         if os.path.exists(self.name_lut_fname):
             raise Exception('Output LUT file {} exists!'.format(self.name_lut_fname))
-        self._rotate_logfile(logname=logname)
         
         # Read name/taxonIDs dictionary for name resolution
         nametaxa = self._read_name_taxa(self.nametaxa_fname)

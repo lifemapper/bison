@@ -387,11 +387,11 @@ class BisonFiller(object):
 
         recno = 0
         try:
-#             dreader, dwriter = self._open_files(self.infname, outfname=outfname)
             dict_reader, inf, writer, outf = open_csv_files(self.infname, 
-                                             BISON_DELIMITER, ENCODING, 
-                                             outfname=outfname, 
-                                             outfields=self._outfields)
+                                                 BISON_DELIMITER, ENCODING, 
+                                                 outfname=outfname, 
+                                                 outfields=self._outfields)
+                
             for rec in dict_reader:
                 recno += 1
                 squid = rec[BISON_SQUID_FLD]
@@ -726,6 +726,53 @@ class BisonFiller(object):
                             .format(squid, recno, e))                    
         finally:
             inf.close()
+
+#     # ...............................................
+#     def write_dataset_org_lookup(self, dataset_lut_fname, resource_lut_fname, 
+#                                  org_lut_fname, provider_lut_fname, 
+#                                  outdelimiter=BISON_DELIMITER):
+#         """
+#         @summary: Create lookup table for: 
+#                   BISON resource and provider from 
+#                   GBIF datasetKey and dataset publishingOrganizationKey
+#         @return: One file, containing dataset metadata, 
+#                            including publishingOrganization metadata 
+#                            for that dataset
+#         """
+#         gbifapi = GbifAPI()
+#         if os.path.exists(dataset_lut_fname):
+#             self._log.info('Output file {} exists!'.format(dataset_lut_fname))
+#         else:
+#             old_resources = Lookup.initFromFile(resource_lut_fname, GBIF_UUID_KEY, 
+#                                             ANCILLARY_DELIMITER, valtype=VAL_TYPE.DICT, 
+#                                             encoding=ENCODING)
+#             datasets = self._write_dataset_lookup(gbifapi, old_resources,
+#                                                   dataset_lut_fname, 
+#                                                   outdelimiter)
+#             
+#         if os.path.exists(org_lut_fname):
+#             self._log.info('Output file {} exists!'.format(org_lut_fname))
+#         else:
+#             old_providers = Lookup.initFromFile(provider_lut_fname, GBIF_UUID_KEY, 
+#                                             ANCILLARY_DELIMITER, valtype=VAL_TYPE.DICT, 
+#                                             encoding=ENCODING)
+#     
+#             # --------------------------------------
+#             # Gather organization UUIDs from dataset metadata assembled (LUT or file)
+#             org_uuids = set()
+#             try:
+#                 for key, ddict in datasets.lut.items():
+#                     try:
+#                         org_uuids.add(ddict['publishingOrganizationKey'])
+#                     except Exception as e:
+#                         print('No publishingOrganizationKey in dataset {}'.format(key))
+#             except Exception as e:             
+#                 gmetardr = GBIFMetaReader(self._log)
+#                 org_uuids = gmetardr.get_organization_uuids(dataset_lut_fname)
+#                 
+#             self._write_org_lookup(org_uuids, gbifapi, old_providers, 
+#                                    org_lut_fname, outdelimiter)
+            
             
 # ...............................................
 if __name__ == '__main__':
