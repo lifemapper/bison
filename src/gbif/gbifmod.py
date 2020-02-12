@@ -26,16 +26,16 @@ import time
 
 from common.constants import (ANCILLARY_DELIMITER, BISON_DELIMITER, 
                               ENCODING, LOGINTERVAL, PROHIBITED_VALS,
-                              LEGACY_ID_DEFAULT, BISON_ORDERED_DATALOAD_FIELDS,
-                              EXTRA_VALS_KEY)
+                              LEGACY_ID_DEFAULT, EXTRA_VALS_KEY,
+                              BISON_ORDERED_DATALOAD_FIELDS, BISON_IPT_PREFIX)
 from common.lookup import Lookup, VAL_TYPE
 from common.tools import (getCSVReader, getCSVDictReader, getCSVWriter, 
-                          open_csv_files, getLogger)
+                          open_csv_files)
 
 from gbif.constants import (GBIF_DELIMITER, TERM_CONVERT, META_FNAME, 
                             BISON_GBIF_MAP, OCC_ID_FLD,
                             CLIP_CHAR, GBIF_UUID_KEY,
-                            BISON_ORG_UUID, BISON_IPT_PREFIX, 
+                            BISON_ORG_UUID, 
                             GBIF_CONVERT_TEMP_FIELDS, GBIF_NAMEKEY_TEMP_FIELD)
 from gbif.gbifmeta import GBIFMetaReader
 from gbif.gbifapi import GbifAPI
@@ -53,7 +53,7 @@ class GBIFReader(object):
              where 1-5000 are lines to delete, and 10000 is the line on which to stop.
     """
     # ...............................................
-    def __init__(self, basepath, tmpdir, outdir, logname):
+    def __init__(self, basepath, tmpdir, outdir, logger):
         """
         @summary: Constructor
         @param interpreted_fname: Full filename containing records from the GBIF 
@@ -63,6 +63,7 @@ class GBIFReader(object):
                      https://www.gbif.org/occurrence/search
         @param outfname: Full filename for the output BISON CSV file
         """
+        self._log = logger
         # Remove any trailing /
         self.basepath = basepath.rstrip(os.sep)
         self.outpath = os.path.join(basepath, outdir)
@@ -82,10 +83,6 @@ class GBIFReader(object):
             gbiffld = gfld[gfld.rfind(CLIP_CHAR)+1:]
             self._gbif_bison_map[gbiffld] = bfld
             
-        logfname = os.path.join(self.tmppath, '{}.log'.format(logname))
-        self._log = getLogger(logname, logfname)
-
-        self._rotate_logfile(logname=logname)
         self._files = []
         # Canonical lookup tmp data, header: scientificName, taxonKeys
         self._nametaxa = {}
@@ -108,15 +105,6 @@ class GBIFReader(object):
             else:
                 row.append(rec[fld])
         return row
-        
-    # ...............................................
-    def _rotate_logfile(self, logname=None):
-        if self._log is None:
-            if logname is None:
-                nm, _ = os.path.splitext(os.path.basename(__file__))
-                logname = '{}.{}'.format(nm, int(time.time()))
-            logfname = os.path.join(self.tmppath, '{}.log'.format(logname))
-            self._log = getLogger(logname, logfname)
             
     # ...............................................
     def _replace_resource_vals(self, rec, datasets):
@@ -506,7 +494,7 @@ class GBIFReader(object):
         @return: list of ordered fields containing BISON-interpreted values for 
                     a single GBIF occurrence record. 
         """
-        gid = grec[OCC_ID_FLD]
+        gid = grec['gbifID']
         brec = {}
         
         try:

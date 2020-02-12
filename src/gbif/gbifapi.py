@@ -24,16 +24,15 @@
 import os
 import requests
 
-from common.constants import (BISON_DELIMITER, ENCODING, NEWLINE, 
-                              LEGACY_ID_DEFAULT) 
+from common.constants import (BISON_DELIMITER, BISON_IPT_PREFIX, 
+                              ENCODING, NEWLINE, LEGACY_ID_DEFAULT) 
 from common.tools import getCSVWriter
 
 from gbif.constants import (GBIF_DSET_KEYS, GBIF_ORG_KEYS, GBIF_URL,
                             GBIF_DATASET_URL, GBIF_ORGANIZATION_URL,
                             GBIF_BATCH_PARSER_URL, GBIF_SINGLE_PARSER_URL,
                             GBIF_TAXON_URL, GBIF_URL_ESCAPES, 
-                            BISON_ORG_UUID, BISON_IPT_PREFIX)
-from old.gbifProviderAll import legacyid
+                            BISON_ORG_UUID)
     
 # .............................................................................
 class GbifAPI(object):
