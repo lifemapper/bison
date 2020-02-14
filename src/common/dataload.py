@@ -24,7 +24,7 @@
 import os
 
 from common.bisonfill import BisonFiller
-from common.constants import BISON_DELIMITER, BISON_PROVIDER, ProviderActions
+from common.constants import BISON_DELIMITER, BISON_PROVIDER
 from common.tools import getLogger
 
 from gbif.gbifmod import GBIFReader
@@ -185,23 +185,39 @@ if __name__ == '__main__':
             
         elif step == 5:
             merger = BisonMerger(outpath, logger)
+            
             old_resources, old_providers = merger.read_provider_resources(
-                resource_lut_fname, provider_lut_fname)
-            for resource_id, pvals in BISON_PROVIDER.items():
+                 resource_lut_fname, provider_lut_fname)
+             
+            for resource_ident, pvals in BISON_PROVIDER.items():
                 fname = pvals['filename']
                 if fname is None:
-                    fname = 'bison_{}.csv'.format(resource_id)
+                    fname = 'bison_{}.csv'.format(resource_ident)
                 infile = os.path.join(inpath, fname)
                 if not os.path.exists(infile):
                     print('File {} does not exist for {}'
-                          .format(fname, resource_id))
+                          .format(fname, resource_ident))
                 else:
                     basename, _ = os.path.splitext(fname)
                     outfile = os.path.join(outpath, basename + '_clean.csv')
+
+                # Step 1: rewrite filling ticket/constant vals for resource/provider
                 merger.rewrite_bison_data(infile, outfile, 
-                        old_resources, old_providers,
-                        resource_id, pvals['resource'], pvals['resource_url'], 
-                        pvals['action'])
+                        old_resources, old_providers, resource_ident, 
+                        pvals['resource'], pvals['resource_url'], pvals['action'])
+                
+                # Step 2: rewrite filling lookup vals from 
+                # itis, establishment_means and centroid 
+                outfile2 = os.path.join(outpath, basename + '_itis_em_cnt.csv')            
+                bf = BisonFiller(outfile, log=logger)
+                bf.update_itis_estmeans_centroid(itis2_lut_fname, estmeans_fname, 
+                                                 terrestrial_shpname, outfile2, 
+                                                 fromGbif=False)
+                # Step 3: of CSV transform
+                # Use Derek D. generated ITIS lookup itis2_lut_fname
+                outfile3 = os.path.join(outpath, basename + '_final.csv')            
+                bf = BisonFiller(outfile2, log=logger)
+                bf.update_point_in_polygons(ancillary_path, outfile3, fromGbif=False)
 
         elif step == 10:
             bf = BisonFiller(pass3_fname, log=logger)

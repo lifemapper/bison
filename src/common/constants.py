@@ -93,6 +93,12 @@ class ProviderActions(Enum):
     replace_rename = auto()
     wait = auto()
     unknown = auto()
+    
+class BISON_PROVIDER_VALUE(object):
+    legacyid = '440'
+    name = 'BISON'
+    url = 'https://bison.usgs.gov'
+
 
 BISON_ORDERED_DATALOAD_FIELDS = [
     'clean_provided_scientific_name', 
@@ -221,7 +227,6 @@ BISONPROVIDER_BISON_MAP = [
 ('tmpid', None)
 ]
 
-# ProviderAction
 BISON_PROVIDER = {
     
     # my.usgs.gov/jira/browse/BISON-832
