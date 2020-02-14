@@ -88,6 +88,17 @@ def rotate_logfile(log, logpath, logname=None):
         log = getLogger(logname, logfname)
     return log
 
+
+# ...............................................
+def makerow(rec, outfields):
+    row = []
+    for fld in outfields:
+        if not rec[fld]:
+            row.append('')
+        else:
+            row.append(rec[fld])
+    return row
+
 # ...............................................
 def open_csv_files(infname, delimiter, encoding, infields=None,
                    outfname=None, outfields=None, outdelimiter=None):
