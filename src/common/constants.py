@@ -70,7 +70,7 @@ W3_NAMESPACE =  '{http://www.w3.org/2001/XMLSchema-instance}'
 BISON_IPT_PREFIX = 'https://bison.usgs.gov/ipt/resource?r='
 BISON_VALUES = {'provider': 'BISON',
                 'provider_url': 'https://bison.usgs.gov',
-#                 'provider_id': '440',
+                'provider_id': '440',
                 'license' : 'http://creativecommons.org/publicdomain/zero/1.0/legalcode',
                 }
 
@@ -91,13 +91,14 @@ class ProviderActions(Enum):
     rename = auto()
     replace = auto()
     replace_rename = auto()
+    rewrite = auto()
     wait = auto()
     unknown = auto()
     
-class BISON_PROVIDER_VALUE(object):
-    legacyid = '440'
-    name = 'BISON'
-    url = 'https://bison.usgs.gov'
+# class BISON_PROVIDER_VALUE(object):
+#     legacyid = '440'
+#     name = 'BISON'
+#     url = 'https://bison.usgs.gov'
 
 
 BISON_ORDERED_DATALOAD_FIELDS = [
@@ -272,7 +273,7 @@ BISON_PROVIDER = {
     '440,100068':
     {'action': ProviderActions.replace,
      'resource': 'Xerces Society - Bumble Bee Watch',
-     'resource_url': BISON_IPT_PREFIX + 'bugguide https://bison.usgs.gov/ipt/resource?r=xerces-bumblebeewatch',
+     'resource_url': BISON_IPT_PREFIX + 'xerces-bumblebeewatch',
      'filename': 'xerces-bumblebeewatch_FINAL14Aug2019.txt'},
     
     # my.usgs.gov/jira/browse/BISON-986
