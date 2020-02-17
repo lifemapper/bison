@@ -414,8 +414,8 @@ class BisonFiller(object):
                     self._fill_centroids(rec, centroids)
                     lon, lat = self._get_coords(rec)
 
-                if not fromGbif:
-                    self._fill_bison_provider_fields(rec)
+#                 if not fromGbif:
+#                     self._fill_bison_provider_fields(rec)
                 # Write updated record
                 row = self._makerow(rec)
                 writer.writerow(row)
@@ -585,9 +585,6 @@ class BisonFiller(object):
         
     # ...............................................
     def _fill_bison_provider_fields(self, rec):
-        for key, val in BISON_VALUES:
-            rec[key] = val
-            
         king = rec['kingdom']
         if king and king.lower() in ITIS_KINGDOMS:
             rec['kingdom'] = king.capitalize()

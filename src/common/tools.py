@@ -38,8 +38,13 @@ def getCSVWriter(datafile, delimiter, encoding, fmode='w'):
 # .............................................................................
 def getCSVDictReader(datafile, delimiter, encoding, fieldnames=None):
     try:
-        f = open(datafile, 'r', encoding=encoding) 
-        dreader = csv.DictReader(f, fieldnames=fieldnames, restkey=EXTRA_VALS_KEY,
+        f = open(datafile, 'r', encoding=encoding)
+        if fieldnames is None:
+            header = next(f)
+            tmpflds = header.split(delimiter)
+            fieldnames = [fld.strip() for fld in tmpflds]
+        dreader = csv.DictReader(f, fieldnames=fieldnames, 
+                                 restkey=EXTRA_VALS_KEY,
                                  delimiter=delimiter)        
     except Exception as e:
         raise Exception('Failed to read or open {}, ({})'
@@ -93,10 +98,14 @@ def rotate_logfile(log, logpath, logname=None):
 def makerow(rec, outfields):
     row = []
     for fld in outfields:
-        if not rec[fld]:
+        try:
+            if not rec[fld]:
+                row.append('')
+            else:
+                row.append(rec[fld])
+        # Add output fields not present in record
+        except:
             row.append('')
-        else:
-            row.append(rec[fld])
     return row
 
 # ...............................................
