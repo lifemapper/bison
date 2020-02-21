@@ -109,6 +109,15 @@ class GbifAPI(object):
                     data = response.json()
                 else:
                     data = response.text
+                    
+            if data is not None:
+                try:
+                    result_count = data['count']
+                except:
+                    pass
+                else:
+                    if result_count == 0:
+                        data = None
         return data
 
             
@@ -145,18 +154,23 @@ class GbifAPI(object):
         return val
         
 # ...............................................
-    def query_for_dataset(self, dsKey):
+    def query_for_dataset(self, dsKey, is_legacyid=False):
         dataDict = {}
         if dsKey == '':
-            return dataDict        
-        metaurl = GBIF_DATASET_URL + dsKey
+            return dataDict
+        if is_legacyid:
+            metaurl = '{}/{}?identifier='.format(GBIF_URL, 
+                                                 GBIF_DSET_KEYS.apitype, dsKey)
+        else:
+            metaurl = GBIF_DATASET_URL + dsKey
         data = self._getDataFromUrl(metaurl)
         if data is None:
             return dataDict
         
         key = self._get_val(data, ['key'], save_nl=False)
+        url = ''
         if key == '':
-            print('Failed to resolve dataset with {}'.format(metaurl))
+            print('Failed to resolve dataset with no key')
         else:
             orgkey = self._get_val(data, ['publishingOrganizationKey'], save_nl=True)
             if orgkey == '':
@@ -165,7 +179,9 @@ class GbifAPI(object):
                 url = self._get_buried_url_val(data, search_prefix=BISON_IPT_PREFIX)
             if url == '': 
                 url = self._get_buried_url_val(data)
-            homepage = self._get_val_or_first_of_list(data, 'homepage')
+            if url == '': 
+                url = self._get_val_or_first_of_list(data, 'homepage')
+                
             legacyid = self._get_legacyid(data)
 
             title = self._get_val(data, ['title'], save_nl=True)
@@ -174,16 +190,16 @@ class GbifAPI(object):
             created = self._get_val(data, ['created'], save_nl=False)
             modified = self._get_val(data, ['modified'], save_nl=False)
             
-            dataDict['key'] = key
-            dataDict['legacyid'] = legacyid
-            dataDict['publishingOrganizationKey'] = orgkey
-            dataDict['homepage'] = homepage
-            dataDict['url'] = url
-            dataDict['title'] = title
-            dataDict['description'] = desc
-            dataDict['citation'] = citation
-            dataDict['created'] = created
-            dataDict['modified'] = modified
+            # Matches current_gbif content of MERGED_RESOURCE_LUT_FIELDS
+            dataDict['gbif_datasetkey'] = key
+            dataDict['gbif_legacyid'] = legacyid
+            dataDict['gbif_publishingOrganizationKey'] = orgkey
+            dataDict['gbif_title'] = title
+            dataDict['gbif_url'] = url
+            dataDict['gbif_description'] = desc
+            dataDict['gbif_citation'] = citation
+            dataDict['gbif_created'] = created
+            dataDict['gbif_modified'] = modified
         return dataDict
 
 # ...............................................
@@ -348,18 +364,20 @@ class GbifAPI(object):
         return legacyid
         
     # ...............................................
-    def query_for_organization(self, orgUUID):
+    def query_for_organization(self, org_key, is_legacyid=False):
         # returns GBIF providerId
         dataDict = {}
-        if orgUUID == '':
+        if org_key == '':
             return dataDict
-        
-        url = GBIF_ORGANIZATION_URL + orgUUID
-        data = self._getDataFromUrl(url)
+        if is_legacyid:
+            metaurl = '{}/{}?identifier='.format(GBIF_URL, 
+                                                 GBIF_ORG_KEYS.apitype, org_key)
+        else:
+            metaurl = GBIF_ORGANIZATION_URL + org_key
+        data = self._getDataFromUrl(metaurl)
         if data is None:
             return dataDict
 
-        url = homepage = ''
         if 'key' in data:
             key = data['key']
             
@@ -371,17 +389,18 @@ class GbifAPI(object):
             
             legacyid = self._get_legacyid(data)
             url = self._get_buried_url_val(data)
-            homepage = self._get_val_or_first_of_list(data, 'homepage')
-                
-            dataDict['key'] = key
-            dataDict['title'] = title
-            dataDict['description'] = desc
-            dataDict['citation'] = citation
-            dataDict['created'] = created
-            dataDict['modified'] = modified
-            dataDict['homepage'] = homepage
-            dataDict['url'] = url
-            dataDict['legacyid'] = legacyid
+            if url == '':
+                url = self._get_val_or_first_of_list(data, 'homepage')
+
+            # Matches current_gbif content of MERGED_RESOURCE_LUT_FIELDS    
+            dataDict['gbif_organizationKey'] = key
+            dataDict['gbif_legacyid'] = legacyid
+            dataDict['gbif_title'] = title
+            dataDict['gbif_url'] = url
+            dataDict['gbif_description'] = desc
+            dataDict['gbif_citation'] = citation
+            dataDict['gbif_created'] = created
+            dataDict['gbif_modified'] = modified
 
         return dataDict
 

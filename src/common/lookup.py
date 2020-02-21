@@ -2,7 +2,7 @@ import os
 
 from common.constants import ENCODING
 from common.tools import (getCSVDictReader, getCSVDictWriter, 
-                          getCSVReader, getCSVWriter, getLine)
+                          getCSVReader, getCSVWriter, getLine, makerow)
 
 class VAL_TYPE:
     DICT = 1
@@ -62,7 +62,7 @@ class Lookup(object):
         if key is None and val is None:
             print('Missing key {} or value {}'.format(key, val))
         else:
-            print('Saving key {}'.format(key))
+#             print('Saving key {}'.format(key))
             try:
                 existingval = self.lut[key]
             except KeyError:
@@ -86,17 +86,27 @@ class Lookup(object):
             fmode = 'a'
         try:
             if self.valtype == VAL_TYPE.DICT:
-                writer, outf = getCSVDictWriter(fname, delimiter, self.encoding, 
-                                                header, fmode=fmode)
-                print('Opened file {} for write'.format(fname))
-                if fmode == 'w':
-                    writer.writeheader()
-                for key, ddict in self.lut.items():
-                    writer.writerow(ddict)
+                # Write all vals in dict, assumes each dictionary-value has the same keys
+                if header is None:
+                    writer, outf = getCSVDictWriter(fname, delimiter, self.encoding, 
+                                                    header, fmode=fmode)
+                    if fmode == 'w':
+                        writer.writeheader()
+                    for key, ddict in self.lut.items():
+                        writer.writerow(ddict)
+                # Write values from dict for header fields, insert '' when missing
+                else:
+                    writer, outf = getCSVWriter(fname, delimiter, self.encoding, 
+                                                fmode=fmode)
+                    writer.writerow(header)
+                    for key, rec in self.lut.items():
+                        row = makerow(rec, header)
+                        writer.writerow(row)
+            
+            # Non-dictionary lookup
             else:
                 writer, outf = getCSVWriter(fname, delimiter, self.encoding, 
                                             fmode=fmode)
-                print('Opened file {} for write'.format(fname))
                 if fmode == 'w' and header is not None:
                     writer.writerow(header)
                 if self.valtype in (VAL_TYPE.SET, VAL_TYPE.TUPLE):
@@ -104,8 +114,8 @@ class Lookup(object):
                         row = [k for k in val]
                         row.insert(0, key)
                         writer.writerow(row)
-        except Exception:
-            print('Failed to write data to {}'.format(fname))
+        except Exception as e:
+            print('Failed to write data to {}, ({})'.format(fname, e))
         finally:
             outf.close()
 
@@ -124,7 +134,7 @@ class Lookup(object):
                                     .format(fname, e))
                 else:
                     for data in rdr:
-                        datakey = data.pop(keyfld)
+                        datakey = data[keyfld]
                         self.lut[datakey] = data
                 finally:
                     inf.close()

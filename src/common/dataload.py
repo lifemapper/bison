@@ -129,8 +129,9 @@ if __name__ == '__main__':
     estmeans_fname = os.path.join(ancillary_path, 'NonNativesIndex20190912.txt')
     marine_shpname = os.path.join(ancillary_path, 'World_EEZ_v8_20140228_splitpolygons/World_EEZ_v8_2014_HR.shp')
     itis2_lut_fname = os.path.join(ancillary_path, 'itis_lookup.csv')
-    resource_lut_fname = os.path.join(ancillary_path, 'resourcestable.csv')
-    provider_lut_fname = os.path.join(ancillary_path, 'providerstable.csv')
+    # Old data from July 2019
+    resource_lut_fname = os.path.join(ancillary_path, 'resource.csv')
+    provider_lut_fname = os.path.join(ancillary_path, 'provider.csv')
         
     if step in [1,2,3,4]:
         # Files of name lookup and list for creation 
@@ -141,9 +142,9 @@ if __name__ == '__main__':
         pass2_fname = os.path.join(tmppath, 'step2_{}.csv'.format(basefname))
         pass3_fname = os.path.join(tmppath, 'step3_{}.csv'.format(basefname))
         pass4_fname = os.path.join(tmppath, 'step4_{}.csv'.format(basefname))    
-        # filenames for dataset/resource and organization/provider lookups
-        dataset_lut_fname = os.path.join(tmppath, 'dataset_lut.csv')
-        org_lut_fname = os.path.join(tmppath, 'organization_lut.csv')
+        # OUTPUT filenames for merged dataset/resource and organization/provider lookups
+        merged_dataset_lut_fname = os.path.join(tmppath, 'merged_dataset_lut.csv')
+        merged_org_lut_fname = os.path.join(tmppath, 'merged_organization_lut.csv')
     
     if not os.path.exists(occ_file_or_path):
         raise Exception('File or path {} does not exist'.format(occ_file_or_path))
@@ -152,13 +153,16 @@ if __name__ == '__main__':
         logger = getLogger(logbasename, logfname)
         if step == 1:
             gr = GBIFReader(inpath, tmpdir, outdir, logger)
-            gr.write_dataset_org_lookup(dataset_lut_fname, resource_lut_fname, 
-                                        org_lut_fname, provider_lut_fname, 
-                                        outdelimiter=BISON_DELIMITER)
+            gr.write_dataset_org_lookup(
+                merged_dataset_lut_fname, resource_lut_fname, 
+                merged_org_lut_fname, provider_lut_fname, 
+                outdelimiter=BISON_DELIMITER)
             # Pass 1 of CSV transform, initial pull, standardize, 
-            gr.transform_gbif_to_bison(occ_file_or_path, dataset_lut_fname, 
-                                       org_lut_fname, nametaxa_fname, 
-                                       pass1_fname)
+            gr.transform_gbif_to_bison(
+                occ_file_or_path, 
+                merged_dataset_lut_fname, 
+                merged_org_lut_fname, 
+                nametaxa_fname, pass1_fname)
             
         elif step == 2:
             gr = GBIFReader(inpath, tmpdir, outdir, logger)
@@ -248,7 +252,11 @@ wc -l occurrence.txt
 wc -l tmp/step1.csv 
 1577732 tmp/step1.csv
 
-python3.6 /state/partition1/git/bison/src/gbif/convert2bison.py /tank/data/bison/2019/Terr/occurrence_lines_1-10000001.csv --step=1
+python3.6 \
+  /state/partition1/git/bison/src/common/dataload.py \
+  /tank/data/bison/2019/provider --step=5 
+
+/tank/data/bison/2019/Terr/occurrence_lines_1-10000001.csv --step=1
 
 import os
 from osgeo import ogr 
