@@ -16,6 +16,8 @@ def getCSVReader(datafile, delimiter, encoding):
     except Exception as e:
         raise Exception('Failed to read or open {}, ({})'
                         .format(datafile, str(e)))
+    else:
+        print('Opened file {} for read'.format(datafile))
     return reader, f
 
 # .............................................................................
@@ -33,6 +35,8 @@ def getCSVWriter(datafile, delimiter, encoding, fmode='w'):
     except Exception as e:
         raise Exception('Failed to read or open {}, ({})'
                         .format(datafile, str(e)))
+    else:
+        print('Opened file {} for write'.format(datafile))
     return writer, f
 
 # .............................................................................
@@ -49,6 +53,8 @@ def getCSVDictReader(datafile, delimiter, encoding, fieldnames=None):
     except Exception as e:
         raise Exception('Failed to read or open {}, ({})'
                         .format(datafile, str(e)))
+    else:
+        print('Opened file {} for read'.format(datafile))
     return dreader, f
 
 # .............................................................................
@@ -66,6 +72,8 @@ def getCSVDictWriter(datafile, delimiter, encoding, fldnames, fmode='w'):
     except Exception as e:
         raise Exception('Failed to read or open {}, ({})'
                         .format(datafile, str(e)))
+    else:
+        print('Opened file {} for write'.format(datafile))
     return writer, f
 
 # .............................................................................

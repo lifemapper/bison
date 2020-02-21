@@ -121,6 +121,9 @@ BISON_GBIF_MAP = {
     'occurrenceStatus': NS.dwc + 'occurrenceStatus',
     'locality': NS.dwc + 'locality',
     'habitat': NS.dwc + 'habitat',
+    # Direct mapping, ties to original GBIF occ rec and dataset
+    'gbifID': NS.gbif + 'gbifID',
+    'datasetKey': NS.gbif + 'datasetKey',
     # Direct mapping
     'basis_of_record': NS.dwc + 'basisOfRecord',
     'occurrence_date': NS.dwc + 'eventDate',
@@ -143,8 +146,8 @@ BISON_GBIF_MAP = {
     'general_comments': NS.dwc + 'eventRemarks',
     'occurrence_id': NS.dwc + 'occurrenceID',
     'id': NS.gbif + 'gbifID',
-    # To be replaced with legacy organization, or GBIF Rest Url + datasetKey
-    'resource_id': NS.gbif + 'datasetKey',
+#     # To be replaced with legacy organization, or GBIF Rest Url + datasetKey
+#     'resource_id': NS.gbif + 'datasetKey',
     'provided_common_name': NS.dwc + 'vernacularName',
     'kingdom': NS.dwc + 'kingdom',
     'coordinate_precision': NS.dwc + 'coordinatePrecision',   

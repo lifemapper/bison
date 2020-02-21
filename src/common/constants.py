@@ -155,6 +155,69 @@ BISON_ORDERED_DATALOAD_FIELDS = [
     'license',
     ]
 
+class FieldContent(Enum):
+    legacy_bison = auto()
+    current_gbif = auto()
+
+MERGED_PROVIDER_LUT_FIELDS = (
+    ('name', FieldContent.legacy_bison),
+    ('provider_url', FieldContent.legacy_bison), 
+    ('description', FieldContent.legacy_bison),
+    ('website_url', FieldContent.legacy_bison),
+    ('created', FieldContent.legacy_bison),
+    ('modified', FieldContent.legacy_bison),
+    ('deleted', FieldContent.legacy_bison),
+    ('display_name', FieldContent.legacy_bison),
+    ('BISONProviderID', FieldContent.legacy_bison),
+    # Query with legacy identifier second
+    ('OriginalProviderID', FieldContent.legacy_bison),          # BISON provider legacy id
+    # Query with UUID first
+    ('organization_id', FieldContent.legacy_bison),             # GBIF organization UUID
+
+    ('gbif_organizationKey', FieldContent.current_gbif),
+    ('gbif_legacyid', FieldContent.current_gbif),               # --> provider_id field
+    ('gbif_title', FieldContent.current_gbif),                  # --> record provider field
+    ('gbif_url', FieldContent.current_gbif),                    # --> provider_url field 
+    ('gbif_description', FieldContent.current_gbif), 
+    ('gbif_citation', FieldContent.current_gbif), 
+    ('gbif_created', FieldContent.current_gbif), 
+    ('gbif_modified', FieldContent.current_gbif), 
+)
+
+MERGED_RESOURCE_LUT_FIELDS = (
+    ('BISONProviderID', FieldContent.legacy_bison), 
+    ('name', FieldContent.legacy_bison), 
+    ('display_name', FieldContent.legacy_bison), 
+    ('description', FieldContent.legacy_bison), 
+    ('rights', FieldContent.legacy_bison), 
+    ('citation', FieldContent.legacy_bison), 
+    ('logo_url', FieldContent.legacy_bison), 
+    ('created', FieldContent.legacy_bison), 
+    ('modified', FieldContent.legacy_bison), 
+    ('deleted', FieldContent.legacy_bison), 
+    ('website_url', FieldContent.legacy_bison),
+    ('override_citation', FieldContent.legacy_bison), 
+    ('provider_id', FieldContent.legacy_bison),                 # BISON provider legacy id
+    # Query with legacy identifier second
+    ('OriginalResourceID', FieldContent.legacy_bison),          # BISON resource legacy id
+    ('BISONResourceID', FieldContent.legacy_bison),
+    # Query with UUID first
+    ('dataset_id', FieldContent.legacy_bison),                  # GBIF dataset UUID
+    ('owningorganization_id', FieldContent.legacy_bison),
+    ('provider_url', FieldContent.legacy_bison),
+    ('provider_name', FieldContent.legacy_bison),
+
+    ('gbif_datasetkey', FieldContent.current_gbif),             # GBIF dataset UUID
+    ('gbif_legacyid', FieldContent.current_gbif),               # --> resource_id field
+    ('gbif_publishingOrganizationKey', FieldContent.current_gbif), # GBIF organization UUID
+    ('gbif_title', FieldContent.current_gbif),                  # --> resource field
+    ('gbif_url', FieldContent.current_gbif),                    # --> resource_url field 
+    ('gbif_description', FieldContent.current_gbif), 
+    ('gbif_citation', FieldContent.current_gbif), 
+    ('gbif_created', FieldContent.current_gbif), 
+    ('gbif_modified', FieldContent.current_gbif), 
+)
+
 # BISON provider data from solr core
 BISON_PROVIDER_UNIQUE_COLS=('provider', 'resource_id', 'resource_url') 
 
