@@ -137,7 +137,7 @@ class GBIFMetaReader(object):
         try:
             rdr, inf = getCSVDictReader(dset_lut_fname, BISON_DELIMITER, ENCODING)
             for dset_data in rdr:
-                orgUUID = dset_data[GBIF_ORG_FOREIGN_KEY]
+                orgUUID = dset_data['gbif_publishingOrganizationKey']
                 org_uuids.add(orgUUID) 
         except Exception as e:
             print('Failed read {} ({})'.format(dset_lut_fname, e))
