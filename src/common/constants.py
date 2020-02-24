@@ -198,12 +198,11 @@ MERGED_RESOURCE_LUT_FIELDS = (
     ('website_url', FieldContent.legacy_bison),
     ('override_citation', FieldContent.legacy_bison), 
     ('provider_id', FieldContent.legacy_bison),                 # BISON provider legacy id
-    # Query with legacy identifier second
     ('OriginalResourceID', FieldContent.legacy_bison),          # BISON resource legacy id
     ('BISONResourceID', FieldContent.legacy_bison),
-    # Query with UUID first
+    # Query with UUID for GBIF dataload
     ('dataset_id', FieldContent.legacy_bison),                  # GBIF dataset UUID
-    ('owningorganization_id', FieldContent.legacy_bison),
+    ('owningorganization_id', FieldContent.legacy_bison),       # GBIF organization UUID
     ('provider_url', FieldContent.legacy_bison),
     ('provider_name', FieldContent.legacy_bison),
 
