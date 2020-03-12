@@ -31,8 +31,7 @@ from common.constants import (ITIS_SOLR_URL, ITIS_NAME_KEY, ITIS_TSN_KEY,
     
 # .............................................................................
 class ITISSvc(object):
-    """
-    @summary: Pulls data from the ITIS Solr service, documentation at:
+    """Class to pull data from the ITIS Solr service, documentation at:
               https://itis.gov/solr_documentation.html
     """
 # ...............................................
@@ -41,9 +40,7 @@ class ITISSvc(object):
     
 # ...............................................
     def _getDataFromUrl(self, url, resp_type='json'):
-        """
-        @summary: Return a JSON dictionary or ElementTree tree 
-        """
+        """Returns a JSON dictionary or ElementTree tree """
         data = None
         try:
             response = requests.get(url)
@@ -102,6 +99,11 @@ class ITISSvc(object):
 
 # ...............................................
     def get_itis_vernacular(self, tsn):
+        """Return vernacular names for an ITIS TSN.
+        
+        Args:
+            tsn: an ITIS code designating a taxonomic name
+        """
         common_names = []
         if tsn is not None:
             url = ITIS_VERNACULAR_QUERY + str(tsn)
@@ -114,12 +116,16 @@ class ITISSvc(object):
                     nelt = cnElt.find('{}commonName'.format(ITIS_DATA_NAMESPACE))
                     if nelt is not None and nelt.text is not None:
                         common_names.append(nelt.text)
-#                 print('Returned {} names {} for tsn {}'.format(len(common_names), 
-#                                                                common_names, tsn))
         return common_names
 
 # ...............................................
     def get_itis_name(self, tsn):
+        """Return an ITIS taxonomic name record for the first accepted name 
+        used for an ITIS TSN (possibly designating an unaccepted name).
+        
+        Args:
+            tsn: an ITIS code designating a taxonomic name
+        """
         accepted_name = kingdom = None
         url = '{}?q={}:{}&wt=json'.format(ITIS_SOLR_URL, ITIS_TSN_KEY, tsn)
         output = self._getDataFromUrl(url, resp_type='json')
@@ -135,20 +141,21 @@ class ITISSvc(object):
             docs = data['docs']
         except:
             raise Exception('Failed to return docs')
-#         print('Reported/returned {}/{} docs for tsn {}'.format(count, len(docs), tsn))
         for doc in docs:
             usage = doc['usage']
             if usage in ('accepted', 'valid'):
                 accepted_name = self._get_fld_value(doc, 'nameWOInd')
                 kingdom = self._get_fld_value(doc, 'kingdom')
-#                 print('Returned accepted_name {} {}, for tsn {}'
-#                       .format(accepted_name, kingdom, tsn))
-#             else:
-#                 print('Returned {} values for tsn {}'.format(usage, tsn))
         return accepted_name, kingdom
 
 # ...............................................
     def get_itis_tsn(self, sciname):
+        """Return an ITIS TSN and its accepted name and kingdom for a 
+        scientific name.
+        
+        Args:
+            sciname: a scientific name designating a taxon
+        """
         tsn = accepted_name = kingdom = None
         accepted_tsn_list = []
         escname = sciname
@@ -182,26 +189,3 @@ class ITISSvc(object):
 #             print('Returned tsn {} acceptedTSN list {}, {} for {} name {}'
 #                   .format(tsn, accepted_tsn_list, kingdom, usage, sciname))
         return tsn, accepted_name, kingdom, accepted_tsn_list
-
-
-"""
-import requests
-import xml.etree.ElementTree as ET
-
-from common.constants import (ITIS_SOLR_URL, ITIS_NAME_KEY, ITIS_TSN_KEY, 
-                              ITIS_VERNACULAR_QUERY, ITIS_URL_ESCAPES, 
-                              ITIS_NAMESPACE, W3_NAMESPACE)
-
-
-sciname = 'Enteromorpha clathrata'
-tsn = 173441
-invalidname = 'Rana catesbeiana'
-
-itis_svc = ITISSvc()
-
-tsn, accepted_name, kingdom, accepted_tsn_list = itis_svc.get_itis_tsn(sciname)
-tsn, accepted_name, kingdom, accepted_tsn_list = itis_svc.get_itis_tsn(invalidname)
-
-
-
-"""
