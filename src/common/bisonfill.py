@@ -356,6 +356,11 @@ class BisonFiller(object):
         return lon, lat
 
     # ...............................................
+    def _fix_itis_kingdoms(self, itistsns):
+        for key, vals in itistsns.lut.iteritems:
+            itistsns.lut[key]['kingdom'] = vals['kingdom'].strip()
+        
+    # ...............................................
     def update_itis_estmeans_centroid(self, itis2_lut_fname, estmeans_fname, 
                                       terrestrial_shpname, outfname, 
                                       fromGbif=True):
@@ -382,6 +387,7 @@ class BisonFiller(object):
         # hierarchy_string, common_name, amb, kingdom
         itistsns = Lookup.initFromFile(itis2_lut_fname, 'scientific_name', ',', 
                                        valtype=VAL_TYPE.DICT, encoding=ENCODING)
+        self._fix_itis_kingdoms(itistsns)
         estmeans = self._read_estmeans_lookup(estmeans_fname)
         centroids = self._read_centroid_lookup(terrestrial_shpname)
 
@@ -582,12 +588,6 @@ class BisonFiller(object):
         if ctry and ctry not in ISO_COUNTRY_CODES:
             self._log.error('Record {}, {}, has invalid iso_country_code {}'
                             .format(recno, squid, ctry))
-        
-    # ...............................................
-    def _fill_bison_provider_fields(self, rec):
-        king = rec['kingdom']
-        if king and king.lower() in ITIS_KINGDOMS:
-            rec['kingdom'] = king.capitalize()
         
     # ...............................................
     def _test_name(self, rec, recno, squid, bad_name_chars):
