@@ -24,7 +24,7 @@
 import os
 import time
 
-from common.constants import (ANCILLARY_DELIMITER, BISON_DELIMITER, ENCODING, 
+from common.constants import (BISON_DELIMITER, ENCODING, 
         LOGINTERVAL, PROHIBITED_VALS, LEGACY_ID_DEFAULT, EXTRA_VALS_KEY,
         BISON_ORDERED_DATALOAD_FIELDS, BISON_IPT_PREFIX, 
         MERGED_RESOURCE_LUT_FIELDS, MERGED_PROVIDER_LUT_FIELDS)
@@ -34,8 +34,7 @@ from common.tools import (getCSVReader, getCSVDictReader, getCSVWriter,
 
 from gbif.constants import (GBIF_DELIMITER, TERM_CONVERT, META_FNAME, 
                             BISON_GBIF_MAP, OCC_ID_FLD,
-                            CLIP_CHAR, GBIF_UUID_KEY,
-                            BISON_ORG_UUID, 
+                            CLIP_CHAR, BISON_ORG_UUID, 
                             GBIF_CONVERT_TEMP_FIELDS, GBIF_NAMEKEY_TEMP_FIELD)
 from gbif.gbifmeta import GBIFMetaReader
 from gbif.gbifapi import GbifAPI
@@ -111,7 +110,7 @@ class GBIFReader(object):
             
     # ...............................................
     def _replace_resource_vals(self, rec, dataset_by_uuid):
-        # GBIF Dataset maps to BISON resource, values from datasets LUT  
+        # GBIF Dataset <--> BISON resource, values from datasets LUT  
         # LUT = BISON resource table merged with GBIF dataset API
         # Header in MERGED_RESOURCE_LUT_FIELDS
         dskey = rec['datasetKey']
@@ -142,14 +141,14 @@ class GBIFReader(object):
                 if legacy_dataset_id is None or legacy_dataset_id == '':
                     legacy_dataset_id = ds_metavals['gbif_legacyid']
                 # Save title and url from GBIF-returned value
-                res_title = ds_metavals['gbif_title']
-                res_meta_url = ds_metavals['gbif_url']
+                dataset_title = ds_metavals['gbif_title']
+                dataset_meta_url = ds_metavals['gbif_url']
                     
                 if gbif_org_uuid == BISON_ORG_UUID:
-                    if (res_meta_url is not None 
-                          and res_meta_url.startswith(BISON_IPT_PREFIX)):
+                    if (dataset_meta_url is not None 
+                          and dataset_meta_url.startswith(BISON_IPT_PREFIX)):
                         self._log.info('Discard rec {}: dataset URL {}'
-                                       .format(rec[OCC_ID_FLD], res_meta_url))
+                                       .format(rec[OCC_ID_FLD], dataset_meta_url))
                         rec = None
                 else:
                     # Log other bison urls
@@ -158,9 +157,10 @@ class GBIFReader(object):
                                        .format(rec[OCC_ID_FLD], gbif_org_uuid, 
                                                res_meta_url))
         if rec is not None:
-            rec['resource_id'] = legacy_dataset_id
-            rec['resource'] = res_title
-            rec['resource_url'] = res_meta_url
+            bison_resource_id = '{},{}'.format(legacy_org_id, legacy_dataset_id)
+            rec['resource_id'] = bison_resource_id
+            rec['resource'] = dataset_title
+            rec['resource_url'] = dataset_meta_url
                             
         return gbif_org_uuid, legacy_org_id
 
@@ -514,7 +514,7 @@ class GBIFReader(object):
         
         try:
             extravals = grec[EXTRA_VALS_KEY]
-        except Exception as e:
+        except Exception:
             pass
         else:
             self._log.warning("""Data misalignment? 
@@ -1068,9 +1068,9 @@ class GBIFReader(object):
                 for key, ddict in merged_datasets.lut.items():
                     try:
                         org_uuids.add(ddict['gbif_publishingOrganizationKey'])
-                    except Exception as e:
+                    except Exception:
                         print('No publishingOrganizationKey in dataset {}'.format(key))
-            except Exception as e:             
+            except Exception:             
                 gmetardr = GBIFMetaReader(self._log)
                 org_uuids = gmetardr.get_organization_uuids(
                     merged_dataset_lut_fname)
@@ -1104,7 +1104,7 @@ class GBIFReader(object):
                                        .format(count, lut_fname))
                         names_resolved.append(badname)
                         break
-        except Exception as e:
+        except Exception:
             pass
         finally:
             f.close()
@@ -1119,33 +1119,38 @@ class GBIFReader(object):
         tot = 1000
         name_dict = {}
         name_fails = []
-        csvwriter, f = getCSVWriter(lut_fname, delimiter, ENCODING, fmode='w')
-        header = ['provided_scientific_name_or_taxon_key', 'clean_provided_scientific_name']
-        csvwriter.writerow(header)
-        gbifapi = GbifAPI()
-        while namelst:
-            # Write first 1000, then delete first 1000
-            currnames = namelst[:tot]
-            namelst = namelst[tot:]
-            # Get, write parsed names
-            parsed_names, currfail = gbifapi.get_parsednames(currnames)
-            # If > 10% fail, test for BOLD or pause
-            fail_rate = len(currfail) / tot
-            if fail_rate > 0.1:
-                non_sn_count = 0
-                for sn in currfail:
-                    if sn.find(':') >= 0:
-                        non_sn_count += 1
-                non_sn_rate = non_sn_count / len(currfail)
-                if non_sn_rate < 0.8:
-                    time.sleep(10)
-                    parsed_names, currfail = gbifapi.get_parsednames(currnames)
-            name_fails.extend(currfail)
-            for sciname, canonical in parsed_names.items():
-                name_dict[sciname] = canonical
-                csvwriter.writerow([sciname, canonical])
-            self._log.info('Wrote {} sciname/canonical pairs ({} failed) to {}'
-                           .format(len(parsed_names), len(currfail), lut_fname))
+        try:
+            csvwriter, f = getCSVWriter(lut_fname, delimiter, ENCODING, fmode='w')
+            header = ['provided_scientific_name_or_taxon_key', 'clean_provided_scientific_name']
+            csvwriter.writerow(header)
+            gbifapi = GbifAPI()
+            while namelst:
+                # Write first 1000, then delete first 1000
+                currnames = namelst[:tot]
+                namelst = namelst[tot:]
+                # Get, write parsed names
+                parsed_names, currfail = gbifapi.get_parsednames(currnames)
+                # If > 10% fail, test for BOLD or pause
+                fail_rate = len(currfail) / tot
+                if fail_rate > 0.1:
+                    non_sn_count = 0
+                    for sn in currfail:
+                        if sn.find(':') >= 0:
+                            non_sn_count += 1
+                    non_sn_rate = non_sn_count / len(currfail)
+                    if non_sn_rate < 0.8:
+                        time.sleep(10)
+                        parsed_names, currfail = gbifapi.get_parsednames(currnames)
+                name_fails.extend(currfail)
+                for sciname, canonical in parsed_names.items():
+                    name_dict[sciname] = canonical
+                    csvwriter.writerow([sciname, canonical])
+                self._log.info('Wrote {} sciname/canonical pairs ({} failed) to {}'
+                               .format(len(parsed_names), len(currfail), lut_fname))
+        except Exception as e:
+            self._log.error('Failed writing parsed names {}'.format(e))
+        finally:
+            f.close()
         return name_dict, name_fails
             
             
