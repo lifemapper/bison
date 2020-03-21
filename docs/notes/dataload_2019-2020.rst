@@ -338,3 +338,8 @@ Misc Notes:
 
 * Use ‘$’ delimiter in CSV output
 
+
+>>> len(terrfeats)
+3527
+>>> len(marfeats)
+250

@@ -129,10 +129,10 @@ class BisonFiller(object):
         terr_data_src = driver.Open(terrestrial_shpname, 0)
         terrlyr = terr_data_src.GetLayer()
         terr_def = terrlyr.GetLayerDefn()
-        idx_fips = terr_def.GetFieldIndex('FIPS')
-        idx_cnty = terr_def.GetFieldIndex('COUNTY_NAM')
-        idx_st = terr_def.GetFieldIndex('STATE_NAME')
-        idx_centroid = terr_def.GetFieldIndex('centroid')
+        idx_fips = terr_def.GetFieldIndex('B_FIPS')
+        idx_cnty = terr_def.GetFieldIndex('B_COUNTY')
+        idx_st = terr_def.GetFieldIndex('B_STATE')
+        idx_centroid = terr_def.GetFieldIndex('B_CENTROID')
 
         centroids = None
         datadict = {}
@@ -200,29 +200,33 @@ class BisonFiller(object):
         pt = ogr.Geometry(ogr.wkbPoint)
         pt.AddPoint(lon, lat)
         
-        for tfid in list(terrindex.intersection((lon, lat))):
-    #         feat = terrfeats[tfid]['feature']
-    #         geom = feat.GetGeometryRef()
+        terr_intersect_fids = list(terrindex.intersection((lon, lat)))
+        for tfid in terr_intersect_fids:
             geom = terrfeats[tfid]['geom']
             if pt.Within(geom):
-                if terr_count == 0:
-                    terr_count += 1
+                terr_count += 1
+                # If intersects, take values for first polygon
+                if terr_count == 1:
                     for fn in terr_bison_fldnames:
                         fldvals[fn] = terrfeats[tfid][fn]
+                # If > 1 polygon, clear all values
                 else:
-                    terr_count = 0
                     fldvals = {}
-                    break     
-        # Single terrestrial polygon takes precedence
-        if terr_count == 0:
-            for mfid in list(marindex.intersection((lon, lat))):
-                if marine_count == 0:
-                    marine_count += 1
+                    break
+
+        mar_intersect_fids = list(marindex.intersection((lon, lat)))
+        for mfid in mar_intersect_fids:
+            geom = marfeats[mfid]['geom']
+            if pt.Within(geom):
+                marine_count += 1
+                # If intersects, take values for first polygon
+                if marine_count == 1:
                     for fn in mar_bison_fldnames:
                         fldvals[fn] = marfeats[mfid][fn]
+                # If > 1 polygon, clear marine values (leave terr)
                 else:
-                    marine_count = 0
-                    fldvals = {}
+                    for fn in mar_bison_fldnames:
+                        fldvals[fn] = None
                     break
         # Update record with resolved values for intersecting polygons
         for name, val in fldvals.items():
@@ -357,7 +361,7 @@ class BisonFiller(object):
 
     # ...............................................
     def _fix_itis_kingdoms(self, itistsns):
-        for key, vals in itistsns.lut.iteritems:
+        for key, vals in itistsns.lut.items():
             itistsns.lut[key]['kingdom'] = vals['kingdom'].strip()
         
     # ...............................................
@@ -436,27 +440,49 @@ class BisonFiller(object):
             inf.close()
             outf.close()
             
+#     # ...............................................    
+#     def _create_spatial_index(self, geodata, lyr):
+#         lyr_def = lyr.GetLayerDefn()
+#         fldindexes = []
+#         bisonfldnames = []
+#         for geofld, bisonfld in geodata['fields']:
+#             geoidx = lyr_def.GetFieldIndex(geofld)
+#             fldindexes.append((bisonfld, geoidx))
+#             bisonfldnames.append(bisonfld)
+#             
+#         spindex = rtree.index.Index(interleaved=False)
+#         spfeats = {}
+#         for fid in range(0, lyr.GetFeatureCount()):
+#             feat = lyr.GetFeature(fid)
+#             geom = feat.geometry()
+#             xmin, xmax, ymin, ymax = geom.GetEnvelope()
+#             spindex.insert(fid, (xmin, xmax, ymin, ymax))
+#             spfeats[fid] = {'feature': feat, 
+#                             'geom': geom}
+#             for name, idx in fldindexes:
+#                 spfeats[fid][name] = feat.GetFieldAsString(idx)
+#         return spindex, spfeats, bisonfldnames
+
     # ...............................................    
-    def _create_spatial_index(self, geodata, lyr):
-        terr_def = lyr.GetLayerDefn()
-        fldindexes = []
+    def _create_spatial_index(self, flddata, lyr):
         bisonfldnames = []
-        for geofld, bisonfld in geodata['fields']:
-            geoidx = terr_def.GetFieldIndex(geofld)
-            fldindexes.append((bisonfld, geoidx))
+        for reffld, bisonfld in flddata:
             bisonfldnames.append(bisonfld)
             
         spindex = rtree.index.Index(interleaved=False)
         spfeats = {}
-        for fid in range(0, lyr.GetFeatureCount()):
-            feat = lyr.GetFeature(fid)
+        feat = lyr.GetNextFeature()
+        while feat is not None:
+            fid = feat.GetFID()
             geom = feat.GetGeometryRef()
+            # GetEnvelope returns ordering:  minX, maxX, minY, maxY
             xmin, xmax, ymin, ymax = geom.GetEnvelope()
+            # Interleaved = False requires: minX, maxX, minY, maxY
             spindex.insert(fid, (xmin, xmax, ymin, ymax))
             spfeats[fid] = {'feature': feat, 
                             'geom': geom}
-            for name, idx in fldindexes:
-                spfeats[fid][name] = feat.GetFieldAsString(idx)
+            for reffld, bisonfld in flddata:
+                spfeats[fid][bisonfld] = feat.GetFieldAsString(reffld)
         return spindex, spfeats, bisonfldnames
 
             
@@ -481,19 +507,19 @@ class BisonFiller(object):
             self.close()
         driver = ogr.GetDriverByName("ESRI Shapefile")
 
-        terr_geodata = ANCILLARY_FILES['terrestrial']
-        terrestrial_shpname = os.path.join(ancillary_path, terr_geodata['file'])
+        terr_data = ANCILLARY_FILES['terrestrial']
+        terrestrial_shpname = os.path.join(ancillary_path, terr_data['file'])
         terr_data_src = driver.Open(terrestrial_shpname, 0)
         terrlyr = terr_data_src.GetLayer()
         terrindex, terrfeats, terr_bison_fldnames = \
-            self._create_spatial_index(terr_geodata, terrlyr)
+            self._create_spatial_index(terr_data['fields'], terrlyr)
         
-        marine_geodata = ANCILLARY_FILES['marine']
-        marine_shpname = os.path.join(ancillary_path, marine_geodata['file'])
+        marine_data = ANCILLARY_FILES['marine']
+        marine_shpname = os.path.join(ancillary_path, marine_data['file'])
         eez_data_src = driver.Open(marine_shpname, 0)
         eezlyr = eez_data_src.GetLayer()
         marindex, marfeats, mar_bison_fldnames = \
-            self._create_spatial_index(marine_geodata, eezlyr)
+            self._create_spatial_index(marine_data['fields'], eezlyr)
 
         recno = 0
         try:
@@ -516,7 +542,7 @@ class BisonFiller(object):
                 writer.writerow(row)
                 # Log progress occasionally, this process is very time-consuming
                 # so show progress at shorter intervals to ensure it is moving
-                if (recno % (LOGINTERVAL/10)) == 0:
+                if (recno % 10) == 0:
                     self._log.info('*** Record number {} ***'.format(recno))
                                     
         except Exception as e:
