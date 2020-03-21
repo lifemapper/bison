@@ -24,7 +24,8 @@
 import os
 
 from common.bisonfill import BisonFiller
-from common.constants import BISON_DELIMITER, BISON_PROVIDER, ProviderActions
+from common.constants import (BISON_DELIMITER, ANCILLARY_DIR, ANCILLARY_FILES, 
+                              ProviderActions)
 from common.tools import getLogger
 
 from gbif.gbifmod import GBIFReader
@@ -123,15 +124,20 @@ if __name__ == '__main__':
     os.makedirs(tmppath, mode=0o775, exist_ok=True)
     os.makedirs(outpath, mode=0o775, exist_ok=True)
 
-    # ancillary data for record update
-    ancillary_path = os.path.join(datapth, 'ancillary')
-    terrestrial_shpname = os.path.join(ancillary_path, 'US_CA_Counties_Centroids.shp')
-    estmeans_fname = os.path.join(ancillary_path, 'NonNativesIndex20190912.txt')
-    marine_shpname = os.path.join(ancillary_path, 'World_EEZ_v8_20140228_splitpolygons/World_EEZ_v8_2014_HR.shp')
-    itis2_lut_fname = os.path.join(ancillary_path, 'itis_lookup.csv')
-    # Old data from July 2019
-    resource_lut_fname = os.path.join(ancillary_path, 'resource.csv')
-    provider_lut_fname = os.path.join(ancillary_path, 'provider.csv')
+    # ancillary data for record update    
+    ancillary_path = os.path.join(datapth, ANCILLARY_DIR)
+    terrestrial_shpname = os.path.join(ancillary_path, 
+                                       ANCILLARY_FILES['terrestrial']['file'])
+    estmeans_fname = os.path.join(ancillary_path, 
+                                  ANCILLARY_FILES['establishment_means']['file'])
+#     marine_shpname = os.path.join(ancillary_path, 
+#                                   ANCILLARY_FILES['marine']['file'])
+    itis2_lut_fname = os.path.join(ancillary_path, 
+                                   ANCILLARY_FILES['itis']['file'])
+    resource_lut_fname = os.path.join(ancillary_path, 
+                                      ANCILLARY_FILES['resource']['file'])
+    provider_lut_fname = os.path.join(ancillary_path,
+                                      ANCILLARY_FILES['provider']['file'])
         
     if step in [1,2,3,4]:
         # Files of name lookup and list for creation 
