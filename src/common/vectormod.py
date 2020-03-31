@@ -38,7 +38,6 @@ from common.constants import (BISON_DELIMITER, ENCODING, LOGINTERVAL,
                               ISO_COUNTRY_CODES, BISON_ORDERED_DATALOAD_FIELDS)
 from common.lookup import Lookup, VAL_TYPE
 from common.tools import (getCSVDictReader, open_csv_files, getLogger)
-from builtins import None, False
 
 filepath = '/tank/data/bison/2019/ancillary'
 overwrite = True

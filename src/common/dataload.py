@@ -51,7 +51,7 @@ if __name__ == '__main__':
                         are not present in the same directory as the raw data, 
                         they will be  created for temp and final output files.
                         """)
-    parser.add_argument('--step', type=int, default=1, choices=[1,2,3,4,5,10],
+    parser.add_argument('--step', type=int, default=1, choices=[1,2,3,4,5,10, 13],
                         help="""
                         Step number for data processing:
                            1: Only for GBIF data. 
@@ -112,7 +112,7 @@ if __name__ == '__main__':
 
     inpath = occ_file_or_path
     logbasename = 'step{}'.format(step)
-    if step in [1,2,3,4,10]:
+    if step != 5:
         occ_fname = occ_file_or_path
         inpath, basefname_wext = os.path.split(occ_file_or_path)
         basefname, ext = os.path.splitext(basefname_wext)
@@ -126,31 +126,32 @@ if __name__ == '__main__':
 
     # ancillary data for record update    
     ancillary_path = os.path.join(datapth, ANCILLARY_DIR)
-    terrestrial_shpname = os.path.join(ancillary_path, 
-                                       ANCILLARY_FILES['terrestrial']['file'])
-    estmeans_fname = os.path.join(ancillary_path, 
-                                  ANCILLARY_FILES['establishment_means']['file'])
+    centroid_shpname = os.path.join(
+        ancillary_path, ANCILLARY_FILES['centroid']['file'])
+    terrestrial_shpname = os.path.join(
+        ancillary_path, ANCILLARY_FILES['terrestrial']['file'])
+    estmeans_fname = os.path.join(
+        ancillary_path, ANCILLARY_FILES['establishment_means']['file'])
 #     marine_shpname = os.path.join(ancillary_path, 
 #                                   ANCILLARY_FILES['marine']['file'])
-    itis2_lut_fname = os.path.join(ancillary_path, 
-                                   ANCILLARY_FILES['itis']['file'])
-    resource_lut_fname = os.path.join(ancillary_path, 
-                                      ANCILLARY_FILES['resource']['file'])
-    provider_lut_fname = os.path.join(ancillary_path,
-                                      ANCILLARY_FILES['provider']['file'])
+    itis2_lut_fname = os.path.join(
+        ancillary_path, ANCILLARY_FILES['itis']['file'])
+    resource_lut_fname = os.path.join(
+        ancillary_path, ANCILLARY_FILES['resource']['file'])
+    provider_lut_fname = os.path.join(
+        ancillary_path, ANCILLARY_FILES['provider']['file'])
         
-    if step in [1,2,3,4]:
-        # Files of name lookup and list for creation 
-        nametaxa_fname = os.path.join(tmppath, 'step1_{}_sciname_taxkey_list.csv'.format(basefname))
-        canonical_lut_fname = os.path.join(tmppath, 'step2_{}_canonical_lut.csv'.format(basefname))        
-        # Output CSV files of all records after initial creation or field replacements
-        pass1_fname = os.path.join(tmppath, 'step1_{}.csv'.format(basefname))
-        pass2_fname = os.path.join(tmppath, 'step2_{}.csv'.format(basefname))
-        pass3_fname = os.path.join(tmppath, 'step3_{}.csv'.format(basefname))
-        pass4_fname = os.path.join(tmppath, 'step4_{}.csv'.format(basefname))    
-        # OUTPUT filenames for merged dataset/resource and organization/provider lookups
-        merged_dataset_lut_fname = os.path.join(tmppath, 'merged_dataset_lut.csv')
-        merged_org_lut_fname = os.path.join(tmppath, 'merged_organization_lut.csv')
+    # Files of name lookup and list for creation 
+    nametaxa_fname = os.path.join(tmppath, 'step1_{}_sciname_taxkey_list.csv'.format(basefname))
+    canonical_lut_fname = os.path.join(tmppath, 'step2_{}_canonical_lut.csv'.format(basefname))        
+    # Output CSV files of all records after initial creation or field replacements
+    pass1_fname = os.path.join(tmppath, 'step1_{}.csv'.format(basefname))
+    pass2_fname = os.path.join(tmppath, 'step2_{}.csv'.format(basefname))
+    pass3_fname = os.path.join(tmppath, 'step3_{}.csv'.format(basefname))
+    pass4_fname = os.path.join(tmppath, 'step4_{}.csv'.format(basefname))    
+    # OUTPUT filenames for merged dataset/resource and organization/provider lookups
+    merged_dataset_lut_fname = os.path.join(tmppath, 'merged_dataset_lut.csv')
+    merged_org_lut_fname = os.path.join(tmppath, 'merged_organization_lut.csv')
     
     if not os.path.exists(occ_file_or_path):
         raise Exception('File or path {} does not exist'.format(occ_file_or_path))
@@ -186,12 +187,12 @@ if __name__ == '__main__':
             # Pass 3 of CSV transform
             # Use Derek D. generated ITIS lookup itis2_lut_fname
             bf.update_itis_estmeans_centroid(itis2_lut_fname, estmeans_fname, 
-                                             terrestrial_shpname, pass3_fname, 
+                                             centroid_shpname, pass3_fname, 
                                              fromGbif=True)
         elif step == 4:
             bf = BisonFiller(pass3_fname, log=logger)
             # Pass 4 of CSV transform, final step, point-in-polygon intersection
-            bf.update_point_in_polygons(ancillary_path, pass4_fname, fromGbif=True)
+            bf.update_point_in_polygons(ancillary_path, pass4_fname)
             
         elif step == 5:
             merger = BisonMerger(outpath, logger)
@@ -231,55 +232,71 @@ if __name__ == '__main__':
                         # Step 3: of CSV transform
                         # Use Derek D. generated ITIS lookup itis2_lut_fname
                         bf = BisonFiller(outfile2, log=logger)
-                        bf.update_point_in_polygons(ancillary_path, outfile3, fromGbif=False)
+                        bf.update_point_in_polygons(ancillary_path, outfile3)
 
         elif step == 10:
             bf = BisonFiller(pass3_fname, log=logger)
             # Pass 3 of CSV transform
             # Use Derek D. generated ITIS lookup itis2_lut_fname
             bf.test_bison_outfile(fromGbif=True)
+        elif step == 13:
+            bf = BisonFiller(pass3_fname, log=logger)
+            # Pass 4 of CSV transform, final step, point-in-polygon intersection
+            ((terr_data_src, terrlyr, terrindex, terrfeats, terr_bison_fldnames), 
+             (eez_data_src, eezlyr, marindex, marfeats, 
+              mar_bison_fldnames)) = bf.test_point_in_polygons(
+                  ancillary_path, pass4_fname)
 """
 
 # /tank/data/bison/2019/Terr/occurrence_lines_5000-10000.csv --step=4
 
-inpath = '/tank/data/bison/2019/provider'
-
-for resource_id, pvals in BISON_PROVIDER.items():
-    fname = pvals['filename']
-    if fname is None:
-        fname = 'bison_{}.csv'.format(resource_id)
-    infile = os.path.join(inpath, fname)
-    if not os.path.exists(infile):
-        print('File {} does not exist for {}'
-              .format(fname, resource_id))
-
-wc -l occurrence.txt 
-71057978 occurrence.txt
-wc -l tmp/step1.csv 
-1577732 tmp/step1.csv
-
-python3.6 \
-  /state/partition1/git/bison/src/common/dataload.py \
-  /tank/data/bison/2019/provider --step=5 
-
-/tank/data/bison/2019/Terr/occurrence_lines_1-10000001.csv --step=1
-
 import os
-from osgeo import ogr 
-import time
+from common.bisonfill import BisonFiller
+from common.constants import (BISON_DELIMITER, ANCILLARY_DIR, ANCILLARY_FILES, 
+                              ProviderActions)
+from common.tools import getLogger
+from gbif.gbifmod import GBIFReader
+from provider.providermod import BisonMerger
 
-from gbif.constants import (GBIF_DELIMITER, BISON_DELIMITER, PROHIBITED_VALS, 
-                            TERM_CONVERT, ENCODING, META_FNAME,
-                            BISON_GBIF_MAP, OCC_ID_FLD, DISCARD_FIELDS,
-                            CLIP_CHAR, GBIF_UUID_KEY)
-from gbif.gbifmeta import GBIFMetaReader
-from common.tools import (getCSVReader, getCSVDictReader, 
-                        getCSVWriter, getCSVDictWriter, getLine, getLogger)
-from gbif.gbifapi import GbifAPI
-from pympler import asizeof
+occ_file_or_path = '/tank/data/bison/2019/Terr/occurrence_lines_30000001-40000001.csv'
+occ_file_or_path = '/tank/data/bison/2019/Terr/occurrence_lines_5000-10000.csv'
+step = 4
 
-ENCODING = 'utf-8'
-BISON_DELIMITER = '$'
+inpath, basefname_wext = os.path.split(occ_file_or_path)
+basefname, ext = os.path.splitext(basefname_wext)
+datapth, _ = os.path.split(inpath)
+tmppath = os.path.join(inpath, 'tmp')
+ancillary_path = os.path.join(datapth, ANCILLARY_DIR)
+terrestrial_shpname = os.path.join(
+    ancillary_path, ANCILLARY_FILES['terrestrial']['file'])
+estmeans_fname = os.path.join( 
+    ancillary_path, ANCILLARY_FILES['establishment_means']['file'])
+itis2_lut_fname = os.path.join( 
+    ancillary_path, ANCILLARY_FILES['itis']['file'])
 
+pass2_fname = os.path.join(tmppath, 'step2_{}.csv'.format(basefname))
+pass3_fname = os.path.join(tmppath, 'step3_{}.csv'.format(basefname))
+pass4_fname = os.path.join(tmppath, 'step4_{}.csv'.format(basefname))    
+
+logbasename = 'step{}_{}'.format(step, basefname)
+logfname = os.path.join(tmppath, '{}.log'.format(logbasename))
+logger = getLogger(logbasename, logfname)
+
+# TEST step 13
+self = BisonFiller(pass3_fname, log=logger)
+# TEST - go to BisonFiller code
+
+
+
+
+# step 3
+bf = BisonFiller(pass2_fname, log=logger)
+bf.update_itis_estmeans_centroid(itis2_lut_fname, estmeans_fname, 
+                                             terrestrial_shpname, pass3_fname, 
+                                             fromGbif=True)
+
+# step 4
+bf = BisonFiller(pass3_fname, log=logger)
+bf.update_point_in_polygons(ancillary_path, pass4_fname)
 
 """

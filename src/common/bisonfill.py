@@ -127,6 +127,7 @@ class BisonFiller(object):
         '''
         driver = ogr.GetDriverByName("ESRI Shapefile")
         terr_data_src = driver.Open(terrestrial_shpname, 0)
+        time.sleep(30)
         terrlyr = terr_data_src.GetLayer()
         terr_def = terrlyr.GetLayerDefn()
         idx_fips = terr_def.GetFieldIndex('B_FIPS')
@@ -171,36 +172,17 @@ class BisonFiller(object):
             except Exception:
                 pass
             
-#     # ...............................................
-#     def _open_files(self, infname, outfname=None):
-#         '''
-#         @summary: Open BISON-created CSV data for reading, 
-#                   new output file for writing
-#         '''
-#         # Open incomplete BISON CSV file as input
-#         self._log.info('Open input file {}'.format(infname))
-#         drdr, inf = getCSVDictReader(infname, BISON_DELIMITER, ENCODING)
-#         self._files.append(inf)
-#         # Optional new BISON CSV output file
-#         dwtr = None
-#         if outfname:
-#             self._log.info('Open output file {}'.format(outfname))
-#             dwtr, outf = getCSVWriter(outfname, BISON_DELIMITER, ENCODING)
-#             dwtr.writerow(self._outfields)
-#             self._files.append(outf)
-#         return drdr, dwtr
-#             
     # ...............................................
     def _fill_geofields(self, rec, lon, lat, 
                         terrindex, terrfeats, terr_bison_fldnames,
                         marindex, marfeats, mar_bison_fldnames):
         fldvals = {}
-        terr_count = 0
-        marine_count = 0
         pt = ogr.Geometry(ogr.wkbPoint)
         pt.AddPoint(lon, lat)
         
+#         start = time.time()
         terr_intersect_fids = list(terrindex.intersection((lon, lat)))
+        terr_count = 0
         for tfid in terr_intersect_fids:
             geom = terrfeats[tfid]['geom']
             if pt.Within(geom):
@@ -213,21 +195,27 @@ class BisonFiller(object):
                 else:
                     fldvals = {}
                     break
+        
+        if terr_count != 1:
+            mar_intersect_fids = list(marindex.intersection((lon, lat)))
+            marine_count = 0
+            for mfid in mar_intersect_fids:
+                geom = marfeats[mfid]['geom']
+                if pt.Within(geom):
+                    marine_count += 1
+                    # If intersects, take values for first polygon
+                    if marine_count == 1:
+                        for fn in mar_bison_fldnames:
+                            fldvals[fn] = marfeats[mfid][fn]
+                    # If > 1 polygon, clear marine values (leave terr)
+                    else:
+                        for fn in mar_bison_fldnames:
+                            fldvals[fn] = None
+                        break
+#             stop = time.time()
+#             elapsed = stop - start
+#             self._log.info('Time for intersect {}'.format(elapsed))
 
-        mar_intersect_fids = list(marindex.intersection((lon, lat)))
-        for mfid in mar_intersect_fids:
-            geom = marfeats[mfid]['geom']
-            if pt.Within(geom):
-                marine_count += 1
-                # If intersects, take values for first polygon
-                if marine_count == 1:
-                    for fn in mar_bison_fldnames:
-                        fldvals[fn] = marfeats[mfid][fn]
-                # If > 1 polygon, clear marine values (leave terr)
-                else:
-                    for fn in mar_bison_fldnames:
-                        fldvals[fn] = None
-                    break
         # Update record with resolved values for intersecting polygons
         for name, val in fldvals.items():
             rec[name] = val
@@ -243,11 +231,17 @@ class BisonFiller(object):
             try:
                 lon, lat = centroids.lut[key]
             except:
-                pass
+                self._log.info('Missing county centroid for {}'.format(key))
             else:
                 rec['longitude'] = lon
                 rec['latitude'] = lat
                 rec['centroid'] = 'county'
+                self._log.info('Filled county centroid {}, {}'.format(lon, lat))
+        # No lon/lat and no fips or state/county 
+        else:
+            rec = None
+            self._log.info('No info for county centroid {}, {}, {}'.format(
+                pfips, pcounty, pstate))
 
 #     # ...............................................
 #     def _get_itisfields(self, name, itis_svc):
@@ -427,8 +421,9 @@ class BisonFiller(object):
 #                 if not fromGbif:
 #                     self._fill_bison_provider_fields(rec)
                 # Write updated record
-                row = self._makerow(rec)
-                writer.writerow(row)
+                if lon is not None:
+                    row = self._makerow(rec)
+                    writer.writerow(row)
                 # Log progress occasionally
                 if (recno % LOGINTERVAL) == 0:
                     self._log.info('*** Record number {} ***'.format(recno))
@@ -475,6 +470,8 @@ class BisonFiller(object):
         while feat is not None:
             fid = feat.GetFID()
             geom = feat.GetGeometryRef()
+#             self._log.info('  {} Geometry {} count {}'.format(
+#                 fid, geom.GetGeometryName(), geom.GetGeometryCount()))
             # GetEnvelope returns ordering:  minX, maxX, minY, maxY
             xmin, xmax, ymin, ymax = geom.GetEnvelope()
             # Interleaved = False requires: minX, maxX, minY, maxY
@@ -483,11 +480,12 @@ class BisonFiller(object):
                             'geom': geom}
             for reffld, bisonfld in flddata:
                 spfeats[fid][bisonfld] = feat.GetFieldAsString(reffld)
+            feat = lyr.GetNextFeature()
         return spindex, spfeats, bisonfldnames
 
             
     # ...............................................
-    def update_point_in_polygons(self, ancillary_path, outfname, fromGbif=True):
+    def update_point_in_polygons(self, ancillary_path, outfname):
         """
         @summary: Process a CSV file with 47 ordered BISON fields (and optional
                   gbifID field for GBIF provided data) to 
@@ -527,24 +525,33 @@ class BisonFiller(object):
                                              BISON_DELIMITER, ENCODING, 
                                              outfname=outfname, 
                                              outfields=self._outfields)
+            start = time.time()
+            int_start = start
             for rec in dict_reader:
                 recno += 1
                 squid = rec[BISON_SQUID_FLD]
                 lon, lat = self._get_coords(rec)
                 # Use coordinates to calc 
-                if lon is not None:
+                if lon is None:
+                    print('wtf {}'.format(squid))
+                else:
                     # Compute geo: coordinates and polygons
                     self._fill_geofields(rec, lon, lat, 
                                          terrindex, terrfeats, terr_bison_fldnames,
                                          marindex, marfeats, mar_bison_fldnames)
-                # Write updated record
-                row = self._makerow(rec)
-                writer.writerow(row)
+                    # Write updated record
+                    row = self._makerow(rec)
+                    writer.writerow(row)
                 # Log progress occasionally, this process is very time-consuming
                 # so show progress at shorter intervals to ensure it is moving
-                if (recno % 10) == 0:
-                    self._log.info('*** Record number {} ***'.format(recno))
-                                    
+                if (recno % 1000) == 0:
+                    int_stop = time.time()
+                    self._log.info('*** Record number {}, elapsed {} ***'.format(
+                        recno, int_start - int_stop))
+                    int_start = int_stop
+            self._log.info('*** Total recs {}, total time {} ***'.format(
+                        recno, start - int_stop))
+            
         except Exception as e:
             self._log.error('Failed filling data from id {}, line {}: {}'
                             .format(squid, recno, e))                    
@@ -552,6 +559,78 @@ class BisonFiller(object):
             inf.close()
             outf.close()
             
+    # ...............................................
+    def test_point_in_polygons(self, ancillary_path, outfname):
+        """
+        @summary: Process a CSV file with 47 ordered BISON fields (and optional
+                  gbifID field for GBIF provided data) to 
+                  1) fill itis_tsn, valid_accepted_scientific_name, 
+                     valid_accepted_tsn, itis_common_name, kingdom (if blank) 
+                     with ITIS values based on clean_provided_scientific_name, 
+                  2) georeference records without coordinates or re-georeference 
+                     records previously georeferenced to county centroid, 
+                  3) fill terrestrial (state/county/fips) or marine (EEZ) fields
+                     for reported/computed coordinates
+                  4) fill 'establishment_means' field for species non-native 
+                     to Alaska, Hawaii, or Lower 48 based on itis_tsn or 
+                     clean_provided_scientific_name
+        @return: A CSV file of BISON-modified records  
+        """
+        if self.is_open():
+            self.close()
+        driver = ogr.GetDriverByName("ESRI Shapefile")
+
+        terr_data = ANCILLARY_FILES['terrestrial']
+        terrestrial_shpname = os.path.join(ancillary_path, terr_data['file'])
+        terr_data_src = driver.Open(terrestrial_shpname, 0)
+        terrlyr = terr_data_src.GetLayer()
+        self._log.info('*** Terrestrial layer {} with {} features'.format(
+            terrestrial_shpname, terrlyr.GetFeatureCount()))
+        terrindex, terrfeats, terr_bison_fldnames = \
+            self._create_spatial_index(terr_data['fields'], terrlyr)
+        
+        marine_data = ANCILLARY_FILES['marine']
+        marine_shpname = os.path.join(ancillary_path, marine_data['file'])
+        eez_data_src = driver.Open(marine_shpname, 0)
+        eezlyr = eez_data_src.GetLayer()
+        self._log.info('*** Marine layer {} with {} features'.format(
+            terrestrial_shpname, terrlyr.GetFeatureCount()))
+        marindex, marfeats, mar_bison_fldnames = \
+            self._create_spatial_index(marine_data['fields'], eezlyr)
+
+        return  ((terr_data_src, terrlyr, terrindex, terrfeats, terr_bison_fldnames), 
+                 (eez_data_src, eezlyr, marindex, marfeats, mar_bison_fldnames))
+
+#         recno = 0
+#         try:
+#             dict_reader, inf, writer, outf = open_csv_files(self.infname, 
+#                                              BISON_DELIMITER, ENCODING, 
+#                                              outfname=outfname, 
+#                                              outfields=self._outfields)
+#             for rec in dict_reader:
+#                 recno += 1
+#                 squid = rec[BISON_SQUID_FLD]
+#                 lon, lat = self._get_coords(rec)
+#                 # Use coordinates to calc 
+#                 if lon is not None:
+#                     # Compute geo: coordinates and polygons
+#                     self._fill_geofields(rec, lon, lat, 
+#                                          terrindex, terrfeats, terr_bison_fldnames,
+#                                          marindex, marfeats, mar_bison_fldnames)
+#                 # Write updated record
+#                 row = self._makerow(rec)
+#                 writer.writerow(row)
+#                 # Log progress occasionally, this process is very time-consuming
+#                 # so show progress at shorter intervals to ensure it is moving
+#                 if (recno % LOGINTERVAL/10) == 0:
+#                     self._log.info('*** Record number {} ***'.format(recno))
+#                                     
+#         except Exception as e:
+#             self._log.error('Failed filling data from id {}, line {}: {}'
+#                             .format(squid, recno, e))                    
+#         finally:
+#             inf.close()
+#             outf.close()
             
     # ...............................................
     def _test_other_fields(self, rec, recno, squid):
@@ -878,22 +957,134 @@ wc -l tmp/step1.csv
 
 python3.6 /state/partition1/git/bison/src/common/bisonfill.py 
 
+from osgeo import ogr
 import os
-from osgeo import ogr 
+import rtree
 import time
 
-from gbif.constants import (GBIF_DELIMITER, BISON_DELIMITER, PROHIBITED_VALS, 
-                            TERM_CONVERT, ENCODING, META_FNAME,
-                            BISON_GBIF_MAP, OCC_ID_FLD, DISCARD_FIELDS,
-                            CLIP_CHAR, GBIF_UUID_KEY)
-from gbif.gbifmeta import GBIFMetaReader
-from common.tools import (getCSVReader, getCSVDictReader, 
-                        getCSVWriter, getCSVDictWriter, getLine, getLogger)
-from gbif.gbifapi import GbifAPI
-from pympler import asizeof
+from common.constants import (BISON_DELIMITER, ENCODING, LOGINTERVAL, 
+                              PROHIBITED_CHARS, PROHIBITED_SNAME_CHARS, 
+                              PROHIBITED_VALS, ANCILLARY_FILES,
+                              BISON_VALUES, BISON_SQUID_FLD, ITIS_KINGDOMS, 
+                              ISO_COUNTRY_CODES, BISON_ORDERED_DATALOAD_FIELDS)
+from common.lookup import Lookup, VAL_TYPE
+from common.tools import (getCSVDictReader, open_csv_files, getLogger)
 
-ENCODING = 'utf-8'
-BISON_DELIMITER = '$'
+
+self = BisonFiller(pass3_fname, log=logger)
+# TEST - go to BisonFiller code
+
+driver = ogr.GetDriverByName("ESRI Shapefile")
+
+terr_data = ANCILLARY_FILES['terrestrial']
+terrestrial_shpname = os.path.join(ancillary_path, terr_data['file'])
+terr_data_src = driver.Open(terrestrial_shpname, 0)
+terrlyr = terr_data_src.GetLayer()
+terrflddata = terr_data['fields']
+terrindex = rtree.index.Index(interleaved=False)
+terrfeats = {}
+######### LOOP ##########
+terrfeat = terrlyr.GetNextFeature()
+while terrfeat is not None:
+    terrfid = terrfeat.GetFID()
+    terrgeom = terrfeat.GetGeometryRef()
+    self._log.info('  {} Geometry {} count {}'.format(
+        terrfid, terrgeom.GetGeometryName(), terrgeom.GetGeometryCount()))
+    xmin, xmax, ymin, ymax = terrgeom.GetEnvelope()
+    terrindex.insert(terrfid, (xmin, xmax, ymin, ymax))
+    terrfeats[terrfid] = {'feature': terrfeat, 
+                          'geom': terrgeom,
+                          'type': terrgeom.GetGeometryName(), 
+                          'count': terrgeom.GetGeometryCount()}
+    for reffld, bisonfld in terrflddata:
+        terrfeats[terrfid][bisonfld] = terrfeat.GetFieldAsString(reffld)
+    terrfeat = terrlyr.GetNextFeature()
+######### ENDLOOP ##########
+
+# terrindex, terrfeats, terr_bison_fldnames = \
+#     self._create_spatial_index(terr_data['fields'], terrlyr)
+
+marine_data = ANCILLARY_FILES['marine']
+marine_shpname = os.path.join(ancillary_path, marine_data['file'])
+mar_data_src = driver.Open(marine_shpname, 0)
+marlyr = mar_data_src.GetLayer()
+marflddata = marine_data['fields']
+marindex = rtree.index.Index(interleaved=False)
+marfeats = {}
+######### LOOP ##########
+marfeat = marlyr.GetNextFeature()
+while marfeat is not None:
+    marfid = marfeat.GetFID()
+    margeom = marfeat.GetGeometryRef()
+    self._log.info('  {} Geometry {} count {}'.format(
+        marfid, margeom.GetGeometryName(), margeom.GetGeometryCount()))
+    xmin, xmax, ymin, ymax = margeom.GetEnvelope()
+    marindex.insert(marfid, (xmin, xmax, ymin, ymax))
+    marfeats[marfid] = {'feature': marfeat, 
+                        'geom': margeom,
+                        'type': margeom.GetGeometryName(), 
+                        'count': margeom.GetGeometryCount()}
+    for reffld, bisonfld in marflddata:
+        marfeats[marfid][bisonfld] = marfeat.GetFieldAsString(reffld)
+    marfeat = marlyr.GetNextFeature()
+######### ENDLOOP ##########
+
+
+marine_data = ANCILLARY_FILES['marine']
+mar2_shpname = os.path.join(ancillary_path, 
+    'World_EEZ_v8_20140228_splitpolygons/World_EEZ_v8_2014_HR.shp')
+mar2_data_src = driver.Open(mar2_shpname, 0)
+mar2lyr = mar2_data_src.GetLayer()
+mar2index = rtree.index.Index(interleaved=False)
+mar2feats = {}
+######### LOOP ##########
+mar2feat = mar2lyr.GetNextFeature()
+while mar2feat is not None:
+    mar2fid = mar2feat.GetFID()
+    mar2geom = mar2feat.GetGeometryRef()
+    self._log.info('  {} Geometry {} count {}'.format(
+        mar2fid, mar2geom.GetGeometryName(), mar2geom.GetGeometryCount()))
+    xmin, xmax, ymin, ymax = mar2geom.GetEnvelope()
+    mar2index.insert(mar2fid, (xmin, xmax, ymin, ymax))
+    mar2feats[mar2fid] = {'feature': mar2feat, 
+                         'geom': mar2geom,
+                          'type': mar2geom.GetGeometryName(), 
+                          'count': mar2geom.GetGeometryCount()}
+    for reffld, bisonfld in marflddata:
+        mar2feats[mar2fid][bisonfld] = mar2feat.GetFieldAsString(reffld)
+    mar2feat = mar2lyr.GetNextFeature()
+######### ENDLOOP ##########
+
+
+multipoly 215, 217, 218, 232, 
+
+poly, 244, 248, 249
+
+sgs = []
+msgs = []
+g = mar2feats[215]['geom']
+if g.GetGeometryName() == 'MULTIPOLYGON':
+    print('MULTIPOLY')
+    for i in range(g.GetGeometryCount()):
+        msg = g.GetGeometryRef(i)
+        msgs.append(msg)
+        print('{} subgeom, simple {}, count {}'.format(msg.GetGeometryName(), msg.IsSimple(), msg.GetGeometryCount()))
+elif g.GetGeometryName() == 'POLYGON':
+    print('POLY')
+    for i in range(g.GetGeometryCount()):
+        sg = g.GetGeometryRef(i)
+        sgs.append(sg)
+        print('{} subgeom, simple {}, count {}'.format(sg.GetGeometryName(), sg.IsSimple(), sg.GetGeometryCount()))
+
+
+# testme
+for i in range(margeom.GetGeometryCount()):
+    mg = margeom.GetGeometryRef(i)
+
+ 
+# marindex, marfeats, mar_bison_fldnames = \
+#     self._create_spatial_index(marine_data['fields'], eezlyr)
+
 
 
 """
