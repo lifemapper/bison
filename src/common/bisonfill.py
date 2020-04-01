@@ -485,7 +485,8 @@ class BisonFiller(object):
 
             
     # ...............................................
-    def update_point_in_polygons(self, ancillary_path, outfname):
+    def update_point_in_polygons(self, terr_data, marine_data, ancillary_path, 
+                                 outfname):
         """
         @summary: Process a CSV file with 47 ordered BISON fields (and optional
                   gbifID field for GBIF provided data) to 
@@ -505,14 +506,12 @@ class BisonFiller(object):
             self.close()
         driver = ogr.GetDriverByName("ESRI Shapefile")
 
-        terr_data = ANCILLARY_FILES['terrestrial']
         terrestrial_shpname = os.path.join(ancillary_path, terr_data['file'])
         terr_data_src = driver.Open(terrestrial_shpname, 0)
         terrlyr = terr_data_src.GetLayer()
         terrindex, terrfeats, terr_bison_fldnames = \
             self._create_spatial_index(terr_data['fields'], terrlyr)
         
-        marine_data = ANCILLARY_FILES['marine']
         marine_shpname = os.path.join(ancillary_path, marine_data['file'])
         eez_data_src = driver.Open(marine_shpname, 0)
         eezlyr = eez_data_src.GetLayer()
@@ -549,15 +548,19 @@ class BisonFiller(object):
                     self._log.info('*** Record number {}, elapsed {} ***'.format(
                         recno, int_start - int_stop))
                     int_start = int_stop
-            self._log.info('*** Total recs {}, total time {} ***'.format(
-                        recno, start - int_stop))
-            
+            try:
+                self._log.info('*** Total recs {}, total time {} ***'.format(
+                            recno, start - int_stop))
+            except:
+                self._log.info('*** Start time {} ***'.format(time.time()))
+                
         except Exception as e:
             self._log.error('Failed filling data from id {}, line {}: {}'
                             .format(squid, recno, e))                    
         finally:
             inf.close()
             outf.close()
+            self._log.info('*** Stop time {} ***'.format(time.time()))
             
     # ...............................................
     def test_point_in_polygons(self, ancillary_path, outfname):
