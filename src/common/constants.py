@@ -76,16 +76,31 @@ BISON_VALUES = {'provider': 'BISON',
 ANCILLARY_DIR = 'ancillary'
 ANCILLARY_FILES = {
     # Modified from original to merge US and Canada, and add centroids
-    'terrestrial': {'file': 'us_can_county_centroid.shp',
-                    'fields': (('B_FIPS', 'calculated_fips'), 
-                               ('B_COUNTY', 'calculated_county_name'),
-                               ('B_STATE', 'calculated_state_name'))},
+    'centroid': {
+        'file': 'us_can_county_centroid/us_can_county_centroid.shp',
+        'fields': (('B_FIPS', 'calculated_fips'), 
+                   ('B_COUNTY', 'calculated_county_name'),
+                   ('B_STATE', 'calculated_state_name'))},
+    'terrestrial': {
+#         'file': 'us_can_county_centroid/us_can_county_centroid.shp',
+#         'fields': (('B_FIPS', 'calculated_fips'), 
+#                    ('B_COUNTY', 'calculated_county_name'),
+#                    ('B_STATE', 'calculated_state_name'))},
+        'file': 'us_counties/us_counties.shp',
+        'fields': (('STATE_FIPS', 'calculated_fips'), 
+                   ('NAME', 'calculated_county_name'),
+                   ('STATE_NAME', 'calculated_state_name'))},
     # Modified from original to split into individual (no multi)
     # polygons
-    'marine': {'file': 'marine_polygons.shp',
-    #                               'file': 'World_EEZ_v8_20140228_splitpolygons/World_EEZ_v8_2014_HR.shp',
-               'fields': (('EEZ', 'calculated_waterbody'), 
-                          ('MRGID', 'mrgid'))},
+    'marine': {
+#         'file': 'marine_polygons/marine_polygons.shp',
+#         'file': 'World_EEZ_v8_20140228_splitpolygons/World_EEZ_v8_2014_HR.shp',
+#         'fields': (('EEZ', 'calculated_waterbody'), 
+#                    ('MRGID', 'mrgid'))},
+        'file': 'can_counties/can_counties.shp',
+        'fields': (('CDUID', 'calculated_fips'), 
+                   ('CDNAME', 'calculated_county_name'),
+                   ('PRNAME', 'calculated_state_name'))},
     # From Annie Simpson
     'establishment_means': {'file': 'NonNativesIndex20190912.txt'},
     # From ITIS developers

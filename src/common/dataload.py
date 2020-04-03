@@ -22,16 +22,160 @@
              02110-1301, USA.
 """
 import os
+from concurrent.futures import ProcessPoolExecutor
+from multiprocessing import cpu_count
+import subprocess
 
 from common.bisonfill import BisonFiller
-from common.constants import (BISON_DELIMITER, ANCILLARY_DIR, ANCILLARY_FILES, 
-                              ProviderActions)
+from common.constants import (
+    BISON_DELIMITER, ANCILLARY_DIR, ANCILLARY_FILES, ProviderActions)
+from common.intersect_one import intersect_csv_and_shapefiles
 from common.tools import getLogger
 
 from gbif.gbifmod import GBIFReader
 
 from provider.providermod import BisonMerger
-            
+
+# .............................................................................
+def get_line_count(filename):
+    """ find total number lines in a file """
+    cmd = "wc -l {}".format(filename)
+    info, _ = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()
+    temp = info.split(b'\n')[0]
+    line_count = int(temp.split()[0])
+    print("line_count = {}".format(line_count))
+    return line_count
+
+# .............................................................................
+def get_header(filename):
+    """ find fieldnames from the first line of a CSV file """
+    header = None
+    try:
+        f = open(filename, 'r', encoding='utf-8')
+        header = f.readline()
+    except Exception as e:
+        print('Failed to read first line of {}: {}'.format(filename, e))
+    finally:
+        f.close()
+    return header
+
+# .............................................................................
+def find_chunk_files(big_csv_filename):
+    """ Finds multiple smaller input csv files from a large input csv file, 
+    if they exist, and return these filenames, paired with output filenames for the results of 
+    processing these files. """
+    cpus = cpu_count()
+    in_base_filename, ext = os.path.splitext(big_csv_filename)
+    pth, basename = os.path.split(in_base_filename)
+    # We know filename starts with 'step' followed by 1 char integer
+    nextstep = str(int(basename[4]) + 1)
+    out_base_filename = os.path.join(pth, basename[:4] + nextstep + basename[5:])
+    total_lines = get_line_count(big_csv_filename)
+    chunk_size = int(total_lines / cpus)
+    
+    header = None
+    csv_filename_pairs = []
+    start = 1
+    stop = chunk_size
+    while start <= total_lines:
+        in_filename = '{}_{}-{}{}'.format(in_base_filename, start, stop, ext)
+        out_filename =  '{}_{}-{}{}'.format(out_base_filename, start, stop, ext)
+        if os.path.exists(in_filename):
+            csv_filename_pairs.append((in_filename, out_filename))
+            small_count = get_line_count(in_filename)
+            print('{} lines in file {}'.format(small_count, in_filename))
+        else:
+            csv_filename_pairs = None
+            print('Missing file {}'.format(in_filename))
+            break
+        start = stop + 1
+        stop = start + chunk_size - 1
+        
+    if csv_filename_pairs is not None:
+        header = get_header(big_csv_filename)
+    return csv_filename_pairs, header
+
+# .............................................................................
+def make_chunk_files(big_csv_filename):
+    """ Creates multiple smaller input csv files from a large input csv file, and 
+    return these filenames, paired with output filenames for the results of 
+    processing these files. """
+    cpus = cpu_count()
+    in_base_filename, ext = os.path.splitext(big_csv_filename)
+    pth, basename = os.path.split(in_base_filename)
+    # We know filename starts with 'step' followed by 1 char integer
+    nextstep = str(int(basename[4]) + 1)
+    out_base_filename = os.path.join(pth, basename[:4] + nextstep + basename[5:])
+    total_lines = get_line_count(big_csv_filename)
+    chunk_size = int(total_lines / cpus)
+    
+    csv_filename_pairs = []
+    try:
+        bigf = open(big_csv_filename, 'r', encoding='utf-8')
+        header = bigf.readline()
+        line = bigf.readline()
+        curr_recno = 1
+        while line != '':
+            # Reset vars for next chunk
+            start = curr_recno
+            stop = start + chunk_size - 1
+            in_filename = '{}_{}-{}{}'.format(in_base_filename, start, stop, ext)
+            out_filename =  '{}_{}-{}{}'.format(out_base_filename, start, stop, ext)
+            csv_filename_pairs.append((in_filename, out_filename))
+            try:
+                # Start writing the smaller file
+                inf = open(in_filename, 'w', encoding='utf-8')
+                inf.write('{}'.format(header))
+                while curr_recno <= stop:
+                    if line != '':
+                        inf.write('{}'.format(line))
+                        line = bigf.readline()
+                        curr_recno += 1
+                    else:
+                        curr_recno = stop + 1
+            except Exception as inner_err:
+                print('Failed in inner loop {}'.format(inner_err))
+                raise
+            finally:
+                inf.close()
+    except Exception as outer_err:
+        print('Failed to do something {}'.format(outer_err))
+        raise
+    finally:
+        bigf.close()
+    
+    return csv_filename_pairs, header
+        
+# .............................................................................
+def step_parallel(in_csv_filename, terrestrial_data, marine_data, ancillary_path, 
+                  out_csv_filename):
+    """Main method for parallel execution of geo-referencing script"""
+    csv_filename_pairs, header = find_chunk_files(in_csv_filename)
+    if csv_filename_pairs is None:
+        csv_filename_pairs, header = make_chunk_files(in_csv_filename)
+    
+#     in_csv_fn, out_csv_fn = csv_filename_pairs[0]
+#     intersect_csv_and_shapefiles(in_csv_fn, terrestrial_data, 
+#                 marine_data, ancillary_path, out_csv_fn)
+    with ProcessPoolExecutor() as executor:
+        for in_csv_fn, out_csv_fn in csv_filename_pairs:
+            executor.submit(
+                intersect_csv_and_shapefiles, in_csv_fn, terrestrial_data, 
+                marine_data, ancillary_path, out_csv_fn)
+        
+#     try:
+#         outf = open(out_csv_filename, 'w', encoding='utf-8')
+#         outf.write('{}\n'.format(header))
+#         for _, small_csv_fn in csv_filename_pairs:
+#             try:
+#                 for line in open(small_csv_fn, 'r', encoding='utf-8'):
+#                     outf.write('{}\n'.format(line))
+#             except Exception as inner_err:
+#                 print('Failed to write {} to merged file; {}'.format(small_csv_fn, inner_err))
+#     except Exception as outer_err:
+#         print('Failed to write to {}; {}'.format(out_csv_filename, outer_err))
+#     finally:
+#         outf.close()
 # ...............................................
 if __name__ == '__main__':
     import argparse
@@ -51,7 +195,7 @@ if __name__ == '__main__':
                         are not present in the same directory as the raw data, 
                         they will be  created for temp and final output files.
                         """)
-    parser.add_argument('--step', type=int, default=1, choices=[1,2,3,4,5,10],
+    parser.add_argument('--step', type=int, default=1, choices=[1,2,3,4,5,10, 13],
                         help="""
                         Step number for data processing:
                            1: Only for GBIF data. 
@@ -112,7 +256,7 @@ if __name__ == '__main__':
 
     inpath = occ_file_or_path
     logbasename = 'step{}'.format(step)
-    if step in [1,2,3,4,10]:
+    if step != 5:
         occ_fname = occ_file_or_path
         inpath, basefname_wext = os.path.split(occ_file_or_path)
         basefname, ext = os.path.splitext(basefname_wext)
@@ -126,38 +270,39 @@ if __name__ == '__main__':
 
     # ancillary data for record update    
     ancillary_path = os.path.join(datapth, ANCILLARY_DIR)
-    terrestrial_shpname = os.path.join(ancillary_path, 
-                                       ANCILLARY_FILES['terrestrial']['file'])
-    estmeans_fname = os.path.join(ancillary_path, 
-                                  ANCILLARY_FILES['establishment_means']['file'])
-#     marine_shpname = os.path.join(ancillary_path, 
-#                                   ANCILLARY_FILES['marine']['file'])
-    itis2_lut_fname = os.path.join(ancillary_path, 
-                                   ANCILLARY_FILES['itis']['file'])
-    resource_lut_fname = os.path.join(ancillary_path, 
-                                      ANCILLARY_FILES['resource']['file'])
-    provider_lut_fname = os.path.join(ancillary_path,
-                                      ANCILLARY_FILES['provider']['file'])
+    centroid_shpname = os.path.join(
+        ancillary_path, ANCILLARY_FILES['centroid']['file'])
+    terrestrial_shpname = os.path.join(
+        ancillary_path, ANCILLARY_FILES['terrestrial']['file'])
+    estmeans_fname = os.path.join(
+        ancillary_path, ANCILLARY_FILES['establishment_means']['file'])
+    marine_shpname = os.path.join(ancillary_path, 
+                                  ANCILLARY_FILES['marine']['file'])
+    itis2_lut_fname = os.path.join(
+        ancillary_path, ANCILLARY_FILES['itis']['file'])
+    resource_lut_fname = os.path.join(
+        ancillary_path, ANCILLARY_FILES['resource']['file'])
+    provider_lut_fname = os.path.join(
+        ancillary_path, ANCILLARY_FILES['provider']['file'])
         
-    if step in [1,2,3,4]:
-        # Files of name lookup and list for creation 
-        nametaxa_fname = os.path.join(tmppath, 'step1_{}_sciname_taxkey_list.csv'.format(basefname))
-        canonical_lut_fname = os.path.join(tmppath, 'step2_{}_canonical_lut.csv'.format(basefname))        
-        # Output CSV files of all records after initial creation or field replacements
-        pass1_fname = os.path.join(tmppath, 'step1_{}.csv'.format(basefname))
-        pass2_fname = os.path.join(tmppath, 'step2_{}.csv'.format(basefname))
-        pass3_fname = os.path.join(tmppath, 'step3_{}.csv'.format(basefname))
-        pass4_fname = os.path.join(tmppath, 'step4_{}.csv'.format(basefname))    
-        # OUTPUT filenames for merged dataset/resource and organization/provider lookups
-        merged_dataset_lut_fname = os.path.join(tmppath, 'merged_dataset_lut.csv')
-        merged_org_lut_fname = os.path.join(tmppath, 'merged_organization_lut.csv')
+    # Files of name lookup and list for creation 
+    nametaxa_fname = os.path.join(tmppath, 'step1_{}_sciname_taxkey_list.csv'.format(basefname))
+    canonical_lut_fname = os.path.join(tmppath, 'step2_{}_canonical_lut.csv'.format(basefname))        
+    # Output CSV files of all records after initial creation or field replacements
+    pass1_fname = os.path.join(tmppath, 'step1_{}.csv'.format(basefname))
+    pass2_fname = os.path.join(tmppath, 'step2_{}.csv'.format(basefname))
+    pass3_fname = os.path.join(tmppath, 'step3_{}.csv'.format(basefname))
+    pass4_fname = os.path.join(tmppath, 'step4_{}.csv'.format(basefname))    
+    # OUTPUT filenames for merged dataset/resource and organization/provider lookups
+    merged_dataset_lut_fname = os.path.join(tmppath, 'merged_dataset_lut.csv')
+    merged_org_lut_fname = os.path.join(tmppath, 'merged_organization_lut.csv')
     
     if not os.path.exists(occ_file_or_path):
         raise Exception('File or path {} does not exist'.format(occ_file_or_path))
     else:
         logfname = os.path.join(tmppath, '{}.log'.format(logbasename))
-        logger = getLogger(logbasename, logfname)
         if step == 1:
+            logger = getLogger(logbasename, logfname)
             gr = GBIFReader(inpath, tmpdir, outdir, logger)
             gr.write_dataset_org_lookup(
                 merged_dataset_lut_fname, resource_lut_fname, 
@@ -171,6 +316,7 @@ if __name__ == '__main__':
                 nametaxa_fname, pass1_fname)
             
         elif step == 2:
+            logger = getLogger(logbasename, logfname)
             gr = GBIFReader(inpath, tmpdir, outdir, logger)
             # Reread output ONLY if missing gbif name/taxkey 
             if not os.path.exists(nametaxa_fname):
@@ -182,18 +328,25 @@ if __name__ == '__main__':
             gr.update_bison_names(pass1_fname, pass2_fname, canonical_lut)
             
         elif step == 3:
+            logger = getLogger(logbasename, logfname)
             bf = BisonFiller(pass2_fname, log=logger)
             # Pass 3 of CSV transform
             # Use Derek D. generated ITIS lookup itis2_lut_fname
             bf.update_itis_estmeans_centroid(itis2_lut_fname, estmeans_fname, 
-                                             terrestrial_shpname, pass3_fname, 
+                                             centroid_shpname, pass3_fname, 
                                              fromGbif=True)
         elif step == 4:
-            bf = BisonFiller(pass3_fname, log=logger)
-            # Pass 4 of CSV transform, final step, point-in-polygon intersection
-            bf.update_point_in_polygons(ancillary_path, pass4_fname, fromGbif=True)
+            terr_data = ANCILLARY_FILES['terrestrial']
+            marine_data = ANCILLARY_FILES['marine']
+            step_parallel(pass3_fname, terr_data, marine_data, ancillary_path, 
+                          pass4_fname)
+            
+#             bf = BisonFiller(pass3_fname, log=logger)
+#             # Pass 4 of CSV transform, final step, point-in-polygon intersection
+#             bf.update_point_in_polygons(ancillary_path, pass4_fname)
             
         elif step == 5:
+            logger = getLogger(logbasename, logfname)
             merger = BisonMerger(outpath, logger)
             old_resources = merger.read_old_resources(resource_lut_fname)
             provider_datasets = merger.assemble_files(inpath, old_resources)
@@ -231,55 +384,73 @@ if __name__ == '__main__':
                         # Step 3: of CSV transform
                         # Use Derek D. generated ITIS lookup itis2_lut_fname
                         bf = BisonFiller(outfile2, log=logger)
-                        bf.update_point_in_polygons(ancillary_path, outfile3, fromGbif=False)
+                        bf.update_point_in_polygons(ancillary_path, outfile3)
 
         elif step == 10:
+            logger = getLogger(logbasename, logfname)
             bf = BisonFiller(pass3_fname, log=logger)
             # Pass 3 of CSV transform
             # Use Derek D. generated ITIS lookup itis2_lut_fname
             bf.test_bison_outfile(fromGbif=True)
+        elif step == 13:
+            logger = getLogger(logbasename, logfname)
+            bf = BisonFiller(pass3_fname, log=logger)
+            # Pass 4 of CSV transform, final step, point-in-polygon intersection
+            ((terr_data_src, terrlyr, terrindex, terrfeats, terr_bison_fldnames), 
+             (eez_data_src, eezlyr, marindex, marfeats, 
+              mar_bison_fldnames)) = bf.test_point_in_polygons(
+                  ancillary_path, pass4_fname)
 """
 
 # /tank/data/bison/2019/Terr/occurrence_lines_5000-10000.csv --step=4
 
-inpath = '/tank/data/bison/2019/provider'
-
-for resource_id, pvals in BISON_PROVIDER.items():
-    fname = pvals['filename']
-    if fname is None:
-        fname = 'bison_{}.csv'.format(resource_id)
-    infile = os.path.join(inpath, fname)
-    if not os.path.exists(infile):
-        print('File {} does not exist for {}'
-              .format(fname, resource_id))
-
-wc -l occurrence.txt 
-71057978 occurrence.txt
-wc -l tmp/step1.csv 
-1577732 tmp/step1.csv
-
-python3.6 \
-  /state/partition1/git/bison/src/common/dataload.py \
-  /tank/data/bison/2019/provider --step=5 
-
-/tank/data/bison/2019/Terr/occurrence_lines_1-10000001.csv --step=1
-
 import os
-from osgeo import ogr 
-import time
+from common.bisonfill import BisonFiller
+from common.constants import (BISON_DELIMITER, ANCILLARY_DIR, ANCILLARY_FILES, 
+                              ProviderActions)
+from common.tools import getLogger
+from gbif.gbifmod import GBIFReader
+from provider.providermod import BisonMerger
 
-from gbif.constants import (GBIF_DELIMITER, BISON_DELIMITER, PROHIBITED_VALS, 
-                            TERM_CONVERT, ENCODING, META_FNAME,
-                            BISON_GBIF_MAP, OCC_ID_FLD, DISCARD_FIELDS,
-                            CLIP_CHAR, GBIF_UUID_KEY)
-from gbif.gbifmeta import GBIFMetaReader
-from common.tools import (getCSVReader, getCSVDictReader, 
-                        getCSVWriter, getCSVDictWriter, getLine, getLogger)
-from gbif.gbifapi import GbifAPI
-from pympler import asizeof
+occ_file_or_path = '/tank/data/bison/2019/Terr/occurrence_lines_30000001-40000001.csv'
+occ_file_or_path = '/tank/data/bison/2019/Terr/occurrence_lines_5000-10000.csv'
+step = 4
 
-ENCODING = 'utf-8'
-BISON_DELIMITER = '$'
+inpath, basefname_wext = os.path.split(occ_file_or_path)
+basefname, ext = os.path.splitext(basefname_wext)
+datapth, _ = os.path.split(inpath)
+tmppath = os.path.join(inpath, 'tmp')
+ancillary_path = os.path.join(datapth, ANCILLARY_DIR)
+terrestrial_shpname = os.path.join(
+    ancillary_path, ANCILLARY_FILES['terrestrial']['file'])
+estmeans_fname = os.path.join( 
+    ancillary_path, ANCILLARY_FILES['establishment_means']['file'])
+itis2_lut_fname = os.path.join( 
+    ancillary_path, ANCILLARY_FILES['itis']['file'])
 
+pass2_fname = os.path.join(tmppath, 'step2_{}.csv'.format(basefname))
+pass3_fname = os.path.join(tmppath, 'step3_{}.csv'.format(basefname))
+pass4_fname = os.path.join(tmppath, 'step4_{}.csv'.format(basefname))    
+_
+logbasename = 'step{}_{}'.format(step, basefname)
+logfname = os.path.join(tmppath, '{}.log'.format(logbasename))
+logger = getLogger(logbasename, logfname)
+
+# TEST step 13
+self = BisonFiller(pass3_fname, log=logger)
+# TEST - go to BisonFiller code
+
+
+
+
+# step 3
+bf = BisonFiller(pass2_fname, log=logger)
+bf.update_itis_estmeans_centroid(itis2_lut_fname, estmeans_fname, 
+                                             terrestrial_shpname, pass3_fname, 
+                                             fromGbif=True)
+
+# step 4
+bf = BisonFiller(pass3_fname, log=logger)
+bf.update_point_in_polygons(ancillary_path, pass4_fname)
 
 """
