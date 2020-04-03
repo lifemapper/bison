@@ -180,12 +180,20 @@ class BisonFiller(object):
         pt = ogr.Geometry(ogr.wkbPoint)
         pt.AddPoint(lon, lat)
         
-#         start = time.time()
+#         self._log.info('**** Start geo-intersect')
+        start = time.time()
         terr_intersect_fids = list(terrindex.intersection((lon, lat)))
+        self._log.info('Rtree intersect time for {} matching fids: {}'.format(
+            len(terr_intersect_fids), time.time()-start))
+        
         terr_count = 0
+        start = time.time()
         for tfid in terr_intersect_fids:
             geom = terrfeats[tfid]['geom']
-            if pt.Within(geom):
+            start = time.time()
+            is_within = pt.Within(geom)
+#             self._log.info('  ogr within time: {}'.format(time.time()-start))
+            if is_within:
                 terr_count += 1
                 # If intersects, take values for first polygon
                 if terr_count == 1:
@@ -193,25 +201,27 @@ class BisonFiller(object):
                         fldvals[fn] = terrfeats[tfid][fn]
                 # If > 1 polygon, clear all values
                 else:
+                    self._log.info('  FOUND AGAIN!')
                     fldvals = {}
                     break
+        self._log.info('  OGR within time {}'.format(time.time()-start))
         
-        if terr_count != 1:
-            mar_intersect_fids = list(marindex.intersection((lon, lat)))
-            marine_count = 0
-            for mfid in mar_intersect_fids:
-                geom = marfeats[mfid]['geom']
-                if pt.Within(geom):
-                    marine_count += 1
-                    # If intersects, take values for first polygon
-                    if marine_count == 1:
-                        for fn in mar_bison_fldnames:
-                            fldvals[fn] = marfeats[mfid][fn]
-                    # If > 1 polygon, clear marine values (leave terr)
-                    else:
-                        for fn in mar_bison_fldnames:
-                            fldvals[fn] = None
-                        break
+#         if terr_count != 1:
+#             mar_intersect_fids = list(marindex.intersection((lon, lat)))
+#             marine_count = 0
+#             for mfid in mar_intersect_fids:
+#                 geom = marfeats[mfid]['geom']
+#                 if pt.Within(geom):
+#                     marine_count += 1
+#                     # If intersects, take values for first polygon
+#                     if marine_count == 1:
+#                         for fn in mar_bison_fldnames:
+#                             fldvals[fn] = marfeats[mfid][fn]
+#                     # If > 1 polygon, clear marine values (leave terr)
+#                     else:
+#                         for fn in mar_bison_fldnames:
+#                             fldvals[fn] = None
+#                         break
 #             stop = time.time()
 #             elapsed = stop - start
 #             self._log.info('Time for intersect {}'.format(elapsed))
@@ -219,6 +229,7 @@ class BisonFiller(object):
         # Update record with resolved values for intersecting polygons
         for name, val in fldvals.items():
             rec[name] = val
+        return terr_count
 
     # ...............................................
     def _fill_centroids(self, rec, centroids):
@@ -435,53 +446,53 @@ class BisonFiller(object):
             inf.close()
             outf.close()
             
+    # ...............................................    
+    def _create_spatial_index(self, flddata, lyr):
+        lyr_def = lyr.GetLayerDefn()
+        fldindexes = []
+        bisonfldnames = []
+        for geofld, bisonfld in flddata:
+            geoidx = lyr_def.GetFieldIndex(geofld)
+            fldindexes.append((bisonfld, geoidx))
+            bisonfldnames.append(bisonfld)
+             
+        spindex = rtree.index.Index(interleaved=False)
+        spfeats = {}
+        for fid in range(0, lyr.GetFeatureCount()):
+            feat = lyr.GetFeature(fid)
+            geom = feat.geometry()
+            xmin, xmax, ymin, ymax = geom.GetEnvelope()
+            spindex.insert(fid, (xmin, xmax, ymin, ymax))
+            spfeats[fid] = {'feature': feat, 
+                            'geom': geom}
+            for name, idx in fldindexes:
+                spfeats[fid][name] = feat.GetFieldAsString(idx)
+        return spindex, spfeats, bisonfldnames
+# 
 #     # ...............................................    
-#     def _create_spatial_index(self, geodata, lyr):
-#         lyr_def = lyr.GetLayerDefn()
-#         fldindexes = []
+#     def _create_spatial_index(self, flddata, lyr):
 #         bisonfldnames = []
-#         for geofld, bisonfld in geodata['fields']:
-#             geoidx = lyr_def.GetFieldIndex(geofld)
-#             fldindexes.append((bisonfld, geoidx))
+#         for reffld, bisonfld in flddata:
 #             bisonfldnames.append(bisonfld)
 #             
 #         spindex = rtree.index.Index(interleaved=False)
 #         spfeats = {}
-#         for fid in range(0, lyr.GetFeatureCount()):
-#             feat = lyr.GetFeature(fid)
-#             geom = feat.geometry()
+#         feat = lyr.GetNextFeature()
+#         while feat is not None:
+#             fid = feat.GetFID()
+#             geom = feat.GetGeometryRef()
+# #             self._log.info('  {} Geometry {} count {}'.format(
+# #                 fid, geom.GetGeometryName(), geom.GetGeometryCount()))
+#             # GetEnvelope returns ordering:  minX, maxX, minY, maxY
 #             xmin, xmax, ymin, ymax = geom.GetEnvelope()
+#             # Interleaved = False requires: minX, maxX, minY, maxY
 #             spindex.insert(fid, (xmin, xmax, ymin, ymax))
 #             spfeats[fid] = {'feature': feat, 
 #                             'geom': geom}
-#             for name, idx in fldindexes:
-#                 spfeats[fid][name] = feat.GetFieldAsString(idx)
+#             for reffld, bisonfld in flddata:
+#                 spfeats[fid][bisonfld] = feat.GetFieldAsString(reffld)
+#             feat = lyr.GetNextFeature()
 #         return spindex, spfeats, bisonfldnames
-
-    # ...............................................    
-    def _create_spatial_index(self, flddata, lyr):
-        bisonfldnames = []
-        for reffld, bisonfld in flddata:
-            bisonfldnames.append(bisonfld)
-            
-        spindex = rtree.index.Index(interleaved=False)
-        spfeats = {}
-        feat = lyr.GetNextFeature()
-        while feat is not None:
-            fid = feat.GetFID()
-            geom = feat.GetGeometryRef()
-#             self._log.info('  {} Geometry {} count {}'.format(
-#                 fid, geom.GetGeometryName(), geom.GetGeometryCount()))
-            # GetEnvelope returns ordering:  minX, maxX, minY, maxY
-            xmin, xmax, ymin, ymax = geom.GetEnvelope()
-            # Interleaved = False requires: minX, maxX, minY, maxY
-            spindex.insert(fid, (xmin, xmax, ymin, ymax))
-            spfeats[fid] = {'feature': feat, 
-                            'geom': geom}
-            for reffld, bisonfld in flddata:
-                spfeats[fid][bisonfld] = feat.GetFieldAsString(reffld)
-            feat = lyr.GetNextFeature()
-        return spindex, spfeats, bisonfldnames
 
             
     # ...............................................
@@ -518,14 +529,15 @@ class BisonFiller(object):
         marindex, marfeats, mar_bison_fldnames = \
             self._create_spatial_index(marine_data['fields'], eezlyr)
 
+        matches = {0: 0, 1: 0, 2: 0}
         recno = 0
         try:
+            start_time = time.time()
+            loop_time = start_time
             dict_reader, inf, writer, outf = open_csv_files(self.infname, 
                                              BISON_DELIMITER, ENCODING, 
                                              outfname=outfname, 
                                              outfields=self._outfields)
-            start = time.time()
-            int_start = start
             for rec in dict_reader:
                 recno += 1
                 squid = rec[BISON_SQUID_FLD]
@@ -535,24 +547,25 @@ class BisonFiller(object):
                     print('wtf {}'.format(squid))
                 else:
                     # Compute geo: coordinates and polygons
-                    self._fill_geofields(rec, lon, lat, 
+                    match_count = self._fill_geofields(rec, lon, lat, 
                                          terrindex, terrfeats, terr_bison_fldnames,
                                          marindex, marfeats, mar_bison_fldnames)
+                    if match_count == 0:
+                        matches[0] += 1
+                    elif match_count == 1:
+                        matches[1] += 1
+                    else:
+                        matches[2] += 1
                     # Write updated record
                     row = self._makerow(rec)
                     writer.writerow(row)
                 # Log progress occasionally, this process is very time-consuming
                 # so show progress at shorter intervals to ensure it is moving
-                if (recno % 1000) == 0:
-                    int_stop = time.time()
+                if (recno % 5000) == 0:
+                    now = time.time()
                     self._log.info('*** Record number {}, elapsed {} ***'.format(
-                        recno, int_start - int_stop))
-                    int_start = int_stop
-            try:
-                self._log.info('*** Total recs {}, total time {} ***'.format(
-                            recno, start - int_stop))
-            except:
-                self._log.info('*** Start time {} ***'.format(time.time()))
+                        recno, now - loop_time))
+                    loop_time = now
                 
         except Exception as e:
             self._log.error('Failed filling data from id {}, line {}: {}'
@@ -560,7 +573,11 @@ class BisonFiller(object):
         finally:
             inf.close()
             outf.close()
-            self._log.info('*** Stop time {} ***'.format(time.time()))
+            self._log.info('*** Elapsed time {} for {} records ***'.format(
+                time.time() - start_time, recno))
+            self._log.info('*** Matched 0: {}, 1: {}, >1: {} records ***'.format(
+                matches[0], matches[1], matches[2]))
+            
             
     # ...............................................
     def test_point_in_polygons(self, ancillary_path, outfname):

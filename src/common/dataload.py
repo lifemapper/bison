@@ -43,7 +43,6 @@ def get_line_count(filename):
     info, _ = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()
     temp = info.split(b'\n')[0]
     line_count = int(temp.split()[0])
-    print("line_count = {}".format(line_count))
     return line_count
 
 # .............................................................................
@@ -83,7 +82,6 @@ def find_chunk_files(big_csv_filename):
         if os.path.exists(in_filename):
             csv_filename_pairs.append((in_filename, out_filename))
             small_count = get_line_count(in_filename)
-            print('{} lines in file {}'.format(small_count, in_filename))
         else:
             csv_filename_pairs = None
             print('Missing file {}'.format(in_filename))
@@ -154,14 +152,14 @@ def step_parallel(in_csv_filename, terrestrial_data, marine_data, ancillary_path
     if csv_filename_pairs is None:
         csv_filename_pairs, header = make_chunk_files(in_csv_filename)
     
-#     in_csv_fn, out_csv_fn = csv_filename_pairs[0]
-#     intersect_csv_and_shapefiles(in_csv_fn, terrestrial_data, 
-#                 marine_data, ancillary_path, out_csv_fn)
-    with ProcessPoolExecutor() as executor:
-        for in_csv_fn, out_csv_fn in csv_filename_pairs:
-            executor.submit(
-                intersect_csv_and_shapefiles, in_csv_fn, terrestrial_data, 
+    in_csv_fn, out_csv_fn = csv_filename_pairs[0]
+    intersect_csv_and_shapefiles(in_csv_fn, terrestrial_data, 
                 marine_data, ancillary_path, out_csv_fn)
+#     with ProcessPoolExecutor() as executor:
+#         for in_csv_fn, out_csv_fn in csv_filename_pairs:
+#             executor.submit(
+#                 intersect_csv_and_shapefiles, in_csv_fn, terrestrial_data, 
+#                 marine_data, ancillary_path, out_csv_fn)
         
 #     try:
 #         outf = open(out_csv_filename, 'w', encoding='utf-8')

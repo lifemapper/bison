@@ -3,6 +3,7 @@
 	<name>bison</name>
 	<comment></comment>
 	<projects>
+		<project>skeleton</project>
 	</projects>
 	<buildSpec>
 		<buildCommand>
