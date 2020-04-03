@@ -110,3 +110,14 @@ Process Records Iteration 2
 Process Records Iteration 3
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #. Process as "GBIF and BISON provider common processing" in `BISON Data Load`_
+
+Correct reference data
+----------------------
+#. Assemble US and Canada political boundaries into single simplified shapefile
+
+Merge us_counties, can_counties:
+B_STATE = if (PRNAME = 0, STATE_NAME, replace(PRNAME, ' Canada', ''))
+B_COUNTY = if (PRNAME = 0, NAME, CDNAME)
+B_FIPS = if (PRNAME = 0, concat(STATE_FIPS, CNTY_FIPS), CDUID)
+B_CENTROID = geom_to_wkt (centroid( $geometry ) )
+
