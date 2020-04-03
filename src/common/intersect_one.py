@@ -21,7 +21,7 @@ def intersect_csv_and_shapefiles(in_csv_filename, geodata1, geodata2,
             intersection.
         out_csv_filename (str): Path for output CSV records.
     """
-    pth, basefname = os.path.split(in_csv_filename)
+    pth, basefname = os.path.split(out_csv_filename)
     logbasename, _ = os.path.splitext(basefname)
     logfname = os.path.join(pth, '{}.log'.format(logbasename))
     logger = getLogger(logbasename, logfname)

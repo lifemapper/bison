@@ -425,7 +425,6 @@ class GBIFReader(object):
 #         self._files.append(inf) 
 #         
 #         # Open new BISON CSV file for output, DictWriter does not order fields
-#         self._log.info('Open output file {}'.format(outfname))
 #         dwtr, outf = getCSVDictWriter(outfname, BISON_DELIMITER, ENCODING, 
 #                                       self._outfields)
 #         dwtr.writeheader()
