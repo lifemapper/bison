@@ -152,14 +152,14 @@ def step_parallel(in_csv_filename, terrestrial_data, marine_data, ancillary_path
     if csv_filename_pairs is None:
         csv_filename_pairs, header = make_chunk_files(in_csv_filename)
     
-    in_csv_fn, out_csv_fn = csv_filename_pairs[0]
-    intersect_csv_and_shapefiles(in_csv_fn, terrestrial_data, 
-                marine_data, ancillary_path, out_csv_fn)
-#     with ProcessPoolExecutor() as executor:
-#         for in_csv_fn, out_csv_fn in csv_filename_pairs:
-#             executor.submit(
-#                 intersect_csv_and_shapefiles, in_csv_fn, terrestrial_data, 
+#     in_csv_fn, out_csv_fn = csv_filename_pairs[0]
+#     intersect_csv_and_shapefiles(in_csv_fn, terrestrial_data, 
 #                 marine_data, ancillary_path, out_csv_fn)
+    with ProcessPoolExecutor() as executor:
+        for in_csv_fn, out_csv_fn in csv_filename_pairs:
+            executor.submit(
+                intersect_csv_and_shapefiles, in_csv_fn, terrestrial_data, 
+                marine_data, ancillary_path, out_csv_fn)
         
 #     try:
 #         outf = open(out_csv_filename, 'w', encoding='utf-8')
