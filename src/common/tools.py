@@ -11,6 +11,9 @@ from common.constants import (LOG_FORMAT, LOG_DATE_FORMAT, LOGFILE_MAX_BYTES,
                               LOGFILE_BACKUP_COUNT, EXTRA_VALS_KEY)
 from osgeo.ogr import wkbPolygon
 
+REQUIRED_FIELDS = ['STATE_NAME', 'NAME', 'STATE_FIPS', 'CNTY_FIPS', 'PRNAME', 
+     'CDNAME', 'CDUID']
+
 # .............................................................................
 def getCSVReader(datafile, delimiter, encoding):
     try:
@@ -209,21 +212,21 @@ def delete_shapefile(shp_filename):
             print('Failed to remove {}, {}'.format(simfname, str(err)))
     return success
 
-# .............................
-def _fill_ogr_feature(feat, feat_vals, feature_attributes):
-    # Fill the fields
-    for i in range(len(feature_attributes)):
-        fldname = feature_attributes[i][0]
-        val = feat_vals[i]
-        if fldname == 'geom':
-            geom = ogr.CreateGeometryFromWkt(val)
-            feat.SetGeometryDirectly(geom)
-        elif val is not None and val != 'None':
-            feat.SetField(fldname, val)
+# # .............................
+# def _fill_ogr_feature(feat, feat_vals, feature_attributes):
+#     # Fill the fields
+#     for i in range(len(feature_attributes)):
+#         fldname = feature_attributes[i][0]
+#         val = feat_vals[i]
+#         if fldname == 'geom':
+#             geom = ogr.CreateGeometryFromWkt(val)
+#             feat.SetGeometryDirectly(geom)
+#         elif val is not None and val != 'None':
+#             feat.SetField(fldname, val)
             
 # .............................................................................
 def _create_empty_dataset(out_shp_filename, feature_attributes, ogr_type, 
-                          epsg_code, overwrite=False):
+                          epsg_code, overwrite=True):
     """ Create an empty ogr dataset given a set of feature attributes
     
     Args:
@@ -261,7 +264,9 @@ def _create_empty_dataset(out_shp_filename, feature_attributes, ogr_type,
 
         # Define the fields
         for (fldname, fldtype) in feature_attributes:
-            if fldname != 'geom':
+            if fldname == 'geometries':
+                fld_defn = ogr.FieldDefn('geom', ogr.OFTString)
+            else:
                 fld_defn = ogr.FieldDefn(fldname, fldtype)
                 # Special case to handle long names
                 if (fldname.endswith('name') and fldtype == ogr.OFTString):
@@ -271,53 +276,63 @@ def _create_empty_dataset(out_shp_filename, feature_attributes, ogr_type,
                     raise Exception(
                         'CreateField failed for {} in {}'.format(
                             fldname, out_shp_filename))
+            
     except Exception as e:
         print('Failed to create shapefile {}'.format(out_shp_filename), e)
                     
     return dataset, lyr
 
 # .............................................................................
-def _calc_newfield_values(feat_vals, newfield_mapping):
-    calcvals = {}
-    for newfldname in newfield_mapping.keys():
-        if newfldname == 'B_STATE':
-            try:
-                calcval = feat_vals['STATE_NAME']
-            except:
-                try:
-                    tmp = feat_vals['PRNAME']
-                    calcval = tmp.replace(' Canada', '')
-                except:
-                    print('Failed to fill B_STATE')
-        elif newfldname == 'B_COUNTY':
-            try:
-                calcval = feat_vals['NAME']
-            except:
-                try:
-                    calcval = feat_vals['CDNAME']
-                except:
-                    print('Failed to fill B_COUNTY')
-        elif newfldname == 'B_FIPS':
-            try:
-                calcval = '{}{}'.format(
-                    feat_vals['STATE_FIPS'], feat_vals['CNTY_FIPS'])
-            except:
-                try:
-                    calcval = feat_vals['CDUID']
-                except:
-                    print('Failed to fill B_FIPS')
-        elif newfldname == 'B_CENTROID':
-            geom = feat_vals['geom']
-            centroid = geom.Centroid()
-            calcval = centroid.ExportToWkt()
-            
-        calcvals[newfldname] = calcval
-        
-    return calcvals
+def _calc_newfield_values(feat_vals):
+    state = cnty = fips = ''
+    try:
+        state = feat_vals['STATE_NAME']
+    except:
+        try:
+            tmp = feat_vals['PRNAME']
+            state = tmp.replace(' Canada', '')
+        except:
+            print('Failed to fill B_STATE')
+    try:
+        cnty = feat_vals['NAME']
+    except:
+        try:
+            cnty = feat_vals['CDNAME']
+        except:
+            print('Failed to fill B_COUNTY')
+    try:
+        fips = '{}{}'.format(
+            feat_vals['STATE_FIPS'], feat_vals['CNTY_FIPS'])
+    except:
+        try:
+            fips = feat_vals['CDUID']
+        except:
+            print('Failed to fill B_FIPS')
+    return {'B_STATE': state, 'B_COUNTY': cnty, 'B_FIPS': fips}
 
-
+# # .............................................................................
+# def _make_feature(new_layer, new_layer_def, feat_vals, geom, newfield_mapping):
+#     # create a new feature
+#     newfeat = ogr.Feature(new_layer_def)
+#     try:
+#         # put old dataset values into old fieldnames
+#         for fldname, fldval in feat_vals.items():
+#             newfeat.SetField(fldname, fldval)
+#         # put new calculated values into new fieldnames
+#         calcvals = _calc_newfield_values(feat_vals, geom, newfield_mapping)
+#         for calcname, calcval in calcvals.items():
+#             newfeat.SetField(calcname, calcval)
+#         # set geometry
+#         newfeat.SetGeometryDirectly(geom)
+#     except Exception as e:
+#         print('Failed to fill feature, e = {}'.format(e))
+#     else:
+#         # Create new feature, setting FID, in this layer
+#         new_layer.CreateFeature(newfeat)
+#         newfeat.Destroy() 
+           
 # .............................................................................
-def write_shapefile(new_dataset, new_layer, newfield_mapping, feats_list):
+def write_shapefile(new_dataset, new_layer, feature_sets):
     """ Write a shapefile given a set of features, attribute
     
     Args:
@@ -327,32 +342,39 @@ def write_shapefile(new_dataset, new_layer, newfield_mapping, feats_list):
     """
     new_layer_def = new_layer.GetLayerDefn()
     # for each set of features
-    for feats in feats_list:
+    for feats in feature_sets:
+        print('Starting feature set with {} features'.format(len(feats)))
         # for each feature
-        for oldfid, feat_vals in feats.keys():
-            # create a new feature
-            newfeat = ogr.Feature(new_layer_def)
-            try:
-                # put old dataset values into old fieldnames
-                for fldname, fldval in feat_vals:
-                    newfeat.SetField(fldname, fldval)
-                # put new calculated values into new fieldnames
-                calcvals = _calc_newfield_values(feat_vals, newfield_mapping)
-                for calcname, calcval in calcvals.items():
-                    newfeat.SetField(calcname, calcval)
-                # set geometry
-                newfeat.SetGeometryDirectly(feat_vals['geom'])                
-            except Exception as e:
-                print('Failed to fill feature, e = {}'.format(e))
-            else:
-                # Create new feature, setting FID, in this layer
-                new_layer.CreateFeature(newfeat)
-                newfeat.Destroy()
+        for oldfid, feat_vals in feats.items():
+            # create one or more features
+            simple_geoms = feat_vals['geometries']
+            print('Starting feature with {} geometries'.format(len(simple_geoms)))
+            for geom in simple_geoms:
+                try:
+                    # create a new feature
+                    newfeat = ogr.Feature(new_layer_def)
+                    # put old dataset values into old fieldnames
+                    for fldname, fldval in feat_vals.items():
+                        if fldname != 'geometries' and fldval is not None:
+                            newfeat.SetField(fldname, fldval)
+                    # put new calculated values into new fieldnames
+                    calcvals = _calc_newfield_values(feat_vals)
+                    for calcname, calcval in calcvals.items():
+                        newfeat.SetField(calcname, calcval)
+                    # set geometry
+                    newfeat.SetGeomField('geom', geom)
+                except Exception as e:
+                    print('Failed to fill feature, e = {}'.format(e))
+                else:
+                    # Create new feature, setting FID, in this layer
+                    new_layer.CreateFeature(newfeat)
+                    newfeat.Destroy()
+
     # Close and flush to disk
     new_dataset.Destroy()
 
 # .............................................................................
-def _read_shapefile(in_shp_filename):
+def _read_complex_shapefile(in_shp_filename):
     ogr.RegisterAll()
     drv = ogr.GetDriverByName('ESRI Shapefile')
     try:
@@ -376,28 +398,60 @@ def _read_shapefile(in_shp_filename):
     feat_attrs = []
     for i in range(fld_count):
         fld = lyr_def.GetFieldDefn(i)
-        feat_attrs.append((fld.GetNameRef(), fld.GetType()))
-    # Add geom WKT as last field
-    feat_attrs.append('geom')
+        fldname = fld.GetNameRef()
+        # ignore these fields
+        if fldname not in ('JSON', 'EXTENT'):
+            feat_attrs.append((fld.GetNameRef(), fld.GetType()))
     
     # Read Features
     feats = {}
     try:
+        old_feat_count = lyr.GetFeatureCount()
+        new_feat_count = 0
         for fid in range(0, lyr.GetFeatureCount()):
             feat = lyr.GetFeature(fid)
-            feat_vals = {}
+            geom = feat.geometry()
+            # Save centroid of original polygon
+            centroid = geom.Centroid()
+            feat_vals = {
+                'B_CENTROID': centroid.ExportToWkt() 
+                }
             for (fldname, _) in feat_attrs:
-                val = feat.GetFieldAsString(fldname)
+                try:
+                    val = feat.GetFieldAsString(fldname)
+                except:
+                    val = ''
+                    if fldname in REQUIRED_FIELDS:
+                        print('Failed to read value in {}, FID {}'.format(fldname, fid))
                 feat_vals[fldname] = val
-            # Add geom WKT as last field
-            feat_vals.append(feat.geometry())
+            feat_geoms = []
+            if geom.GetGeometryName() == 'MULTIPOLYGON':
+                for i in range(geom.GetGeometryCount()):
+                    subgeom = geom.GetGeometryRef(i)
+                    subname = subgeom.GetGeometryName()
+                    if subname == 'POLYGON':
+                        feat_geoms.append(subgeom)
+                    else:
+                        print('{} (non-polygon) subgeom, simple {}, count {}'.format(
+                            subname, subgeom.IsSimple(), subgeom.GetGeometryCount()))
+            # Add one or more geometries to feature
+            if len(feat_geoms) == 0:
+                feat_geoms.append(geom)
+            feat_vals['geometries'] = feat_geoms
+            new_feat_count += len(feat_geoms)    
             feats[fid] = feat_vals
+        print('Read {} features into {} simple features'.format(
+            old_feat_count, new_feat_count))
 
     except Exception as e:
         raise Exception('Failed to read features from {} ({})'.format(
             out_shp_filename, e))
         
-    return lyr, feats, feat_attrs, bbox
+    finally:
+        lyr = None
+        dataset = None
+        
+    return feats, feat_attrs, bbox
 
 # .............................................................................
 def merge_simplify_shapefiles(in_shp_filename1, in_shp_filename2, 
@@ -413,38 +467,35 @@ def merge_simplify_shapefiles(in_shp_filename1, in_shp_filename2,
     '''
     epsg_code = 4326
     # Open input shapefiles, read layer def
-    lyr1, feats1, feat_attrs1, bbox1 = _read_shapefile(in_shp_filename1)
-    lyr2, feats2, feat_attrs2, bbox2 = _read_shapefile(in_shp_filename2)
+    feats1, feat_attrs1, bbox1 = _read_complex_shapefile(in_shp_filename1)
+    feats2, feat_attrs2, bbox2 = _read_complex_shapefile(in_shp_filename2)
+#     feat_attrs1, bbox1 = _read_shapefile_fields(in_shp_filename1)
+#     feat_attrs2, bbox2 = _read_shapefile_fields(in_shp_filename2)
+#     input_data = {in_shp_filename1: feat_attrs1, in_shp_filename2: feat_attrs2}
     # ----------------- Merge attributes -----------------
-    new_feat_attrs = []
+    out_feat_attrs = []
     fnames1 = []
     for (fname,ftype) in feat_attrs1:
-        new_feat_attrs.append((fname,ftype))
+        out_feat_attrs.append((fname,ftype))
         fnames1.append(fname)
     for (fname,ftype) in feat_attrs2:
         if fname in fnames1:
             fname = fname+'2'
-        new_feat_attrs.append((fname,ftype))
+        out_feat_attrs.append((fname,ftype))
     # Add new attributes
-    for new_fldname in newfield_mapping.keys():
-        new_fldtype = newfield_mapping['ogr_field_type']
-        new_feat_attrs.append(new_fldname, new_fldtype)
+    for new_fldname, new_fldtype in newfield_mapping.items():
+        out_feat_attrs.append((new_fldname, new_fldtype))
         
-    # ----------------- Merge features  -----------------
-    
-    new_dataset, new_layer = _create_empty_dataset(
-        out_shp_filename, new_feat_attrs, wkbPolygon, epsg_code)
-    
-    new_feats = []
-    newid = 0
-    for fid, f_vals in feats1.items():
-        newid += 1
-        for (new_fldname, new_fldtype) in new_feat_attrs:
-            
+    new_bbox = (min(bbox1[0], bbox2[0]), min(bbox1[1], bbox2[1]),
+                max(bbox1[2], bbox2[2]), max(bbox1[3], bbox2[3]))
         
+    # ----------------- Create structure -----------------
+    out_dataset, out_layer = _create_empty_dataset(
+        out_shp_filename, out_feat_attrs, wkbPolygon, epsg_code, new_bbox)
     
-    # ----------------- Write -----------------
-    write_shapefile(new_dataset, new_layer, newfield_mapping, [feats1, feats2])    
+    # ----------------- Write old feats to new layer  -----------------
+    write_shapefile(out_dataset, out_layer, [feats1, feats2])    
+#     merge_shapefiles(out_dataset, out_layer, input_data)
 
 
 # ...............................................
@@ -458,31 +509,19 @@ if __name__ == '__main__':
     in_shp_filename2 = os.path.join(pth, sfname2)
     out_shp_filename = os.path.join(pth, outfname)
     newfield_mapping = {
-        'B_STATE': {
-            'ogr_field_type': ogr.OFTString,
-            in_shp_filename1: 'STATE_NAME',
-            in_shp_filename2: ('replace', 'PRNAME', ' Canada', '')
-            },
-        'B_COUNTY': {
-            'ogr_field_type': ogr.OFTString,
-            in_shp_filename1: 'NAME',
-            in_shp_filename2: 'CDNAME'
-            },
-        'B_FIPS': {
-            'ogr_field_type': ogr.OFTString,
-            in_shp_filename1: ('concat', 'STATE_FIPS', 'CNTY_FIPS'),
-            in_shp_filename2: 'CDUID'
-            },
-        'B_CENTROID': {
-            'ogr_field_type': ogr.OFTString,
-            in_shp_filename1: ('geom_to_wkt', 'centroid', 'geom'),
-            in_shp_filename2: ('geom_to_wkt', 'centroid', 'geom')
-            }
+        'B_STATE': ogr.OFTString,
+        'B_COUNTY': ogr.OFTString,
+        'B_FIPS': ogr.OFTString,
+        'B_CENTROID': ogr.OFTString
         }
-                                    
+    
     merge_simplify_shapefiles(in_shp_filename1, in_shp_filename2, 
                               newfield_mapping, out_shp_filename)
-    
+#     if not os.path.exists(out_shp_filename):                                
+#         merge_simplify_shapefiles(in_shp_filename1, in_shp_filename2, 
+#                                   newfield_mapping, out_shp_filename)
+#     else:
+#         (_, _, _) = _read_complex_shapefile(out_shp_filename)
     
     
     

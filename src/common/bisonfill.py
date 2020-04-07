@@ -181,16 +181,16 @@ class BisonFiller(object):
         pt.AddPoint(lon, lat)
         
 #         self._log.info('**** Start geo-intersect')
-        start = time.time()
+#         start = time.time()
         terr_intersect_fids = list(terrindex.intersection((lon, lat)))
-        self._log.info('Rtree intersect time for {} matching fids: {}'.format(
-            len(terr_intersect_fids), time.time()-start))
+#         self._log.info('Rtree intersect time for {} matching fids: {}'.format(
+#             len(terr_intersect_fids), time.time()-start))
         
         terr_count = 0
-        start = time.time()
+#         start = time.time()
         for tfid in terr_intersect_fids:
             geom = terrfeats[tfid]['geom']
-            start = time.time()
+#             start = time.time()
             is_within = pt.Within(geom)
 #             self._log.info('  ogr within time: {}'.format(time.time()-start))
             if is_within:
@@ -201,10 +201,10 @@ class BisonFiller(object):
                         fldvals[fn] = terrfeats[tfid][fn]
                 # If > 1 polygon, clear all values
                 else:
-                    self._log.info('  FOUND AGAIN!')
+#                     self._log.info('  FOUND AGAIN!')
                     fldvals = {}
                     break
-        self._log.info('  OGR within time {}'.format(time.time()-start))
+#         self._log.info('  OGR within time {}'.format(time.time()-start))
         
 #         if terr_count != 1:
 #             mar_intersect_fids = list(marindex.intersection((lon, lat)))
