@@ -32,7 +32,8 @@ from common.constants import (BISON_DELIMITER, ENCODING, LOGINTERVAL,
                               BISON_VALUES, BISON_SQUID_FLD, ITIS_KINGDOMS, 
                               ISO_COUNTRY_CODES, BISON_ORDERED_DATALOAD_FIELDS)
 from common.lookup import Lookup, VAL_TYPE
-from common.tools import (getCSVDictReader, open_csv_files, getLogger)
+from common.tools import (getCSVDictReader, open_csv_files, getLogger,
+    delete_shapefile)
 
 # .............................................................................
 class BisonFiller(object):
@@ -129,23 +130,25 @@ class BisonFiller(object):
         terr_data_src = driver.Open(terrestrial_shpname, 0)
         time.sleep(30)
         terrlyr = terr_data_src.GetLayer()
-        terr_def = terrlyr.GetLayerDefn()
-        idx_fips = terr_def.GetFieldIndex('B_FIPS')
-        idx_cnty = terr_def.GetFieldIndex('B_COUNTY')
-        idx_st = terr_def.GetFieldIndex('B_STATE')
-        idx_centroid = terr_def.GetFieldIndex('B_CENTROID')
 
         centroids = None
         datadict = {}
-        for poly in terrlyr:
-            fips = poly.GetFieldAsString(idx_fips)
-            county = poly.GetFieldAsString(idx_cnty)
-            state = poly.GetFieldAsString(idx_st)
-            centroid = poly.GetFieldAsString(idx_centroid)
+        for feat in terrlyr:
+            fips = feat.GetFieldAsString('B_FIPS')
+            county = feat.GetFieldAsString('B_COUNTY')
+            state = feat.GetFieldAsString('B_STATE')
+            centroid = feat.GetFieldAsString('B_CENTROID')
             key = ';'.join([state, county, fips])
-            tmp = centroid.lstrip('Point (').rstrip(')')
-            lonstr, latstr = tmp.split(' ')
-            datadict[key] = (lonstr, latstr)
+            tmp = centroid[centroid.find('(')+1:centroid.find(')')]
+            coords = tmp.split(' ')
+            try:
+                float(coords[0])
+                float(coords[1])
+            except:
+                self._log.error('Failed to read coordinates from {}'.format(
+                    centroid))
+            else:
+                datadict[key] = (coords[0], coords[1])
         terrlyr.ResetReading()
         if datadict:
             centroids = Lookup.initFromDict(datadict, valtype=VAL_TYPE.TUPLE)
@@ -176,24 +179,17 @@ class BisonFiller(object):
     def _fill_geofields(self, rec, lon, lat, 
                         terrindex, terrfeats, terr_bison_fldnames,
                         marindex, marfeats, mar_bison_fldnames):
+        msgs = []
         fldvals = {}
         pt = ogr.Geometry(ogr.wkbPoint)
         pt.AddPoint(lon, lat)
         
-#         self._log.info('**** Start geo-intersect')
-#         start = time.time()
-        terr_intersect_fids = list(terrindex.intersection((lon, lat)))
-#         self._log.info('Rtree intersect time for {} matching fids: {}'.format(
-#             len(terr_intersect_fids), time.time()-start))
-        
+        terr_intersect_fids = list(terrindex.intersection((lon, lat)))        
         terr_count = 0
-#         start = time.time()
+        start = time.time()
         for tfid in terr_intersect_fids:
             geom = terrfeats[tfid]['geom']
-#             start = time.time()
-            is_within = pt.Within(geom)
-#             self._log.info('  ogr within time: {}'.format(time.time()-start))
-            if is_within:
+            if pt.Within(geom):
                 terr_count += 1
                 # If intersects, take values for first polygon
                 if terr_count == 1:
@@ -201,35 +197,39 @@ class BisonFiller(object):
                         fldvals[fn] = terrfeats[tfid][fn]
                 # If > 1 polygon, clear all values
                 else:
-#                     self._log.info('  FOUND AGAIN!')
                     fldvals = {}
                     break
-#         self._log.info('  OGR within time {}'.format(time.time()-start))
+        ogr_seconds = time.time()-start
+        if ogr_seconds > 0.5:
+            msgs.append('Terr fid intersect {}; point {}, {}; OGR time {} '.format(
+                terr_intersect_fids, lon, lat, ogr_seconds))
         
-#         if terr_count != 1:
-#             mar_intersect_fids = list(marindex.intersection((lon, lat)))
-#             marine_count = 0
-#             for mfid in mar_intersect_fids:
-#                 geom = marfeats[mfid]['geom']
-#                 if pt.Within(geom):
-#                     marine_count += 1
-#                     # If intersects, take values for first polygon
-#                     if marine_count == 1:
-#                         for fn in mar_bison_fldnames:
-#                             fldvals[fn] = marfeats[mfid][fn]
-#                     # If > 1 polygon, clear marine values (leave terr)
-#                     else:
-#                         for fn in mar_bison_fldnames:
-#                             fldvals[fn] = None
-#                         break
-#             stop = time.time()
-#             elapsed = stop - start
-#             self._log.info('Time for intersect {}'.format(elapsed))
+        if terr_count != 1:
+            mar_intersect_fids = list(marindex.intersection((lon, lat)))
+            marine_count = 0
+            start = time.time()
+            for mfid in mar_intersect_fids:
+                geom = marfeats[mfid]['geom']
+                if pt.Within(geom):
+                    marine_count += 1
+                    # If intersects, take values for first polygon
+                    if marine_count == 1:
+                        for fn in mar_bison_fldnames:
+                            fldvals[fn] = marfeats[mfid][fn]
+                    # If > 1 polygon, clear marine values (leave terr)
+                    else:
+                        for fn in mar_bison_fldnames:
+                            fldvals[fn] = None
+                        break
+        ogr_seconds = time.time()-start
+        if ogr_seconds > 0.5:
+            msgs.append('EEZ fid intersect {}; point {}, {}; OGR time {} '.format(
+                mar_intersect_fids, lon, lat, ogr_seconds))
 
         # Update record with resolved values for intersecting polygons
         for name, val in fldvals.items():
             rec[name] = val
-        return terr_count
+        return terr_count, msgs
 
     # ...............................................
     def _fill_centroids(self, rec, centroids):
@@ -461,7 +461,9 @@ class BisonFiller(object):
         for fid in range(0, lyr.GetFeatureCount()):
             feat = lyr.GetFeature(fid)
             geom = feat.geometry()
+            # OGR returns xmin, xmax, ymin, ymax
             xmin, xmax, ymin, ymax = geom.GetEnvelope()
+            # Rtree takes xmin, xmax, ymin, ymax IFF interleaved = False
             spindex.insert(fid, (xmin, xmax, ymin, ymax))
             spfeats[fid] = {'feature': feat, 
                             'geom': geom}
@@ -513,6 +515,8 @@ class BisonFiller(object):
                      clean_provided_scientific_name
         @return: A CSV file of BISON-modified records  
         """
+        if os.path.exists(outfname):
+            delete_shapefile(outfname)
         if self.is_open():
             self.close()
         driver = ogr.GetDriverByName("ESRI Shapefile")
@@ -531,6 +535,7 @@ class BisonFiller(object):
 
         matches = {0: 0, 1: 0, 2: 0}
         recno = 0
+        painful_count = 0
         try:
             start_time = time.time()
             loop_time = start_time
@@ -547,24 +552,31 @@ class BisonFiller(object):
                     print('wtf {}'.format(squid))
                 else:
                     # Compute geo: coordinates and polygons
-                    match_count = self._fill_geofields(rec, lon, lat, 
-                                         terrindex, terrfeats, terr_bison_fldnames,
-                                         marindex, marfeats, mar_bison_fldnames)
+                    match_count, msgs = self._fill_geofields(
+                        rec, lon, lat, terrindex, terrfeats, terr_bison_fldnames, 
+                        marindex, marfeats, mar_bison_fldnames)
+
                     if match_count == 0:
                         matches[0] += 1
                     elif match_count == 1:
                         matches[1] += 1
                     else:
                         matches[2] += 1
-                    # Write updated record
-                    row = self._makerow(rec)
-                    writer.writerow(row)
+                        
+                    if msgs:
+                        painful_count += 1
+                        for msg in msgs:
+                            self._log.info('Rec {}; {}'.format(recno, msg))
+                
+                # Write updated record
+                row = self._makerow(rec)
+                writer.writerow(row)
                 # Log progress occasionally, this process is very time-consuming
                 # so show progress at shorter intervals to ensure it is moving
-                if (recno % 5000) == 0:
+                if (recno % LOGINTERVAL/10) == 0:
                     now = time.time()
-                    self._log.info('*** Record number {}, elapsed {} ***'.format(
-                        recno, now - loop_time))
+                    self._log.info('*** Record number {}, painful {}, time {} ***'.format(
+                        recno, painful_count, now - loop_time))
                     loop_time = now
                 
         except Exception as e:
