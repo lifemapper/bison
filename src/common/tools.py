@@ -4,15 +4,16 @@ import logging
 from logging.handlers import RotatingFileHandler
 import os
 from osgeo import ogr, osr
+import rtree
 from sys import maxsize
 import time
 
 from common.constants import (LOG_FORMAT, LOG_DATE_FORMAT, LOGFILE_MAX_BYTES,
                               LOGFILE_BACKUP_COUNT, EXTRA_VALS_KEY)
-from osgeo.ogr import wkbPolygon
 
 REQUIRED_FIELDS = ['STATE_NAME', 'NAME', 'STATE_FIPS', 'CNTY_FIPS', 'PRNAME', 
      'CDNAME', 'CDUID']
+CENTROID_FIELD = 'B_CENTROID'
 
 # .............................................................................
 def getCSVReader(datafile, delimiter, encoding):
@@ -264,75 +265,171 @@ def _create_empty_dataset(out_shp_filename, feature_attributes, ogr_type,
 
         # Define the fields
         for (fldname, fldtype) in feature_attributes:
-            if fldname == 'geometries':
-                fld_defn = ogr.FieldDefn('geom', ogr.OFTString)
-            else:
-                fld_defn = ogr.FieldDefn(fldname, fldtype)
-                # Special case to handle long names
-                if (fldname.endswith('name') and fldtype == ogr.OFTString):
-                    fld_defn.SetWidth(255)
-                return_val = lyr.CreateField(fld_defn)
-                if return_val != 0:
-                    raise Exception(
-                        'CreateField failed for {} in {}'.format(
-                            fldname, out_shp_filename))
-            
+            fld_defn = ogr.FieldDefn(fldname, fldtype)
+            # Special case to handle long names
+            if (fldname.endswith('name') and fldtype == ogr.OFTString):
+                fld_defn.SetWidth(255)
+            return_val = lyr.CreateField(fld_defn)
+            if return_val != 0:
+                raise Exception(
+                    'CreateField failed for {} in {}'.format(
+                        fldname, out_shp_filename))
+        print('Created empty dataset with {} fields'.format(
+            len(feature_attributes)))            
     except Exception as e:
         print('Failed to create shapefile {}'.format(out_shp_filename), e)
                     
     return dataset, lyr
 
 # .............................................................................
-def _calc_newfield_values(feat_vals):
-    state = cnty = fips = ''
-    try:
-        state = feat_vals['STATE_NAME']
-    except:
-        try:
-            tmp = feat_vals['PRNAME']
-            state = tmp.replace(' Canada', '')
-        except:
-            print('Failed to fill B_STATE')
-    try:
-        cnty = feat_vals['NAME']
-    except:
-        try:
-            cnty = feat_vals['CDNAME']
-        except:
-            print('Failed to fill B_COUNTY')
-    try:
-        fips = '{}{}'.format(
-            feat_vals['STATE_FIPS'], feat_vals['CNTY_FIPS'])
-    except:
-        try:
-            fips = feat_vals['CDUID']
-        except:
-            print('Failed to fill B_FIPS')
-    return {'B_STATE': state, 'B_COUNTY': cnty, 'B_FIPS': fips}
+def _calc_newfield_values(feat_vals, calc_fldnames):
+    calc_vals = {}
+    state = cnty = fips = None
+    for fldname in calc_fldnames:
+        if fldname ==  'B_STATE':
+            try:
+                state = feat_vals['STATE_NAME']
+            except:
+                try:
+                    tmp = feat_vals['PRNAME']
+                    state = tmp.replace(' Canada', '')
+                except:
+                    print('Failed to fill B_STATE')
+            calc_vals['B_STATE'] = state
+        elif fldname == 'B_COUNTY':
+            try:
+                cnty = feat_vals['NAME']
+            except:
+                try:
+                    cnty = feat_vals['CDNAME']
+                except:
+                    print('Failed to fill B_COUNTY')
+            calc_vals['B_COUNTY'] = cnty
+        elif fldname == 'B_FIPS':
+            try:
+                fips = '{}{}'.format(
+                    feat_vals['STATE_FIPS'], feat_vals['CNTY_FIPS'])
+            except:
+                try:
+                    fips = feat_vals['CDUID']
+                except:
+                    print('Failed to fill B_FIPS')
+            calc_vals['B_FIPS'] = fips
+        else:
+            print('Not calculating field {}'.format(fldname))
+    return calc_vals
 
-# # .............................................................................
-# def _make_feature(new_layer, new_layer_def, feat_vals, geom, newfield_mapping):
-#     # create a new feature
-#     newfeat = ogr.Feature(new_layer_def)
-#     try:
-#         # put old dataset values into old fieldnames
-#         for fldname, fldval in feat_vals.items():
-#             newfeat.SetField(fldname, fldval)
-#         # put new calculated values into new fieldnames
-#         calcvals = _calc_newfield_values(feat_vals, geom, newfield_mapping)
-#         for calcname, calcval in calcvals.items():
-#             newfeat.SetField(calcname, calcval)
-#         # set geometry
-#         newfeat.SetGeometryDirectly(geom)
-#     except Exception as e:
-#         print('Failed to fill feature, e = {}'.format(e))
-#     else:
-#         # Create new feature, setting FID, in this layer
-#         new_layer.CreateFeature(newfeat)
-#         newfeat.Destroy() 
-           
 # .............................................................................
-def write_shapefile(new_dataset, new_layer, feature_sets):
+def get_clustered_spatial_index(shp_filename):
+    pth, basename = os.path.split(shp_filename)
+    idxname, _ = os.path.splitext(basename)
+    idx_filename = os.path.join(pth, idxname)
+
+    if not(os.path.exists(idx_filename+'.dat')):
+        # Create spatial index
+        prop = rtree.index.Property()
+        prop.set_filename(idx_filename)
+        
+        driver = ogr.GetDriverByName("ESRI Shapefile")
+        datasrc = driver.Open(shp_filename, 0)
+        lyr = datasrc.GetLayer()
+        spindex = rtree.index.Index(idx_filename, interleaved=False, properties=prop)
+        for fid in range(0, lyr.GetFeatureCount()):
+            feat = lyr.GetFeature(fid)
+            geom = feat.geometry()
+            wkt = geom.ExportToWkt()
+            # OGR returns xmin, xmax, ymin, ymax
+            xmin, xmax, ymin, ymax = geom.GetEnvelope()
+            # Rtree takes xmin, xmax, ymin, ymax IFF interleaved = False
+            spindex.insert(fid, (xmin, xmax, ymin, ymax), obj=wkt)
+        # Write spatial index
+        spindex.close()
+    else:
+        spindex = rtree.index.Index(idx_filename, interleaved=False)
+    return spindex
+
+# .............................................................................
+def _refine_intersect(gc_wkt, poly, new_layer, feat_vals):
+    newfeat_count = 0
+    # select only the intersections
+    gridcell = ogr.CreateGeometryFromWkt(gc_wkt)
+    if poly.Intersects(gridcell):
+        intersection = poly.Intersection(gridcell)
+        itxname = intersection.GetGeometryName()
+        
+        # Split polygon/gridcell intersection into 1 or more simple polygons
+        itx_polys = []
+        if itxname == 'POLYGON':
+            itx_polys.append(intersection)
+        elif itxname in ('MULTIPOLYGON', 'GEOMETRYCOLLECTION'):
+            for i in range(intersection.GetGeometryCount()):
+                subgeom = intersection.GetGeometryRef(i)
+                subname = subgeom.GetGeometryName()
+                if subname == 'POLYGON':
+                    itx_polys.append(subgeom)
+                else:
+                    print('{} intersection subgeom, simple {}, count {}'.format(
+                        subname, subgeom.IsSimple(), subgeom.GetGeometryCount()))
+        else:
+            print('{} intersection geom, simple {}, count {}'.format(
+                itxname, intersection.IsSimple(), intersection.GetGeometryCount()))
+
+        # Make a feature from each simple polygon
+        for ipoly in itx_polys:
+            try:
+                newfeat = ogr.Feature(new_layer.GetLayerDefn())
+                newfeat.SetGeometry(ipoly)
+                # put values into fieldnames
+                for fldname, fldval in feat_vals.items():
+                    if fldname != 'geometries' and fldval is not None:
+                        newfeat.SetField(fldname, fldval)
+            except Exception as e:
+                print('      Failed to fill feature, e = {}'.format(e))
+            else:
+                # Create new feature, setting FID, in this layer
+                new_layer.CreateFeature(newfeat)
+                newfeat.Destroy()
+                newfeat_count += 1
+    return newfeat_count
+
+# .............................................................................
+def intersect_write_shapefile(new_dataset, new_layer, feats, grid_index):
+    feat_count = 0
+    # for each feature
+    print ('Loop through {} poly features for intersection'.format(len(feats)))
+    for fid, feat_vals in feats.items():
+        curr_count = 0
+        # create new feature for every simple geometry
+        simple_wkts = feat_vals['geometries']
+        print ('  Loop through {} simple features in poly'.format(
+            len(simple_wkts)))
+        for wkt in simple_wkts:
+            # create a new feature
+            simple_geom = ogr.CreateGeometryFromWkt(wkt)
+            gname = simple_geom.GetGeometryName()
+            if gname != 'POLYGON':
+                print ('    Discard invalid {} subgeometry'.format(gname))
+            else:
+                # xmin, xmax, ymin, ymax
+                xmin, xmax, ymin, ymax = simple_geom.GetEnvelope()
+                hits = list(grid_index.intersection((xmin, xmax, ymin, ymax), 
+                                                    objects=True))
+                print ('    Loop through {} roughly intersected gridcells'.format(len(hits)))
+                for item in hits:
+                    gc_wkt = item.object
+                    newfeat_count = _refine_intersect(
+                        gc_wkt, simple_geom, new_layer, feat_vals)
+                    curr_count += newfeat_count
+#                     print ('  Created {} new features for simplified poly'.format(
+#                         newfeat_count))
+        print ('  Created {} new features for primary poly'.format(feat_count))
+        feat_count += curr_count
+    print ('Created {} new features from intersection'.format(feat_count))
+    # Close and flush to disk
+    new_dataset.Destroy()
+
+# .............................................................................
+def write_shapefile(new_dataset, new_layer, feature_sets, calc_nongeo_fields):
     """ Write a shapefile given a set of features, attribute
     
     Args:
@@ -340,38 +437,41 @@ def write_shapefile(new_dataset, new_layer, feature_sets):
         new_layer: an OGR layer object with feature
         newfield_mapping = 
     """
+    feat_count = 0
     new_layer_def = new_layer.GetLayerDefn()
     # for each set of features
     for feats in feature_sets:
-        print('Starting feature set with {} features'.format(len(feats)))
         # for each feature
         for oldfid, feat_vals in feats.items():
-            # create one or more features
+            # create new feature for every simple geometry
             simple_geoms = feat_vals['geometries']
-            print('Starting feature with {} geometries'.format(len(simple_geoms)))
-            for geom in simple_geoms:
+            for wkt in simple_geoms:
                 try:
                     # create a new feature
                     newfeat = ogr.Feature(new_layer_def)
+                    poly = ogr.CreateGeometryFromWkt(wkt)
+                    newfeat.SetGeometry(poly)
                     # put old dataset values into old fieldnames
                     for fldname, fldval in feat_vals.items():
                         if fldname != 'geometries' and fldval is not None:
                             newfeat.SetField(fldname, fldval)
                     # put new calculated values into new fieldnames
-                    calcvals = _calc_newfield_values(feat_vals)
+                    calcvals = _calc_newfield_values(feat_vals, calc_nongeo_fields)
                     for calcname, calcval in calcvals.items():
                         newfeat.SetField(calcname, calcval)
-                    # set geometry
-                    newfeat.SetGeomField('geom', geom)
                 except Exception as e:
                     print('Failed to fill feature, e = {}'.format(e))
                 else:
                     # Create new feature, setting FID, in this layer
                     new_layer.CreateFeature(newfeat)
                     newfeat.Destroy()
+                    feat_count += 1
+        print('Wrote {} records from feature set'.format(feat_count))
+        feat_count = 0
 
     # Close and flush to disk
     new_dataset.Destroy()
+
 
 # .............................................................................
 def _read_complex_shapefile(in_shp_filename):
@@ -399,9 +499,12 @@ def _read_complex_shapefile(in_shp_filename):
     for i in range(fld_count):
         fld = lyr_def.GetFieldDefn(i)
         fldname = fld.GetNameRef()
+        fldtype = fld.GetType()
         # ignore these fields
-        if fldname not in ('JSON', 'EXTENT'):
-            feat_attrs.append((fld.GetNameRef(), fld.GetType()))
+        if fldname not in ('JSON', 'EXTENT', 'ALAND', 'AWATER', 'Area_m2'):
+            if fldname == 'MRGID':
+                fldtype = ogr.OFTInteger
+            feat_attrs.append((fldname, fldtype))
     
     # Read Features
     feats = {}
@@ -410,42 +513,49 @@ def _read_complex_shapefile(in_shp_filename):
         new_feat_count = 0
         for fid in range(0, lyr.GetFeatureCount()):
             feat = lyr.GetFeature(fid)
-            geom = feat.geometry()
-            # Save centroid of original polygon
-            centroid = geom.Centroid()
-            feat_vals = {
-                'B_CENTROID': centroid.ExportToWkt() 
-                }
+            feat_vals = {}
             for (fldname, _) in feat_attrs:
                 try:
                     val = feat.GetFieldAsString(fldname)
                 except:
                     val = ''
                     if fldname in REQUIRED_FIELDS:
-                        print('Failed to read value in {}, FID {}'.format(fldname, fid))
+                        print('Failed to read value in {}, FID {}'.format(
+                            fldname, fid))
                 feat_vals[fldname] = val
-            feat_geoms = []
-            if geom.GetGeometryName() == 'MULTIPOLYGON':
+            # Save centroid of original polygon
+            geom = feat.geometry()
+            geom_name = geom.GetGeometryName()
+            centroid = geom.Centroid()
+            feat_vals[CENTROID_FIELD] = centroid.ExportToWkt() 
+            # Split multipolygon into 1 record - 1 simple polygon
+            feat_wkts = []
+            if geom_name == 'POLYGON':
+                feat_wkts.append(geom.ExportToWkt())
+            elif geom_name in ('MULTIPOLYGON', 'GEOMETRYCOLLECTION'):
                 for i in range(geom.GetGeometryCount()):
                     subgeom = geom.GetGeometryRef(i)
                     subname = subgeom.GetGeometryName()
                     if subname == 'POLYGON':
-                        feat_geoms.append(subgeom)
+                        feat_wkts.append(subgeom.ExportToWkt())
                     else:
-                        print('{} (non-polygon) subgeom, simple {}, count {}'.format(
+                        print('{} subgeom, simple {}, count {}'.format(
                             subname, subgeom.IsSimple(), subgeom.GetGeometryCount()))
+            else:
+                print('{} primary geom, simple {}, count {}'.format(
+                    geom_name, geom.IsSimple(), geom.GetGeometryCount()))
             # Add one or more geometries to feature
-            if len(feat_geoms) == 0:
-                feat_geoms.append(geom)
-            feat_vals['geometries'] = feat_geoms
-            new_feat_count += len(feat_geoms)    
+            if len(feat_wkts) == 0:
+                feat_wkts.append(geom.ExportToWkt())
+            feat_vals['geometries'] = feat_wkts
+            new_feat_count += len(feat_wkts)
             feats[fid] = feat_vals
         print('Read {} features into {} simple features'.format(
             old_feat_count, new_feat_count))
 
     except Exception as e:
         raise Exception('Failed to read features from {} ({})'.format(
-            out_shp_filename, e))
+            in_shp_filename, e))
         
     finally:
         lyr = None
@@ -454,74 +564,160 @@ def _read_complex_shapefile(in_shp_filename):
     return feats, feat_attrs, bbox
 
 # .............................................................................
-def merge_simplify_shapefiles(in_shp_filename1, in_shp_filename2, 
-                              newfield_mapping, out_shp_filename):
-    ''' Merge 2 shapefiles, simplifying multipolygons into simple polygons with
+def simplify_merge_polygon_shapefiles(in_shp_filenames, calc_fields, out_shp_filename):
+    ''' Merge one or more shapefiles, simplifying multipolygons into simple polygons with
     the same attribute values.
     
     Args:
-        in_shp_filename1:
-        in_shp_filename2: 
-        newfield_mapping: 
-        out_shp_filename:
+        in_shp_filenames: list of one or more input shapefiles 
+        newfield_mapping: dictionary of new fields, fieldtypes
+        out_shp_filename: output filename
     '''
     epsg_code = 4326
     # Open input shapefiles, read layer def
-    feats1, feat_attrs1, bbox1 = _read_complex_shapefile(in_shp_filename1)
-    feats2, feat_attrs2, bbox2 = _read_complex_shapefile(in_shp_filename2)
-#     feat_attrs1, bbox1 = _read_shapefile_fields(in_shp_filename1)
-#     feat_attrs2, bbox2 = _read_shapefile_fields(in_shp_filename2)
-#     input_data = {in_shp_filename1: feat_attrs1, in_shp_filename2: feat_attrs2}
+    features_lst = []
+    feat_attrs_lst = []
+    bboxes = []
+    for shp_fname in in_shp_filenames:
+        # Calculate B_CENTROID and save values of original polygon/feature
+        feats, feat_attrs, bbox = _read_complex_shapefile(shp_fname)
+        features_lst.append(feats)
+        feat_attrs_lst.append(feat_attrs)
+        bboxes.append(bbox)
+
     # ----------------- Merge attributes -----------------
     out_feat_attrs = []
-    fnames1 = []
-    for (fname,ftype) in feat_attrs1:
-        out_feat_attrs.append((fname,ftype))
-        fnames1.append(fname)
-    for (fname,ftype) in feat_attrs2:
-        if fname in fnames1:
-            fname = fname+'2'
-        out_feat_attrs.append((fname,ftype))
-    # Add new attributes
-    for new_fldname, new_fldtype in newfield_mapping.items():
-        out_feat_attrs.append((new_fldname, new_fldtype))
-        
-    new_bbox = (min(bbox1[0], bbox2[0]), min(bbox1[1], bbox2[1]),
-                max(bbox1[2], bbox2[2]), max(bbox1[3], bbox2[3]))
+    new_fldnames = []
+    for i in range(len(feat_attrs_lst)):
+        feat_attrs = feat_attrs_lst[i]
+        for (fname,ftype) in feat_attrs:
+            if fname in new_fldnames:
+                fname = fname + str(i)
+            new_fldnames.append(fname)
+            out_feat_attrs.append((fname,ftype))
+    # Add new attributes including B_CENTROID
+    for calc_fldname, calc_fldtype in calc_fields.items():
+        out_feat_attrs.append((calc_fldname, calc_fldtype))
+        new_fldnames.append(calc_fldname)
+
+    # ----------------- ? bbox -----------------
+    new_bbox = (min([b[0] for b in bboxes]), min([b[1] for b in bboxes]),
+                max([b[2] for b in bboxes]), max([b[3] for b in bboxes]))
         
     # ----------------- Create structure -----------------
     out_dataset, out_layer = _create_empty_dataset(
-        out_shp_filename, out_feat_attrs, wkbPolygon, epsg_code, new_bbox)
+        out_shp_filename, out_feat_attrs, ogr.wkbPolygon, epsg_code, 
+        overwrite=True)
     
     # ----------------- Write old feats to new layer  -----------------
-    write_shapefile(out_dataset, out_layer, [feats1, feats2])    
-#     merge_shapefiles(out_dataset, out_layer, input_data)
+    # Calculate non-geometric fields
+    # Write one or more new features for each original feature
+    calc_nongeo_fields = [k for k in calc_fields.keys() if k != CENTROID_FIELD] 
+    write_shapefile(
+        out_dataset, out_layer, features_lst, calc_nongeo_fields)
 
+
+# .............................................................................
+def intersect_polygon_with_grid(primary_shp_filename, grid_shp_filename, 
+                                calc_fields, out_shp_filename):
+    ''' Intersect a primary shapefile with a grid (or other simple polygon) 
+    shapefile, simplifying multipolygons in the primary shapefile into simple 
+    polygons. Intersect the simple polygons with gridcells in the second 
+    shapefile to further reduce polygon size and complexity.
+    
+    Args:
+        in_shp_filenames: list of one or more input shapefiles 
+        grid_shp_filename: dictionary of new fields, fieldtypes
+        out_shp_filename: output filename
+    '''
+    epsg_code = 4326
+    # Open input shapefile, read layer def
+    feats, feat_attrs, bbox = _read_complex_shapefile(primary_shp_filename)
+    
+    # Add new attributes including B_CENTROID
+    for calc_fldname, calc_fldtype in calc_fields.items():
+        feat_attrs.append((calc_fldname, calc_fldtype))
+         
+    # Get spatial index for grid with WKT for each cell
+    grid_index = get_clustered_spatial_index(grid_shp_filename)
+ 
+    # ----------------- Create structure -----------------
+    out_dataset, out_layer = _create_empty_dataset(
+        out_shp_filename, feat_attrs, ogr.wkbPolygon, epsg_code, 
+        overwrite=True)
+       
+    # ----------------- Intersect polygons -----------------
+    intersect_write_shapefile(out_dataset, out_layer, feats, grid_index)
+        
 
 # ...............................................
 if __name__ == '__main__':
     pth = '/tank/data/bison/2019/ancillary'
-    sfname1 = 'us_counties/us_counties.shp'
-    sfname2 = 'can_counties/can_counties.shp'
-    outfname = 'us_can_boundaries_centroids.shp'
     
-    in_shp_filename1 = os.path.join(pth, sfname1)
-    in_shp_filename2 = os.path.join(pth, sfname2)
-    out_shp_filename = os.path.join(pth, outfname)
-    newfield_mapping = {
-        'B_STATE': ogr.OFTString,
-        'B_COUNTY': ogr.OFTString,
-        'B_FIPS': ogr.OFTString,
-        'B_CENTROID': ogr.OFTString
-        }
+#     # Terrestrial boundaries
+#     us_sfname = 'us_counties/us_counties.shp'
+#     can_sfname = 'can_counties/can_counties.shp'
+#     terr_outfname = 'us_can_boundaries_centroids.shp'
+#     
+#     in_terr_filenames = [os.path.join(pth, us_sfname), 
+#                         os.path.join(pth, can_sfname)]
+#     out_terr_filename = os.path.join(pth, terr_outfname)
+#     calc_terr_fields = {
+#         'B_STATE': ogr.OFTString,
+#         'B_COUNTY': ogr.OFTString,
+#         'B_FIPS': ogr.OFTString,
+#         CENTROID_FIELD: ogr.OFTString
+#         }
+#     simplify_merge_polygon_shapefiles(in_terr_filenames, calc_terr_fields, 
+#                                       out_terr_filename)
     
-    merge_simplify_shapefiles(in_shp_filename1, in_shp_filename2, 
-                              newfield_mapping, out_shp_filename)
-#     if not os.path.exists(out_shp_filename):                                
-#         merge_simplify_shapefiles(in_shp_filename1, in_shp_filename2, 
-#                                   newfield_mapping, out_shp_filename)
-#     else:
-#         (_, _, _) = _read_complex_shapefile(out_shp_filename)
+    # Marine boundaries
+    eez_orig_sfname = 'World_EEZ_v8_20140228_splitpolygons/World_EEZ_v8_2014_HR.shp'
+    grid_sfname = 'world_grid_10.shp'
+    intersect_outfname = 'gridded_eez.shp'
+    eez_outfname = 'eez_boundaries_centroids.shp'
+    
+    orig_eez_filename = os.path.join(pth, eez_orig_sfname)
+    grid_shp_filename = os.path.join(pth, grid_sfname)
+    intersect_filename = os.path.join(pth, intersect_outfname)
     
     
+#     in_eez_filenames = [intersect_outfname]
+#     out_eez_filename = os.path.join(pth, eez_outfname)
+    calc_eez_fields = {CENTROID_FIELD: ogr.OFTString}
+#     simplify_merge_polygon_shapefiles(in_eez_filenames, calc_eez_fields, 
+#                                       out_eez_filename)
     
+    intersect_polygon_with_grid(orig_eez_filename, grid_shp_filename, 
+                                calc_eez_fields, intersect_filename)
+    
+"""
+pth = '/tank/data/bison/2019/ancillary'
+grid_sfname = 'world_grid_5.shp'
+shp_filename = os.path.join(pth, grid_sfname)
+
+
+pth, basename = os.path.split(shp_filename)
+idxname, _ = os.path.splitext(basename)
+idx_filename = os.path.join(pth, idxname)
+
+prop = rtree.index.Property()
+prop.set_filename(idx_filename)
+
+driver = ogr.GetDriverByName("ESRI Shapefile")
+datasrc = driver.Open(shp_filename, 0)
+lyr = datasrc.GetLayer()
+spindex = rtree.index.Index(idxname, interleaved=False, properties=prop)
+
+for fid in range(0, lyr.GetFeatureCount()):
+    feat = lyr.GetFeature(fid)
+    geom = feat.geometry()
+    wkt = geom.ExportToWkt()
+    # OGR returns xmin, xmax, ymin, ymax
+    xmin, xmax, ymin, ymax = geom.GetEnvelope()
+    # Rtree takes xmin, xmax, ymin, ymax IFF interleaved = False
+    spindex.insert(fid, (xmin, xmax, ymin, ymax), obj=wkt)
+
+spindex.close()
+
+"""
