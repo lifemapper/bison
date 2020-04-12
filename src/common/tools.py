@@ -673,9 +673,9 @@ if __name__ == '__main__':
     
     # Marine boundaries
     eez_orig_sfname = 'World_EEZ_v8_20140228_splitpolygons/World_EEZ_v8_2014_HR.shp'
-    grid_sfname = 'world_grid_10.shp'
+    grid_sfname = 'world_grid_5.shp'
     intersect_outfname = 'gridded_eez.shp'
-    eez_outfname = 'eez_boundaries_centroids.shp'
+    eez_outfname = 'eez_boundaries_centroids_5.shp'
     
     orig_eez_filename = os.path.join(pth, eez_orig_sfname)
     grid_shp_filename = os.path.join(pth, grid_sfname)

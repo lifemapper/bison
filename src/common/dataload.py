@@ -165,7 +165,7 @@ def step_parallel(in_csv_filename, terrestrial_data, marine_data, ancillary_path
     
     try:
         outf = open(out_csv_filename, 'w', encoding='utf-8')
-        outf.write('{}\n'.format(header))
+        outf.write('{}'.format(header))
         for _, small_csv_fn in csv_filename_pairs:
             lineno = 0
             try:
