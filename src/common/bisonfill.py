@@ -200,7 +200,7 @@ class BisonFiller(object):
                     fldvals = {}
                     break
         ogr_seconds = time.time()-start
-        if ogr_seconds > 0.5:
+        if ogr_seconds > 0.75:
             msgs.append('Terr fid intersect {}; point {}, {}; OGR time {} '.format(
                 terr_intersect_fids, lon, lat, ogr_seconds))
         
@@ -221,10 +221,10 @@ class BisonFiller(object):
                         for fn in mar_bison_fldnames:
                             fldvals[fn] = None
                         break
-        ogr_seconds = time.time()-start
-        if ogr_seconds > 0.5:
-            msgs.append('EEZ fid intersect {}; point {}, {}; OGR time {} '.format(
-                mar_intersect_fids, lon, lat, ogr_seconds))
+            ogr_seconds = time.time()-start
+            if ogr_seconds > 0.75:
+                msgs.append('EEZ fid intersect {}; point {}, {}; OGR time {} '.format(
+                    mar_intersect_fids, lon, lat, ogr_seconds))
 
         # Update record with resolved values for intersecting polygons
         for name, val in fldvals.items():
