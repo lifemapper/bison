@@ -75,17 +75,19 @@ BISON_VALUES = {'provider': 'BISON',
                 }
 ANCILLARY_DIR = 'ancillary'
 ANCILLARY_FILES = {
-    # Modified from original to merge US and Canada, and add centroids
+    # Modified from original to merge US and Canada, split into simple
+    # (no multi) polygons, and add centroids
     'terrestrial': {
         'file': 'us_can_boundaries_centroids.shp',
         'fields': (('B_FIPS', 'calculated_fips'), 
                    ('B_COUNTY', 'calculated_county_name'),
                    ('B_STATE', 'calculated_state_name'))},
-    # Modified from original to split into individual (no multi)
-    # polygons
+    # Modified from original to split into simple polygons and 
+    # intersected with a 5/10 degree grid
     'marine': {
-        'file': 'gridded_eez.shp',
 #         'file': 'World_EEZ_v8_20140228_splitpolygons/World_EEZ_v8_2014_HR.shp',
+#         'file': 'eez_gridded_boundaries_10.shp',
+        'file': 'eez_gridded_boundaries_5.shp',
         'fields': (('EEZ', 'calculated_waterbody'), 
                    ('MRGID', 'mrgid'))},
     # From Annie Simpson
