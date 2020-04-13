@@ -114,7 +114,7 @@ class GBIFReader(object):
         # LUT = BISON resource table merged with GBIF dataset API
         # Header in MERGED_RESOURCE_LUT_FIELDS
         dskey = rec['datasetKey']
-        res_title = res_meta_url = ''
+        dataset_title = dataset_meta_url = ''
         legacy_dataset_id = LEGACY_ID_DEFAULT
         gbif_org_uuid = legacy_org_id = None
         if dskey is not None:                    
@@ -152,10 +152,10 @@ class GBIFReader(object):
                         rec = None
                 else:
                     # Log other bison urls
-                    if res_meta_url.find('bison.') >= 0:
+                    if dataset_meta_url.find('bison.') >= 0:
                         self._log.info('In rec {}, found provider {} url {}'
                                        .format(rec[OCC_ID_FLD], gbif_org_uuid, 
-                                               res_meta_url))
+                                               dataset_meta_url))
         if rec is not None:
             bison_resource_id = '{},{}'.format(legacy_org_id, legacy_dataset_id)
             rec['resource_id'] = bison_resource_id

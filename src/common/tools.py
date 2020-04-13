@@ -422,7 +422,7 @@ def intersect_write_shapefile(new_dataset, new_layer, feats, grid_index):
                     curr_count += newfeat_count
 #                     print ('  Created {} new features for simplified poly'.format(
 #                         newfeat_count))
-        print ('  Created {} new features for primary poly'.format(feat_count))
+        print ('  Created {} new features for primary poly'.format(curr_count))
         feat_count += curr_count
     print ('Created {} new features from intersection'.format(feat_count))
     # Close and flush to disk
@@ -673,13 +673,16 @@ if __name__ == '__main__':
     
     # Marine boundaries
     eez_orig_sfname = 'World_EEZ_v8_20140228_splitpolygons/World_EEZ_v8_2014_HR.shp'
-    grid_sfname = 'world_grid_5.shp'
-    intersect_outfname = 'gridded_eez.shp'
-    eez_outfname = 'eez_boundaries_centroids_5.shp'
+    grid_sfname = 'world_grid_10.shp'
+    # Same as ANCILLARY_FILES['marine']['file']
+    eez_outfname = 'eez_gridded_boundaries_10.shp'
+#     grid_sfname = 'world_grid_5.shp'
+#     eez_outfname = 'eez_gridded_boundaries_5.shp'
+#     intersect_outfname = 'gridded_eez.shp'
     
     orig_eez_filename = os.path.join(pth, eez_orig_sfname)
     grid_shp_filename = os.path.join(pth, grid_sfname)
-    intersect_filename = os.path.join(pth, intersect_outfname)
+    intersect_filename = os.path.join(pth, eez_outfname)
     
     
 #     in_eez_filenames = [intersect_outfname]
