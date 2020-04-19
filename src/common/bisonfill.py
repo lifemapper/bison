@@ -123,8 +123,10 @@ class BisonFiller(object):
     def _read_centroid_lookup(self, terrestrial_shpname):
         '''
         @summary: Read and populate dictionary with key = concatenated string of 
-                  state name, county name, fips code and value = 
-                  tuple of centroid longitude and latitude.
+            state name, county name, fips code = tuple of centroid coordinates
+        @note: The input shapefile has been modified to split original polygons 
+            with unique state/county/fips combination into multiple polygons 
+            with the same state/county/fips and centroid values
         '''
         driver = ogr.GetDriverByName("ESRI Shapefile")
         terr_data_src = driver.Open(terrestrial_shpname, 0)
@@ -137,18 +139,21 @@ class BisonFiller(object):
             fips = feat.GetFieldAsString('B_FIPS')
             county = feat.GetFieldAsString('B_COUNTY')
             state = feat.GetFieldAsString('B_STATE')
-            centroid = feat.GetFieldAsString('B_CENTROID')
             key = ';'.join([state, county, fips])
-            tmp = centroid[centroid.find('(')+1:centroid.find(')')]
-            coords = tmp.split(' ')
             try:
-                float(coords[0])
-                float(coords[1])
+                datadict[key]
             except:
-                self._log.error('Failed to read coordinates from {}'.format(
-                    centroid))
-            else:
-                datadict[key] = (coords[0], coords[1])
+                centroid = feat.GetFieldAsString('B_CENTROID')
+                tmp = centroid[centroid.find('(')+1:centroid.find(')')]
+                coords = tmp.split(' ')
+                try:
+                    float(coords[0])
+                    float(coords[1])
+                except:
+                    self._log.error('Failed to read coordinates from {}'.format(
+                        centroid))
+                else:
+                    datadict[key] = (coords[0], coords[1])
         terrlyr.ResetReading()
         if datadict:
             centroids = Lookup.initFromDict(datadict, valtype=VAL_TYPE.TUPLE)
@@ -204,7 +209,8 @@ class BisonFiller(object):
             msgs.append('Terr fid intersect {}; point {}, {}; OGR time {} '.format(
                 terr_intersect_fids, lon, lat, ogr_seconds))
         
-        if terr_count != 1:
+        match_count = terr_count
+        if match_count != 1:
             mar_intersect_fids = list(marindex.intersection((lon, lat)))
             marine_count = 0
             start = time.time()
@@ -225,24 +231,26 @@ class BisonFiller(object):
             if ogr_seconds > 0.75:
                 msgs.append('EEZ fid intersect {}; point {}, {}; OGR time {} '.format(
                     mar_intersect_fids, lon, lat, ogr_seconds))
+            match_count += marine_count
 
         # Update record with resolved values for intersecting polygons
         for name, val in fldvals.items():
             rec[name] = val
-        return terr_count, msgs
+        return match_count, msgs
 
     # ...............................................
     def _fill_centroids(self, rec, centroids):
-        pfips = rec['provided_fips']
-        pcounty = rec['provided_county_name']
-        pstate = rec['provided_state_name']
+        pfips = rec['provided_fips'].strip()
+        pcounty = rec['provided_county_name'].strip()
+        pstate = rec['provided_state_name'].strip()
         if ((pcounty not in (None, '') and pstate not in (None, '')) 
             or pfips not in (None, '')):
             key = ';'.join((pstate, pcounty, pfips))
             try:
                 lon, lat = centroids.lut[key]
             except:
-                self._log.info('Missing county centroid for {}'.format(key))
+                self._log.info('Missing county centroid for provided vals {}'
+                               .format(key))
             else:
                 rec['longitude'] = lon
                 rec['latitude'] = lat
@@ -251,8 +259,8 @@ class BisonFiller(object):
         # No lon/lat and no fips or state/county 
         else:
             rec = None
-            self._log.info('No info for county centroid {}, {}, {}'.format(
-                pfips, pcounty, pstate))
+            self._log.info('No info for provided vals  {}, {}, {}'.format(
+                pstate, pcounty, pfips))
 
 #     # ...............................................
 #     def _get_itisfields(self, name, itis_svc):
