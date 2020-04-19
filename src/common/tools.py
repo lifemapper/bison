@@ -673,9 +673,9 @@ if __name__ == '__main__':
     
     # Marine boundaries
     eez_orig_sfname = 'World_EEZ_v8_20140228_splitpolygons/World_EEZ_v8_2014_HR.shp'
-    grid_sfname = 'world_grid_10.shp'
+    grid_sfname = 'world_grid_2.5.shp'
     # Same as ANCILLARY_FILES['marine']['file']
-    eez_outfname = 'eez_gridded_boundaries_10.shp'
+    eez_outfname = 'eez_gridded_boundaries_2.5.shp'
 #     grid_sfname = 'world_grid_5.shp'
 #     eez_outfname = 'eez_gridded_boundaries_5.shp'
 #     intersect_outfname = 'gridded_eez.shp'
