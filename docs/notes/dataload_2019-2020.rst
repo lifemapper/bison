@@ -57,7 +57,9 @@ process info at: https://my.usgs.gov/confluence/display/DEV/SAS+Development
 
 * ITIS lookup 
   
-  * Prep: get updated lookup table created by ITIS developers provided by Denver
+  * Prep: 
+    * Get updated lookup table created by ITIS developers provided by Denver
+    * When loading, strip trailing spaces from ITIS kingdom values
 
     * Rejected options:
     
@@ -73,10 +75,43 @@ process info at: https://my.usgs.gov/confluence/display/DEV/SAS+Development
     * valid_accepted_tsn
     * kingdom if provided field is blank
   
+
+* Establishment Means lookup
+  
+  * Prep: Get lookup table from Annie Simpson
+    * New: Lookup by ITIS TSN first, if that fails, lookup by scientific name
+
 * Geo lookup
 
-  * Prep: compute centroids for all polygons in US Counties shapefile, add to 
-    polygon attributes, create a LUT for faster lookup.
+  * Prep: 
+    * Get US counties shapefile from Shayne and Canada shapefile from Denver
+    * Merge US and Canada shapefiles into a single shapefile with centroids.
+      * Add new fields for BISON data processing which compute/edit values from 
+        the input datasets to fill calculated_state_name, 
+        calculated_county_name, calculated_fips, and longitude and latitude 
+        coordinates if needed and possible.  \
+      * field mapping:
+        * Canada PRNAME to calculated_state_name, strip " Canada" from value
+        * Canada CDNAME to calculated_county_name
+        * Canada CDUID to calculated_fips
+        * US STATE_FIPS + CNTY_FIPS = calculated_fips
+      * Compute the centroid coordinates of each input feature.
+      * Simplify the output polygon shapefile, replacing MULTIPOLYGON features
+        with the component simple POLYGON features.  Replicate attribute values
+        from the original polygon into the simple polygons.
+      * Create a LUT for faster lookup.
+
+    * Simplify the marine EEZ shapefile into a shapefile with smaller, simpler
+      polygons for intersection.
+      * Replace MULTIPOLYGON features with the component simple POLYGON features.  
+        Replicate attribute values from the original polygon into the simple 
+        polygons.
+      * Create a 2.5 or 5 degree global grid (experimented with 0.01, 0.10, 1, 
+        2.5, 5, 10 degree resolution).
+      * Intersect simplified polygons with global grid for smaller, simpler 
+        polygons.  Split complex intersections from MULTIPOLYGON or 
+        GEOMETRYCOLLECTION into simple POLYGON
+      * Create a LUT for faster lookup.
 
   * On records with longitude/latitude
    
@@ -99,7 +134,13 @@ process info at: https://my.usgs.gov/confluence/display/DEV/SAS+Development
     * if provided_fips, fill longitude/latitude 
       with fips centroid coordinates, fill centroid with "county"
 
-           
+* Data standardization
+
+  * Capitalize kingdom values
+  * Negate longitude if positive value on US and Canada points
+  
+
+
 BISON 49 (48 database fields + hierarchy_string and amb for Solr)
 -------------------------------------------------------------------
 For GBIF data load, field values will be pulled from named GBIF field or 
