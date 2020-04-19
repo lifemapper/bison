@@ -87,7 +87,8 @@ ANCILLARY_FILES = {
     'marine': {
 #         'file': 'World_EEZ_v8_20140228_splitpolygons/World_EEZ_v8_2014_HR.shp',
 #         'file': 'eez_gridded_boundaries_10.shp',
-        'file': 'eez_gridded_boundaries_5.shp',
+#         'file': 'eez_gridded_boundaries_5.shp',
+        'file': 'eez_gridded_boundaries_2.5.shp',
         'fields': (('EEZ', 'calculated_waterbody'), 
                    ('MRGID', 'mrgid'))},
     # From Annie Simpson
