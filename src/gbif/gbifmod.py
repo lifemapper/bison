@@ -157,6 +157,7 @@ class GBIFReader(object):
                                        .format(rec[OCC_ID_FLD], gbif_org_uuid, 
                                                dataset_meta_url))
         if rec is not None:
+            # Concat old org and dataset ids for bison resource id 
             bison_resource_id = '{},{}'.format(legacy_org_id, legacy_dataset_id)
             rec['resource_id'] = bison_resource_id
             rec['resource'] = dataset_title
@@ -516,9 +517,8 @@ class GBIFReader(object):
         except Exception:
             pass
         else:
-            self._log.warning("""Data misalignment? 
-            Received {} extra fields ({}) for brec {}"""
-                  .format(len(extravals), extravals, gid))
+            self._log.warning("""Data misalignment? Received {} extra fields for brec {}"""
+                  .format(len(extravals), gid))
         
         # Initialize record
         for bfld in self._infields:
