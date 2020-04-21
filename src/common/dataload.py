@@ -314,7 +314,8 @@ if __name__ == '__main__':
                 merged_dataset_lut_fname, resource_lut_fname, 
                 merged_org_lut_fname, provider_lut_fname, 
                 outdelimiter=BISON_DELIMITER)
-            # Pass 1 of CSV transform, initial pull, standardize, 
+            # Pass 1 of CSV transform, initial conversion of GBIF to BISON 
+            # fields, standardize
             gr.transform_gbif_to_bison(
                 occ_file_or_path, 
                 merged_dataset_lut_fname, 
@@ -329,12 +330,13 @@ if __name__ == '__main__':
                 
             canonical_lut = gr.get_canonical_lookup(nametaxa_fname, 
                                                     canonical_lut_fname)
-            # Pass 2 of CSV transform
+            # Pass 2 of CSV transform, fill names with GBIF-parsed clean scientific name
             gr.update_bison_names(pass1_fname, pass2_fname, canonical_lut)            
         elif step == 3:
             logger = getLogger(logbasename, logfname)
             bf = BisonFiller(pass2_fname, log=logger)
-            # Pass 3 of CSV transform
+            # Pass 3 of CSV transform, fill with ITIS resolved fields, 
+            #     establishment means, county centroids
             # Use Derek D. generated ITIS lookup itis2_lut_fname
             bf.update_itis_estmeans_centroid(itis2_lut_fname, estmeans_fname, 
                                              terrestrial_shpname, pass3_fname, 
@@ -342,6 +344,9 @@ if __name__ == '__main__':
         elif step == 4:
             terr_data = ANCILLARY_FILES['terrestrial']
             marine_data = ANCILLARY_FILES['marine']
+            # Pass 4 of CSV transform, split into smaller files and parallel 
+            # process with most CPUs.  Georeference records to fill calculated 
+            # county/state/fips and marine EEZ and MRGID
             step_parallel(pass3_fname, terr_data, marine_data, ancillary_path,
                           pass4_fname)
         elif step == 5:
