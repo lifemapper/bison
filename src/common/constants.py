@@ -117,6 +117,7 @@ class ProviderActions(Enum):
 
 
 BISON_ORDERED_DATALOAD_FIELDS = [
+    'id',
     'clean_provided_scientific_name', 
     'itis_common_name',
     'itis_tsn',
@@ -154,7 +155,6 @@ BISON_ORDERED_DATALOAD_FIELDS = [
     'associated_references',
     'general_comments',
     'occurrence_id',                    # New field
-    'id',
     'provider_id',
     'resource_id',
     'provided_common_name',

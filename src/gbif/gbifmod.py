@@ -30,7 +30,7 @@ from common.constants import (BISON_DELIMITER, ENCODING,
         MERGED_RESOURCE_LUT_FIELDS, MERGED_PROVIDER_LUT_FIELDS)
 from common.lookup import Lookup, VAL_TYPE
 from common.tools import (getCSVReader, getCSVDictReader, getCSVWriter, 
-                          open_csv_files)
+                          open_csv_files, makerow)
 
 from gbif.constants import (GBIF_DELIMITER, TERM_CONVERT, META_FNAME, 
                             BISON_GBIF_MAP, OCC_ID_FLD,
@@ -512,6 +512,9 @@ class GBIFReader(object):
         gid = grec['gbifID']
         brec = {}
         
+        if gid in ('2213699335', '2046976295'):
+            print('Problematic record with gbifid {}'.format(gid))
+        
         try:
             extravals = grec[EXTRA_VALS_KEY]
         except Exception:
@@ -526,7 +529,9 @@ class GBIFReader(object):
 
         # Fill values for gbif fields of interest
         for gfld, bfld in self._gbif_bison_map.items():
-            brec[bfld] = self._get_gbif_val(grec, gfld)
+            val = self._get_gbif_val(grec, gfld)
+            brec[bfld] = val
+                
         return brec
     
     # ...............................................
@@ -551,11 +556,12 @@ class GBIFReader(object):
             nametaxas.save_to_lookup(brec['provided_scientific_name'], 
                                      brec['taxonKey'])
             # create the ordered row
-            for fld in self._outfields:
-                if not brec[fld]:
-                    biline.append('')
-                else:
-                    biline.append(brec[fld])
+            biline = makerow(brec, self._outfields)
+#             for fld in self._outfields:
+#                 if not brec[fld]:
+#                     biline.append('')
+#                 else:
+#                     biline.append(brec[fld])
         return biline
     
     # ...............................................
