@@ -320,9 +320,6 @@ if __name__ == '__main__':
                 merged_dataset_lut_fname, 
                 merged_org_lut_fname, 
                 nametaxa_fname, pass1_fname)
-            logger.info('Elapsed time {} for step {}, file {}'.format(
-                time.time() - start_time, step, occ_file_or_path))
-            
         elif step == 2:
             logger = getLogger(logbasename, logfname)
             gr = GBIFReader(inpath, tmpdir, outdir, logger)
@@ -333,10 +330,7 @@ if __name__ == '__main__':
             canonical_lut = gr.get_canonical_lookup(nametaxa_fname, 
                                                     canonical_lut_fname)
             # Pass 2 of CSV transform
-            gr.update_bison_names(pass1_fname, pass2_fname, canonical_lut)
-            logger.info('Elapsed time {} for step {}, file {}'.format(
-                time.time() - start_time, step, occ_file_or_path))
-            
+            gr.update_bison_names(pass1_fname, pass2_fname, canonical_lut)            
         elif step == 3:
             logger = getLogger(logbasename, logfname)
             bf = BisonFiller(pass2_fname, log=logger)
@@ -345,18 +339,11 @@ if __name__ == '__main__':
             bf.update_itis_estmeans_centroid(itis2_lut_fname, estmeans_fname, 
                                              terrestrial_shpname, pass3_fname, 
                                              fromGbif=True)
-            logger.info('Elapsed time {} for step {}, file {}'.format(
-                time.time() - start_time, step, occ_file_or_path))
-
         elif step == 4:
             terr_data = ANCILLARY_FILES['terrestrial']
             marine_data = ANCILLARY_FILES['marine']
             step_parallel(pass3_fname, terr_data, marine_data, ancillary_path,
                           pass4_fname)
-            
-            print('Elapsed time {} for step {}, file {}'.format(
-                time.time() - start_time, step, occ_file_or_path))
-            
         elif step == 5:
             logger = getLogger(logbasename, logfname)
             merger = BisonMerger(outpath, logger)
@@ -412,6 +399,12 @@ if __name__ == '__main__':
              (eez_data_src, eezlyr, marindex, marfeats, 
               mar_bison_fldnames)) = bf.test_point_in_polygons(
                   ancillary_path, pass4_fname)
+        try:
+            logger.info('Elapsed time {} for step {}, file {}'.format(
+                time.time() - start_time, step, occ_file_or_path))
+        except:
+            print('Elapsed time {} for step {}, file {}'.format(
+                time.time() - start_time, step, occ_file_or_path))
 """
 
 # /tank/data/bison/2019/Terr/occurrence_lines_5000-10000.csv --step=4

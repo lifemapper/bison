@@ -19,7 +19,7 @@ CENTROID_FIELD = 'B_CENTROID'
 def getCSVReader(datafile, delimiter, encoding):
     try:
         f = open(datafile, 'r', encoding=encoding) 
-        reader = csv.reader(f, delimiter=delimiter)        
+        reader = csv.reader(f, delimiter=delimiter, quoting=csv.QUOTE_NONE)
     except Exception as e:
         raise Exception('Failed to read or open {}, ({})'
                         .format(datafile, str(e)))
@@ -43,7 +43,7 @@ def getCSVWriter(datafile, delimiter, encoding, fmode='w'):
     csv.field_size_limit(maxsize)
     try:
         f = open(datafile, fmode, encoding=encoding) 
-        writer = csv.writer(f, delimiter=delimiter)
+        writer = csv.writer(f, delimiter=delimiter) #, quoting=csv.QUOTE_NONE)
     except Exception as e:
         raise Exception('Failed to read or open {}, ({})'
                         .format(datafile, str(e)))
@@ -60,6 +60,7 @@ def getCSVDictReader(datafile, delimiter, encoding, fieldnames=None):
             tmpflds = header.split(delimiter)
             fieldnames = [fld.strip() for fld in tmpflds]
         dreader = csv.DictReader(f, fieldnames=fieldnames, 
+                                 quoting=csv.QUOTE_NONE,
                                  restkey=EXTRA_VALS_KEY,
                                  delimiter=delimiter)        
     except Exception as e:
@@ -80,7 +81,8 @@ def getCSVDictWriter(datafile, delimiter, encoding, fldnames, fmode='w'):
     csv.field_size_limit(maxsize)
     try:
         f = open(datafile, fmode, encoding=encoding) 
-        writer = csv.DictWriter(f, fieldnames=fldnames, delimiter=delimiter)
+        writer = csv.DictWriter(f, fieldnames=fldnames, delimiter=delimiter,
+                                quoting=csv.QUOTE_NONE)
     except Exception as e:
         raise Exception('Failed to read or open {}, ({})'
                         .format(datafile, str(e)))
@@ -585,7 +587,7 @@ def simplify_merge_polygon_shapefiles(in_shp_filenames, calc_fields, out_shp_fil
         feat_attrs_lst.append(feat_attrs)
         bboxes.append(bbox)
 
-    # ----------------- Merge attributes -----------------
+    # ......................... Merge attributes .........................
     out_feat_attrs = []
     new_fldnames = []
     for i in range(len(feat_attrs_lst)):
@@ -600,16 +602,16 @@ def simplify_merge_polygon_shapefiles(in_shp_filenames, calc_fields, out_shp_fil
         out_feat_attrs.append((calc_fldname, calc_fldtype))
         new_fldnames.append(calc_fldname)
 
-    # ----------------- ? bbox -----------------
+    # ......................... ? bbox .........................
     new_bbox = (min([b[0] for b in bboxes]), min([b[1] for b in bboxes]),
                 max([b[2] for b in bboxes]), max([b[3] for b in bboxes]))
         
-    # ----------------- Create structure -----------------
+    # ......................... Create structure .........................
     out_dataset, out_layer = _create_empty_dataset(
         out_shp_filename, out_feat_attrs, ogr.wkbPolygon, epsg_code, 
         overwrite=True)
     
-    # ----------------- Write old feats to new layer  -----------------
+    # ......................... Write old feats to new layer  .........................
     # Calculate non-geometric fields
     # Write one or more new features for each original feature
     calc_nongeo_fields = [k for k in calc_fields.keys() if k != CENTROID_FIELD] 
@@ -641,12 +643,12 @@ def intersect_polygon_with_grid(primary_shp_filename, grid_shp_filename,
     # Get spatial index for grid with WKT for each cell
     grid_index = get_clustered_spatial_index(grid_shp_filename)
  
-    # ----------------- Create structure -----------------
+    # ......................... Create structure .........................
     out_dataset, out_layer = _create_empty_dataset(
         out_shp_filename, feat_attrs, ogr.wkbPolygon, epsg_code, 
         overwrite=True)
        
-    # ----------------- Intersect polygons -----------------
+    # ......................... Intersect polygons .........................
     intersect_write_shapefile(out_dataset, out_layer, feats, grid_index)
         
 
