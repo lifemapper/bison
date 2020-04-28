@@ -28,9 +28,10 @@ import time
 
 from common.constants import (BISON_DELIMITER, ENCODING, LOGINTERVAL, 
                               PROHIBITED_CHARS, PROHIBITED_SNAME_CHARS, 
-                              PROHIBITED_VALS, ANCILLARY_FILES,
+                              PROHIBITED_VALS, 
                               BISON_VALUES, BISON_SQUID_FLD, ITIS_KINGDOMS, 
                               ISO_COUNTRY_CODES, BISON_ORDERED_DATALOAD_FIELDS)
+from common.inputdata import ANCILLARY_FILES
 from common.lookup import Lookup, VAL_TYPE
 from common.tools import (getCSVDictReader, open_csv_files, getLogger,
     delete_shapefile)
