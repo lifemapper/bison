@@ -846,32 +846,41 @@ class GBIFReader(object):
         merged_lut = Lookup(valtype=VAL_TYPE.DICT, encoding=ENCODING)
         header = [fld for (fld, _) in MERGED_PROVIDER_LUT_FIELDS]
         
-        # First, get new values for record in old table
+        # First, get current metadata for record in old table
         for legacyid, oldrec in old_providers.lut.items():
             uuid = oldrec['organization_id']
-            resolved_uuids.add(uuid)
+            newrec = None
             # get metadata dictionary newrec from GBIF
             if uuid is not None and len(uuid) > 20:
                 newrec = gbifapi.query_for_organization(uuid)
-            else:
+                if newrec:
+                    resolved_uuids.add(uuid)
+            if not newrec:
                 newrec = gbifapi.query_for_organization(legacyid, 
                                                         is_legacyid=True)
+            if not newrec:
+                self._log.info('No current metadata for organization legacyid {}'
+                               .format(legacyid))
+            else:
+                self._log.info('Found organization legacyid {}'
+                               .format(legacyid))
             # Add newrec keys and their values to oldrec
             for key, val in newrec.items():
                 oldrec[key] = val
             # Save all keys/vals to merged LUT
             merged_lut.save_to_lookup(legacyid, oldrec)
 
-        # Next, get metadata for any UUIDs not already resolved
+        # Next, get current metadata for any UUIDs not already resolved
         unresolved_uuids = org_uuids.difference(resolved_uuids)
         for uuid in unresolved_uuids:
             newrec = gbifapi.query_for_organization(uuid)
-            legacyid = newrec['gbif_legacyid']
-            # Save new keys/vals to merged LUT
-            if newrec['gbif_legacyid'] != LEGACY_ID_DEFAULT:
-                merged_lut.save_to_lookup(legacyid, oldrec)
-            else:
-                merged_lut.save_to_lookup(uuid, oldrec)
+            if newrec:
+                legacyid = newrec['gbif_legacyid']
+                # Save new keys/vals to merged LUT
+                if legacyid != LEGACY_ID_DEFAULT:
+                    merged_lut.save_to_lookup(legacyid, newrec)
+                else:
+                    merged_lut.save_to_lookup(uuid, newrec)
 
         merged_lut.write_lookup(merged_org_lut_fname, header, outdelimiter)
         self._log.info('Wrote organization metadata to {}'.format(
@@ -989,29 +998,39 @@ class GBIFReader(object):
         
         # First, get new values for record in old table
         for legacyid, oldrec in old_resources.lut.items():
+            newrec = None
             # get metadata dictionary newrec from GBIF
             uuid = oldrec['dataset_id']
-            resolved_uuids.add(uuid)
             if uuid is not None and len(uuid) > 20:
                 newrec = gbifapi.query_for_dataset(uuid)
-            else:
+                if newrec:
+                    resolved_uuids.add(uuid)
+            # If no UUID or unresolved UUID, try with legacy id
+            if not newrec:
                 newrec = gbifapi.query_for_dataset(legacyid, is_legacyid=True)
+            if not newrec:
+                self._log.info('No current metadata for dataset legacyid {}'
+                               .format(legacyid))
+            else:
+                self._log.info('Found dataset legacyid {}'
+                               .format(legacyid))
             # Add newrec keys and their values to oldrec
             for key, val in newrec.items():
                 oldrec[key] = val
             # Save all keys/vals to merged LUT
             merged_lut.save_to_lookup(legacyid, oldrec)
             
-        # Next, get metadata for any UUIDs not already resolved
+        # Next, get metadata for any UUIDs not in old table
         unresolved_uuids = ds_uuids.difference(resolved_uuids)
         for uuid in unresolved_uuids:
             newrec = gbifapi.query_for_dataset(uuid)
-            legacyid = newrec['gbif_legacyid']
-            # Save new keys/vals to merged LUT
-            if newrec['gbif_legacyid'] != LEGACY_ID_DEFAULT:
-                merged_lut.save_to_lookup(legacyid, oldrec)
-            else:
-                merged_lut.save_to_lookup(uuid, oldrec)
+            if newrec:
+                legacyid = newrec['gbif_legacyid']
+                # Save new keys/vals to merged LUT
+                if legacyid != LEGACY_ID_DEFAULT:
+                    merged_lut.save_to_lookup(legacyid, newrec)
+                else:
+                    merged_lut.save_to_lookup(uuid, newrec)
 
         merged_lut.write_lookup(merged_dataset_lut_fname, header, outdelimiter)
         # Query/save dataset information
@@ -1049,7 +1068,6 @@ class GBIFReader(object):
         else:
             old_resources = Lookup.initFromFile(resource_lut_fname, 
                                                 'OriginalResourceID',
-#                                                 'dataset_id', 
                                                 BISON_DELIMITER, 
                                                 valtype=VAL_TYPE.DICT, 
                                                 encoding=ENCODING)
@@ -1061,7 +1079,6 @@ class GBIFReader(object):
         else:
             old_providers = Lookup.initFromFile(provider_lut_fname, 
                                                 'OriginalProviderID',
-#                                                 'organization_id', 
                                                 BISON_DELIMITER, 
                                                 valtype=VAL_TYPE.DICT, 
                                                 encoding=ENCODING)

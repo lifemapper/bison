@@ -215,18 +215,6 @@ def delete_shapefile(shp_filename):
             print('Failed to remove {}, {}'.format(simfname, str(err)))
     return success
 
-# # .............................
-# def _fill_ogr_feature(feat, feat_vals, feature_attributes):
-#     # Fill the fields
-#     for i in range(len(feature_attributes)):
-#         fldname = feature_attributes[i][0]
-#         val = feat_vals[i]
-#         if fldname == 'geom':
-#             geom = ogr.CreateGeometryFromWkt(val)
-#             feat.SetGeometryDirectly(geom)
-#         elif val is not None and val != 'None':
-#             feat.SetField(fldname, val)
-            
 # .............................................................................
 def _create_empty_dataset(out_shp_filename, feature_attributes, ogr_type, 
                           epsg_code, overwrite=True):
@@ -380,6 +368,7 @@ def _refine_intersect(gc_wkt, poly, new_layer, feat_vals):
         for ipoly in itx_polys:
             try:
                 newfeat = ogr.Feature(new_layer.GetLayerDefn())
+                # Makes a copy of the ipoly for the new feature
                 newfeat.SetGeometry(ipoly)
                 # put values into fieldnames
                 for fldname, fldval in feat_vals.items():
@@ -452,7 +441,8 @@ def write_shapefile(new_dataset, new_layer, feature_sets, calc_nongeo_fields):
                     # create a new feature
                     newfeat = ogr.Feature(new_layer_def)
                     poly = ogr.CreateGeometryFromWkt(wkt)
-                    newfeat.SetGeometry(poly)
+                    # New geom can be assigned directly to new feature
+                    newfeat.SetGeometryDirectly(poly)
                     # put old dataset values into old fieldnames
                     for fldname, fldval in feat_vals.items():
                         if fldname != 'geometries' and fldval is not None:

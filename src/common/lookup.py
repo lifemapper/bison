@@ -125,6 +125,8 @@ class Lookup(object):
         @summary: Read and populate dictionary with key = uuid and 
                   val = dictionary of record values
         '''
+        no_old_legacy = 0
+        no_new_legacy = 0
         if os.path.exists(fname):
             if self.valtype == VAL_TYPE.DICT:
                 try:
@@ -135,9 +137,22 @@ class Lookup(object):
                 else:
                     for data in rdr:
                         datakey = data[keyfld]
+                        if not datakey:
+                            try:
+                                resolvedid = data['gbif_legacyid']
+                                if resolvedid == '-9999':
+                                    no_new_legacy += 1
+                                else:
+                                    no_old_legacy += 1
+                                    print('Failed getting old legacy id, resolved to {}'
+                                          .format(data['gbif_legacyid']))
+                            except:
+                                pass
                         self.lut[datakey] = data
                 finally:
                     inf.close()
+                print('no_old_legacy {}  no_new_legacy (default -9999) {}'
+                      .format(no_old_legacy, no_new_legacy))
                     
             elif self.valtype == VAL_TYPE.SET:
                 recno = 0
