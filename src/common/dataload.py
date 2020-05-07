@@ -147,7 +147,7 @@ def get_chunk_files(big_csv_filename):
         
 # .............................................................................
 def step_parallel(in_csv_filename, terrestrial_data, marine_data, ancillary_path,
-                  out_csv_filename):
+                  out_csv_filename, from_gbif=True):
     """Main method for parallel execution of geo-referencing script"""
     csv_filename_pairs, header = get_chunk_files(in_csv_filename)
     
@@ -161,7 +161,7 @@ def step_parallel(in_csv_filename, terrestrial_data, marine_data, ancillary_path
         for in_csv_fn, out_csv_fn in csv_filename_pairs:
             executor.submit(
                 intersect_csv_and_shapefiles, in_csv_fn, terrestrial_data, 
-                marine_data, ancillary_path, out_csv_fn)
+                marine_data, ancillary_path, out_csv_fn, from_gbif)
     
     try:
         outf = open(out_csv_filename, 'w', encoding='utf-8')
@@ -293,6 +293,9 @@ if __name__ == '__main__':
     merged_dataset_lut_fname = os.path.join(ancillary_path, 'merged_dataset_lut.csv')
     merged_org_lut_fname = os.path.join(ancillary_path, 'merged_organization_lut.csv')
 
+    terr_data = ANCILLARY_FILES['terrestrial']
+    marine_data = ANCILLARY_FILES['marine']
+
         
     # For GBIF processing, steps 1-4, files of name lookup and list for creation 
     if step < 5:
@@ -318,6 +321,7 @@ if __name__ == '__main__':
                 outdelimiter=BISON_DELIMITER)
             # Pass 1 of CSV transform, initial conversion of GBIF to BISON 
             # fields, standardize
+            # Discard records from BISON org, bison IPT
             gr.transform_gbif_to_bison(
                 occ_file_or_path, 
                 merged_dataset_lut_fname, 
@@ -333,6 +337,7 @@ if __name__ == '__main__':
             canonical_lut = gr.get_canonical_lookup(nametaxa_fname, 
                                                     canonical_lut_fname)
             # Pass 2 of CSV transform, fill names with GBIF-parsed clean scientific name
+            # Discard records with no clean name
             gr.update_bison_names(pass1_fname, pass2_fname, canonical_lut)            
         elif step == 3:
             logger = getLogger(logbasename, logfname)
@@ -340,17 +345,17 @@ if __name__ == '__main__':
             # Pass 3 of CSV transform, fill with ITIS resolved fields, 
             #     establishment means, county centroids
             # Use Derek D. generated ITIS lookup itis2_lut_fname
+            # Discard records with no coordinates and no centroid-computed coordinates
             bf.update_itis_estmeans_centroid(itis2_lut_fname, estmeans_fname, 
                                              terrestrial_shpname, pass3_fname, 
-                                             fromGbif=True)
+                                             from_gbif=True)
         elif step == 4:
-            terr_data = ANCILLARY_FILES['terrestrial']
-            marine_data = ANCILLARY_FILES['marine']
             # Pass 4 of CSV transform, split into smaller files and parallel 
             # process with most CPUs.  Georeference records to fill calculated 
             # county/state/fips and marine EEZ and MRGID
+            # No discards
             step_parallel(pass3_fname, terr_data, marine_data, ancillary_path,
-                          pass4_fname)
+                          pass4_fname, from_gbif=True)
             
         # Log time elapsed for steps 1-4 
         minutes = (time.time() - start_time) / 60
@@ -366,8 +371,10 @@ if __name__ == '__main__':
         logfname = os.path.join(tmppath, '{}.log'.format(logbasename))
         logger = getLogger(logbasename, logfname)
         if step == 5:        
+                
             merger = BisonMerger(outpath, logger)
             old_resources = merger.read_resources(merged_dataset_lut_fname)
+#             old_resources.write_lookupfname, header, delimiter)
             # Merge metadata from old provider data with new provider file and data ticket
             prov_dataload_metadata = merger.assemble_files(datapth, old_resources)
             
@@ -387,24 +394,34 @@ if __name__ == '__main__':
                     outfile1 = os.path.join(tmppath, basename + '_clean.csv')
                     outfile2 = os.path.join(tmppath, basename + '_958itis_em_geo.csv')            
                     outfile3 = os.path.join(outpath, basename + '_final.csv')
-                    if os.path.exists(outfile3):
-                        logger.info('Final file {} already exists for {}'
-                              .format(fname, resource_ident))
+                    if os.path.exists(outfile1):
+                        logger.info('Provider {} step 1/3 output in {}'.format(
+                            resource_ident, outfile1))
                     else:
                         # Step 1: rewrite filling ticket/constant vals for resource/provider
-                        merger.rewrite_bison_data(infile, outfile1, old_resources, 
-                                                  resource_ident, pvals['resource'], 
-                                                  pvals['resource_url'], action)
-#                         # Step 2: rewrite filling lookup vals from 
-#                         # itis, establishment_means and centroid 
-#                         bf = BisonFiller(outfile1, log=logger)
-#                         bf.update_itis_estmeans_centroid(itis2_lut_fname, estmeans_fname, 
-#                                                          terrestrial_shpname, outfile2, 
-#                                                          fromGbif=False)
-#                         # Step 3: of CSV transform
-#                         # Use Derek D. generated ITIS lookup itis2_lut_fname
-#                         bf = BisonFiller(outfile2, log=logger)
-#                         bf.update_point_in_polygons(ancillary_path, outfile3)
+                        merger.rewrite_bison_data(
+                            infile, outfile1, old_resources, resource_ident, 
+                            pvals['resource'], pvals['resource_url'], action)
+                    if os.path.exists(outfile2):
+                        logger.info('Provider {} step 2/3 output in {}'.format(
+                            resource_ident, outfile2))
+                    else:
+                        # Step 2: rewrite filling lookup vals from 
+                        # itis, establishment_means and centroid 
+                        # Identical to Step 3 for GBIF data
+                        bf = BisonFiller(outfile1, log=logger)
+                        bf.update_itis_estmeans_centroid(
+                            itis2_lut_fname, estmeans_fname, terrestrial_shpname, 
+                            outfile2, fromGbif=False)
+                    if os.path.exists(outfile3):
+                        logger.info('Provider {} step 3/3 output in {}'.format(
+                            resource_ident, outfile3))
+                    else:
+                        # Step 3: of CSV transform
+                        # Identical to Step 4 for GBIF data
+                        bf = BisonFiller(outfile2, log=logger)
+                        bf.update_point_in_polygons(
+                            terr_data, marine_data, ancillary_path, outfile3)
     
         elif step == 10:
             logger = getLogger(logbasename, logfname)
