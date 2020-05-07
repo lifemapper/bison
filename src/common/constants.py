@@ -21,6 +21,7 @@
              Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 
              02110-1301, USA.
 """
+from collections import OrderedDict
 from enum import Enum, auto
 
 # Test these against lowercase values
@@ -91,60 +92,116 @@ class ProviderActions(Enum):
 #     name = 'BISON'
 #     url = 'https://bison.usgs.gov'
 
+class ALLOWED_TYPE(Enum):
+    varchar = auto()
+    integer = auto()
+    double_precision = auto()
+    
 
-BISON_ORDERED_DATALOAD_FIELDS = [
-    'id',
-    'clean_provided_scientific_name', 
-    'itis_common_name',
-    'itis_tsn',
-    'hierarchy_string',                 # New field
-    'amb',                              # New field
-    'basis_of_record',
-    'occurrence_date',
-    'year',
-    'verbatim_event_date',   
-    'provider',
-    'provider_url',    
-    'resource',   
-    'resource_url',   
-    'occurrence_url',   
-    'catalog_number',   
-    'collector',
-    'collector_number',  
-    'valid_accepted_scientific_name',   
-    'valid_accepted_tsn',   
-    'provided_scientific_name',
-    'provided_tsn',
-    'latitude',
-    'longitude',
-    'verbatim_elevation',   
-    'verbatim_depth',
-    'calculated_county_name',   
-    'calculated_fips',
-    'calculated_state_name',
-    'centroid',
-    'provided_county_name', 
-    'provided_fips',
-    'provided_state_name',
-    'thumb_url',
-    'associated_media',
-    'associated_references',
-    'general_comments',
-    'occurrence_id',                    # New field
-    'provider_id',
-    'resource_id',
-    'provided_common_name',
-    'kingdom',
-    'geodetic_datum',
-    'coordinate_precision',   
-    'coordinate_uncertainty',
-    'verbatim_locality',
-    'mrgid',
-    'calculated_waterbody',   
-    'establishment_means',
-    'iso_country_code',
-    'license',
-    ]
+BISON_ORDERED_DATALOAD_FIELD_TYPE = OrderedDict(
+    {'id': {'pgtype': ALLOWED_TYPE.integer},
+     'clean_provided_scientific_name': 
+     {'pgtype': ALLOWED_TYPE.varchar, 'max_len': None},
+     'itis_common_name': 
+     {'pgtype': ALLOWED_TYPE.varchar, 'max_len': None},
+     'itis_tsn': 
+     {'pgtype': ALLOWED_TYPE.varchar, 'max_len': None},
+     'hierarchy_string':                                    # New field
+     {'pgtype': ALLOWED_TYPE.varchar, 'max_len': 600},  
+     'amb': 
+     {'pgtype': ALLOWED_TYPE.integer},                      # New field
+     'basis_of_record': 
+     {'pgtype': ALLOWED_TYPE.varchar, 'max_len': 100},
+     'occurrence_date': 
+     {'pgtype': ALLOWED_TYPE.varchar, 'max_len': 100},
+     'year': 
+     {'pgtype': ALLOWED_TYPE.integer},
+     'verbatim_event_date': 
+     {'pgtype': ALLOWED_TYPE.varchar, 'max_len': None},
+     'provider': 
+     {'pgtype': ALLOWED_TYPE.varchar, 'max_len': 255},
+     'provider_url': 
+     {'pgtype': ALLOWED_TYPE.varchar, 'max_len': 255},
+     'resource': 
+     {'pgtype': ALLOWED_TYPE.varchar, 'max_len': 300},
+     'resource_url': 
+     {'pgtype': ALLOWED_TYPE.varchar, 'max_len': 255},
+     'occurrence_url': 
+     {'pgtype': ALLOWED_TYPE.varchar, 'max_len': 255},
+     'catalog_number': 
+     {'pgtype': ALLOWED_TYPE.varchar, 'max_len': 100},
+     'collector': 
+     {'pgtype': ALLOWED_TYPE.varchar, 'max_len': None},
+     'collector_number': 
+     {'pgtype': ALLOWED_TYPE.varchar, 'max_len': 500},
+     'valid_accepted_scientific_name': 
+     {'pgtype': ALLOWED_TYPE.varchar, 'max_len': 300},
+     'valid_accepted_tsn': 
+     {'pgtype': ALLOWED_TYPE.varchar, 'max_len': 300},
+     'provided_scientific_name': 
+     {'pgtype': ALLOWED_TYPE.varchar, 'max_len': 300},
+     'provided_tsn': 
+     {'pgtype': ALLOWED_TYPE.varchar, 'max_len': 64},
+     'latitude': 
+     {'pgtype': ALLOWED_TYPE.double_precision},
+     'longitude': 
+     {'pgtype': ALLOWED_TYPE.double_precision},
+     'verbatim_elevation': 
+     {'pgtype': ALLOWED_TYPE.varchar, 'max_len': None},
+     'verbatim_depth': 
+     {'pgtype': ALLOWED_TYPE.varchar, 'max_len': None},
+     'calculated_county_name': 
+     {'pgtype': ALLOWED_TYPE.varchar, 'max_len': 100},
+     'calculated_fips': 
+     {'pgtype': ALLOWED_TYPE.varchar, 'max_len': 5},
+     'calculated_state_name': 
+     {'pgtype': ALLOWED_TYPE.varchar, 'max_len': 100},
+     'centroid': 
+     {'pgtype': ALLOWED_TYPE.varchar, 'max_len': 50},
+     'provided_county_name': 
+     {'pgtype': ALLOWED_TYPE.varchar, 'max_len': 500},
+     'provided_fips': 
+     {'pgtype': ALLOWED_TYPE.varchar, 'max_len': 5},
+     'provided_state_name': 
+     {'pgtype': ALLOWED_TYPE.varchar, 'max_len': 255},
+     'thumb_url': 
+     {'pgtype': ALLOWED_TYPE.varchar, 'max_len': None},
+     'associated_media': 
+     {'pgtype': ALLOWED_TYPE.varchar, 'max_len': None},
+     'associated_references': 
+     {'pgtype': ALLOWED_TYPE.varchar, 'max_len': None},
+     'general_comments': 
+     {'pgtype': ALLOWED_TYPE.varchar, 'max_len': None},
+    # TODO: ???
+     'occurrence_id': 
+     {'pgtype': ALLOWED_TYPE.varchar, 'max_len': None},
+     'provider_id': 
+     {'pgtype': ALLOWED_TYPE.varchar, 'max_len': None},
+     'resource_id': 
+     {'pgtype': ALLOWED_TYPE.varchar, 'max_len': 300},
+     'provided_common_name': 
+     {'pgtype': ALLOWED_TYPE.varchar, 'max_len': None},
+     'kingdom': 
+     {'pgtype': ALLOWED_TYPE.varchar, 'max_len': 64},
+     'geodetic_datum': 
+     {'pgtype': ALLOWED_TYPE.varchar, 'max_len': 128},
+     'coordinate_precision': 
+     {'pgtype': ALLOWED_TYPE.varchar, 'max_len': 64},
+     'coordinate_uncertainty': 
+     {'pgtype': ALLOWED_TYPE.varchar, 'max_len': 1000},
+     'verbatim_locality': 
+     {'pgtype': ALLOWED_TYPE.varchar, 'max_len': None},
+     'mrgid': 
+     {'pgtype': ALLOWED_TYPE.integer},
+     'calculated_waterbody': 
+     {'pgtype': ALLOWED_TYPE.varchar, 'max_len': 200},
+     'establishment_means': 
+     {'pgtype': ALLOWED_TYPE.varchar, 'max_len': 40},
+     'iso_country_code': 
+     {'pgtype': ALLOWED_TYPE.varchar, 'max_len': 2},
+     'license':
+     {'pgtype': ALLOWED_TYPE.varchar, 'max_len': None}
+    })
 
 class FieldContent(Enum):
     legacy_bison = auto()
