@@ -242,7 +242,7 @@ class BisonFiller(object):
         return match_count, msgs
 
     # ...............................................
-    def _fill_or_delete_missing_coord(self, rec, centroids):
+    def _fill_centroid_coords(self, rec, centroids):
         centroid = rec['centroid']
         # Recompute coords previously computed to county centroid
         if centroid == 'county':
@@ -270,12 +270,7 @@ class BisonFiller(object):
                     rec['centroid'] = 'county'
                     self._log.info('Filled county centroid {}, {}'.format(lon, lat))
             lon, lat = self._get_coords(rec)
-            # Discard rec without coords and state/province
-            if lon is None and pstate == '':
-                rec = None
-                self._log.info('Discard rec {} without coords and state/province'
-                               .format(thisid))
-        return rec
+            # DO NOT discard rec without coords and state/province
         
         
 #     # ...............................................
@@ -448,15 +443,7 @@ class BisonFiller(object):
                 self._fill_estmeans_field(rec, estmeans)
                 # ..........................................
                 # Fill missing geo or discard if no county info
-                rec = self._fill_or_delete_missing_coord(rec, centroids)
-#                 centroid = rec['centroid']
-#                 lon, lat = self._get_coords(rec)
-#                 # Fill missing coordinates or 
-#                 #   refill previously computed to county centroid
-#                 # Discard records without coordinates or computed centroid
-#                 if lon is None or (centroid and centroid == 'county'):
-#                     self._fill_centroid_coords(rec, centroids)
-#                     lon, lat = self._get_coords(rec)
+                self._fill_centroid_coords(rec, centroids)
 
                 # Write updated record
                 if rec is not None:
