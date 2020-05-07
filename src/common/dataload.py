@@ -345,7 +345,7 @@ if __name__ == '__main__':
             # Pass 3 of CSV transform, fill with ITIS resolved fields, 
             #     establishment means, county centroids
             # Use Derek D. generated ITIS lookup itis2_lut_fname
-            # Discard records with no coordinates and no centroid-computed coordinates
+            # No discards
             bf.update_itis_estmeans_centroid(itis2_lut_fname, estmeans_fname, 
                                              terrestrial_shpname, pass3_fname, 
                                              from_gbif=True)
