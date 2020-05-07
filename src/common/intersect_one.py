@@ -10,7 +10,7 @@ from common.tools import getLogger
 
 # .............................................................................
 def intersect_csv_and_shapefiles(in_csv_filename, geodata1, geodata2, 
-                                 ancillary_path, out_csv_filename):
+                                 ancillary_path, out_csv_filename, from_gbif):
     """Intersect the records in the csv file with the two provided shapefiles.
 
     Args:
@@ -28,7 +28,7 @@ def intersect_csv_and_shapefiles(in_csv_filename, geodata1, geodata2,
     bf = BisonFiller(in_csv_filename, log=logger)
     # Pass 4 of CSV transform, final step, point-in-polygon intersection
     bf.update_point_in_polygons(geodata1, geodata2, ancillary_path, 
-                                out_csv_filename)
+                                out_csv_filename, from_gbif=from_gbif)
     # Do intersection here
     sleep(randint(0, 10))
     print(' - {}'.format(out_csv_filename))

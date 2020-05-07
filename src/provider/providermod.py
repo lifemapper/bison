@@ -2,8 +2,8 @@ import glob
 import os
 
 from common.constants import (
-    BISON_ORDERED_DATALOAD_FIELDS, BISON_VALUES, ProviderActions,
-    PROVIDER_DELIMITER, BISON_DELIMITER, ANCILLARY_DELIMITER, ENCODING, 
+    BISON_ORDERED_DATALOAD_FIELD_TYPE, BISON_VALUES, ProviderActions,
+    PROVIDER_DELIMITER, BISON_DELIMITER, ENCODING, 
     BISON_IPT_PREFIX)
 from common.inputdata import BISON_PROVIDER
 from common.lookup import Lookup, VAL_TYPE
@@ -94,8 +94,6 @@ class BisonMerger(object):
                 if old_resources is not None:
                     try:
                         metavals = old_resources.lut[legacy_ident]
-                        self._log.info('Found resource legacyid {} in resource table'
-                                       .format(legacy_ident))
                     except:
                         self._log.info('No resource legacyid {} in resource table'
                                        .format(legacy_ident))
@@ -132,15 +130,18 @@ class BisonMerger(object):
     def _rewrite_recs(self, infile, outfile, resource_vals, action):
         do_rename = False
         if action in (ProviderActions.rename, ProviderActions.replace_rename):
-            do_rename = True        
+            do_rename = True
+            
+        delimiter = PROVIDER_DELIMITER
+        if action in (ProviderActions.rename, ProviderActions.rewrite):
+            delimiter = BISON_DELIMITER
+        
+        dl_fields = [fldname for (fldname, _) in BISON_ORDERED_DATALOAD_FIELD_TYPE]
         try:
             # Fill resource/provider values, use BISON_DELIMITER
-            dict_reader, inf, writer, outf = open_csv_files(infile, 
-                                             PROVIDER_DELIMITER, 
-                                             ENCODING, 
-                                             outfname=outfile, 
-                                             outfields=BISON_ORDERED_DATALOAD_FIELDS,
-                                             outdelimiter=BISON_DELIMITER)
+            dict_reader, inf, writer, outf = open_csv_files(
+                infile, delimiter, ENCODING, outfname=outfile, 
+                outfields=dl_fields, outdelimiter=BISON_DELIMITER)
             recno = 0
             for rec in dict_reader:
                 recno += 1
@@ -148,7 +149,7 @@ class BisonMerger(object):
                 
                 self._replace_resource(rec, resource_vals, do_rename)
                 
-                row = makerow(rec, BISON_ORDERED_DATALOAD_FIELDS)
+                row = makerow(rec, dl_fields)
                 writer.writerow(row)
         except:
             raise 
@@ -179,7 +180,7 @@ class BisonMerger(object):
                 with res_legacyid {}, res_name {}, res_url {}""".format(
                     action, tkt_resource_name, tkt_resource_ident,
                     infile, outfile, res_legacyid, res_name, res_url))
-#             self._rewrite_recs(infile, outfile, resource_vals, action)
+            self._rewrite_recs(infile, outfile, resource_vals, action)
             
         else:
             self._log.info('Unknown action {} for input {}, ({})'.format(
@@ -188,6 +189,12 @@ class BisonMerger(object):
           
     # ...............................................
     def assemble_files(self, inpath, old_resources):
+        """
+        Merge metadata and actions for new provider input data with existing 
+        provider data from the BISON database into a dictionary with 
+            key BISON provider id (legacy GBIF id) and 
+            values name, url, action, and new input filename.  
+        """
         provider_datasets = BISON_PROVIDER.copy()
         
         prefix = os.path.join(inpath, EXISTING_DATASET_FILE_PREFIX)

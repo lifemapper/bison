@@ -21,6 +21,8 @@
              Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 
              02110-1301, USA.
 """
+from common.constants import ALLOWED_TYPE
+
 NAMESPACE = {'tdwg':   'http://rs.tdwg.org/dwc/text/',
              'gbif':   'http://rs.gbif.org/terms/1.0/',
              'eml':    'eml://ecoinformatics.org/eml-2.1.1',
@@ -106,11 +108,31 @@ class NS(object):
 # gbifID mapped to BISON 'id'
 OCC_ID_FLD = 'id'
 
-GBIF_CONVERT_TEMP_FIELDS = ['occurrenceStatus', 'locality', 'habitat', 
+GBIF_CONVERT_TEMP_FIELD_TYPE = {
+    'occurrenceStatus': 
+     {'pgtype': ALLOWED_TYPE.varchar, 'max_len': None},
+    'locality': 
+     {'pgtype': ALLOWED_TYPE.varchar, 'max_len': None},
+    'habitat': 
+     {'pgtype': ALLOWED_TYPE.varchar, 'max_len': None},
+#      'ownerInstitutionCode':
+#      {'pgtype': ALLOWED_TYPE.varchar, 'max_len': None},
+#      'collectionCode':
+#      {'pgtype': ALLOWED_TYPE.varchar, 'max_len': None},
+#      'institutionID':
+#      {'pgtype': ALLOWED_TYPE.varchar, 'max_len': None},
+#      'collectionID': 
+#      {'pgtype': ALLOWED_TYPE.varchar, 'max_len': None},
+    'datasetKey':
+    {'pgtype': ALLOWED_TYPE.varchar, 'max_len': None},
+     }
+
+# GBIF_CONVERT_TEMP_FIELDS = ['occurrenceStatus', 'locality', 'habitat', 
 #                             'ownerInstitutionCode', 'collectionCode', 
 #                             'institutionID',  'collectionID', 'datasetKey'
-                            ]
+#                             ]
 GBIF_NAMEKEY_TEMP_FIELD = 'taxonKey'
+GBIF_NAMEKEY_TEMP_TYPE = {'pgtype': ALLOWED_TYPE.integer}
 
 # First pass mapping from GBIF data fields to BISON data fields plus a few 
 # fields replaced in later computation
