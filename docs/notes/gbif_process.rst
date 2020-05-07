@@ -121,3 +121,128 @@ B_COUNTY = if (PRNAME = 0, NAME, CDNAME)
 B_FIPS = if (PRNAME = 0, concat(STATE_FIPS, CNTY_FIPS), CDUID)
 B_CENTROID = geom_to_wkt (centroid( $geometry ) )
 
+GBIF download, country=US, 7 May 2020
+---------------------------------------
+
+Total
+    467,237,837 
+License
+    CC BY-NC 4.0 
+Year range
+    1601–2020 
+With year
+    98 % 
+With coordinates
+    96 % 
+With taxon match
+    99.7 % 
+
+Known issues
+
+A part of the GBIF processing is to flag occurrences that have suspicious fields
+* 10,859,178 Geodetic datum invalid 
+* 7,645,032 References uri invalid 
+* 4,485,870 Country derived from coordinates 
+* 3,325,294 Taxon match higherrank 
+* 1,196,123 Taxon match none 
+* 1,115,291 Type status invalid 
+* 1,066,422 Recorded date invalid 
+* 1,005,128 Taxon match fuzzy 
+* 919,444 Country invalid 
+* 836,609 Recorded date mismatch 
+* 819,170 Coordinate precision invalid 
+* 473,785 Basis of record invalid 
+* 452,631 Continent invalid 
+* 338,872 Coordinate invalid 
+* 292,935 Coordinate uncertainty meters invalid 
+* 259,812 Individual count invalid 
+* 131,893 Country coordinate mismatch 
+* 59,274 Depth min/max swapped 
+* 59,225 Presumed negated longitude 
+* 44,041 Depth unlikely 
+* 29,918 Zero coordinate 
+* 27,743 Depth non numeric 
+* 22,758 Modified date unlikely 
+* 17,696 Recorded date unlikely 
+* 9,798 Identified date unlikely 
+* 8,499 Elevation min/max swapped 
+* 7,469 Multimedia uri invalid 
+* 5,745 Depth not metric 
+* 4,017 Elevation non numeric 
+* 3,973 Coordinate reprojection suspicious 
+* 3,570 Coordinate out of range 
+* 2,347 Elevation not metric 
+* 971 Country mismatch 
+* 884 Presumed negated latitude 
+* 381 Multimedia date invalid 
+* 339 Presumed swapped coordinate
+
+Fossils
+There are fossils among your results. That can mean species occurrences at unexpected locations
+Living specimens
+Your search includes living specimens such as occurrences in botanical and zoological gardens.
+
+
+GBIF download, US Territories and Canada, 7 May 2020
+-----------------------------------------------------
+
+country=AS&country=CA&country=FM&country=GU&country=MH&country=MP&country=PR&country=PW&country=UM&country=VI
+
+Total
+    74,804,578 
+License
+    CC BY-NC 4.0 
+Year range
+    1601–2020 
+With year
+    99 % 
+With coordinates
+    97 % 
+With taxon match
+    99.6 % 
+
+Known issues
+
+A part of the GBIF processing is to flag occurrences that have suspicious fields
+* 3,855,657 Country derived from coordinates
+* 1,994,390 Geodetic datum invalid 
+* 1,821,473 Taxon match higherrank 
+* 1,510,152 Coordinate precision invalid 
+* 1,444,710 References uri invalid 
+* 496,677 Basis of record invalid 
+* 282,489 Taxon match none 
+* 279,271 Continent invalid 
+* 135,652 Taxon match fuzzy 
+* 120,860 Recorded date invalid 
+* 80,724 Recorded date mismatch 
+* 53,250 Coordinate invalid 
+* 52,561 Country coordinate mismatch 
+* 21,419 Country mismatch 
+* 19,792 Type status invalid 
+* 15,319 Coordinate uncertainty meters invalid 
+* 13,171 Presumed negated longitude 
+* 12,997 Zero coordinate 
+* 11,711 Country invalid 
+* 7,983 Identified date unlikely 
+* 7,106 Individual count invalid 
+* 4,011 Depth min/max swapped 
+* 3,162 Depth non numeric 
+* 2,358 Coordinate out of range 
+* 1,637 Multimedia uri invalid 
+* 1,164 Depth unlikely 
+* 1,014 Recorded date unlikely 
+* 939 Presumed negated latitude 
+* 858 Coordinate reprojection suspicious 
+* 815 Modified date unlikely 
+* 759 Elevation min/max swapped 
+* 655 Depth not metric 
+* 440 Presumed swapped coordinate 
+* 417 Elevation non numeric 
+* 151 Multimedia date invalid 
+* 42 Coordinate reprojection failed 
+* 31 Elevation not metric
+
+Fossils
+There are fossils among your results. That can mean species occurrences at unexpected locations
+Living specimens
+Your search includes living specimens such as occurrences in botanical and zoological gardens.
