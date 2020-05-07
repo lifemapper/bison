@@ -5,9 +5,11 @@ import time
 
 from common.constants import (BISON_DELIMITER, ENCODING, LOGINTERVAL, 
                               PROHIBITED_CHARS, PROHIBITED_SNAME_CHARS, 
-                              PROHIBITED_VALS, ANCILLARY_FILES,
+                              PROHIBITED_VALS, 
                               BISON_VALUES, BISON_SQUID_FLD, ITIS_KINGDOMS, 
-                              ISO_COUNTRY_CODES, BISON_ORDERED_DATALOAD_FIELDS)
+                              ISO_COUNTRY_CODES, 
+                              BISON_ORDERED_DATALOAD_FIELD_TYPE)
+from common.inputdata import ANCILLARY_FILES
 from common.lookup import Lookup, VAL_TYPE
 from common.tools import (getCSVDictReader, open_csv_files, getLogger)
 
@@ -26,18 +28,6 @@ from common.tools import (getCSVDictReader, open_csv_files, getLogger)
 # filepath = args.filepath
 # outfname = args.filename
 
-from osgeo import ogr
-import os
-import rtree
-import time
-
-from common.constants import (BISON_DELIMITER, ENCODING, LOGINTERVAL, 
-                              PROHIBITED_CHARS, PROHIBITED_SNAME_CHARS, 
-                              PROHIBITED_VALS, ANCILLARY_FILES,
-                              BISON_VALUES, BISON_SQUID_FLD, ITIS_KINGDOMS, 
-                              ISO_COUNTRY_CODES, BISON_ORDERED_DATALOAD_FIELDS)
-from common.lookup import Lookup, VAL_TYPE
-from common.tools import (getCSVDictReader, open_csv_files, getLogger)
 
 filepath = '/tank/data/bison/2019/ancillary'
 overwrite = True
