@@ -30,7 +30,8 @@ from common.constants import (BISON_DELIMITER, ENCODING, LOGINTERVAL,
                               PROHIBITED_CHARS, PROHIBITED_SNAME_CHARS, 
                               PROHIBITED_VALS, 
                               BISON_VALUES, BISON_SQUID_FLD, ITIS_KINGDOMS, 
-                              ISO_COUNTRY_CODES, BISON_ORDERED_DATALOAD_FIELDS)
+                              ISO_COUNTRY_CODES, ALLOWED_TYPE, 
+                              BISON_ORDERED_DATALOAD_FIELD_TYPE)
 from common.inputdata import ANCILLARY_FILES
 from common.lookup import Lookup, VAL_TYPE
 from common.tools import (getCSVDictReader, open_csv_files, getLogger,
@@ -60,14 +61,9 @@ class BisonFiller(object):
         
         # Ordered output fields
         # Individual steps may add/remove temporary fields for input/output
-        self._infields = BISON_ORDERED_DATALOAD_FIELDS.copy()
+        self._infields = list(BISON_ORDERED_DATALOAD_FIELD_TYPE.keys())
         # Write these fields after processing for next step
-        self._outfields = BISON_ORDERED_DATALOAD_FIELDS.copy()
-#         discards = DISCARD_FIELDS.copy().extend(DISCARD_AFTER_UPDATE)
-#         
-#         for (bisonfld, _) in BISON_GBIF_MAP:
-#             if bisonfld not in DISCARD_FIELDS:
-#                 self._bison_ordered_flds.append(bisonfld)
+        self._outfields = self._infields.copy()
 
         self._files = []
                 
@@ -140,21 +136,27 @@ class BisonFiller(object):
             fips = feat.GetFieldAsString('B_FIPS')
             county = feat.GetFieldAsString('B_COUNTY')
             state = feat.GetFieldAsString('B_STATE')
-            key = ';'.join([state, county, fips])
+            # lookup coordinates
+            centroid = feat.GetFieldAsString('B_CENTROID')
+            tmp = centroid[centroid.find('(')+1:centroid.find(')')]
+            coords = tmp.split(' ')
             try:
-                datadict[key]
+                float(coords[0])
+                float(coords[1])
             except:
-                centroid = feat.GetFieldAsString('B_CENTROID')
-                tmp = centroid[centroid.find('(')+1:centroid.find(')')]
-                coords = tmp.split(' ')
-                try:
-                    float(coords[0])
-                    float(coords[1])
-                except:
-                    self._log.error('Failed to read coordinates from {}'.format(
-                        centroid))
-                else:
-                    datadict[key] = (coords[0], coords[1])
+                self._log.error('Failed to read coordinates from {}'.format(
+                    centroid))
+            else:
+                # fill coordinates for search combo of 
+                #     state + county + fips, state + county, or fips
+                for key in [';'.join([state, county, fips]), 
+                            ';'.join([state, county]), 
+                            fips]:
+                    try:
+                        # Multiple polygons may exist for each county/province
+                        existing_val = datadict[key]
+                    except:
+                        datadict[key] = (coords[0], coords[1])
         terrlyr.ResetReading()
         if datadict:
             centroids = Lookup.initFromDict(datadict, valtype=VAL_TYPE.TUPLE)
@@ -240,29 +242,42 @@ class BisonFiller(object):
         return match_count, msgs
 
     # ...............................................
-    def _fill_centroids(self, rec, centroids):
-        pfips = rec['provided_fips'].strip()
-        pcounty = rec['provided_county_name'].strip()
-        pstate = rec['provided_state_name'].strip()
-        if ((pcounty not in (None, '') and pstate not in (None, '')) 
-            or pfips not in (None, '')):
-            key = ';'.join((pstate, pcounty, pfips))
-            try:
-                lon, lat = centroids.lut[key]
-            except:
-                self._log.info('Missing county centroid for provided vals {}'
-                               .format(key))
-            else:
-                rec['longitude'] = lon
-                rec['latitude'] = lat
-                rec['centroid'] = 'county'
-                self._log.info('Filled county centroid {}, {}'.format(lon, lat))
-        # No lon/lat and no fips or state/county 
-        else:
-            rec = None
-            self._log.info('No info for provided vals  {}, {}, {}'.format(
-                pstate, pcounty, pfips))
-
+    def _fill_or_delete_missing_coord(self, rec, centroids):
+        centroid = rec['centroid']
+        # Recompute coords previously computed to county centroid
+        if centroid == 'county':
+            rec['centroid'] = ''
+            rec['longitude'] = ''
+            rec['latitude'] = ''
+        lon, lat = self._get_coords(rec)
+        # Fill missing coordinates 
+        #     or refill previously computed to county centroid
+        if lon is None:
+            thisid = rec['id']
+            pfips = rec['provided_fips'].strip()
+            pcounty = rec['provided_county_name'].strip()
+            pstate = rec['provided_state_name'].strip()
+            if (pcounty != '' and pstate != '') or pfips != '':
+                key = ';'.join([s for s in (pstate, pcounty, pfips) if s != ''])
+                try:
+                    lon, lat = centroids.lut[key]
+                except:
+                    self._log.info('Missing county centroid for provided vals {}'
+                                   .format(key))
+                else:
+                    rec['longitude'] = lon
+                    rec['latitude'] = lat
+                    rec['centroid'] = 'county'
+                    self._log.info('Filled county centroid {}, {}'.format(lon, lat))
+            lon, lat = self._get_coords(rec)
+            # Discard rec without coords and state/province
+            if lon is None and pstate == '':
+                rec = None
+                self._log.info('Discard rec {} without coords and state/province'
+                               .format(thisid))
+        return rec
+        
+        
 #     # ...............................................
 #     def _get_itisfields(self, name, itis_svc):
 #         # Get tsn, acceptedTSN, accepted_name, kingdom
@@ -381,7 +396,7 @@ class BisonFiller(object):
     # ...............................................
     def update_itis_estmeans_centroid(self, itis2_lut_fname, estmeans_fname, 
                                       terrestrial_shpname, outfname, 
-                                      fromGbif=True):
+                                      from_gbif=True):
         """
         @summary: Process a CSV file with 47 ordered BISON fields (and optional
                   gbifID field for GBIF provided data) to 
@@ -418,7 +433,10 @@ class BisonFiller(object):
                 
             for rec in dict_reader:
                 recno += 1
-                squid = rec[BISON_SQUID_FLD]
+                if from_gbif:
+                    squid = rec['id']
+                else:
+                    squid = rec[BISON_SQUID_FLD]
                 
                 # ..........................................
                 # Clean kingdom value, Fill ITIS
@@ -429,21 +447,22 @@ class BisonFiller(object):
                 # clean_provided_scientific_name and establishment means table
                 self._fill_estmeans_field(rec, estmeans)
                 # ..........................................
-                # Fill geo
-                centroid = rec['centroid']
-                lon, lat = self._get_coords(rec)
-                # Fill missing coordinates or 
-                #   refill previously computed to county centroid
-                if lon is None or (centroid and centroid == 'county'):
-                    self._fill_centroids(rec, centroids)
-                    lon, lat = self._get_coords(rec)
+                # Fill missing geo or discard if no county info
+                rec = self._fill_or_delete_missing_coord(rec, centroids)
+#                 centroid = rec['centroid']
+#                 lon, lat = self._get_coords(rec)
+#                 # Fill missing coordinates or 
+#                 #   refill previously computed to county centroid
+#                 # Discard records without coordinates or computed centroid
+#                 if lon is None or (centroid and centroid == 'county'):
+#                     self._fill_centroid_coords(rec, centroids)
+#                     lon, lat = self._get_coords(rec)
 
-#                 if not fromGbif:
-#                     self._fill_bison_provider_fields(rec)
                 # Write updated record
-                if lon is not None:
+                if rec is not None:
                     row = self._makerow(rec)
                     writer.writerow(row)
+                
                 # Log progress occasionally
                 if (recno % LOGINTERVAL) == 0:
                     self._log.info('*** Record number {} ***'.format(recno))
@@ -508,7 +527,7 @@ class BisonFiller(object):
             
     # ...............................................
     def update_point_in_polygons(self, terr_data, marine_data, ancillary_path, 
-                                 outfname):
+                                 outfname, from_gbif=True):
         """
         @summary: Process a CSV file with 47 ordered BISON fields (and optional
                   gbifID field for GBIF provided data) to 
@@ -554,12 +573,13 @@ class BisonFiller(object):
                                              outfields=self._outfields)
             for rec in dict_reader:
                 recno += 1
-                squid = rec[BISON_SQUID_FLD]
+                if from_gbif:
+                    squid = rec['id']
+                else:
+                    squid = rec[BISON_SQUID_FLD]
                 lon, lat = self._get_coords(rec)
                 # Use coordinates to calc 
-                if lon is None:
-                    print('wtf {}'.format(squid))
-                else:
+                if lon is not None:
                     # Compute geo: coordinates and polygons
                     match_count, msgs = self._fill_geofields(
                         rec, lon, lat, terrindex, terrfeats, terr_bison_fldnames, 
@@ -1007,7 +1027,7 @@ from common.constants import (BISON_DELIMITER, ENCODING, LOGINTERVAL,
                               PROHIBITED_CHARS, PROHIBITED_SNAME_CHARS, 
                               PROHIBITED_VALS, ANCILLARY_FILES,
                               BISON_VALUES, BISON_SQUID_FLD, ITIS_KINGDOMS, 
-                              ISO_COUNTRY_CODES, BISON_ORDERED_DATALOAD_FIELDS)
+                              ISO_COUNTRY_CODES, BISON_ORDERED_DATALOAD_FIELD_TYPE)
 from common.lookup import Lookup, VAL_TYPE
 from common.tools import (getCSVDictReader, open_csv_files, getLogger)
 
