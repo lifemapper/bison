@@ -348,29 +348,6 @@ class GBIFReader(object):
         return estmeans
         
     # ...............................................
-    def _read_centroid_lookup(self, terrlyr, idx_fips, idx_cnty, idx_st, 
-                              idx_centroid):
-        '''
-        @summary: Read and populate dictionary with key = concatenated string of 
-                  state name, county name, fips code and value = 
-                  tuple of centroid longitude and latitude.
-        '''
-        centroids = None
-        datadict = {}
-        for poly in terrlyr:
-            fips = poly.GetFieldAsString(idx_fips)
-            county = poly.GetFieldAsString(idx_cnty)
-            state = poly.GetFieldAsString(idx_st)
-            centroid = poly.GetFieldAsString(idx_centroid)
-            key = ';'.join([state, county, fips])
-            tmp = centroid.lstrip('Point (').rstrip(')')
-            lonstr, latstr = tmp.split(' ')
-            datadict[key] = (lonstr, latstr)
-        if datadict:
-            centroids = Lookup.initFromDict(datadict, valtype=VAL_TYPE.TUPLE)
-        return centroids
-
-    # ...............................................
     def _read_name_lookup(self, name_lut_fname):
         """
         @summary: Create lookup table (type DICT) for: 

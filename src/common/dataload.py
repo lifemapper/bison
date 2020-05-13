@@ -303,8 +303,11 @@ if __name__ == '__main__':
         logbasename = '{}_{}'.format(logbasename, basefname)
         logfname = os.path.join(tmppath, '{}.log'.format(logbasename))
 
-        nametaxa_fname = os.path.join(tmppath, 'step1_{}_sciname_taxkey_list.csv'.format(basefname))
-        canonical_lut_fname = os.path.join(tmppath, 'step2_{}_canonical_lut.csv'.format(basefname))        
+        nametaxa_fname = os.path.join(tmppath, 'step1_{}_sciname_taxkey_list.csv'
+                                      .format(basefname))
+        canonical_lut_fname = os.path.join(tmppath, 'step2_{}_canonical_lut.csv'
+                                           .format(basefname))        
+        
         # Output CSV files of all records after initial creation or field replacements
         pass1_fname = os.path.join(tmppath, 'step1_{}.csv'.format(basefname))
         pass2_fname = os.path.join(tmppath, 'step2_{}.csv'.format(basefname))
@@ -341,14 +344,14 @@ if __name__ == '__main__':
             gr.update_bison_names(pass1_fname, pass2_fname, canonical_lut)            
         elif step == 3:
             logger = getLogger(logbasename, logfname)
-            bf = BisonFiller(pass2_fname, log=logger)
+            bf = BisonFiller(logger)
             # Pass 3 of CSV transform, fill with ITIS resolved fields, 
             #     establishment means, county centroids
             # Use Derek D. generated ITIS lookup itis2_lut_fname
             # No discards
-            bf.update_itis_estmeans_centroid(itis2_lut_fname, estmeans_fname, 
-                                             terrestrial_shpname, pass3_fname, 
-                                             from_gbif=True)
+            bf.update_itis_estmeans_centroid(
+                itis2_lut_fname, estmeans_fname, terrestrial_shpname, 
+                pass2_fname, pass3_fname, from_gbif=True)
         elif step == 4:
             # Pass 4 of CSV transform, split into smaller files and parallel 
             # process with most CPUs.  Georeference records to fill calculated 
@@ -370,65 +373,106 @@ if __name__ == '__main__':
     else:
         logfname = os.path.join(tmppath, '{}.log'.format(logbasename))
         logger = getLogger(logbasename, logfname)
-        if step == 5:        
-                
-            merger = BisonMerger(outpath, logger)
+        if step == 5:
+            merger = BisonMerger(logger)
+            bfiller = BisonFiller(logger)
             old_resources = merger.read_resources(merged_dataset_lut_fname)
-#             old_resources.write_lookupfname, header, delimiter)
+            # Pull metadata from ticket first, 
+            # if missing, fill with old provider table data second
+            prov_dataload_metadata = merger.assemble_files(datapth, old_resources)
+            
+            for resource_ident, pvals in prov_dataload_metadata.items():
+                fname = pvals['filename']
+                action = pvals['action']
+                resource_url = pvals['resource_url']
+                resource_name = pvals['resource']
+                
+                if action in (ProviderActions.wait, ProviderActions.unknown):
+                    logger.info('Wait to process {}'.format(resource_ident))
+                else:
+                    if fname is None:
+                        fname = 'bison_{}.csv'.format(resource_ident)
+                    logger.info('\n{}: {} {}'.format(
+                        resource_ident, action, fname))
+                    infile = os.path.join(datapth, fname)
+                    if not os.path.exists(infile):
+                        raise Exception('File {} does not exist for {}'
+                                        .format(fname, resource_ident))
+                    basename, _ = os.path.splitext(fname)
+                    s1dir = os.path.join(tmppath, 'step1-clean')
+                    s2dir = os.path.join(tmppath, 'step2-itisescent')
+                    s3dir = os.path.join(tmppath, 'step3-geo')
+                    outfile1 = os.path.join(s1dir, basename + '_clean.csv')
+                    outfile2 = os.path.join(s2dir, basename + '_itis_em_geo.csv')            
+                    outfile3 = os.path.join(s3dir, basename + '_final.csv')
+                    
+                    if os.path.exists(outfile1):
+                        logger.info('  Existing step 1/3 output in {}'.format(
+                            outfile1))
+                    else:
+                        # Step 1: rewrite filling ticket/constant vals for resource/provider
+                        logger.info('  Process step 1/3 output to {}'.format(
+                            outfile1))
+                        merger.rewrite_bison_data(
+                            infile, outfile1, resource_ident, resource_name, 
+                            resource_url, action)
+                    if os.path.exists(outfile2):
+                        logger.info('  Existing step 2/3 output in {}'.format(
+                            outfile2))
+                    else:
+                        # Step 2: rewrite filling lookup vals from 
+                        # itis, establishment_means and centroid 
+                        # Identical to Step 3 for GBIF data
+                        logger.info('  Process step 2/3 output to {}'.format(
+                            outfile2))
+                        bfiller.update_itis_estmeans_centroid(
+                            itis2_lut_fname, estmeans_fname, terrestrial_shpname, 
+                            outfile1, outfile2, from_gbif=False)
+                    if os.path.exists(outfile3):
+                        logger.info('  Existing step 3/3 output in {}'.format(
+                            outfile3))
+                    else:
+                        # Step 3: of CSV transform
+                        # Identical to Step 4 for GBIF data
+                        logger.info('  Process step 3/3 output to {}'.format(
+                            outfile3))                        
+#                         bfiller.update_point_in_polygons(
+#                             terr_data, marine_data, ancillary_path, outfile2, outfile3)
+        elif step == 10:
+            merger = BisonMerger(logger)
+            old_resources = merger.read_resources(merged_dataset_lut_fname)
             # Merge metadata from old provider data with new provider file and data ticket
             prov_dataload_metadata = merger.assemble_files(datapth, old_resources)
             
             for resource_ident, pvals in prov_dataload_metadata.items():
                 fname = pvals['filename']
                 action = pvals['action']
+                ticket = pvals['ticket']
+                resource_url = pvals['resource_url']
+                resource_name = pvals['resource']
                 if action in (ProviderActions.wait, ProviderActions.unknown):
                     logger.info('Wait to process {}'.format(resource_ident))
                 else:
                     if fname is None:
                         fname = 'bison_{}.csv'.format(resource_ident)
+                    logger.info('\n\n{}: {} {}'.format(
+                        ticket, resource_ident, action))
                     infile = os.path.join(datapth, fname)
                     if not os.path.exists(infile):
                         raise Exception('File {} does not exist for {}'
                                         .format(fname, resource_ident))
-                    basename, _ = os.path.splitext(fname)
-                    outfile1 = os.path.join(tmppath, basename + '_clean.csv')
-                    outfile2 = os.path.join(tmppath, basename + '_958itis_em_geo.csv')            
-                    outfile3 = os.path.join(outpath, basename + '_final.csv')
-                    if os.path.exists(outfile1):
-                        logger.info('Provider {} step 1/3 output in {}'.format(
-                            resource_ident, outfile1))
-                    else:
-                        # Step 1: rewrite filling ticket/constant vals for resource/provider
-                        merger.rewrite_bison_data(
-                            infile, outfile1, old_resources, resource_ident, 
-                            pvals['resource'], pvals['resource_url'], action)
-                    if os.path.exists(outfile2):
-                        logger.info('Provider {} step 2/3 output in {}'.format(
-                            resource_ident, outfile2))
-                    else:
-                        # Step 2: rewrite filling lookup vals from 
-                        # itis, establishment_means and centroid 
-                        # Identical to Step 3 for GBIF data
-                        bf = BisonFiller(outfile1, log=logger)
-                        bf.update_itis_estmeans_centroid(
-                            itis2_lut_fname, estmeans_fname, terrestrial_shpname, 
-                            outfile2, fromGbif=False)
-                    if os.path.exists(outfile3):
-                        logger.info('Provider {} step 3/3 output in {}'.format(
-                            resource_ident, outfile3))
-                    else:
-                        # Step 3: of CSV transform
-                        # Identical to Step 4 for GBIF data
-                        bf = BisonFiller(outfile2, log=logger)
-                        bf.update_point_in_polygons(
-                            terr_data, marine_data, ancillary_path, outfile3)
-    
-        elif step == 10:
-            logger = getLogger(logbasename, logfname)
-            bf = BisonFiller(pass3_fname, log=logger)
-            # Pass 3 of CSV transform
-            # Use Derek D. generated ITIS lookup itis2_lut_fname
-            bf.test_bison_outfile(fromGbif=True)
+                        
+                    merger.test_bison_encoding_resource(
+                            infile, resource_ident, resource_name, resource_url, 
+                            action)
+            correction_info = merger.get_correction_info()
+            logger.info(correction_info)
+            
+            # TODO: Test and Update old_resources to ensure that constant values
+            # from tickets are included and corrections updated for existing records
+            # Check that all resource_id values contain ticket identifier for 
+            # newly added resources or 440,xxxxxx
+                    
         elif step == 13:
             logger = getLogger(logbasename, logfname)
             bf = BisonFiller(pass3_fname, log=logger)

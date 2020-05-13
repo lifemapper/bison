@@ -123,6 +123,7 @@ B_CENTROID = geom_to_wkt (centroid( $geometry ) )
 
 GBIF download, country=US, 7 May 2020
 ---------------------------------------
+http://api.gbif.org/v1/occurrence/download/request/0058167-200221144449610.zip
 
 Total
     467,237,837 
@@ -185,6 +186,7 @@ Your search includes living specimens such as occurrences in botanical and zoolo
 
 GBIF download, US Territories and Canada, 7 May 2020
 -----------------------------------------------------
+http://api.gbif.org/v1/occurrence/download/request/0058175-200221144449610.zip
 
 country=AS&country=CA&country=FM&country=GU&country=MH&country=MP&country=PR&country=PW&country=UM&country=VI
 

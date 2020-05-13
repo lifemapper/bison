@@ -154,6 +154,8 @@ BISON_ORDERED_DATALOAD_FIELD_TYPE = OrderedDict(
      {'pgtype': ALLOWED_TYPE.varchar, 'max_len': 100},
      'calculated_fips': 
      {'pgtype': ALLOWED_TYPE.varchar, 'max_len': 5},
+     'calculated_state_fips': 
+     {'pgtype': ALLOWED_TYPE.varchar, 'max_len': 2},
      'calculated_state_name': 
      {'pgtype': ALLOWED_TYPE.varchar, 'max_len': 100},
      'centroid': 
@@ -298,7 +300,7 @@ BISONPROVIDER_BISON_MAP = [
 ('state_original', 'provided_state_name'), 
 # Mismatch, postgres has computedcountyfips
 ('countycomputedfips', 'calculated_fips'),
-('statecomputedfips', None),
+('statecomputedfips', 'calculated_state_fips'),
 ('centroid',), 
 ('hierarchy_string', ), 
 ('tsns', 'valid_accepted_tsn'), 
