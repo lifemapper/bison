@@ -1,8 +1,8 @@
 import os
 
 from common.constants import ENCODING
-from common.tools import (getCSVDictReader, getCSVDictWriter, 
-                          getCSVReader, getCSVWriter, getLine, makerow)
+from common.tools import (get_csv_dict_reader, get_csv_dict_writer, 
+                          get_csv_reader, get_csv_writer, getLine, makerow)
 
 class VAL_TYPE:
     DICT = 1
@@ -39,13 +39,14 @@ class Lookup(object):
 
     # ...............................................
     @classmethod
-    def initFromFile(cls, lookup_fname, keyfld, delimiter, 
-                     valtype=VAL_TYPE.DICT, encoding=ENCODING):
+    def initFromFile(cls, lookup_fname, keyfld, delimiter, valtype=VAL_TYPE.DICT, 
+                     encoding=ENCODING, ignore_quotes=True):
         """
         @summary: Constructor
         """
         lookup = Lookup(valtype=valtype, encoding=encoding)
-        lookup.read_lookup(lookup_fname, keyfld, delimiter)
+        lookup.read_lookup(
+            lookup_fname, keyfld, delimiter, ignore_quotes=ignore_quotes)
         return lookup
 
     # ...............................................
@@ -88,7 +89,7 @@ class Lookup(object):
             if self.valtype == VAL_TYPE.DICT:
                 # Write all vals in dict, assumes each dictionary-value has the same keys
                 if header is None:
-                    writer, outf = getCSVDictWriter(fname, delimiter, self.encoding, 
+                    writer, outf = get_csv_dict_writer(fname, delimiter, self.encoding, 
                                                     header, fmode=fmode)
                     if fmode == 'w':
                         writer.writeheader()
@@ -96,7 +97,7 @@ class Lookup(object):
                         writer.writerow(ddict)
                 # Write values from dict for header fields, insert '' when missing
                 else:
-                    writer, outf = getCSVWriter(fname, delimiter, self.encoding, 
+                    writer, outf = get_csv_writer(fname, delimiter, self.encoding, 
                                                 fmode=fmode)
                     writer.writerow(header)
                     for key, rec in self.lut.items():
@@ -105,7 +106,7 @@ class Lookup(object):
             
             # Non-dictionary lookup
             else:
-                writer, outf = getCSVWriter(fname, delimiter, self.encoding, 
+                writer, outf = get_csv_writer(fname, delimiter, self.encoding, 
                                             fmode=fmode)
                 if fmode == 'w' and header is not None:
                     writer.writerow(header)
@@ -120,7 +121,7 @@ class Lookup(object):
             outf.close()
 
     # ...............................................
-    def read_lookup(self, fname, keyfld, delimiter):
+    def read_lookup(self, fname, keyfld, delimiter, ignore_quotes=True):
         '''
         @summary: Read and populate dictionary with key = uuid and 
                   val = dictionary of record values
@@ -130,13 +131,16 @@ class Lookup(object):
         if os.path.exists(fname):
             if self.valtype == VAL_TYPE.DICT:
                 try:
-                    rdr, inf = getCSVDictReader(fname, delimiter, self.encoding)
+                    rdr, inf = get_csv_dict_reader(
+                        fname, delimiter, self.encoding, 
+                        ignore_quotes=ignore_quotes)
                 except Exception as e:
                     print('Failed reading data in {}: {}'
                                     .format(fname, e))
                 else:
                     for data in rdr:
                         datakey = data[keyfld]
+                        # special case for legacy resource and provider tables
                         if not datakey:
                             try:
                                 resolvedid = data['gbif_legacyid']
@@ -148,7 +152,9 @@ class Lookup(object):
                                           .format(data['gbif_legacyid']))
                             except:
                                 pass
-                        self.lut[datakey] = data
+                            
+                        else:
+                            self.lut[datakey] = data
                 finally:
                     inf.close()
                 print('no_old_legacy {}  no_new_legacy (default -9999) {}'
@@ -157,7 +163,7 @@ class Lookup(object):
             elif self.valtype == VAL_TYPE.SET:
                 recno = 0
                 try:
-                    rdr, inf = getCSVReader(fname, delimiter, self.encoding)
+                    rdr, inf = get_csv_reader(fname, delimiter, self.encoding)
                     # get header
                     line, recno = getLine(rdr, recno)
                     # read lookup vals into dictionary

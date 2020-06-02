@@ -16,7 +16,7 @@ REQUIRED_FIELDS = ['STATE_NAME', 'NAME', 'STATE_FIPS', 'CNTY_FIPS', 'PRNAME',
 CENTROID_FIELD = 'B_CENTROID'
 
 # .............................................................................
-def getCSVReader(datafile, delimiter, encoding):
+def get_csv_reader(datafile, delimiter, encoding):
     try:
         f = open(datafile, 'r', encoding=encoding) 
         reader = csv.reader(f, delimiter=delimiter, quoting=csv.QUOTE_NONE)
@@ -28,7 +28,7 @@ def getCSVReader(datafile, delimiter, encoding):
     return reader, f
 
 # .............................................................................
-def getCSVWriter(datafile, delimiter, encoding, fmode='w'):
+def get_csv_writer(datafile, delimiter, encoding, fmode='w'):
     ''' Get a CSV writer that can handle encoding
     
     Args:
@@ -52,17 +52,23 @@ def getCSVWriter(datafile, delimiter, encoding, fmode='w'):
     return writer, f
 
 # .............................................................................
-def getCSVDictReader(datafile, delimiter, encoding, fieldnames=None):
+def get_csv_dict_reader(datafile, delimiter, encoding, fieldnames=None, 
+                        ignore_quotes=True):
     try:
         f = open(datafile, 'r', encoding=encoding)
         if fieldnames is None:
             header = next(f)
             tmpflds = header.split(delimiter)
             fieldnames = [fld.strip() for fld in tmpflds]
-        dreader = csv.DictReader(f, fieldnames=fieldnames, 
-                                 quoting=csv.QUOTE_NONE,
-                                 restkey=EXTRA_VALS_KEY,
-                                 delimiter=delimiter)        
+        if ignore_quotes:
+            dreader = csv.DictReader(
+                f, fieldnames=fieldnames, quoting=csv.QUOTE_NONE,
+                restkey=EXTRA_VALS_KEY, delimiter=delimiter)
+        else:
+            dreader = csv.DictReader(
+                f, fieldnames=fieldnames, restkey=EXTRA_VALS_KEY, 
+                delimiter=delimiter)
+            
     except Exception as e:
         raise Exception('Failed to read or open {}, ({})'
                         .format(datafile, str(e)))
@@ -71,7 +77,7 @@ def getCSVDictReader(datafile, delimiter, encoding, fieldnames=None):
     return dreader, f
 
 # .............................................................................
-def getCSVDictWriter(datafile, delimiter, encoding, fldnames, fmode='w'):
+def get_csv_dict_writer(datafile, delimiter, encoding, fldnames, fmode='w'):
     '''
     @summary: Get a CSV writer that can handle encoding
     '''
@@ -91,7 +97,7 @@ def getCSVDictWriter(datafile, delimiter, encoding, fldnames, fmode='w'):
     return writer, f
 
 # .............................................................................
-def getLogger(name, fname):
+def get_logger(name, fname):
     log = logging.getLogger(name)
     log.setLevel(logging.DEBUG)
     formatter = logging.Formatter(LOG_FORMAT, LOG_DATE_FORMAT)
@@ -112,7 +118,7 @@ def rotate_logfile(log, logpath, logname=None):
             nm, _ = os.path.splitext(os.path.basename(__file__))
             logname = '{}.{}'.format(nm, int(time.time()))
         logfname = os.path.join(logpath, '{}.log'.format(logname))
-        log = getLogger(logname, logfname)
+        log = get_logger(logname, logfname)
     return log
 
 
@@ -150,14 +156,14 @@ def open_csv_files(infname, delimiter, encoding, infields=None,
         outfields: Optional ordered list of fieldnames for output header 
     '''
     # Open incomplete BISON CSV file as input
-    csv_dict_reader, inf = getCSVDictReader(infname, delimiter, encoding, 
+    csv_dict_reader, inf = get_csv_dict_reader(infname, delimiter, encoding, 
                                             fieldnames=infields)
     # Optional new BISON CSV output file
     csv_writer = outf = None
     if outfname:
         if outdelimiter is None:
             outdelimiter = delimiter
-        csv_writer, outf = getCSVWriter(outfname, outdelimiter, encoding)
+        csv_writer, outf = get_csv_writer(outfname, outdelimiter, encoding)
         # if outfields are not provided, no header
         if outfields:
             csv_writer.writerow(outfields)
