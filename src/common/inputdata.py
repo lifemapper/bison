@@ -17,7 +17,7 @@ ANCILLARY_FILES = {
     # From Annie Simpson
     'establishment_means': {'file': 'NonNativesIndex20190912.txt'},
     # From ITIS developers
-    'itis': {'file': 'itis_lookup.csv'},
+    'itis': {'file': 'itis_lookup_csv-05-2020.csv'},
     # From existing database
     'resource': {'file': 'resource.csv'},
     'provider': {'file': 'provider.csv'}}
@@ -246,3 +246,20 @@ BISON_PROVIDER = {
      'filename': 'USGS-WERCcarnivoreCam-20200318.txt'},
 
 }
+
+"""
+Correction table
+
+440,100025
+  resource:  {'Kauai Invasive Species Committee - Pest Surveys - 2001-2011'}
+
+440,100045
+  resource_url:  {'https://bison.usgs.gov/ipt/resource?r=usgs-pwrc-bird-phenology-program'}
+
+440,100030
+  resource:  {'USFWS - Ruby Lake NWR - Vegetation Mapping Survey - 2012-2013'}
+
+440,100005
+  resource:  {'USGS PWRC - North American Breeding Bird Atlas Explorer'}
+
+"""

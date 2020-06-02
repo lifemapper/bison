@@ -26,7 +26,7 @@ import requests
 
 from common.constants import (BISON_DELIMITER, BISON_IPT_PREFIX, 
                               ENCODING, NEWLINE, LEGACY_ID_DEFAULT) 
-from common.tools import getCSVWriter
+from common.tools import get_csv_writer
 
 from gbif.constants import (GBIF_DSET_KEYS, GBIF_ORG_KEYS, GBIF_URL,
                             GBIF_DATASET_URL, GBIF_ORGANIZATION_URL,
@@ -469,7 +469,7 @@ class GbifAPI(object):
             fmode = 'a'
         else:
             fmode = 'w'
-        csvwriter, f = getCSVWriter(outfname, delimiter, ENCODING, fmode=fmode)
+        csvwriter, f = get_csv_writer(outfname, delimiter, ENCODING, fmode=fmode)
 
         output = self._postJsonToParser(GBIF_BATCH_PARSER_URL, indata)
         total = 0

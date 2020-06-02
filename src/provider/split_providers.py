@@ -1,7 +1,7 @@
 import os
 
 from common.constants import ENCODING #, BISON_PROVIDER_HEADER
-from common.tools import getLogger, getCSVReader, getCSVWriter
+from common.tools import getLogger, get_csv_reader, get_csv_writer
 
 # ...............................................
 def usage():
@@ -58,7 +58,7 @@ class DataSplitter(object):
     def _open_group_file(self, grpval, out_delimiter):
         basefname = '{}_{}.csv'.format(self._dataname, grpval)
         grp_fname = os.path.join(self._basepath, basefname)
-        writer, outf = getCSVWriter(grp_fname, out_delimiter, ENCODING)
+        writer, outf = get_csv_writer(grp_fname, out_delimiter, ENCODING)
         self._files[grp_fname] = outf
         return writer
 
@@ -70,7 +70,7 @@ class DataSplitter(object):
         @note: Replicate the original header on each smaller sorted file
         """
         try:
-            reader, inf = getCSVReader(self.messyfile, self.indelimiter, ENCODING)
+            reader, inf = get_csv_reader(self.messyfile, self.indelimiter, ENCODING)
             header = next(reader)
             groups = {}
     
@@ -102,7 +102,7 @@ class DataSplitter(object):
             inf.close()
             
         try:
-            writer, outf = getCSVWriter(fname, self.indelimiter, ENCODING)
+            writer, outf = get_csv_writer(fname, self.indelimiter, ENCODING)
             writer.writerow(['groupvalue', 'count'])
             for grpval, grpcount in groups.items():
                 writer.writerow([grpval, grpcount])
@@ -121,7 +121,7 @@ class DataSplitter(object):
         @note: Use "gather" to evaluate the dataset first.
         """
         try:
-            reader, inf = getCSVReader(self.messyfile, self.indelimiter, ENCODING)
+            reader, inf = get_csv_reader(self.messyfile, self.indelimiter, ENCODING)
             header = next(reader)
             if self.group_idx is None:
                 try:
@@ -153,7 +153,7 @@ class DataSplitter(object):
 
     # ...............................................
     def _getHeader(self):
-        reader, inf = getCSVReader(self.messyfile, self.indelimiter)
+        reader, inf = get_csv_reader(self.messyfile, self.indelimiter)
         header = next(reader)
         inf.close()
         return header
@@ -164,7 +164,7 @@ class DataSplitter(object):
         @summary: Sort file
         """
         self._log.info('Gathering unique sort values from file {}'.format(self.messyfile))
-        reader, inf = getCSVReader(self.messyfile, self.indelimiter, ENCODING)        
+        reader, inf = get_csv_reader(self.messyfile, self.indelimiter, ENCODING)        
 
         group_idxs = self._get_sortidxs(reader, group_cols)
         sortvals = set()
@@ -191,7 +191,7 @@ class DataSplitter(object):
         """
         self._log.info('Testing file {}'.format(self.tidyfile))
         reccount = 0
-        reader, outf = getCSVReader(self.tidyfile, outdelimiter, ENCODING)
+        reader, outf = get_csv_reader(self.tidyfile, outdelimiter, ENCODING)
         self._files[self.tidyfile] = outf
         header = next(reader)
         if header[self.group_idx] != 'gbifID':
@@ -264,7 +264,7 @@ python3.6 /state/partition1/git/bison/src/provider/split_providers.py \
 
 import os
 from common.constants import ENCODING 
-from common.tools import getLogger, getCSVReader, getCSVWriter
+from common.tools import getLogger, get_csv_reader, get_csv_writer
 
 group_idx = 13
 group_col = 'resource_id'
@@ -276,7 +276,7 @@ dataname, ext = os.path.splitext(fname)
 logname = '{}_{}.log'.format('split_provider', dataname)        
 
 gf = DataSplitter(messyfile, in_delimiter, group_col, logname)
-reader, outf = getCSVReader(messyfile, delimiter, ENCODING)
+reader, outf = get_csv_reader(messyfile, delimiter, ENCODING)
 header = next(reader)
 
 splitIdx = 0

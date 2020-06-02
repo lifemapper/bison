@@ -11,7 +11,7 @@ from common.constants import (BISON_DELIMITER, ENCODING, LOGINTERVAL,
                               BISON_ORDERED_DATALOAD_FIELD_TYPE)
 from common.inputdata import ANCILLARY_FILES
 from common.lookup import Lookup, VAL_TYPE
-from common.tools import (getCSVDictReader, open_csv_files, getLogger)
+from common.tools import (get_csv_dict_reader, open_csv_files, get_logger)
 
 # .............................................................................
 # ...............................................

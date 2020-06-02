@@ -6,7 +6,7 @@ from random import randint
 from time import sleep
 
 from common.bisonfill import BisonFiller
-from common.tools import getLogger
+from common.tools import get_logger
 
 # .............................................................................
 def intersect_csv_and_shapefiles(in_csv_filename, geodata1, geodata2, 
@@ -24,7 +24,7 @@ def intersect_csv_and_shapefiles(in_csv_filename, geodata1, geodata2,
     pth, basefname = os.path.split(out_csv_filename)
     logbasename, _ = os.path.splitext(basefname)
     logfname = os.path.join(pth, '{}.log'.format(logbasename))
-    logger = getLogger(logbasename, logfname)
+    logger = get_logger(logbasename, logfname)
     bf = BisonFiller(in_csv_filename, log=logger)
     # Pass 4 of CSV transform, final step, point-in-polygon intersection
     bf.update_point_in_polygons(geodata1, geodata2, ancillary_path, 
