@@ -5,7 +5,7 @@ import time
 
 from common.constants import (BISON_DELIMITER, ENCODING, GEOREFERENCE_FILES)
 from common.bisonfill import BisonFiller
-from common.tools import (getCSVDictReader, getCSVDictWriter, getLogger)
+from common.tools import (get_csv_dict_reader, get_csv_dict_writer, getLogger)
 
 gbif_interp_file='/tank/data/bison/2019/AS/occurrence.txt'
 gbif_interp_file='/tank/data/bison/2019/Terr/occurrence_lines_1-10000001.txt'
@@ -50,7 +50,7 @@ idx_mg = eez_def.GetFieldIndex('MRGID')
 def rewrite_records(infname, outfname):
     self = BisonFiller(infname)
      
-    drdr, inf = getCSVDictReader(infname, BISON_DELIMITER, ENCODING)
+    drdr, inf = get_csv_dict_reader(infname, BISON_DELIMITER, ENCODING)
     self._files.append(inf)
      
     deleteme = []
@@ -61,7 +61,7 @@ def rewrite_records(infname, outfname):
     for fld in deleteme:
         self._bison_ordered_flds.remove(fld)
      
-    dwtr, outf = getCSVDictWriter(outfname, BISON_DELIMITER, ENCODING, 
+    dwtr, outf = get_csv_dict_writer(outfname, BISON_DELIMITER, ENCODING, 
                                   self._bison_ordered_flds)
      
     dwtr.writeheader()
@@ -91,7 +91,7 @@ def read_some_points(infname, count):
     recno = 0
     points = []
     try:
-        drdr, inf = getCSVDictReader(infname, BISON_DELIMITER, ENCODING)
+        drdr, inf = get_csv_dict_reader(infname, BISON_DELIMITER, ENCODING)
         for rec in drdr:
             if recno > count:
                 break

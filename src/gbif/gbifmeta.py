@@ -25,7 +25,7 @@ import os
 import xml.etree.ElementTree as ET
 
 from common.constants import (BISON_DELIMITER, ENCODING)
-from common.tools import (getCSVDictReader, getCSVWriter)
+from common.tools import (get_csv_dict_reader, get_csv_writer)
                             
 from gbif.constants import (INTERPRETED, CLIP_CHAR, NAMESPACE, GBIF_ORG_FOREIGN_KEY)
 from gbif.gbifapi import GbifAPI
@@ -135,7 +135,7 @@ class GBIFMetaReader(object):
         """
         org_uuids = set()
         try:
-            rdr, inf = getCSVDictReader(dset_lut_fname, BISON_DELIMITER, ENCODING)
+            rdr, inf = get_csv_dict_reader(dset_lut_fname, BISON_DELIMITER, ENCODING)
             for dset_data in rdr:
                 orgUUID = dset_data['gbif_publishingOrganizationKey']
                 org_uuids.add(orgUUID) 
@@ -154,7 +154,7 @@ class GBIFMetaReader(object):
         @summary: Create lookup table for: 
                   BISON canonicalName from GBIF scientificName and/or taxonKey
         """
-        csvwriter, f = getCSVWriter(lut_fname, BISON_DELIMITER, ENCODING, 
+        csvwriter, f = get_csv_writer(lut_fname, BISON_DELIMITER, ENCODING, 
                                     fmode='a')
         count = 0
         tax_resolved = []

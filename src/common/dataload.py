@@ -31,7 +31,7 @@ from common.bisonfill import BisonFiller
 from common.constants import (BISON_DELIMITER, ANCILLARY_DIR, ProviderActions)
 from common.inputdata import ANCILLARY_FILES
 from common.intersect_one import intersect_csv_and_shapefiles
-from common.tools import getLogger
+from common.tools import get_logger
 
 from gbif.gbifmod import GBIFReader
 
@@ -316,7 +316,7 @@ if __name__ == '__main__':
     
         start_time = time.time()
         if step == 1:
-            logger = getLogger(logbasename, logfname)
+            logger = get_logger(logbasename, logfname)
             gr = GBIFReader(datapth, tmpdir, outdir, logger)
             gr.write_dataset_org_lookup(
                 merged_dataset_lut_fname, resource_lut_fname, 
@@ -331,7 +331,7 @@ if __name__ == '__main__':
                 merged_org_lut_fname, 
                 nametaxa_fname, pass1_fname)
         elif step == 2:
-            logger = getLogger(logbasename, logfname)
+            logger = get_logger(logbasename, logfname)
             gr = GBIFReader(datapth, tmpdir, outdir, logger)
             # Reread output ONLY if missing gbif name/taxkey 
             if not os.path.exists(nametaxa_fname):
@@ -343,7 +343,7 @@ if __name__ == '__main__':
             # Discard records with no clean name
             gr.update_bison_names(pass1_fname, pass2_fname, canonical_lut)            
         elif step == 3:
-            logger = getLogger(logbasename, logfname)
+            logger = get_logger(logbasename, logfname)
             bf = BisonFiller(logger)
             # Pass 3 of CSV transform, fill with ITIS resolved fields, 
             #     establishment means, county centroids
@@ -372,7 +372,7 @@ if __name__ == '__main__':
             
     else:
         logfname = os.path.join(tmppath, '{}.log'.format(logbasename))
-        logger = getLogger(logbasename, logfname)
+        logger = get_logger(logbasename, logfname)
         if step == 5:
             merger = BisonMerger(logger)
             bfiller = BisonFiller(logger)
@@ -474,7 +474,7 @@ if __name__ == '__main__':
             # newly added resources or 440,xxxxxx
                     
         elif step == 13:
-            logger = getLogger(logbasename, logfname)
+            logger = get_logger(logbasename, logfname)
             bf = BisonFiller(pass3_fname, log=logger)
             # Pass 4 of CSV transform, final step, point-in-polygon intersection
             ((terr_data_src, terrlyr, terrindex, terrfeats, terr_bison_fldnames), 
@@ -490,7 +490,7 @@ import os
 from common.bisonfill import BisonFiller
 from common.constants import (BISON_DELIMITER, ANCILLARY_DIR, ANCILLARY_FILES, 
                               ProviderActions)
-from common.tools import getLogger
+from common.tools import get_logger
 from gbif.gbifmod import GBIFReader
 from provider.providermod import BisonMerger
 

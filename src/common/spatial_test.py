@@ -6,7 +6,7 @@ import time
 from common.constants import (BISON_DELIMITER, ENCODING, 
                               ANCILLARY_DIR, ANCILLARY_FILES,)
 from common.bisonfill import BisonFiller
-from common.tools import (getCSVDictReader, getCSVDictWriter, getLogger)
+from common.tools import (get_csv_dict_reader, get_csv_dict_writer, get_logger)
 
 testsize = 10000
 gbif_interp_file='/tank/data/bison/2019/Terr/occurrence_lines_5000-10000.txt'
@@ -18,7 +18,7 @@ outdir = 'out'
 def rewrite_records(infname, outfname):
     self = BisonFiller(infname)
      
-    drdr, inf = getCSVDictReader(infname, BISON_DELIMITER, ENCODING)
+    drdr, inf = get_csv_dict_reader(infname, BISON_DELIMITER, ENCODING)
     self._files.append(inf)
      
     deleteme = []
@@ -29,7 +29,7 @@ def rewrite_records(infname, outfname):
     for fld in deleteme:
         self._bison_ordered_flds.remove(fld)
      
-    dwtr, outf = getCSVDictWriter(outfname, BISON_DELIMITER, ENCODING, 
+    dwtr, outf = get_csv_dict_writer(outfname, BISON_DELIMITER, ENCODING, 
                                   self._bison_ordered_flds)
      
     dwtr.writeheader()
@@ -59,7 +59,7 @@ def read_some_points(infname, count):
     recno = 0
     points = []
     try:
-        drdr, inf = getCSVDictReader(infname, BISON_DELIMITER, ENCODING)
+        drdr, inf = get_csv_dict_reader(infname, BISON_DELIMITER, ENCODING)
         for rec in drdr:
             if recno > count:
                 break
@@ -177,7 +177,7 @@ def create_terr_index(terrlyr, idx_fips, idx_cnty, idx_st):
 # def rewrite_records(infname, outfname):
 #     self = BisonFiller(infname)
 #      
-#     drdr, inf = getCSVDictReader(infname, BISON_DELIMITER, ENCODING)
+#     drdr, inf = get_csv_dict_reader(infname, BISON_DELIMITER, ENCODING)
 #     self._files.append(inf)
 #      
 #     deleteme = []
@@ -188,7 +188,7 @@ def create_terr_index(terrlyr, idx_fips, idx_cnty, idx_st):
 #     for fld in deleteme:
 #         self._bison_ordered_flds.remove(fld)
 #      
-#     dwtr, outf = getCSVDictWriter(outfname, BISON_DELIMITER, ENCODING, 
+#     dwtr, outf = get_csv_dict_writer(outfname, BISON_DELIMITER, ENCODING, 
 #                                   self._bison_ordered_flds)
 #      
 #     dwtr.writeheader()
@@ -218,7 +218,7 @@ def create_terr_index(terrlyr, idx_fips, idx_cnty, idx_st):
 #     recno = 0
 #     points = []
 #     try:
-#         drdr, inf = getCSVDictReader(infname, BISON_DELIMITER, ENCODING)
+#         drdr, inf = get_csv_dict_reader(infname, BISON_DELIMITER, ENCODING)
 #         for rec in drdr:
 #             if recno > count:
 #                 break

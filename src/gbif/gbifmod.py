@@ -29,7 +29,7 @@ from common.constants import (BISON_DELIMITER, ENCODING,
         ALLOWED_TYPE, BISON_ORDERED_DATALOAD_FIELD_TYPE, BISON_IPT_PREFIX, 
         MERGED_RESOURCE_LUT_FIELDS, MERGED_PROVIDER_LUT_FIELDS)
 from common.lookup import Lookup, VAL_TYPE
-from common.tools import (getCSVReader, getCSVDictReader, getCSVWriter, 
+from common.tools import (get_csv_reader, get_csv_dict_reader, get_csv_writer, 
                           open_csv_files, makerow)
 
 from gbif.constants import (GBIF_DELIMITER, TERM_CONVERT, META_FNAME, 
@@ -322,7 +322,7 @@ class GBIFReader(object):
         sep = ' '
         if os.path.exists(estmeans_fname):
             try:
-                drdr, inf = getCSVDictReader(estmeans_fname, '\t', ENCODING)
+                drdr, inf = get_csv_dict_reader(estmeans_fname, '\t', ENCODING)
                 for rec in drdr:
                     tsn = rec['TSN']
                     sciname = rec['scientificName']
@@ -356,7 +356,7 @@ class GBIFReader(object):
         if not os.path.exists(name_lut_fname):
             raise Exception('Input file {} missing!'.format(name_lut_fname))
         try:
-            drdr, inf = getCSVReader(name_lut_fname, BISON_DELIMITER, 
+            drdr, inf = get_csv_reader(name_lut_fname, BISON_DELIMITER, 
                                      ENCODING)
             for name_or_key, canonical in drdr:
                 self._nametaxa[name_or_key] = canonical 
@@ -374,12 +374,12 @@ class GBIFReader(object):
 #         '''
 #         # Open raw GBIF data
 #         self._log.info('Open raw GBIF input file {}'.format(gbif_interp_fname))
-#         rdr, inf = getCSVReader(gbif_interp_fname, GBIF_DELIMITER, ENCODING)
+#         rdr, inf = get_csv_reader(gbif_interp_fname, GBIF_DELIMITER, ENCODING)
 #         self._files.append(inf) 
 #         
 #         # Open output BISON file 
 #         self._log.info('Open step1 BISON output file {}'.format(pass1_fname))
-#         wtr, outf = getCSVWriter(pass1_fname, BISON_DELIMITER, ENCODING)
+#         wtr, outf = get_csv_writer(pass1_fname, BISON_DELIMITER, ENCODING)
 #         self._files.append(outf)
 #         wtr.writerow(self._outfields)
 # 
@@ -403,11 +403,11 @@ class GBIFReader(object):
 #             raise Exception('Input file {} missing!'.format(infname))
 #         # Open incomplete BISON CSV file as input
 #         self._log.info('Open input file {}'.format(infname))
-#         drdr, inf = getCSVDictReader(infname, BISON_DELIMITER, ENCODING)
+#         drdr, inf = get_csv_dict_reader(infname, BISON_DELIMITER, ENCODING)
 #         self._files.append(inf) 
 #         
 #         # Open new BISON CSV file for output, DictWriter does not order fields
-#         dwtr, outf = getCSVDictWriter(outfname, BISON_DELIMITER, ENCODING, 
+#         dwtr, outf = get_csv_dict_writer(outfname, BISON_DELIMITER, ENCODING, 
 #                                       self._outfields)
 #         dwtr.writeheader()
 #         self._files.append(outf)
@@ -747,7 +747,7 @@ class GBIFReader(object):
 #         if self.is_open():
 #             self.close()
 #         # Open raw GBIF data
-#         self._gbif_reader, inf = getCSVReader(gbif_interp_fname, GBIF_DELIMITER, ENCODING)
+#         self._gbif_reader, inf = get_csv_reader(gbif_interp_fname, GBIF_DELIMITER, ENCODING)
 #         self._files.append(inf) 
 #         # Pull the header row 
 #         self._gbif_line, self._gbif_recno = getLine(self._gbif_reader, 0)
@@ -764,7 +764,7 @@ class GBIFReader(object):
             self._log.info('Open initial pre-processed BISON output file {}'
                            .format(pass1_fname))
             # Open output BISON file 
-            dreader, inf = getCSVDictReader(pass1_fname, BISON_DELIMITER,
+            dreader, inf = get_csv_dict_reader(pass1_fname, BISON_DELIMITER,
                                             ENCODING)
             # CSV of name and one or more taxon keys
             nametaxa_lut = Lookup(valtype=VAL_TYPE.SET, encoding=ENCODING)
@@ -1139,7 +1139,7 @@ class GBIFReader(object):
         @summary: Create lookup table for: 
                   BISON canonicalName from GBIF scientificName and/or taxonKey
         """
-        csvwriter, f = getCSVWriter(lut_fname, delimiter, ENCODING, fmode='a')
+        csvwriter, f = get_csv_writer(lut_fname, delimiter, ENCODING, fmode='a')
         count = 0
         names_resolved = []
         gbifapi = GbifAPI()
@@ -1172,7 +1172,7 @@ class GBIFReader(object):
         name_dict = {}
         name_fails = []
         try:
-            csvwriter, f = getCSVWriter(lut_fname, delimiter, ENCODING, fmode='w')
+            csvwriter, f = get_csv_writer(lut_fname, delimiter, ENCODING, fmode='w')
             header = ['provided_scientific_name_or_taxon_key', 'clean_provided_scientific_name']
             csvwriter.writerow(header)
             gbifapi = GbifAPI()
