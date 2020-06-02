@@ -30,12 +30,12 @@ from common.constants import (BISON_DELIMITER, ENCODING, LOGINTERVAL,
                               PROHIBITED_CHARS, PROHIBITED_SNAME_CHARS, 
                               PROHIBITED_VALS, 
                               BISON_VALUES, BISON_SQUID_FLD, ITIS_KINGDOMS, 
-                              ISO_COUNTRY_CODES, ALLOWED_TYPE, 
+                              ISO_COUNTRY_CODES, 
                               BISON_ORDERED_DATALOAD_FIELD_TYPE)
 from common.inputdata import ANCILLARY_FILES
 from common.lookup import Lookup, VAL_TYPE
-from common.tools import (getCSVDictReader, open_csv_files, getLogger,
-    delete_shapefile)
+from common.tools import (get_csv_dict_reader, open_csv_files, delete_shapefile, 
+                          get_logger)
 
 # .............................................................................
 class BisonFiller(object):
@@ -71,9 +71,10 @@ class BisonFiller(object):
     def initialize_itis_estmeans_centroid(self, itis2_lut_fname, estmeans_fname, 
                                           terrestrial_shpname):
         if self.itistsns is None:
-            self.itistsns = Lookup.initFromFile(itis2_lut_fname, 'scientific_name', ',', 
-                                           valtype=VAL_TYPE.DICT, encoding=ENCODING)
-            self._fix_itis_kingdoms()
+            self.itistsns = Lookup.initFromFile(
+                itis2_lut_fname, 'scientific_name', ',', valtype=VAL_TYPE.DICT, 
+                encoding=ENCODING, ignore_quotes=False)
+            self._fix_itis_values()
             
         if self.estmeans is None:
             self.estmeans = self._read_estmeans_lookup(estmeans_fname)
@@ -105,7 +106,7 @@ class BisonFiller(object):
         sep = ' '
         if os.path.exists(estmeans_fname):
             try:
-                drdr, inf = getCSVDictReader(estmeans_fname, '\t', ENCODING)
+                drdr, inf = get_csv_dict_reader(estmeans_fname, '\t', ENCODING)
                 for rec in drdr:
                     tsn = rec['TSN']
                     sciname = rec['scientificName']
@@ -286,6 +287,7 @@ class BisonFiller(object):
                     rec['longitude'] = lon
                     rec['latitude'] = lat
                     rec['centroid'] = 'county'
+                    rec['geodetic_datum'] = 'WGS84'
                     break
             # DO NOT discard rec without coords and state/province
         
@@ -325,7 +327,7 @@ class BisonFiller(object):
 #         recno = 0
 #         try:
 #             inf = open(cleanname_fname, 'r', encoding=ENCODING)
-#             csvwriter, outf = getCSVWriter(itis_lut_fname, BISON_DELIMITER, 
+#             csvwriter, outf = get_csv_writer(itis_lut_fname, BISON_DELIMITER, 
 #                                            ENCODING, 'w')
 #             self._files.extend([inf, outf])
 #             csvwriter.writerow(header)
@@ -401,9 +403,32 @@ class BisonFiller(object):
         return lon, lat
 
     # ...............................................
-    def _fix_itis_kingdoms(self):
+    def _fix_itis_values(self):
         for key, vals in self.itistsns.lut.items():
-            self.itistsns.lut[key]['kingdom'] = vals['kingdom'].strip()
+            try:
+                cleanking = vals['kingdom'].strip()
+            except:
+                print ('wtf kingdom')
+                cleanking = ''
+            
+            self.itistsns.lut[key]['kingdom'] = cleanking
+            
+            try:
+                cname = vals['common_name']
+            except:
+                print('wtf common_name')
+                cname = ''
+
+            if cname == '""':
+                self.itistsns.lut[key]['common_name'] = '' 
+            elif cname.find('"') >= 0:
+                print ('damn data')
+                ch_lst = []
+                for ch in vals['common_name']:
+                    ch_lst.append(ch)
+                cname = ''.join(ch_lst)
+                self.itistsns.lut[key]['common_name'] = cname
+            
         
     # ...............................................
     def update_itis_estmeans_centroid(
@@ -998,7 +1023,8 @@ if __name__ == '__main__':
         raise Exception('Ancillary path {} does not exist'.format(ancillary_path))
 
     overwrite = True
-    outpath = os.path.split(outfile)
+    outpath, outfname = os.path.split(outfile)
+    basename, _ = os.path.splitext(outfname)
     os.makedirs(outpath, mode=0o775, exist_ok=True)
     
     # ancillary data for record update
@@ -1009,23 +1035,21 @@ if __name__ == '__main__':
                                        ANCILLARY_FILES['terrestrial']['file'])
     marine_shpname = os.path.join(ancillary_path, 
                                   ANCILLARY_FILES['marine']['file'])
-        
-    logbasename = 'bisonfill_{}'.format()
+    logbasename = 'bisonfill_{}'.format(basename)
+    logfname = os.path.join(outpath, '{}.log'.format(logbasename))
+    logger = get_logger(logbasename, logfname)
 #     pass3_fname = os.path.join(tmppath, 'step3_itis_geo_estmeans_{}.csv'.format(gbif_basefname))
     
-    gr = BisonFiller(infile, outfile)            
+    gr = BisonFiller(logger)            
+    gr.itistsns = Lookup.initFromFile(
+        itis2_lut_fname, 'scientific_name', ',', valtype=VAL_TYPE.DICT, 
+        encoding=ENCODING, ignore_quotes=False)
+    gr._fix_itis_values()
     # Pass 3 of CSV transform
     # Use Derek D. generated ITIS lookup itis2_lut_fname
-    gr.update_itis_geo_estmeans(itis2_lut_fname, terrestrial_shpname, 
-                                marine_shpname, estmeans_fname)
+#     gr.update_itis_geo_estmeans(itis2_lut_fname, terrestrial_shpname, 
+#                                 marine_shpname, estmeans_fname)
 """
-wc -l occurrence.txt 
-71057978 occurrence.txt
-wc -l tmp/step1.csv 
-1577732 tmp/step1.csv
-
-python3.6 /state/partition1/git/bison/src/common/bisonfill.py 
-
 from osgeo import ogr
 import os
 import rtree
@@ -1033,14 +1057,18 @@ import time
 
 from common.constants import (BISON_DELIMITER, ENCODING, LOGINTERVAL, 
                               PROHIBITED_CHARS, PROHIBITED_SNAME_CHARS, 
-                              PROHIBITED_VALS, ANCILLARY_FILES,
+                              PROHIBITED_VALS, 
                               BISON_VALUES, BISON_SQUID_FLD, ITIS_KINGDOMS, 
-                              ISO_COUNTRY_CODES, BISON_ORDERED_DATALOAD_FIELD_TYPE)
+                              ISO_COUNTRY_CODES, 
+                              BISON_ORDERED_DATALOAD_FIELD_TYPE)
+from common.inputdata import ANCILLARY_FILES
 from common.lookup import Lookup, VAL_TYPE
-from common.tools import (getCSVDictReader, open_csv_files, getLogger)
+from common.tools import (get_csv_dict_reader, open_csv_files, delete_shapefile)
+from common.bisonfill import *
 
-
+logger = 
 self = BisonFiller(pass3_fname, log=logger)
+
 # TEST - go to BisonFiller code
 
 driver = ogr.GetDriverByName("ESRI Shapefile")
@@ -1053,107 +1081,13 @@ terrflddata = terr_data['fields']
 terrindex = rtree.index.Index(interleaved=False)
 terrfeats = {}
 ######### LOOP ##########
-terrfeat = terrlyr.GetNextFeature()
-while terrfeat is not None:
-    terrfid = terrfeat.GetFID()
-    terrgeom = terrfeat.GetGeometryRef()
-    self._log.info('  {} Geometry {} count {}'.format(
-        terrfid, terrgeom.GetGeometryName(), terrgeom.GetGeometryCount()))
-    xmin, xmax, ymin, ymax = terrgeom.GetEnvelope()
-    terrindex.insert(terrfid, (xmin, xmax, ymin, ymax))
-    terrfeats[terrfid] = {'feature': terrfeat, 
-                          'geom': terrgeom,
-                          'type': terrgeom.GetGeometryName(), 
-                          'count': terrgeom.GetGeometryCount()}
-    for reffld, bisonfld in terrflddata:
-        terrfeats[terrfid][bisonfld] = terrfeat.GetFieldAsString(reffld)
-    terrfeat = terrlyr.GetNextFeature()
-######### ENDLOOP ##########
-
-# terrindex, terrfeats, terr_bison_fldnames = \
-#     self._create_spatial_index(terr_data['fields'], terrlyr)
-
-marine_data = ANCILLARY_FILES['marine']
-marine_shpname = os.path.join(ancillary_path, marine_data['file'])
-mar_data_src = driver.Open(marine_shpname, 0)
-marlyr = mar_data_src.GetLayer()
-marflddata = marine_data['fields']
-marindex = rtree.index.Index(interleaved=False)
-marfeats = {}
-######### LOOP ##########
-marfeat = marlyr.GetNextFeature()
-while marfeat is not None:
-    marfid = marfeat.GetFID()
-    margeom = marfeat.GetGeometryRef()
-    self._log.info('  {} Geometry {} count {}'.format(
-        marfid, margeom.GetGeometryName(), margeom.GetGeometryCount()))
-    xmin, xmax, ymin, ymax = margeom.GetEnvelope()
-    marindex.insert(marfid, (xmin, xmax, ymin, ymax))
-    marfeats[marfid] = {'feature': marfeat, 
-                        'geom': margeom,
-                        'type': margeom.GetGeometryName(), 
-                        'count': margeom.GetGeometryCount()}
-    for reffld, bisonfld in marflddata:
-        marfeats[marfid][bisonfld] = marfeat.GetFieldAsString(reffld)
-    marfeat = marlyr.GetNextFeature()
-######### ENDLOOP ##########
 
 
-marine_data = ANCILLARY_FILES['marine']
-mar2_shpname = os.path.join(ancillary_path, 
-    'World_EEZ_v8_20140228_splitpolygons/World_EEZ_v8_2014_HR.shp')
-mar2_data_src = driver.Open(mar2_shpname, 0)
-mar2lyr = mar2_data_src.GetLayer()
-mar2index = rtree.index.Index(interleaved=False)
-mar2feats = {}
-######### LOOP ##########
-mar2feat = mar2lyr.GetNextFeature()
-while mar2feat is not None:
-    mar2fid = mar2feat.GetFID()
-    mar2geom = mar2feat.GetGeometryRef()
-    self._log.info('  {} Geometry {} count {}'.format(
-        mar2fid, mar2geom.GetGeometryName(), mar2geom.GetGeometryCount()))
-    xmin, xmax, ymin, ymax = mar2geom.GetEnvelope()
-    mar2index.insert(mar2fid, (xmin, xmax, ymin, ymax))
-    mar2feats[mar2fid] = {'feature': mar2feat, 
-                         'geom': mar2geom,
-                          'type': mar2geom.GetGeometryName(), 
-                          'count': mar2geom.GetGeometryCount()}
-    for reffld, bisonfld in marflddata:
-        mar2feats[mar2fid][bisonfld] = mar2feat.GetFieldAsString(reffld)
-    mar2feat = mar2lyr.GetNextFeature()
-######### ENDLOOP ##########
 
-
-multipoly 215, 217, 218, 232, 
-
-poly, 244, 248, 249
-
-sgs = []
-msgs = []
-g = mar2feats[215]['geom']
-if g.GetGeometryName() == 'MULTIPOLYGON':
-    print('MULTIPOLY')
-    for i in range(g.GetGeometryCount()):
-        msg = g.GetGeometryRef(i)
-        msgs.append(msg)
-        print('{} subgeom, simple {}, count {}'.format(msg.GetGeometryName(), msg.IsSimple(), msg.GetGeometryCount()))
-elif g.GetGeometryName() == 'POLYGON':
-    print('POLY')
-    for i in range(g.GetGeometryCount()):
-        sg = g.GetGeometryRef(i)
-        sgs.append(sg)
-        print('{} subgeom, simple {}, count {}'.format(sg.GetGeometryName(), sg.IsSimple(), sg.GetGeometryCount()))
-
-
-# testme
-for i in range(margeom.GetGeometryCount()):
-    mg = margeom.GetGeometryRef(i)
-
- 
-# marindex, marfeats, mar_bison_fldnames = \
-#     self._create_spatial_index(marine_data['fields'], eezlyr)
-
+if self.itistsns is None:
+    self.itistsns = Lookup.initFromFile(itis2_lut_fname, 'scientific_name', ',', 
+                                   valtype=VAL_TYPE.DICT, encoding=ENCODING)
+    self._fix_itis_values()
 
 
 """
