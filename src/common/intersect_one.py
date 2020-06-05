@@ -25,10 +25,11 @@ def intersect_csv_and_shapefiles(in_csv_filename, geodata1, geodata2,
     logbasename, _ = os.path.splitext(basefname)
     logfname = os.path.join(pth, '{}.log'.format(logbasename))
     logger = get_logger(logbasename, logfname)
-    bf = BisonFiller(in_csv_filename, log=logger)
+    bf = BisonFiller(log=logger)
     # Pass 4 of CSV transform, final step, point-in-polygon intersection
-    bf.update_point_in_polygons(geodata1, geodata2, ancillary_path, 
-                                out_csv_filename, from_gbif=from_gbif)
+    bf.update_point_in_polygons(
+        geodata1, geodata2, ancillary_path, in_csv_filename, out_csv_filename, 
+        from_gbif=from_gbif)
     # Do intersection here
     sleep(randint(0, 10))
     print(' - {}'.format(out_csv_filename))
