@@ -35,7 +35,7 @@ from common.constants import (BISON_DELIMITER, ENCODING, LOGINTERVAL,
 from common.inputdata import ANCILLARY_FILES
 from common.lookup import Lookup, VAL_TYPE
 from common.tools import (get_csv_dict_reader, open_csv_files, delete_shapefile, 
-                          get_logger)
+                          get_logger, get_line_count)
 
 # .............................................................................
 class BisonFiller(object):
