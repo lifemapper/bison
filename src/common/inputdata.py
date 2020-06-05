@@ -17,7 +17,8 @@ ANCILLARY_FILES = {
     # From Annie Simpson
     'establishment_means': {'file': 'NonNativesIndex20190912.txt'},
     # From ITIS developers
-    'itis': {'file': 'itis_lookup_csv-05-2020.csv'},
+    'itis': {'file': 'itis_lookup_kingdom_2020_06_02.csv'}, 
+#              'itis_lookup_csv-05-2020.csv'},
     # From existing database
     'resource': {'file': 'resource.csv'},
     'provider': {'file': 'provider.csv'}}
