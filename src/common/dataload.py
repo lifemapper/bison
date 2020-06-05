@@ -24,56 +24,42 @@
 import os
 from concurrent.futures import ProcessPoolExecutor
 from multiprocessing import cpu_count
-import subprocess
 import time
 
 from common.bisonfill import BisonFiller
-from common.constants import (BISON_DELIMITER, ANCILLARY_DIR, ProviderActions)
+from common.constants import (
+    BISON_DELIMITER, ANCILLARY_DIR, ProviderActions, LOGINTERVAL)
 from common.inputdata import ANCILLARY_FILES
 from common.intersect_one import intersect_csv_and_shapefiles
-from common.tools import get_logger
+from common.tools import get_logger, get_line_count, get_header
 
 from gbif.gbifmod import GBIFReader
 
 from provider.providermod import BisonMerger
 
 # .............................................................................
-def get_line_count(filename):
-    """ find total number lines in a file """
-    cmd = "wc -l {}".format(filename)
-    info, _ = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()
-    temp = info.split(b'\n')[0]
-    line_count = int(temp.split()[0])
-    return line_count
-
-# .............................................................................
-def get_header(filename):
-    """ find fieldnames from the first line of a CSV file """
-    header = None
-    try:
-        f = open(filename, 'r', encoding='utf-8')
-        header = f.readline()
-    except Exception as e:
-        print('Failed to read first line of {}: {}'.format(filename, e))
-    finally:
-        f.close()
-    return header
-
-# .............................................................................
 def _get_process_count():
     return cpu_count() - 2
 
 # .............................................................................
-def _find_chunk_files(big_csv_filename):
+def _find_chunk_files(big_csv_filename, out_csv_filename=None):
     """ Finds multiple smaller input csv files from a large input csv file, 
     if they exist, and return these filenames, paired with output filenames 
     for the results of processing these files. """
     cpus2use = _get_process_count()
     in_base_filename, ext = os.path.splitext(big_csv_filename)
-    pth, basename = os.path.split(in_base_filename)
-    # We know filename starts with 'step' followed by 1 char integer
-    nextstep = str(int(basename[4]) + 1)
-    out_base_filename = os.path.join(pth, basename[:4] + nextstep + basename[5:])
+    # Construct GBIF filenames from known pattern, in/out files in same path
+    if out_csv_filename is None:
+        pth, basename = os.path.split(in_base_filename)
+        # We know filename starts with 'step' followed by 1 char integer
+        nextstep = str(int(basename[4]) + 1)
+        out_base_filename = os.path.join(pth, basename[:4] + nextstep + basename[5:])
+    # Construct provider filenames from outfilename and separate in/out paths
+    else:
+        out_fname_noext, ext = os.path.splitext(out_csv_filename)
+        outpth, basename = os.path.split(out_fname_noext)
+        out_base_filename = os.path.join(outpth, basename)
+        
     total_lines = get_line_count(big_csv_filename) - 1
     chunk_size = int(total_lines / cpus2use)
     
@@ -95,11 +81,12 @@ def _find_chunk_files(big_csv_filename):
     return csv_filename_pairs, chunk_size
 
 # .............................................................................
-def get_chunk_files(big_csv_filename):
+def get_chunk_files(big_csv_filename, out_csv_filename=None):
     """ Creates multiple smaller input csv files from a large input csv file, and 
     return these filenames, paired with output filenames for the results of 
     processing these files. """
-    csv_filename_pairs, chunk_size = _find_chunk_files(big_csv_filename)
+    csv_filename_pairs, chunk_size = _find_chunk_files(
+        big_csv_filename, out_csv_filename=out_csv_filename)
     # First pair is existing files OR basenames
     if os.path.exists(csv_filename_pairs[0][0]):
         header = get_header(big_csv_filename)
@@ -149,13 +136,15 @@ def get_chunk_files(big_csv_filename):
 def step_parallel(in_csv_filename, terrestrial_data, marine_data, ancillary_path,
                   out_csv_filename, from_gbif=True):
     """Main method for parallel execution of geo-referencing script"""
-    csv_filename_pairs, header = get_chunk_files(in_csv_filename)
+    if from_gbif:
+        csv_filename_pairs, header = get_chunk_files(in_csv_filename)
+    else:
+        csv_filename_pairs, header = get_chunk_files(
+             in_csv_filename, out_csv_filename=out_csv_filename)
     
 #     in_csv_fn, out_csv_fn = csv_filename_pairs[0]
-#     in_csv_fn = '/tank/data/bison/2019/Terr/tmp/step3_occurrence_lines_30000001-40000001_8000001-9000000.csv'
-#     out_csv_fn = '/tank/data/bison/2019/Terr/tmp/step4_occurrence_lines_30000001-40000001_8000001-9000000.csv'
 #     intersect_csv_and_shapefiles(in_csv_fn, terrestrial_data, 
-#                 marine_data, ancillary_path, out_csv_fn)
+#                 marine_data, ancillary_path, out_csv_fn, False)
  
     with ProcessPoolExecutor() as executor:
         for in_csv_fn, out_csv_fn in csv_filename_pairs:
@@ -166,7 +155,13 @@ def step_parallel(in_csv_filename, terrestrial_data, marine_data, ancillary_path
     try:
         outf = open(out_csv_filename, 'w', encoding='utf-8')
         outf.write('{}'.format(header))
+        smfile_linecount = 0
         for _, small_csv_fn in csv_filename_pairs:
+            curr_linecount = get_line_count(small_csv_fn) - 1
+            print('Appending {} records from {}'.format(
+                curr_linecount, small_csv_fn))
+            # Do not count header
+            smfile_linecount += (curr_linecount)
             lineno = 0
             try:
                 for line in open(small_csv_fn, 'r', encoding='utf-8'):
@@ -182,6 +177,12 @@ def step_parallel(in_csv_filename, terrestrial_data, marine_data, ancillary_path
         print('Failed to write to {}; {}'.format(out_csv_filename, outer_err))
     finally:
         outf.close()
+    
+    lgfile_linecount = get_line_count(out_csv_filename) - 1
+    print('Total {} of {} records written to {}'.format(
+        lgfile_linecount, smfile_linecount, out_csv_filename))
+    
+        
         
 # ...............................................
 if __name__ == '__main__':
@@ -406,38 +407,52 @@ if __name__ == '__main__':
                     outfile2 = os.path.join(s2dir, basename + '_itis_em_geo.csv')            
                     outfile3 = os.path.join(s3dir, basename + '_final.csv')
                     
+                    # ..........................................................
+                    # Step 1: rewrite filling ticket/constant vals for resource/provider
                     if os.path.exists(outfile1):
                         logger.info('  Existing step 1/3 output in {}'.format(
                             outfile1))
                     else:
-                        # Step 1: rewrite filling ticket/constant vals for resource/provider
                         logger.info('  Process step 1/3 output to {}'.format(
                             outfile1))
                         merger.rewrite_bison_data(
                             infile, outfile1, resource_ident, resource_name, 
                             resource_url, action)
+                    # ..........................................................
+                    # Step 2: rewrite filling lookup vals from 
+                    # itis, establishment_means and centroid 
+                    # Identical to Step 3 for GBIF data
                     if os.path.exists(outfile2):
                         logger.info('  Existing step 2/3 output in {}'.format(
                             outfile2))
                     else:
-                        # Step 2: rewrite filling lookup vals from 
-                        # itis, establishment_means and centroid 
-                        # Identical to Step 3 for GBIF data
                         logger.info('  Process step 2/3 output to {}'.format(
                             outfile2))
                         bfiller.update_itis_estmeans_centroid(
                             itis2_lut_fname, estmeans_fname, terrestrial_shpname, 
                             outfile1, outfile2, from_gbif=False)
+                    # ..........................................................
+                    # Step 3: of CSV transform, split and process large files in parallel
+                    # Identical to Step 4 for GBIF data
                     if os.path.exists(outfile3):
                         logger.info('  Existing step 3/3 output in {}'.format(
                             outfile3))
                     else:
-                        # Step 3: of CSV transform
-                        # Identical to Step 4 for GBIF data
-                        logger.info('  Process step 3/3 output to {}'.format(
-                            outfile3))                        
-#                         bfiller.update_point_in_polygons(
-#                             terr_data, marine_data, ancillary_path, outfile2, outfile3)
+                        lcount = get_line_count(outfile2)
+                        if lcount < LOGINTERVAL:
+                            logger.info('  Process step 3/3 output to {}'.format(
+                                outfile3))
+                            bfiller.update_point_in_polygons(
+                                terr_data, marine_data, ancillary_path, outfile2, outfile3)
+                        else:
+                            logger.info('  Parallel Process step 3/3 ({} lines) output to {}'
+                                        .format(lcount, outfile3))
+                            # Create chunk input files for parallel processing
+                            csv_filename_pairs, header = get_chunk_files(
+                                 outfile2, out_csv_filename=outfile3)
+                            step_parallel(outfile2, terr_data, marine_data, ancillary_path,
+                                          outfile3, from_gbif=False)
+                            
         elif step == 10:
             merger = BisonMerger(logger)
             old_resources = merger.read_resources(merged_dataset_lut_fname)
