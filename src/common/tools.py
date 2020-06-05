@@ -5,6 +5,7 @@ from logging.handlers import RotatingFileHandler
 import os
 from osgeo import ogr, osr
 import rtree
+import subprocess
 from sys import maxsize
 import time
 
@@ -14,6 +15,28 @@ from common.constants import (LOG_FORMAT, LOG_DATE_FORMAT, LOGFILE_MAX_BYTES,
 REQUIRED_FIELDS = ['STATE_NAME', 'NAME', 'STATE_FIPS', 'CNTY_FIPS', 'PRNAME', 
      'CDNAME', 'CDUID']
 CENTROID_FIELD = 'B_CENTROID'
+
+# .............................................................................
+def get_line_count(filename):
+    """ find total number lines in a file """
+    cmd = "wc -l {}".format(repr(filename))
+    info, _ = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()
+    temp = info.split(b'\n')[0]
+    line_count = int(temp.split()[0])
+    return line_count
+
+# .............................................................................
+def get_header(filename):
+    """ find fieldnames from the first line of a CSV file """
+    header = None
+    try:
+        f = open(filename, 'r', encoding='utf-8')
+        header = f.readline()
+    except Exception as e:
+        print('Failed to read first line of {}: {}'.format(filename, e))
+    finally:
+        f.close()
+    return header
 
 # .............................................................................
 def get_csv_reader(datafile, delimiter, encoding):
