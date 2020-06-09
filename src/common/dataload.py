@@ -291,8 +291,8 @@ if __name__ == '__main__':
         ancillary_path, ANCILLARY_FILES['provider']['file'])
     
     # OUTPUT filenames for merged dataset/resource and organization/provider lookups
-    merged_dataset_lut_fname = os.path.join(ancillary_path, 'merged_dataset_lut.csv')
-    merged_org_lut_fname = os.path.join(ancillary_path, 'merged_organization_lut.csv')
+    merged_dataset_lut_fname = os.path.join(outpath, 'merged_dataset_lut.csv')
+    merged_org_lut_fname = os.path.join(outpath, 'merged_organization_lut.csv')
 
     terr_data = ANCILLARY_FILES['terrestrial']
     marine_data = ANCILLARY_FILES['marine']
@@ -309,11 +309,17 @@ if __name__ == '__main__':
         canonical_lut_fname = os.path.join(tmppath, 'step2_{}_canonical_lut.csv'
                                            .format(basefname))        
         
+        s1dir = os.path.join(tmppath, 'step1-gbif2bison')
+        s2dir = os.path.join(tmppath, 'step2-scinames')
+        s3dir = os.path.join(tmppath, 'step3-itisescent')
+        s4dir = os.path.join(tmppath, 'step4-geo')
+        for sdir in (s1dir, s2dir, s3dir, s4dir):
+            os.makedirs(sdir, mode=0o775, exist_ok=True)
         # Output CSV files of all records after initial creation or field replacements
-        pass1_fname = os.path.join(tmppath, 'step1_{}.csv'.format(basefname))
-        pass2_fname = os.path.join(tmppath, 'step2_{}.csv'.format(basefname))
-        pass3_fname = os.path.join(tmppath, 'step3_{}.csv'.format(basefname))
-        pass4_fname = os.path.join(tmppath, 'step4_{}.csv'.format(basefname))    
+        pass1_fname = os.path.join(s1dir, 'step1_{}.csv'.format(basefname))
+        pass2_fname = os.path.join(s2dir, 'step2_{}.csv'.format(basefname))
+        pass3_fname = os.path.join(s3dir, 'step3_{}.csv'.format(basefname))
+        pass4_fname = os.path.join(s4dir, 'step4_{}.csv'.format(basefname))    
     
         start_time = time.time()
         if step == 1:
@@ -342,7 +348,8 @@ if __name__ == '__main__':
                                                     canonical_lut_fname)
             # Pass 2 of CSV transform, fill names with GBIF-parsed clean scientific name
             # Discard records with no clean name
-            gr.update_bison_names(pass1_fname, pass2_fname, canonical_lut)            
+            gr.update_bison_names(
+                pass1_fname, pass2_fname, canonical_lut, track_providers=True)            
         elif step == 3:
             logger = get_logger(logbasename, logfname)
             bf = BisonFiller(logger)
@@ -405,7 +412,7 @@ if __name__ == '__main__':
                     s3dir = os.path.join(tmppath, 'step3-geo')
                     outfile1 = os.path.join(s1dir, basename + '_clean.csv')
                     outfile2 = os.path.join(s2dir, basename + '_itis_em_geo.csv')            
-                    outfile3 = os.path.join(s3dir, basename + '_final.csv')
+                    outfile3 = os.path.join(s3dir, basename + '_point_in_poly.csv')
                     
                     # ..........................................................
                     # Step 1: rewrite filling ticket/constant vals for resource/provider
@@ -500,6 +507,10 @@ if __name__ == '__main__':
 """
 
 # /tank/data/bison/2019/Terr/occurrence_lines_5000-10000.csv --step=4
+
+
+/tank/data/bison/2019/CA_USTerr_gbif/occurrence_lines_1-10000001.csv
+
 
 import os
 from common.bisonfill import BisonFiller

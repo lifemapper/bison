@@ -39,14 +39,14 @@ class Lookup(object):
 
     # ...............................................
     @classmethod
-    def initFromFile(cls, lookup_fname, keyfld, delimiter, valtype=VAL_TYPE.DICT, 
+    def initFromFile(cls, lookup_fname, prioritized_keyfld_lst, delimiter, valtype=VAL_TYPE.DICT, 
                      encoding=ENCODING, ignore_quotes=True):
         """
         @summary: Constructor
         """
         lookup = Lookup(valtype=valtype, encoding=encoding)
         lookup.read_lookup(
-            lookup_fname, keyfld, delimiter, ignore_quotes=ignore_quotes)
+            lookup_fname, prioritized_keyfld_lst, delimiter, ignore_quotes=ignore_quotes)
         return lookup
 
     # ...............................................
@@ -121,7 +121,7 @@ class Lookup(object):
             outf.close()
 
     # ...............................................
-    def read_lookup(self, fname, keyfld, delimiter, ignore_quotes=True):
+    def read_lookup(self, fname, prioritized_keyfld_lst, delimiter, ignore_quotes=True):
         '''
         @summary: Read and populate dictionary with key = uuid and 
                   val = dictionary of record values
@@ -139,22 +139,12 @@ class Lookup(object):
                                     .format(fname, e))
                 else:
                     for data in rdr:
-                        datakey = data[keyfld]
-                        # special case for legacy resource and provider tables
-                        if not datakey:
-                            try:
-                                resolvedid = data['gbif_legacyid']
-                                if resolvedid == '-9999':
-                                    no_new_legacy += 1
-                                else:
-                                    no_old_legacy += 1
-                                    print('Failed getting old legacy id, resolved to {}'
-                                          .format(data['gbif_legacyid']))
-                            except:
-                                pass
-                            
-                        else:
-                            self.lut[datakey] = data
+                        for keyfld in prioritized_keyfld_lst:
+                            datakey = data[keyfld]
+                            if datakey:
+                                self.lut[datakey] = data
+                                break
+                                
                 finally:
                     inf.close()
                 print('no_old_legacy {}  no_new_legacy (default -9999) {}'

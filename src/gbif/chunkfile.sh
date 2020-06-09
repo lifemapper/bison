@@ -1,7 +1,8 @@
 #!/bin/bash
 #
-# linecount of /tank/data/bison/2019/Terr/occurrence.txt = 72890559
-# bash /state/partition1/git/bison/src/gbif/chunkfile.sh Terr 72890559 10000000
+# [astewart@badenov CA_USTerr_gbif]$ wc -l occurrence.txt 
+# 74804557 occurrence.txt
+# bash /state/partition1/git/bison/src/gbif/chunkfile.sh occurrence.txt 74804557 10000000
 #
 # Example command
 # sed -e '1,5000d;10000q' occurrence.txt > occurrence_lines_5000-10000.csv

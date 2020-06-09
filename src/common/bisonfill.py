@@ -72,7 +72,7 @@ class BisonFiller(object):
                                           terrestrial_shpname):
         if self.itistsns is None:
             self.itistsns = Lookup.initFromFile(
-                itis2_lut_fname, 'scientific_name', ',', valtype=VAL_TYPE.DICT, 
+                itis2_lut_fname, ['scientific_name'], ',', valtype=VAL_TYPE.DICT, 
                 encoding=ENCODING, ignore_quotes=False)
             self._fix_itis_values()
             
@@ -1042,7 +1042,7 @@ if __name__ == '__main__':
     
     gr = BisonFiller(logger)            
     gr.itistsns = Lookup.initFromFile(
-        itis2_lut_fname, 'scientific_name', ',', valtype=VAL_TYPE.DICT, 
+        itis2_lut_fname, ['scientific_name'], ',', valtype=VAL_TYPE.DICT, 
         encoding=ENCODING, ignore_quotes=False)
     gr._fix_itis_values()
     # Pass 3 of CSV transform
@@ -1084,10 +1084,6 @@ terrfeats = {}
 
 
 
-if self.itistsns is None:
-    self.itistsns = Lookup.initFromFile(itis2_lut_fname, 'scientific_name', ',', 
-                                   valtype=VAL_TYPE.DICT, encoding=ENCODING)
-    self._fix_itis_values()
 
 
 """

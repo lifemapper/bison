@@ -14,13 +14,12 @@ Download Data from GBIF
 
 US
   * http://www.gbif.org/occurrence/search?COUNTRY=US
-       * GBIF.org (15 October 2019) GBIF Occurrence Download https://doi.org/10.15468/dl.zqo0nh 
+       * GBIF.org (06 June 2020) GBIF Occurrence Download  
 
 
 US Territories and Canada
   * http://www.gbif.org/occurrence/search?COUNTRY=AS&COUNTRY=CA&COUNTRY=FM&COUNTRY=GU&COUNTRY=MH&COUNTRY=MP&COUNTRY=PR&COUNTRY=PW&COUNTRY=UM&COUNTRY=VI 
-  * GBIF.org (15 October 2019) GBIF Occurrence Download https://doi.org/10.15468/dl.5qoflq 
-  * GBIF.org (06 December 2019) GBIF Occurrence Download https://doi.org/10.15468/dl.trksri 
+  * GBIF.org (07 May 2020) GBIF Occurrence Download  
   
     * American Samoa 
     * Canada 
@@ -248,3 +247,6 @@ Fossils
 There are fossils among your results. That can mean species occurrences at unexpected locations
 Living specimens
 Your search includes living specimens such as occurrences in botanical and zoological gardens.
+
+provided_tsn - mod val:
+Truncate gbifid 2251459304 field provided_tsn value http://www.boldsystems.org/index.php/Public_BarcodeCluster?clusteruri=BOLD:AAG4886 to width 64
