@@ -163,6 +163,9 @@ class GBIFReader(object):
                                        .format(rec[OCC_ID_FLD], gbif_org_uuid, 
                                                dataset_meta_url))
         if rec is not None:
+            if (legacy_org_id == LEGACY_ID_DEFAULT 
+                or legacy_dataset_id == LEGACY_ID_DEFAULT):
+                print('stopme')
             # Concat old org and dataset ids for bison resource id 
             bison_resource_id = '{},{}'.format(legacy_org_id, legacy_dataset_id)
             rec['resource_id'] = bison_resource_id
@@ -220,7 +223,7 @@ class GBIFReader(object):
                 provider_legacyid = int(parts[0])
                 resource_legacyid = int(parts[1])
             except:
-                if bison_legacyid != LEGACY_ID_DEFAULT:
+                if bison_legacyid.find(LEGACY_ID_DEFAULT) < 0:
                     self._log.warning('legacyid {} failed to parse'.format(bison_legacyid))
             else:
                 try:
@@ -546,21 +549,22 @@ class GBIFReader(object):
                 try:
                     int(val)
                 except:
-                    print('Clear gbifid {} field {} value {} cannot be an integer'
+                    self._log.warn('Clear gbifid {} field {} value {} cannot be an integer'
                           .format(gid, bfld, val))
                     val = None
             elif ftype == ALLOWED_TYPE.double_precision:
                 try:
                     float(val)
                 except:
-                    print('Clear gbifid {} field {} value {} cannot be a float'
+                    self._log.warn('Clear gbifid {} field {} value {} cannot be a float'
                           .format(gid, bfld, val))
                     val = None
             # Truncate vals too long
             elif (val is not None and flen is not None 
                   and ftype == ALLOWED_TYPE.varchar and len(val) > flen):
-                print('Truncate gbifid {} field {} value {} to width {}'
-                      .format(gid, bfld, val, flen))
+                if val.find('clusteruri=BOLD:') < 0:
+                    self._log.warn('Truncate gbifid {} field {} value {} to width {}'
+                          .format(gid, bfld, val, flen))
                 val = val[:flen]
         return val
             
@@ -726,6 +730,8 @@ class GBIFReader(object):
                 # Write new record
                 if biline:
                     writer.writerow(biline)
+                    self._track_provider_resources(brec)
+
                                 
         except Exception as e:
             self._log.error('Failed on line {}, exception {}'.format(recno, e))
@@ -733,26 +739,22 @@ class GBIFReader(object):
             inf.close()
             outf.close()
             
-        self._write_resource_provider_stats(pass1_fname)
-                    
+        self.write_resource_provider_stats(pass1_fname)
         self._log.info('Missing organization ids: {}'.format(self._missing_orgs))    
         self._log.info('Missing dataset ids: {}'.format(self._missing_datasets))    
 
+        # Write all lookup values
         if len(nametaxas.lut) > 0:
-            # Write all lookup values
-            nametaxas.write_lookup(nametaxa_fname, ['scientificName', 'taxonKeys'], 
-                                   BISON_DELIMITER)            
+            nametaxas.write_lookup(
+                nametaxa_fname, ['scientificName', 'taxonKeys'], BISON_DELIMITER)            
     
     # ...............................................
-    def _write_resource_provider_stats(self, fname):
+    def write_resource_provider_stats(self, resource_count_fname, 
+                                      provider_count_fname):
         # Write record count per resource and provider
-        count_basename, _ = os.path.splitext(fname)
-        resource_count_fname = count_basename + 'count.resource.txt'
         with open(resource_count_fname, 'w', encoding=ENCODING) as f:
             for legacy_id, count in self._active_resources.items():
                 f.write('{}{}{}'.format(legacy_id, BISON_DELIMITER, count))
-
-        provider_count_fname = count_basename + 'count.provider.txt'
         with open(provider_count_fname, 'w', encoding=ENCODING) as f:
             for legacy_id, count in self._active_providers.items():
                 f.write('{}{}{}'.format(legacy_id, BISON_DELIMITER, count))
@@ -879,9 +881,8 @@ class GBIFReader(object):
                     rec['clean_provided_scientific_name'] = clean_name
                     row = self._makerow(rec)
                     writer.writerow(row)
-                    
-                if track_providers:
-                    self._track_provider_resources(rec)
+                    if track_providers:
+                        self._track_provider_resources(rec)
                     
                 if (recno % LOGINTERVAL) == 0:
                     self._log.info('*** Record number {} ***'.format(recno))
@@ -892,10 +893,32 @@ class GBIFReader(object):
         finally:
             inf.close()
             outf.close()
-            
-        if track_providers:
-            self._write_resource_provider_stats(infname)
-            
+                        
+    # ...............................................
+    def count_provider_resource(self, fname):
+        """
+        @summary: Create a CSV file from pre-processed GBIF data, with
+                  clean_provided_scientific_name resolved from 
+                  original scientificName or taxonKey. 
+        @return: A CSV file of BISON-modified records from a GBIF download. 
+        @return: A text file of clean_provided_scientific_names values 
+        
+        """
+        recno = 0
+        try:
+            dict_reader, inf = get_csv_dict_reader(
+                fname, BISON_DELIMITER, ENCODING)
+            for rec in dict_reader:
+                recno += 1
+                self._track_provider_resources(rec)    
+                if (recno % LOGINTERVAL) == 0:
+                    self._log.info('*** Record number {} ***'.format(recno))                                    
+        except Exception as e:
+            self._log.error('Failed reading data from line {} in {}: {}'
+                            .format(recno, fname, e))                    
+        finally:
+            inf.close()
+                        
     # ...............................................
     def _get_dataset_uuids(self):
         """

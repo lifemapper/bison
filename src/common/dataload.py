@@ -206,7 +206,7 @@ if __name__ == '__main__':
     parser.add_argument('--step', type=int, default=1, choices=[1,2,3,4,5,10, 13],
                         help="""
                         Step number for data processing:
-                           1: Only for GBIF data. 
+                           1: Only for GBIF data files. 
                               Create lookup tables, transform and fill BISON
                               records from GBIF data and lookup tables:
                               * Resource/Provider lookup
@@ -250,7 +250,13 @@ if __name__ == '__main__':
                                   filling calculated_waterbody and mrgid - only 
                                   if terrestrial georef returns 0 or > 1 result
                            5: Only for BISON provider data. 
-                              Transform and fill BISON ...
+                              Process BISON provider data to:
+                              * Assemble datasets, rewriting datasets to 
+                                add, retain, rename
+                              * Fill ITIS, establishment means, centroid fields 
+                              * Fill geo-political boundary fields 
+                                - identify fips/county/state or marine EEZ 
+                                  encompassing the point
                            10: Test data:
                               - ITIS fields - resolve with ITIS lookup and
                         """)
@@ -319,8 +325,29 @@ if __name__ == '__main__':
         pass1_fname = os.path.join(s1dir, 'step1_{}.csv'.format(basefname))
         pass2_fname = os.path.join(s2dir, 'step2_{}.csv'.format(basefname))
         pass3_fname = os.path.join(s3dir, 'step3_{}.csv'.format(basefname))
-        pass4_fname = os.path.join(s4dir, 'step4_{}.csv'.format(basefname))    
-    
+        pass4_fname = os.path.join(s4dir, 'step4_{}.csv'.format(basefname))
+        
+        resource_count_fname = os.path.join(
+            outpath,  '{}.count.resource.txt'.format(basefname))
+        provider_count_fname = os.path.join(
+            outpath,  '{}.count.provider.txt'.format(basefname))
+        # If both exist, do nothing
+        if (os.path.exists(resource_count_fname) and 
+            os.path.exists(provider_count_fname)):
+            print('Files {} and {} exist'.format(
+                resource_count_fname, provider_count_fname))
+            track_providers = False
+        else:
+            track_providers = True
+
+        if step == 1 or track_providers:
+            if os.path.exists(resource_count_fname):
+                print('Deleting {}'.format(resource_count_fname))
+                os.remove(resource_count_fname)
+            if os.path.exists(provider_count_fname):
+                print('Deleting {}'.format(provider_count_fname))
+                os.remove(provider_count_fname)
+
         start_time = time.time()
         if step == 1:
             logger = get_logger(logbasename, logfname)
@@ -337,6 +364,9 @@ if __name__ == '__main__':
                 merged_dataset_lut_fname, 
                 merged_org_lut_fname, 
                 nametaxa_fname, pass1_fname)
+            
+            gr.write_resource_provider_stats(
+                resource_count_fname, provider_count_fname)
         elif step == 2:
             logger = get_logger(logbasename, logfname)
             gr = GBIFReader(datapth, tmpdir, outdir, logger)
@@ -349,7 +379,11 @@ if __name__ == '__main__':
             # Pass 2 of CSV transform, fill names with GBIF-parsed clean scientific name
             # Discard records with no clean name
             gr.update_bison_names(
-                pass1_fname, pass2_fname, canonical_lut, track_providers=True)            
+                pass1_fname, pass2_fname, canonical_lut, 
+                track_providers=track_providers)
+            
+            gr.write_resource_provider_stats(
+                resource_count_fname, provider_count_fname)
         elif step == 3:
             logger = get_logger(logbasename, logfname)
             bf = BisonFiller(logger)
@@ -359,7 +393,11 @@ if __name__ == '__main__':
             # No discards
             bf.update_itis_estmeans_centroid(
                 itis2_lut_fname, estmeans_fname, terrestrial_shpname, 
-                pass2_fname, pass3_fname, from_gbif=True)
+                pass2_fname, pass3_fname, from_gbif=True,
+                track_providers=track_providers)
+            if track_providers:
+                bf.write_resource_provider_stats(
+                    resource_count_fname, provider_count_fname)
         elif step == 4:
             # Pass 4 of CSV transform, split into smaller files and parallel 
             # process with most CPUs.  Georeference records to fill calculated 
@@ -367,6 +405,11 @@ if __name__ == '__main__':
             # No discards
             step_parallel(pass3_fname, terr_data, marine_data, ancillary_path,
                           pass4_fname, from_gbif=True)
+            if track_providers:
+                gr = GBIFReader(datapth, tmpdir, outdir, logger)
+                gr.count_provider_resource(pass4_fname)
+                gr.write_resource_provider_stats(
+                    resource_count_fname, provider_count_fname)
             
         # Log time elapsed for steps 1-4 
         minutes = (time.time() - start_time) / 60
