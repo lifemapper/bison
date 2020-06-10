@@ -28,14 +28,14 @@ import time
 
 from common.constants import (BISON_DELIMITER, ENCODING, LOGINTERVAL, 
                               PROHIBITED_CHARS, PROHIBITED_SNAME_CHARS, 
-                              PROHIBITED_VALS, 
+                              PROHIBITED_VALS, LEGACY_ID_DEFAULT,
                               BISON_VALUES, BISON_SQUID_FLD, ITIS_KINGDOMS, 
                               ISO_COUNTRY_CODES, 
                               BISON_ORDERED_DATALOAD_FIELD_TYPE)
 from common.inputdata import ANCILLARY_FILES
 from common.lookup import Lookup, VAL_TYPE
-from common.tools import (get_csv_dict_reader, open_csv_files, delete_shapefile, 
-                          get_logger, get_line_count)
+from common.tools import (
+    get_csv_dict_reader, open_csv_files, delete_shapefile, get_logger)
 
 # .............................................................................
 class BisonFiller(object):
@@ -66,6 +66,9 @@ class BisonFiller(object):
         self.marindex = None
         self.marfeats = None
         self.mar_bison_fldnames = None
+        
+        self._active_resources = {}
+        self._active_providers = {}
         
     # ...............................................
     def initialize_itis_estmeans_centroid(self, itis2_lut_fname, estmeans_fname, 
@@ -429,11 +432,41 @@ class BisonFiller(object):
                 cname = ''.join(ch_lst)
                 self.itistsns.lut[key]['common_name'] = cname
             
-        
+    # ...............................................
+    def _track_provider_resources(self, rec):
+            bison_legacyid = rec['resource_id']
+            parts = bison_legacyid.split(',')
+            try:
+                provider_legacyid = int(parts[0])
+                resource_legacyid = int(parts[1])
+            except:
+                if bison_legacyid.find(LEGACY_ID_DEFAULT) < 0:
+                    self._log.warning('legacyid {} failed to parse'.format(bison_legacyid))
+            else:
+                try:
+                    self._active_resources[provider_legacyid] += 1
+                except:
+                    self._active_resources[provider_legacyid] = 1
+                try:
+                    self._active_providers[resource_legacyid] += 1
+                except:
+                    self._active_providers[resource_legacyid] = 1
+
+    # ...............................................
+    def write_resource_provider_stats(self, resource_count_fname, 
+                                      provider_count_fname):
+        # Write record count per resource and provider
+        with open(resource_count_fname, 'w', encoding=ENCODING) as f:
+            for legacy_id, count in self._active_resources.items():
+                f.write('{}{}{}'.format(legacy_id, BISON_DELIMITER, count))
+        with open(provider_count_fname, 'w', encoding=ENCODING) as f:
+            for legacy_id, count in self._active_providers.items():
+                f.write('{}{}{}'.format(legacy_id, BISON_DELIMITER, count))
+
     # ...............................................
     def update_itis_estmeans_centroid(
             self, itis2_lut_fname, estmeans_fname, terrestrial_shpname, 
-            infname, outfname, from_gbif=True):
+            infname, outfname, from_gbif=True, track_providers=False):
         """
         @summary: Process a CSV file with 47 ordered BISON fields (and optional
                   gbifID field for GBIF provided data) to 
@@ -488,6 +521,8 @@ class BisonFiller(object):
                 if rec is not None:
                     row = self._makerow(rec)
                     writer.writerow(row)
+                if track_providers:
+                    self._track_provider_resources(rec)
                 
                 # Log progress occasionally
                 if (recno % LOGINTERVAL) == 0:
