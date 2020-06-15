@@ -74,6 +74,9 @@ BISON_VALUES = {'provider': 'BISON',
                 'provider_id': '440',
                 'license' : 'http://creativecommons.org/publicdomain/zero/1.0/legalcode',
                 }
+
+TEMP_DIR = 'tmp'
+OUTPUT_DIR = 'output'
 ANCILLARY_DIR = 'ancillary'
 
 ISO_COUNTRY_CODES = ('AS', 'CA', 'FM', 'GU', 'MH', 'MP', 'PR', 'P', 'UM', 'US', 'VI')

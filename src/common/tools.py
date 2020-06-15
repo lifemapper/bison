@@ -11,6 +11,7 @@ import time
 
 from common.constants import (LOG_FORMAT, LOG_DATE_FORMAT, LOGFILE_MAX_BYTES,
                               LOGFILE_BACKUP_COUNT, EXTRA_VALS_KEY)
+from _collections import OrderedDict
 
 REQUIRED_FIELDS = ['STATE_NAME', 'NAME', 'STATE_FIPS', 'CNTY_FIPS', 'PRNAME', 
      'CDNAME', 'CDUID']
@@ -42,7 +43,8 @@ def get_header(filename):
 def get_csv_reader(datafile, delimiter, encoding):
     try:
         f = open(datafile, 'r', encoding=encoding) 
-        reader = csv.reader(f, delimiter=delimiter, quoting=csv.QUOTE_NONE)
+        reader = csv.reader(f, delimiter=delimiter, escapechar='\\', 
+                            quoting=csv.QUOTE_NONE)
     except Exception as e:
         raise Exception('Failed to read or open {}, ({})'
                         .format(datafile, str(e)))
@@ -66,7 +68,8 @@ def get_csv_writer(datafile, delimiter, encoding, fmode='w'):
     csv.field_size_limit(maxsize)
     try:
         f = open(datafile, fmode, encoding=encoding) 
-        writer = csv.writer(f, delimiter=delimiter) #, quoting=csv.QUOTE_NONE)
+        writer = csv.writer(
+            f, escapechar='\\', delimiter=delimiter, quoting=csv.QUOTE_NONE)
     except Exception as e:
         raise Exception('Failed to read or open {}, ({})'
                         .format(datafile, str(e)))
@@ -77,6 +80,9 @@ def get_csv_writer(datafile, delimiter, encoding, fmode='w'):
 # .............................................................................
 def get_csv_dict_reader(datafile, delimiter, encoding, fieldnames=None, 
                         ignore_quotes=True):
+    '''
+    ignore_quotes: no special processing of quote characters
+    '''
     try:
         f = open(datafile, 'r', encoding=encoding)
         if fieldnames is None:
@@ -86,11 +92,11 @@ def get_csv_dict_reader(datafile, delimiter, encoding, fieldnames=None,
         if ignore_quotes:
             dreader = csv.DictReader(
                 f, fieldnames=fieldnames, quoting=csv.QUOTE_NONE,
-                restkey=EXTRA_VALS_KEY, delimiter=delimiter)
+                escapechar='\\', restkey=EXTRA_VALS_KEY, delimiter=delimiter)
         else:
             dreader = csv.DictReader(
                 f, fieldnames=fieldnames, restkey=EXTRA_VALS_KEY, 
-                delimiter=delimiter)
+                escapechar='\\', delimiter=delimiter)
             
     except Exception as e:
         raise Exception('Failed to read or open {}, ({})'
@@ -111,7 +117,7 @@ def get_csv_dict_writer(datafile, delimiter, encoding, fldnames, fmode='w'):
     try:
         f = open(datafile, fmode, encoding=encoding) 
         writer = csv.DictWriter(f, fieldnames=fldnames, delimiter=delimiter,
-                                quoting=csv.QUOTE_NONE)
+                                escapechar='\\', quoting=csv.QUOTE_NONE)
     except Exception as e:
         raise Exception('Failed to read or open {}, ({})'
                         .format(datafile, str(e)))
@@ -150,18 +156,37 @@ def makerow(rec, outfields):
     row = []
     for fld in outfields:
         try:
-            if not rec[fld]:
+            val = rec[fld]
+            if not val:
                 row.append('')
             else:
-                row.append(rec[fld])
+                if isinstance(val, str) and val.startswith('\"'):
+                    val = val.strip('\"')
+                row.append(val)
         # Add output fields not present in record
         except:
             row.append('')
     return row
 
 # ...............................................
-def open_csv_files(infname, delimiter, encoding, infields=None,
-                   outfname=None, outfields=None, outdelimiter=None):
+def makerec(rec, outfields):
+    newrec = OrderedDict()
+    for fld in outfields:
+        try:
+            val = rec[fld]
+            if not val:
+                newrec[fld] = ''
+            else:                
+                newrec[fld] = val
+        # Add output fields not present in record
+        except:
+            newrec[fld] = ''
+    return newrec
+
+# ...............................................
+def open_csv_files(infname, delimiter, encoding, ignore_quotes=True, 
+                   infields=None, outfname=None, outfields=None, 
+                   outdelimiter=None):
     ''' Open CSV data for reading as a dictionary (assumes a header), 
     new output file for writing (rows as a list, not dictionary)
     
@@ -171,6 +196,7 @@ def open_csv_files(infname, delimiter, encoding, infields=None,
             to set dictionary keys. 
         delimiter: CSV delimiter for input and optionally output 
         encoding: Encoding for input and optionally output 
+        ignore_quotes: if True, QUOTE_NONE
         infields: Optional ordered list of fieldnames, used when input file
             does not contain a header.
         outfname: Optional output CSV file 
@@ -179,8 +205,9 @@ def open_csv_files(infname, delimiter, encoding, infields=None,
         outfields: Optional ordered list of fieldnames for output header 
     '''
     # Open incomplete BISON CSV file as input
-    csv_dict_reader, inf = get_csv_dict_reader(infname, delimiter, encoding, 
-                                            fieldnames=infields)
+    csv_dict_reader, inf = get_csv_dict_reader(
+        infname, delimiter, encoding, fieldnames=infields, 
+        ignore_quotes=ignore_quotes)
     # Optional new BISON CSV output file
     csv_writer = outf = None
     if outfname:
