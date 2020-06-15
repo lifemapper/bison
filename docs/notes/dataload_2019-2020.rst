@@ -23,28 +23,20 @@ GBIF Data Load
 BISON Data Provider Data Load
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-#. Process/sort the current-BISON-provider-records provided by Denver from the BISON 
-   production system, to be used as input for BISON provider dataset processing.
-#. Copy current-BISON-provider-records into a new file for editing: 
-   updated-BISON-provider-records
-#. Download all available, new, individual BISON provider datasets from Jira tickets.
-#. Merge individual BISON provider datasets into updated-BISON-provider-records 
-   into a new updated-BISON-provider-records
+#. Process/sort the BISON-provider datasets, handling individual datasets 
+   differently.  For BISON-provider-specific data processing see 
+   `BISON Data Provider Dataset Processing`_
 
-   * For datasets that do not exist in the current-BISON-provider-records, add 
-     all records to the new updated-BISON-provider-records
-   * For datasets that do exist in current-BISON-provider-records, replace - 
-     **remove** all records for that dataset from updated-BISON-provider-records, and 
-     and **add** all records from the individual BISON provider 
+#. Dataset categories:
 
-#. Process the merged updated-BISON-provider-records, (also step 3 of GBIF processing)
+   * Add new
+   * Rename existing
+   * Replace-and-rename existing
+   * Replace existing
 
-   * fill ITIS fields: itis_tsn, valid_accepted_scientific_name, valid_accepted_tsn, itis_common_names, and if blank, kingdom
-   * fill establishment means using itis_tsn or clean_provided_scientific_name
-   * georeference
-
-     * if no lat/lon, calculate lat/lon from centroids of provided state/county/fips
-     * calculate enclosing terrestrial (state, county, fips) or marine (eez, mrgid) polygons
+#. All *Add*, *Rename*, *Replace-and-rename* datasets will be represented by
+   Jira tickets. *Add*, and *Replace-and-rename* datasets will be linked
+   to tickets for processing.
 
 #. Provide the updated-BISON-provider-records to Derek for ingest
 
@@ -55,7 +47,21 @@ GBIF and BISON provider common processing
 To be done on BISON 48, either from GBIF or data providers,
 process info at: https://my.usgs.gov/confluence/display/DEV/SAS+Development
 
-* ITIS lookup 
+Process in separate steps to fill field dependencies before they are needed.
+
+
+Step X: Clean, lookup ITIS, Establishment Means, Centroid
+==========================================================
+* Cleanup/standardization
+
+  * kingdom: If existing value in ITIS kingdoms, make sure it is capitalized.
+    Overwrite if ITIS lookup succeeds.
+  * quote characters: remove enclosing quotes from all field contents, and
+    escape quote characters
+  * field type: check the field type and length, discard values that cannot
+    be coerced to the correct type, truncate string values that are too long
+
+* ITIS lookup: fill ITIS values from clean_provided_scientific_name
   
   * Prep: 
     * Get updated lookup table created by ITIS developers provided by Denver
@@ -73,48 +79,61 @@ process info at: https://my.usgs.gov/confluence/display/DEV/SAS+Development
     * itis_tsn
     * valid_accepted_scientific_name
     * valid_accepted_tsn
-    * kingdom if provided field is blank
+    * kingdom 
+      * New: first just check capitalization, now rewrite existing value
   
-
 * Establishment Means lookup
   
   * Prep: Get lookup table from Annie Simpson
-    * New: Lookup by ITIS TSN first, if that fails, lookup by scientific name
 
-* Geo lookup
+  * Lookup by ITIS TSN first, (NEW) by clean_provided_scientific_name second, to 
+    fill establishment_means field
 
-  * Prep: 
+* Centroid lookup
+
+  * Prep (for this and geospatial intersection below): 
     * Get US counties shapefile from Shayne and Canada shapefile from Denver
-    * Merge US and Canada shapefiles into a single shapefile with centroids.
+    * Merge US and Canada shapefiles 
+      * Compute the centroid coordinates of each input feature.
       * Add new fields for BISON data processing which compute/edit values from 
         the input datasets to fill calculated_state_name, 
         calculated_county_name, calculated_fips, and longitude and latitude 
-        coordinates if needed and possible.  \
+        coordinates if needed and possible.
       * field mapping:
         * Canada PRNAME to calculated_state_name, strip " Canada" from value
         * Canada CDNAME to calculated_county_name
         * Canada CDUID to calculated_fips
         * US STATE_FIPS + CNTY_FIPS = calculated_fips
-      * Compute the centroid coordinates of each input feature.
       * Simplify the output polygon shapefile, replacing MULTIPOLYGON features
         with the component simple POLYGON features.  Replicate attribute values
         from the original polygon into the simple polygons.
-      * Create a LUT for faster lookup.
+      * Code creates LUT (by state/county or fips) for faster lookup.
+
+  * Lookup values by state/county or fips for records without coordinates,
+    fill coordinates with centroid coordinates, fill centroid field with 'county'
+
+Step X: Geospatial intersection
+================================
+
+  * Prep
+  
+    * Use US/Canada merged,modified shapefiles prepared above
+      * Code creates a spatial index for faster lookup.
 
     * Simplify the marine EEZ shapefile into a shapefile with smaller, simpler
       polygons for intersection.
       * Replace MULTIPOLYGON features with the component simple POLYGON features.  
         Replicate attribute values from the original polygon into the simple 
         polygons.
-      * Create a 2.5 or 5 degree global grid (experimented with 0.01, 0.10, 1, 
-        2.5, 5, 10 degree resolution).
+      * Create a 2.5 degree global grid 
       * Intersect simplified polygons with global grid for smaller, simpler 
         polygons.  Split complex intersections from MULTIPOLYGON or 
         GEOMETRYCOLLECTION into simple POLYGON
-      * Create a LUT for faster lookup.
-
-  * On records with longitude/latitude
+  
+  * On records with longitude/latitude (including those filled with 
+    centroid coordinates)
    
+    * Code creates a spatial index for geospatial intersection 
     * Do point-in-polygon query on shapefiles to fill 
       calculated_state_name, calculated_county_name, calculated_fips from 
       US Counties.zip for US and Canada: https://my.usgs.gov/jira/browse/BISA-1143
@@ -134,11 +153,6 @@ process info at: https://my.usgs.gov/confluence/display/DEV/SAS+Development
     * if provided_fips, fill longitude/latitude 
       with fips centroid coordinates, fill centroid with "county"
 
-* Data standardization
-
-  * Capitalize kingdom values
-  * Negate longitude if positive value on US and Canada points
-  
 
 
 BISON 49 (48 database fields + hierarchy_string and amb for Solr)
@@ -279,7 +293,8 @@ populated, we will test it for contents, format, etc.
 #. centroid
 
    * Calc: populate if coordinates calculated from Geo lookup to polygon
-   * Do not overwrite existing values in BISON-provided datasets
+   * Overwrite existing values in BISON-provided datasets *only* if it was 
+     previously georeferenced to county (centroid field = 'county')
    
 #. provided_county_name
 
@@ -299,7 +314,7 @@ populated, we will test it for contents, format, etc.
    
 #. associated_media
 
-   * not present in gbif occurrence.txt (next, get from verbatim.txt)
+   * not present in gbif occurrence.txt (2021, get from verbatim.txt)
    
 #. associated_references
 
@@ -318,12 +333,14 @@ populated, we will test it for contents, format, etc.
    * Calc: 'legacyid' from provider lookup table (LUT).
      LUT combines provider table from BISON Denver and
      GBIF organization API + publishing organization key (from dataset metadata)
+     If legacyid does not exist for this provider, use the GBIF organization UUID
    
 #. resource_id
 
    * Calc: 'legacyid' from resource lookup table (LUT).
      LUT combines resource table from BISON Denver and
      GBIF dataset API + dataset key
+     If legacyid does not exist for this resource, use the GBIF dataset UUID
     
 #. provided_common_name
 
@@ -337,7 +354,7 @@ populated, we will test it for contents, format, etc.
    
 #. geodetic_datum
 
-   * not present in GBIF occurrence.txt (AMS: next time, use from verbatim.txt)
+   * not present in GBIF occurrence.txt (2021, use from verbatim.txt)
 
 #. coordinate_precision
 
@@ -353,11 +370,11 @@ populated, we will test it for contents, format, etc.
    
 #. mrgid
 
-   * Calc: Point-in-polygon marine, polygon + coordinates
+   * Calc: Point-in-polygon marine (use gridded EEZ), polygon + coordinates
    
 #. calculated_waterbody 
 
-   * Calc: Point-in-polygon marine (use EEZ), polygon + coordinates
+   * Calc: Point-in-polygon marine (use gridded EEZ), polygon + coordinates
    
 #. establishment_means
 
@@ -380,7 +397,3 @@ Misc Notes:
 * Use ‘$’ delimiter in CSV output
 
 
->>> len(terrfeats)
-3527
->>> len(marfeats)
-250
