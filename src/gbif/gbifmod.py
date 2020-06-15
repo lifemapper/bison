@@ -39,6 +39,7 @@ from gbif.constants import (GBIF_DELIMITER, TERM_CONVERT, META_FNAME,
                             GBIF_NAMEKEY_TEMP_FIELD, GBIF_NAMEKEY_TEMP_TYPE)
 from gbif.gbifmeta import GBIFMetaReader
 from gbif.gbifapi import GbifAPI
+from test.test_finalization import Legacy
 
         
 # .............................................................................
@@ -124,20 +125,20 @@ class GBIFReader(object):
             else:
                 # Get organization UUID from dataset metadata (new gbif value)
                 gbif_org_uuid = ds_metavals['gbif_publishingOrganizationKey']
-                if gbif_org_uuid is None or gbif_org_uuid == '':
+                if gbif_org_uuid in (None, ''):
                     gbif_org_uuid = ds_metavals['owningorganization_id']
-                    if gbif_org_uuid is None or gbif_org_uuid == '':
+                    if gbif_org_uuid in (None, ''):
                         self._log.warning('No gbif_org_uuid found for dataset {}'
                                           .format(dskey))
-                # Get organization legacyid from old db table 
+                # Get organization legacyid from old db table, use UUID if missing
                 legacy_org_id = ds_metavals['provider_id']
-                if legacy_org_id is None or legacy_org_id == '':
+                if legacy_org_id in (None, ''):
                     legacy_org_id = ds_metavals['BISONProviderID']
 
                 # Resource legacyid
                 # from old db table value, then try new gbif value
                 legacy_dataset_id = ds_metavals['OriginalResourceID']
-                if legacy_dataset_id is None or legacy_dataset_id == '':
+                if legacy_dataset_id in (None, ''):
                     legacy_dataset_id = ds_metavals['gbif_legacyid']
                 # Save title and url from GBIF-returned value
                 dataset_title = ds_metavals['gbif_title']
@@ -156,9 +157,17 @@ class GBIFReader(object):
                                        .format(rec[OCC_ID_FLD], gbif_org_uuid, 
                                                dataset_meta_url))
         if rec is not None:
-            if (legacy_org_id == LEGACY_ID_DEFAULT 
-                or legacy_dataset_id == LEGACY_ID_DEFAULT):
-                print('stopme')
+            # if no legacy id, use GBIF uuids, if no UUID, use default to indicate missing
+            if legacy_org_id in (None, '', LEGACY_ID_DEFAULT):
+                if gbif_org_uuid not in (None, ''):
+                    legacy_org_id = gbif_org_uuid
+                else:
+                    legacy_org_id = LEGACY_ID_DEFAULT
+            if legacy_dataset_id in (None, '', LEGACY_ID_DEFAULT):
+                if dskey not in (None, ''):
+                    legacy_dataset_id = dskey
+                else:
+                    legacy_dataset_id = LEGACY_ID_DEFAULT
             # Concat old org and dataset ids for bison resource id 
             bison_resource_id = '{},{}'.format(legacy_org_id, legacy_dataset_id)
             rec['resource_id'] = bison_resource_id
@@ -193,7 +202,7 @@ class GBIFReader(object):
                     except:
                         self._missing_orgs.add(gbif_org_uuid)
                         # OR Lookup legacy id
-                        if legacy_org_id is not None:
+                        if legacy_org_id not in (None, ''):
                             try:
                                 org_metavals = org_by_legacyid.lut[legacy_org_id]
                             except:
@@ -210,23 +219,21 @@ class GBIFReader(object):
     
     # ...............................................
     def _track_provider_resources(self, rec):
-            bison_legacyid = rec['resource_id']
-            parts = bison_legacyid.split(',')
+        bison_legacyid = rec['resource_id']
+        parts = bison_legacyid.split(',')
+        if len(parts) != 2:
+            self._log.warning('legacyid {} failed to parse'.format(bison_legacyid))
+        else:
+            provider_legacyid = parts[0]
+            resource_legacyid = parts[1]
             try:
-                provider_legacyid = int(parts[0])
-                resource_legacyid = int(parts[1])
+                self._active_resources[provider_legacyid] += 1
             except:
-                if bison_legacyid.find(LEGACY_ID_DEFAULT) < 0:
-                    self._log.warning('legacyid {} failed to parse'.format(bison_legacyid))
-            else:
-                try:
-                    self._active_resources[provider_legacyid] += 1
-                except:
-                    self._active_resources[provider_legacyid] = 1
-                try:
-                    self._active_providers[resource_legacyid] += 1
-                except:
-                    self._active_providers[resource_legacyid] = 1
+                self._active_resources[provider_legacyid] = 1
+            try:
+                self._active_providers[resource_legacyid] += 1
+            except:
+                self._active_providers[resource_legacyid] = 1
         
 
     # ...............................................
@@ -710,6 +717,8 @@ class GBIFReader(object):
         try:            
             for orig_rec in dict_reader:
                 recno += 1
+                if recno == 3140:
+                    print('here we are')
                 if orig_rec is None:
                     break
                 elif (recno % LOGINTERVAL) == 0:
@@ -726,12 +735,12 @@ class GBIFReader(object):
 
                                 
         except Exception as e:
-            self._log.error('Failed on line {}, exception {}'.format(recno, e))
+            self._log.error('Failed on line {}, e = {}'.format(recno, e))
         finally:
             inf.close()
             outf.close()
             
-        self.write_resource_provider_stats(pass1_fname)
+#         self.write_resource_provider_stats(pass1_fname)
         self._log.info('Missing organization ids: {}'.format(self._missing_orgs))    
         self._log.info('Missing dataset ids: {}'.format(self._missing_datasets))    
 
@@ -740,6 +749,51 @@ class GBIFReader(object):
             nametaxas.write_lookup(
                 nametaxa_fname, ['scientificName', 'taxonKeys'], BISON_DELIMITER)            
     
+    # ...............................................
+    def count_resource_providers(
+            self, infname, merged_dataset_lut_fname, merged_org_lut_fname):
+        """
+        @summary: Create a CSV file containing GBIF occurrence records extracted 
+                     from the interpreted occurrence file provided 
+                     from an Occurrence Download, in Darwin Core format.  
+                     Individual values may be calculated, modified or 
+                     entire records discarded according to BISON requests.
+        @return: A CSV file of first pass of BISON-modified records from a 
+                 GBIF download. 
+        @note: Some fields will be filled in on subsequent processing.
+        """
+        if self.is_open():
+            self.close()
+        if not os.path.exists(infname):
+            raise Exception('Missing input file {}!'.format(infname))            
+#         dataset_by_uuid = Lookup.initFromFile(merged_dataset_lut_fname, 
+#             ['gbif_datasetkey', 'dataset_id'], BISON_DELIMITER, valtype=VAL_TYPE.DICT, 
+#             encoding=ENCODING)
+#         dataset_by_legacyid = Lookup.initFromFile(merged_dataset_lut_fname, 
+#             ['OriginalResourceID', 'gbif_legacyid'], BISON_DELIMITER, valtype=VAL_TYPE.DICT, 
+#             encoding=ENCODING)
+#         org_by_uuid = Lookup.initFromFile(merged_org_lut_fname, 
+#             ['gbif_organizationKey'], BISON_DELIMITER, valtype=VAL_TYPE.DICT, 
+#             encoding=ENCODING)
+#         org_by_legacyid = Lookup.initFromFile(merged_org_lut_fname, 
+#             ['OriginalProviderID', 'gbif_legacyid'], BISON_DELIMITER, valtype=VAL_TYPE.DICT, 
+#             encoding=ENCODING)
+        recno = 0
+        dict_reader, inf = get_csv_dict_reader(infname, BISON_DELIMITER, ENCODING)
+        try:            
+            for rec in dict_reader:
+                recno += 1
+                if rec is None:
+                    break
+                elif (recno % LOGINTERVAL) == 0:
+                    self._log.info('*** Record number {} ***'.format(recno))
+                # Read resource_id (provider_id,bison_legacy_resource_id)
+                self._track_provider_resources(rec)                                
+        except Exception as e:
+            self._log.error('Failed on line {}, e = {}'.format(recno, e))
+        finally:
+            inf.close()
+            
     # ...............................................
     def write_resource_provider_stats(self, resource_count_fname, 
                                       provider_count_fname):
