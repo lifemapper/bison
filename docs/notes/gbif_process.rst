@@ -56,27 +56,40 @@ Process: (LUT = lookup table)
 Prepare lookup tables and process GBIF records into BISON records.  Iterate 
 through all records three times, to satisfy data dependencies in later steps.
 
-Resource and Provider LUT preparation, before Iteration 1
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#. Create 2 lookup tables (LUTs) then initial process occ records from GBIF to BISON, 
+Prep: Resource and Provider LUT
+======================================================
+#. Merge 2 old provider and resource tables with current GBIF metadata
   
-   * Get existing provider and resource tables from BISON database
-   * Create list of dataset UUIDs from Dataset EML files
-   * Create Resource LUT and list of publishingOrganization UUIDs from 
-     GBIF dataset API + dataset UUID.  Fill legacyid from existing resource 
-     table or dataset metadata.
+   * Input: existing provider and resource tables from BISON database
+   * Input: dataset EML files from GBIF download
+   * Merge these datasets, calling GBIF APIs to  Create Resource LUT and list of 
+     publishingOrganization UUIDs from GBIF dataset API + dataset UUID.  
+     Fill legacyid from existing resource table or dataset metadata. If legacyid
+     does not exist for a new dataset, put default value (-9999) in the 
+     table to indicate it does not exist.
    * Create Provider LUT from GBIF publisher API + publishingOrganization UUID.
      Fill legacyid from existing provider table or organization metadata. 
 
-Process Records Iteration 1
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Step 1: Convert from GBIF fields to BISON field, fill Provider and Resource
+============================================================================
+
+
+#. Pull appropriate GBIF fields for BISON output, and minimal calculations 
+
+  * Negate longitude if positive value on US and Canada points
+  * basis_of_record: convert GBIF vals to BISON controlled vocabulary 
+  * occurrence_date: format GBIF eventDate to YYYY-MM-DD if full date, or YYYY
+  * year: Use gbif/dwc year or pull from occurrence_date calc
 
 #. Fill Resource/Provider fields from LUTs and 
 
    * Fill resource, resource_url, resource_id with dataset title, homepage/url,
-     and legacyid from datasetKey and Resource LUT 
+     and legacyid from datasetKey and Resource LUT.   
    * Fill provider, provider_url, provider_id with organization title, 
      homepage/url from publishingOrganizationKey and Provider LUT 
+   * If a legacyid does not exist for a provider or resource, use the GBIF UUID
+     for the organization or dataset respectively.
    * Discard records from BISON providers 
      Publisher: USGS, publishingOrganizationKey=c3ad790a-d426-4ac1-8e32-da61f81f0117 
      AND
@@ -86,7 +99,7 @@ Process Records Iteration 1
 #. Discard records with occurrenceStatus = absent
 #. Replace some fields with controlled vocab, fill with alternate field values
 
-   * NA, n/a, null --> ''
+   * NA, n/a, null, None --> ''
    * Correct/standardize basis_of_record to BISON controlled vocabulary
    * BISON verbatim_locality = either 1)verbatimLocality 2) locality or 3)habitat
    * BISON id = either 1) id or 2) collector_number
@@ -95,19 +108,19 @@ Process Records Iteration 1
 #. Convert gbif eventDate to BISON occurrence_date in ISO 8601, ex: 2018-08-01 or 2018
 #. Save provided_scientific_name and taxonKey to file for name parsing or key lookup
 
-Name/TaxonKey LUT preparation, after Iteration 1, before 2
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Name/TaxonKey LUT preparation, after Step 1
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #. Create name/taxonkey LUT for clean_provided_scientific_name, using GBIF name
    parser service on name first, taxonkey API if name parsing fails.
    process occ records to replace names
     
-Process Records Iteration 2
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Step 2: Fill records with clean scientific name
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #. fill clean_provided_scientific_name from name LUT. 
 #. Remove any temporary columns for final BISON 48 columns 
 
-Process Records Iteration 3
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Steps 3 and 4
+~~~~~~~~~~~~~
 #. Process as "GBIF and BISON provider common processing" in `BISON Data Load`_
 
 Correct reference data
