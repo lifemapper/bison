@@ -6,7 +6,8 @@ from common.constants import (
     PROVIDER_DELIMITER, BISON_DELIMITER, ENCODING, BISON_IPT_PREFIX)
 from common.inputdata import BISON_PROVIDER
 from common.lookup import Lookup, VAL_TYPE
-from common.tools import (makerow, open_csv_files)
+from common.tools import (get_logger, makerow, open_csv_files, 
+                          get_csv_dict_reader, get_csv_writer)
 
 EXISTING_DATASET_FILE_PREFIX = 'bison_'
 # .............................................................................
@@ -19,12 +20,23 @@ class BisonMerger(object):
         """
         @summary: Constructor
         """
-        # Remove any trailing /
         self._log = logger
         self._resource_table = {}
         self._provider_table = {}
         
+    # ...............................................
+    def reset_logger(self, outdir, logname):
+        self._log = None
+        logfname = os.path.join(outdir, '{}.log'.format(logname))
+        logger = get_logger(logname, logfname)
+        self._log = logger
 
+    # ...............................................
+    def loginfo(self, msg):
+        if self._log is None:
+            print(msg)
+        else:
+            self._log.info(msg)
     # ...............................................
     def _get_rewrite_val(self, resource_ident, rec, key, const_val):
         """
@@ -88,7 +100,8 @@ class BisonMerger(object):
         """            
         if rec is not None:
             # Take original ticket values
-            if action in (ProviderActions.rename, ProviderActions.replace_rename):
+            if action in (ProviderActions.add, ProviderActions.rename, 
+                          ProviderActions.replace_rename):
                 rec['resource_id'] = resource_ident
                 rec['resource'] = resource_name
                 rec['resource_url'] = resource_url
@@ -133,26 +146,34 @@ class BisonMerger(object):
             if key == 'provider_url':
                 rval = rec[key]
                 if not rval.startswith(const_val):
-                    self._log.info('{} {} does not match'.format(key, rec[key]))
+                    self.loginfo('{} {} does not match'.format(key, rec[key]))
                     rec[key] = const_val
             else:
                 rec[key] = const_val
 
-    # ...............................................
-    def _rewrite_recs(self, infile, outfile, resource_ident, resource_name, 
-                      resource_url, action):
-        delimiter = PROVIDER_DELIMITER
-        # Rewrite data from existing database, with $ delimiter
-        if action in (ProviderActions.rename, ProviderActions.rewrite):
-            delimiter = BISON_DELIMITER
+    # ...............................................                
+    def _remove_outer_quotes(self, rec):
+        for fld, val in rec.items():
+            if isinstance(val, str):
+                if val.index('\"'):
+                    self.loginfo('here is one!')
+                rec[fld] = val.strip('\"')
 
+    # ...............................................
+    def _rewrite_recs(self, infname, outfname, resource_ident, resource_name, 
+                      resource_url, action, in_delimiter):
         dl_fields = list(BISON_ORDERED_DATALOAD_FIELD_TYPE.keys())
         try:
-            # Fill resource/provider values, use BISON_DELIMITER
-            if action == ProviderActions.add:
-                pass
-            dict_reader, inf, writer, outf = open_csv_files(
-                infile, delimiter, ENCODING, outfname=outfile, 
+#             # Open incomplete BISON CSV file as input
+#             dict_reader, inf = get_csv_dict_reader(
+#                 infname, in_delimiter, ENCODING, fieldnames=dl_fields,
+#                 ignore_quotes=True)
+#             csv_writer, outf = get_csv_writer(outfname, BISON_DELIMITER, ENCODING)
+#             # write header
+#             csv_writer.writerow(dl_fields)
+
+            dict_reader, inf, csv_writer, outf = open_csv_files(
+                infname, in_delimiter, ENCODING, outfname=outfname, 
                 outfields=dl_fields, outdelimiter=BISON_DELIMITER)
             recno = 0
             for rec in dict_reader:
@@ -163,7 +184,7 @@ class BisonMerger(object):
                     rec, resource_ident, resource_name, resource_url, action)
                 
                 row = makerow(rec, dl_fields)
-                writer.writerow(row)
+                csv_writer.writerow(row)
         except:
             raise 
         finally:
@@ -172,14 +193,14 @@ class BisonMerger(object):
     
     # ...............................................
     def rewrite_bison_data(self, infile, outfile, resource_ident, resource_name, 
-                            resource_url, action):
+                           resource_url, action, in_delimiter):
         if not os.path.exists(infile):
             raise Exception('File {} does not exist'.format(infile))
 
         if action not in (ProviderActions.wait, ProviderActions.unknown):
             
             # Step 1: rewrite with updated resource/provider values
-            self._log.info("""{} for ticket {},
+            self.loginfo("""{} for ticket {},
                 infile {} to outfile {}
                 with name {}, url {}""".format(
                     action, resource_ident, infile, outfile, resource_name, 
@@ -187,10 +208,10 @@ class BisonMerger(object):
 
             self._rewrite_recs(
                 infile, outfile, resource_ident, resource_name, resource_url, 
-                action)
+                action, in_delimiter)
             
         else:
-            self._log.info('Unknown action {} for input {}, ({})'.format(
+            self.loginfo('Unknown action {} for input {}, ({})'.format(
                 action, resource_name, resource_ident))
 
     # ...............................................
@@ -221,14 +242,14 @@ class BisonMerger(object):
                         legacy_ident, old_resources)
                     
                     if not resource_name:
-                        self._log.info('Dataset {} missing name'.format(
+                        self.loginfo('Dataset {} missing name'.format(
                             legacy_ident))                        
                     elif not resource_url.startswith(BISON_IPT_PREFIX):
-                        self._log.info('Dataset {} has unexpected URL {}'
+                        self.loginfo('Dataset {} has unexpected URL {}'
                                        .format(legacy_ident, resource_url))
                         
                     _, basefname = os.path.split(fn)
-                    self._log.info('Existing dataset {} {} will be rewritten'
+                    self.loginfo('Existing dataset {} {} will be rewritten'
                                    .format(legacy_ident, basefname))
                     
                     provider_datasets[legacy_ident] = {
@@ -238,7 +259,7 @@ class BisonMerger(object):
                         'resource_url': resource_url,
                         'filename': basefname}
                 else:
-                    self._log.info('Dataset {} {} will be {} by {}'.format(
+                    self.loginfo('Dataset {} {} will be {} by {}'.format(
                         legacy_ident, basefname, newdata['action'], newdata['filename']))
         return provider_datasets
 
@@ -250,21 +271,21 @@ class BisonMerger(object):
 
         if action not in (ProviderActions.wait, ProviderActions.unknown):
             # Step 1: rewrite with updated resource/provider values
-            self._log.info("""
+            self.loginfo("""
             ident {}, 
             infile {},
             name {}, 
             url {}""".format(resource_ident, infile, resource_name, resource_url))
             
             if not os.path.exists(infile):
-                self._log.info(" Missing infile {}".format(infile))
+                self.loginfo(" Missing infile {}".format(infile))
             else:
                 self._test_header_lines(
                     infile, resource_ident, resource_name, resource_url, action)
             
             correction_info = self.get_correction_info(
                 resource_ident=resource_ident)
-            self._log.info(correction_info)
+            self.loginfo(correction_info)
             
     # ...............................................
     def get_correction_info(self, resource_ident=None):
