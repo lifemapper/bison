@@ -35,7 +35,8 @@ from common.constants import (BISON_DELIMITER, ENCODING, LOGINTERVAL,
 from common.inputdata import ANCILLARY_FILES
 from common.lookup import Lookup, VAL_TYPE
 from common.tools import (
-    get_csv_dict_reader, open_csv_files, delete_shapefile, get_logger)
+    get_csv_dict_reader, open_csv_files, delete_shapefile, get_logger,
+    get_csv_writer, makerow)
 
 # .............................................................................
 class BisonFiller(object):
@@ -454,23 +455,21 @@ class BisonFiller(object):
             
     # ...............................................
     def _track_provider_resources(self, rec):
-            bison_legacyid = rec['resource_id']
-            parts = bison_legacyid.split(',')
+        bison_legacyid = rec['resource_id']
+        parts = bison_legacyid.split(',')
+        if len(parts) != 2:
+            self._log.warning('legacyid {} failed to parse'.format(bison_legacyid))
+        else:
+            provider_legacyid = parts[0]
+            resource_legacyid = parts[1]
             try:
-                provider_legacyid = int(parts[0])
-                resource_legacyid = int(parts[1])
+                self._active_resources[provider_legacyid] += 1
             except:
-                if bison_legacyid.find(LEGACY_ID_DEFAULT) < 0:
-                    self._log.warning('legacyid {} failed to parse'.format(bison_legacyid))
-            else:
-                try:
-                    self._active_resources[provider_legacyid] += 1
-                except:
-                    self._active_resources[provider_legacyid] = 1
-                try:
-                    self._active_providers[resource_legacyid] += 1
-                except:
-                    self._active_providers[resource_legacyid] = 1
+                self._active_resources[provider_legacyid] = 1
+            try:
+                self._active_providers[resource_legacyid] += 1
+            except:
+                self._active_providers[resource_legacyid] = 1
 
     # ...............................................
     def write_resource_provider_stats(self, resource_count_fname, 
@@ -482,6 +481,58 @@ class BisonFiller(object):
         with open(provider_count_fname, 'w', encoding=ENCODING) as f:
             for legacy_id, count in self._active_providers.items():
                 f.write('{}{}{}'.format(legacy_id, BISON_DELIMITER, count))
+
+    # ...............................................                
+    def _remove_outer_quotes(self, rec):
+        for fld, val in rec.items():
+            if isinstance(val, str):
+                if val.index('\"') >= 0:
+                    self.loginfo('here is one!')
+                rec[fld] = val.strip('\"')
+
+    # ...............................................
+    def rewrite_recs(self, infname, outfname, in_delimiter):
+        if not os.path.exists(infname):
+            raise Exception('File {} does not exist'.format(infname))
+        if not os.path.exists(outfname):
+            self.loginfo('  Re-write {} output with fix to {}'.format(
+                infname, outfname))
+        else:
+            raise Exception('  {} output exists'.format(outfname))
+
+        dl_fields = list(BISON_ORDERED_DATALOAD_FIELD_TYPE.keys())
+        try:
+#             # Open incomplete BISON CSV file as input
+#             dict_reader, inf = get_csv_dict_reader(
+#                 infname, in_delimiter, ENCODING, fieldnames=dl_fields,
+#                 ignore_quotes=True)
+#             csv_writer, outf = get_csv_writer(outfname, BISON_DELIMITER, ENCODING)
+#             # write header
+#             csv_writer.writerow(dl_fields)
+
+            dict_reader, inf, csv_writer, outf = open_csv_files(
+                infname, in_delimiter, ENCODING, outfname=outfname, 
+                outfields=dl_fields, outdelimiter=BISON_DELIMITER)
+            recno = 0
+            for rec in dict_reader:
+                recno += 1
+                self._remove_outer_quotes(rec)
+                row = makerow(rec, dl_fields)
+                csv_writer.writerow(row)
+        except:
+            raise 
+        finally:
+            inf.close()
+            outf.close()
+    
+    # ...............................................
+    def rewrite_data(self, infile, outfile, in_delimiter):
+        if not os.path.exists(infile):
+            raise Exception('File {} does not exist'.format(infile))
+
+
+        self.rewrite_recs(infile, outfile, in_delimiter)
+            
 
     # ...............................................
     def update_itis_estmeans_centroid(
@@ -578,31 +629,6 @@ class BisonFiller(object):
             for name, idx in fldindexes:
                 spfeats[fid][name] = feat.GetFieldAsString(idx)
         return spindex, spfeats, bisonfldnames
-# 
-#     # ...............................................    
-#     def _create_spatial_index(self, flddata, lyr):
-#         bisonfldnames = []
-#         for reffld, bisonfld in flddata:
-#             bisonfldnames.append(bisonfld)
-#             
-#         spindex = rtree.index.Index(interleaved=False)
-#         spfeats = {}
-#         feat = lyr.GetNextFeature()
-#         while feat is not None:
-#             fid = feat.GetFID()
-#             geom = feat.GetGeometryRef()
-# #             self._log.info('  {} Geometry {} count {}'.format(
-# #                 fid, geom.GetGeometryName(), geom.GetGeometryCount()))
-#             # GetEnvelope returns ordering:  minX, maxX, minY, maxY
-#             xmin, xmax, ymin, ymax = geom.GetEnvelope()
-#             # Interleaved = False requires: minX, maxX, minY, maxY
-#             spindex.insert(fid, (xmin, xmax, ymin, ymax))
-#             spfeats[fid] = {'feature': feat, 
-#                             'geom': geom}
-#             for reffld, bisonfld in flddata:
-#                 spfeats[fid][bisonfld] = feat.GetFieldAsString(reffld)
-#             feat = lyr.GetNextFeature()
-#         return spindex, spfeats, bisonfldnames
 
     # ...............................................
     def initialize_geospatial_data(self, terr_data, marine_data, ancillary_path):
@@ -748,37 +774,6 @@ class BisonFiller(object):
 
         return  ((terr_data_src, terrlyr, terrindex, terrfeats, terr_bison_fldnames), 
                  (eez_data_src, eezlyr, marindex, marfeats, mar_bison_fldnames))
-
-#         recno = 0
-#         try:
-#             dict_reader, inf, writer, outf = open_csv_files(self.infname, 
-#                                              BISON_DELIMITER, ENCODING, 
-#                                              outfname=outfname, 
-#                                              outfields=self._outfields)
-#             for rec in dict_reader:
-#                 recno += 1
-#                 squid = rec[BISON_SQUID_FLD]
-#                 lon, lat = self._get_coords(rec)
-#                 # Use coordinates to calc 
-#                 if lon is not None:
-#                     # Compute geo: coordinates and polygons
-#                     self._fill_geofields(rec, lon, lat, 
-#                                          terrindex, terrfeats, terr_bison_fldnames,
-#                                          marindex, marfeats, mar_bison_fldnames)
-#                 # Write updated record
-#                 row = self._makerow(rec)
-#                 writer.writerow(row)
-#                 # Log progress occasionally, this process is very time-consuming
-#                 # so show progress at shorter intervals to ensure it is moving
-#                 if (recno % LOGINTERVAL/10) == 0:
-#                     self._log.info('*** Record number {} ***'.format(recno))
-#                                     
-#         except Exception as e:
-#             self._log.error('Failed filling data from id {}, line {}: {}'
-#                             .format(squid, recno, e))                    
-#         finally:
-#             inf.close()
-#             outf.close()
             
     # ...............................................
     def _test_other_fields(self, rec, recno, squid):

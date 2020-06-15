@@ -157,7 +157,7 @@ def makerow(rec, outfields):
     for fld in outfields:
         try:
             val = rec[fld]
-            if not val:
+            if val in (None, 'None'):
                 row.append('')
             else:
                 if isinstance(val, str) and val.startswith('\"'):
@@ -168,20 +168,20 @@ def makerow(rec, outfields):
             row.append('')
     return row
 
-# ...............................................
-def makerec(rec, outfields):
-    newrec = OrderedDict()
-    for fld in outfields:
-        try:
-            val = rec[fld]
-            if not val:
-                newrec[fld] = ''
-            else:                
-                newrec[fld] = val
-        # Add output fields not present in record
-        except:
-            newrec[fld] = ''
-    return newrec
+# # ...............................................
+# def makerec(rec, outfields):
+#     newrec = OrderedDict()
+#     for fld in outfields:
+#         try:
+#             val = rec[fld]
+#             if val in (None, 'None'):
+#                 newrec[fld] = ''
+#             else:
+#                 newrec[fld] = val
+#         # Add output fields not present in record
+#         except:
+#             newrec[fld] = ''
+#     return newrec
 
 # ...............................................
 def open_csv_files(infname, delimiter, encoding, ignore_quotes=True, 
