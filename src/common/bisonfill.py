@@ -71,6 +71,20 @@ class BisonFiller(object):
         self._active_providers = {}
         
     # ...............................................
+    def reset_logger(self, outdir, logname):
+        self._log = None
+        logfname = os.path.join(outdir, '{}.log'.format(logname))
+        logger = get_logger(logname, logfname)
+        self._log = logger
+        
+    # ...............................................
+    def loginfo(self, msg):
+        if self._log is None:
+            print(msg)
+        else:
+            self._log.info(msg)
+
+    # ...............................................
     def initialize_itis_estmeans_centroid(self, itis2_lut_fname, estmeans_fname, 
                                           terrestrial_shpname):
         if self.itistsns is None:
@@ -146,37 +160,43 @@ class BisonFiller(object):
         driver = ogr.GetDriverByName("ESRI Shapefile")
         terr_data_src = driver.Open(terrestrial_shpname, 0)
         time.sleep(10)
-        terrlyr = terr_data_src.GetLayer()
-
-        centroids = None
-        datadict = {}
-        for feat in terrlyr:
-            fips = feat.GetFieldAsString('B_FIPS')
-            county = feat.GetFieldAsString('B_COUNTY')
-            state = feat.GetFieldAsString('B_STATE')
-            # lookup coordinates
-            centroid = feat.GetFieldAsString('B_CENTROID')
-            tmp = centroid[centroid.find('(')+1:centroid.find(')')]
-            coords = tmp.split(' ')
-            try:
-                float(coords[0])
-                float(coords[1])
-            except:
-                self._log.error('Failed to read coordinates from {}'.format(
-                    centroid))
-            else:
-                # fill coordinates for search combo of 
-                #     state + county or fips
-                for key in [';'.join([state, county]), fips]:
-                    try:
-                        # Add key only once (there are multiple polygons 
-                        #     for each state/county/fips combo)
-                        datadict[key]
-                    except:
-                        datadict[key] = (coords[0], coords[1])
-        terrlyr.ResetReading()
-        if datadict:
-            centroids = Lookup.initFromDict(datadict, valtype=VAL_TYPE.TUPLE)
+        if terr_data_src is None:
+            time.sleep(20)
+        if terr_data_src is None:
+            raise Exception('Failed to read datasource from {}'.format(
+                terrestrial_shpname))
+        else:
+            terrlyr = terr_data_src.GetLayer()
+    
+            centroids = None
+            datadict = {}
+            for feat in terrlyr:
+                fips = feat.GetFieldAsString('B_FIPS')
+                county = feat.GetFieldAsString('B_COUNTY')
+                state = feat.GetFieldAsString('B_STATE')
+                # lookup coordinates
+                centroid = feat.GetFieldAsString('B_CENTROID')
+                tmp = centroid[centroid.find('(')+1:centroid.find(')')]
+                coords = tmp.split(' ')
+                try:
+                    float(coords[0])
+                    float(coords[1])
+                except:
+                    self._log.error('Failed to read coordinates from {}'.format(
+                        centroid))
+                else:
+                    # fill coordinates for search combo of 
+                    #     state + county or fips
+                    for key in [';'.join([state, county]), fips]:
+                        try:
+                            # Add key only once (there are multiple polygons 
+                            #     for each state/county/fips combo)
+                            datadict[key]
+                        except:
+                            datadict[key] = (coords[0], coords[1])
+            terrlyr.ResetReading()
+            if datadict:
+                centroids = Lookup.initFromDict(datadict, valtype=VAL_TYPE.TUPLE)
         return centroids
 
     # ...............................................
@@ -409,7 +429,7 @@ class BisonFiller(object):
     def _fix_itis_values(self):
         for key, vals in self.itistsns.lut.items():
             try:
-                cleanking = vals['kingdom'].strip()
+                cleanking = vals['kingdom_name'].strip()
             except:
                 print ('wtf kingdom')
                 cleanking = ''
@@ -490,7 +510,6 @@ class BisonFiller(object):
         # hierarchy_string, common_name, amb, kingdom
         self.initialize_itis_estmeans_centroid(
             itis2_lut_fname, estmeans_fname, terrestrial_shpname)
-
         recno = 0
         try:
             dict_reader, inf, writer, outf = open_csv_files(infname, 
@@ -1085,40 +1104,4 @@ if __name__ == '__main__':
 #     gr.update_itis_geo_estmeans(itis2_lut_fname, terrestrial_shpname, 
 #                                 marine_shpname, estmeans_fname)
 """
-from osgeo import ogr
-import os
-import rtree
-import time
-
-from common.constants import (BISON_DELIMITER, ENCODING, LOGINTERVAL, 
-                              PROHIBITED_CHARS, PROHIBITED_SNAME_CHARS, 
-                              PROHIBITED_VALS, 
-                              BISON_VALUES, BISON_SQUID_FLD, ITIS_KINGDOMS, 
-                              ISO_COUNTRY_CODES, 
-                              BISON_ORDERED_DATALOAD_FIELD_TYPE)
-from common.inputdata import ANCILLARY_FILES
-from common.lookup import Lookup, VAL_TYPE
-from common.tools import (get_csv_dict_reader, open_csv_files, delete_shapefile)
-from common.bisonfill import *
-
-logger = 
-self = BisonFiller(pass3_fname, log=logger)
-
-# TEST - go to BisonFiller code
-
-driver = ogr.GetDriverByName("ESRI Shapefile")
-
-terr_data = ANCILLARY_FILES['terrestrial']
-terrestrial_shpname = os.path.join(ancillary_path, terr_data['file'])
-terr_data_src = driver.Open(terrestrial_shpname, 0)
-terrlyr = terr_data_src.GetLayer()
-terrflddata = terr_data['fields']
-terrindex = rtree.index.Index(interleaved=False)
-terrfeats = {}
-######### LOOP ##########
-
-
-
-
-
 """
