@@ -53,7 +53,7 @@ class GBIFReader(object):
              where 1-5000 are lines to delete, and 10000 is the line on which to stop.
     """
     # ...............................................
-    def __init__(self, basepath, tmpdir, outdir, logger):
+    def __init__(self, workpath, logger):
         """
         @summary: Constructor
         @param interpreted_fname: Full filename containing records from the GBIF 
@@ -65,10 +65,9 @@ class GBIFReader(object):
         """
         self._log = logger
         # Remove any trailing /
-        self.basepath = basepath.rstrip(os.sep)
-        self.outpath = os.path.join(basepath, outdir)
-        self.tmppath = os.path.join(basepath, tmpdir)
-        self._dataset_pth = os.path.join(self.basepath, 'dataset')
+        self.workpath = workpath.rstrip(os.sep)
+        self._dataset_pth = os.path.join(self.workpath, 'dataset')
+        self._meta_fname = os.path.join(self.workpath, META_FNAME)
         # Save these fields during processing to fill or compute from GBIF data
         # Individual steps may add/remove temporary fields for input/output
         self._fields = BISON_ORDERED_DATALOAD_FIELD_TYPE.copy()
@@ -97,12 +96,6 @@ class GBIFReader(object):
         self._active_resources = {}
         self._active_providers = {}
         
-#         meta_fname = os.path.join(self.basepath, META_FNAME)
-#         gmetardr = GBIFMetaReader(self._log)
-#         self._gbif_column_map, self._gbif_header = \
-#                         gmetardr.get_field_index_list(meta_fname)
-#         self._gbif_column_map = gmetardr.get_field_meta(meta_fname)
-
     # ...............................................
     def _makerow(self, rec):
         row = []
@@ -676,9 +669,8 @@ class GBIFReader(object):
         if os.path.exists(pass1_fname):
             raise Exception('First pass output file {} exists!'.format(pass1_fname))            
 
-        meta_fname = os.path.join(self.basepath, META_FNAME)
         gm_rdr = GBIFMetaReader(self._log)
-        gbif_header = gm_rdr.get_field_list(meta_fname)
+        gbif_header = gm_rdr.get_field_list(self._meta_fname)
 
         # Add temporary fields, and metadata for limiting field content
         self._infields.extend(list(GBIF_CONVERT_TEMP_FIELD_TYPE.keys()))

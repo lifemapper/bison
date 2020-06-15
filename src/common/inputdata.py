@@ -26,6 +26,7 @@ ANCILLARY_FILES = {
 BISON_PROVIDER = {
     
     # X my.usgs.gov/jira/browse/BISON-402
+    # TODO: Handle internal quotes
     'nplichens':
     {'action': ProviderActions.add,
      'ticket': 'BISON-402',
@@ -65,6 +66,7 @@ BISON_PROVIDER = {
      },
     
     # X my.usgs.gov/jira/browse/BISON-978
+    # TODO: Handle internal quotes
     '440,100061':
     {'action': ProviderActions.replace,
      'ticket': 'BISON-978',
@@ -196,6 +198,7 @@ BISON_PROVIDER = {
     
     # fixed encoding to utf-8
     # X my.usgs.gov/jira/browse/BISON-1018
+    # TODO: Handle internal quotes
     'emammal':
     {'action': ProviderActions.add, 
      'ticket': 'BISON-1018',
@@ -262,5 +265,16 @@ Correction table
 
 440,100005
   resource:  {'USGS PWRC - North American Breeding Bird Atlas Explorer'}
+
+No quote problems:
+
+bison_bbl_ca_province_ordered_final_UTF-8.csv
+bison_bbl_10min_ordered_final_2019-02-21.csv 
+bison_bbl_state_ordered_final_2019-02-22.csv 
+bison_fiap*csv 
+bison_USDA_Plants_2019-12-19.csv
+FINAL-nycitytreecensus-2015-09Apr2020.csv
+USFWS\ -\ Waterfowl\ Breeding\ Population\ and\ Habitat\ Survey\ 11Jul2019.csv
+
 
 """
