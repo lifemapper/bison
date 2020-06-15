@@ -43,7 +43,7 @@ BISON_DELIMITER = '$'
 PROVIDER_DELIMITER = '\t'
 
 NEWLINE = '\n'
-LEGACY_ID_DEFAULT = -9999
+LEGACY_ID_DEFAULT = '-9999'
 
 # Rough log of processing progress
 LOGINTERVAL = 1000000

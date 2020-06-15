@@ -29,7 +29,7 @@ import time
 from common.bisonfill import BisonFiller
 from common.constants import (
     BISON_DELIMITER, ProviderActions, LOGINTERVAL, ANCILLARY_DIR, TEMP_DIR, 
-    CHUNK_DIR, OUTPUT_DIR, PROVIDER_DELIMITER)
+    OUTPUT_DIR, PROVIDER_DELIMITER)
 from common.inputdata import ANCILLARY_FILES
 from common.intersect_one import intersect_csv_and_shapefiles
 from common.tools import get_logger, get_line_count, get_header
@@ -339,7 +339,8 @@ if __name__ == '__main__':
         s2dir = os.path.join(tmppath, 's2-scinames')
         s3dir = os.path.join(tmppath, 's3-itisescent')
         s4dir = os.path.join(tmppath, 's4-geo')
-        for sdir in (s1dir, s2dir, s3dir, s4dir):
+        fixdir = os.path.join(tmppath, 's99-fix')
+        for sdir in (s1dir, s2dir, s3dir, s4dir, fixdir):
             os.makedirs(sdir, mode=0o775, exist_ok=True)
         # Output CSV files of all records after initial creation or field replacements
         pass1_fname = os.path.join(s1dir, '{}.csv'.format(basefname))
@@ -413,11 +414,21 @@ if __name__ == '__main__':
             step_parallel(pass3_fname, terr_data, marine_data, ancillary_path,
                           pass4_fname, from_gbif=True)
             if track_providers:
+                logger = get_logger(logbasename, logfname)
                 gr = GBIFReader(workpath, logger)
                 gr.count_provider_resource(pass4_fname)
                 gr.write_resource_provider_stats(
                     resource_count_fname, provider_count_fname)
             pass
+
+        # ..........................................................
+        # Step 99: fix something
+        elif step == 99:
+            infile = os.path.join(s4dir, 'occurrence_lines_1-2000.csv')
+            fixfile = os.path.join(fixdir, 'occurrence_lines_1-2000.csv')
+            logger = get_logger(logbasename, logfname)
+            bf = BisonFiller(logger)
+            bf.rewrite_recs(infile, fixfile, BISON_DELIMITER)
 
         else:
             print('No step {} for data_source {}'.format(step, data_source))
