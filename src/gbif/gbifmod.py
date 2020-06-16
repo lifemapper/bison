@@ -39,8 +39,6 @@ from gbif.constants import (GBIF_DELIMITER, TERM_CONVERT, META_FNAME,
                             GBIF_NAMEKEY_TEMP_FIELD, GBIF_NAMEKEY_TEMP_TYPE)
 from gbif.gbifmeta import GBIFMetaReader
 from gbif.gbifapi import GbifAPI
-from test.test_finalization import Legacy
-
         
 # .............................................................................
 class GBIFReader(object):
