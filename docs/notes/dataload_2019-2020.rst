@@ -33,14 +33,15 @@ BISON Data Provider Data Load
    * Rename existing
    * Replace-and-rename existing
    * Replace existing
+   * Rewrite existing
 
 #. All *Add*, *Rename*, *Replace-and-rename* datasets will be represented by
    Jira tickets. *Add*, and *Replace-and-rename* datasets will be linked
    to tickets for processing.
-
+#. All datasets encountered in existing data that do not have an action 
+   requested by a Jira ticket, will be *Rewrite*
 #. Provide the updated-BISON-provider-records to Derek for ingest
 
-  
   
 GBIF and BISON provider common processing
 -------------------------------------------
@@ -49,8 +50,75 @@ process info at: https://my.usgs.gov/confluence/display/DEV/SAS+Development
 
 Process in separate steps to fill field dependencies before they are needed.
 
+Reference Data Preparation:
+============================
 
-Step X: Clean, lookup ITIS, Establishment Means, Centroid
+* ITIS data
+
+  * Get updated lookup table created by ITIS developers provided by Denver
+  * Make sure kingdom and amb fields are included
+  * When loading:
+  
+    * strip trailing spaces from ITIS kingdom values
+    * strip external quotes from data
+
+  * Rejected options:
+  
+    * Use API?  No, Solr query is fast, but REST query for common names is slow
+    * Use downloaded database from https://www.itis.gov/downloads/index.html
+      No, data is not as current as version provided by ITIS developers
+
+* Establishment means
+ 
+  * Get lookup table from Annie Simpson
+
+* US Counties and Canada Provinces 
+
+  * Get US counties from Shayne and Canada from Denver
+  * Merge US and Canada shapefiles 
+    * Compute the centroid coordinates of each input feature.
+    * Add new fields for BISON data processing which compute/edit values from 
+      the input datasets to fill calculated_state_name, 
+      calculated_county_name, calculated_fips, and longitude and latitude 
+      coordinates if needed and possible.
+    * field mapping:
+      * Canada PRNAME to calculated_state_name, strip " Canada" from value
+      * Canada CDNAME to calculated_county_name
+      * Canada CDUID to calculated_fips
+      * US STATE_FIPS + CNTY_FIPS = calculated_fips
+    * Simplify the output polygon shapefile, replacing MULTIPOLYGON features
+      with the component simple POLYGON features.  Replicate attribute values
+      from the original polygon into the simple polygons.
+    * Code creates LUT (by state/county or fips) for faster lookup.
+
+* Marine EEZ
+
+    * Simplify the marine EEZ shapefile into a shapefile with smaller, simpler
+      polygons for intersection.
+    
+      * Replace MULTIPOLYGON features with the component simple POLYGON features.  
+        Replicate attribute values from the original polygon into the simple 
+        polygons.
+      * Create a 2.5 degree global grid 
+      * Intersect simplified polygons with global grid for smaller, simpler 
+        polygons.  Split complex intersections from MULTIPOLYGON or 
+        GEOMETRYCOLLECTION into simple POLYGON
+
+Step 1: Handle quotes, check coords, fill resource/provider
+============================================================
+* Ecape internal quotes and removing enclosing quotes
+* Check longitude and negate if needed for US and Canada records
+* Fill resource/provider fields from 
+
+  * current GBIF metadata merged with BISON tables (for GBIF data)
+  * new or modified metadata from Jira tickets (for BISON provider data)
+
+Step 2: GBIF only
+=================
+see `GBIF Data Processing`_
+
+
+Step 3: Clean, lookup ITIS, Establishment Means, Centroid
 ==========================================================
 * Cleanup/standardization
 
@@ -62,16 +130,6 @@ Step X: Clean, lookup ITIS, Establishment Means, Centroid
     be coerced to the correct type, truncate string values that are too long
 
 * ITIS lookup: fill ITIS values from clean_provided_scientific_name
-  
-  * Prep: 
-    * Get updated lookup table created by ITIS developers provided by Denver
-    * When loading, strip trailing spaces from ITIS kingdom values
-
-    * Rejected options:
-    
-      * Use API?  No, Solr query is fast, but REST query for common names is slow
-      * Use downloaded database from https://www.itis.gov/downloads/index.html
-        No, data is not as current as version provided by ITIS developers
 
   * Lookup TSN from clean_provided_scientific_name to fill fields:
 
@@ -83,52 +141,22 @@ Step X: Clean, lookup ITIS, Establishment Means, Centroid
       * New: first just check capitalization, now rewrite existing value
   
 * Establishment Means lookup
-  
-  * Prep: Get lookup table from Annie Simpson
 
   * Lookup by ITIS TSN first, (NEW) by clean_provided_scientific_name second, to 
     fill establishment_means field
 
 * Centroid lookup
 
-  * Prep (for this and geospatial intersection below): 
-    * Get US counties shapefile from Shayne and Canada shapefile from Denver
-    * Merge US and Canada shapefiles 
-      * Compute the centroid coordinates of each input feature.
-      * Add new fields for BISON data processing which compute/edit values from 
-        the input datasets to fill calculated_state_name, 
-        calculated_county_name, calculated_fips, and longitude and latitude 
-        coordinates if needed and possible.
-      * field mapping:
-        * Canada PRNAME to calculated_state_name, strip " Canada" from value
-        * Canada CDNAME to calculated_county_name
-        * Canada CDUID to calculated_fips
-        * US STATE_FIPS + CNTY_FIPS = calculated_fips
-      * Simplify the output polygon shapefile, replacing MULTIPOLYGON features
-        with the component simple POLYGON features.  Replicate attribute values
-        from the original polygon into the simple polygons.
-      * Code creates LUT (by state/county or fips) for faster lookup.
-
   * Lookup values by state/county or fips for records without coordinates,
     fill coordinates with centroid coordinates, fill centroid field with 'county'
 
-Step X: Geospatial intersection
+Step 4: Geospatial intersection
 ================================
 
-  * Prep
-  
-    * Use US/Canada merged,modified shapefiles prepared above
-      * Code creates a spatial index for faster lookup.
+* Use US/Canada merged,modified shapefiles prepared above
 
-    * Simplify the marine EEZ shapefile into a shapefile with smaller, simpler
-      polygons for intersection.
-      * Replace MULTIPOLYGON features with the component simple POLYGON features.  
-        Replicate attribute values from the original polygon into the simple 
-        polygons.
-      * Create a 2.5 degree global grid 
-      * Intersect simplified polygons with global grid for smaller, simpler 
-        polygons.  Split complex intersections from MULTIPOLYGON or 
-        GEOMETRYCOLLECTION into simple POLYGON
+  * Code creates a spatial index for faster lookup.
+
   
   * On records with longitude/latitude (including those filled with 
     centroid coordinates)
@@ -137,12 +165,11 @@ Step X: Geospatial intersection
     * Do point-in-polygon query on shapefiles to fill 
       calculated_state_name, calculated_county_name, calculated_fips from 
       US Counties.zip for US and Canada: https://my.usgs.gov/jira/browse/BISA-1143
+    * New: compute calculated_state_fips from calculated_fips
     * Do point-in-polygon query on shapefiles to fill 
       calculated_waterbody, mrgid from 
       World_EEZ_v8_20140228_splitpolygons.zip, using attributes MRGID & EEZEEZ: 
       https://my.usgs.gov/jira/browse/BISA-763 
-      Shayne says: "I think we will always need to check EEZ as there is some 
-      overlap with the other layers"
     * If point intersects with > 1 terrestrial or marine polygon, leave blank
     * If point intersects with terrestrial AND marine polygons, leave blank      
       
@@ -157,11 +184,16 @@ Step X: Geospatial intersection
 
 BISON 49 (48 database fields + hierarchy_string and amb for Solr)
 -------------------------------------------------------------------
-For GBIF data load, field values will be pulled from named GBIF field or 
+#. For GBIF data load, field values will be pulled from named GBIF field or 
 calculated according to rules laid out in `GBIF Data Processing`_.
 
-For BISON provider data processing, the data should already be correctly 
-populated, we will test it for contents, format, etc.
+#. For BISON provider data processing, the data should already be correctly 
+populated.  I will re-compute and fill *only* the values noted in "common processing": 
+
+   * itis_common_name, itis_tsn, hierarchy_string, amb, (ITIS lookup, establishment_means, coordinates (if record has missing coords 
+     and matching state/county/fips and centroid field != 'county')
+   * calculated_state_name, calculated_county_name, calculated_fips, 
+     calculated_waterbody, mrgid. 
 
 #. clean_provided_scientific_name
 
