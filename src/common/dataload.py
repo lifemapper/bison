@@ -353,7 +353,8 @@ if __name__ == '__main__':
         
         start_time = time.time()
         # ..........................................................
-        # Step 1: assemble metadata, initial rewrite to BISON format
+        # Step 1: assemble metadata, initial rewrite to BISON format, (GBIF-only)
+        # fill resource/provider, check coords (like provider step 1)
         if step == 1:
             logger = get_logger(logbasename, logfname)
             gr = GBIFReader(workpath, logger)
@@ -477,22 +478,25 @@ if __name__ == '__main__':
                     raise Exception('File {} does not exist for {}'
                                     .format(fname, resource_ident))
                 s1dir = os.path.join(tmppath, 's1-clean')
-                s2dir = os.path.join(tmppath, 's2-itisescent')
-                s3dir = os.path.join(tmppath, 's3-geo')
+                # No step 2 for BISON provider data
+                s3dir = os.path.join(tmppath, 's3-itisescent')
+                s4dir = os.path.join(tmppath, 's4-geo')
                 for sdir in (s1dir, s2dir, s3dir):
                     os.makedirs(sdir, mode=0o775, exist_ok=True)
                 outfile1 = os.path.join(s1dir, outfname)
-                outfile2 = os.path.join(s2dir, outfname)            
-                outfile3 = os.path.join(s3dir, outfname)
+                outfile3 = os.path.join(s3dir, outfname)            
+                outfile4 = os.path.join(s4dir, outfname)
                 logbasename = '{}.step{}'.format(outfname, step)                
             # ..........................................................
-            # Step 1: rewrite filling ticket/constant vals for resource/provider
+            # Step 1: rewrite, handle quotes, fill ticket/constant vals for 
+            # resource/provider
+            # Same process as GBIF Step 1, different resource/provider inputs
             if step == 1 and not ignore_me:
                 if os.path.exists(outfile1):
-                    combo_logger.info('  Existing step 1/3 output in {}'.format(
+                    combo_logger.info('  Existing step 1 output in {}'.format(
                         outfile1))
                 else:
-                    combo_logger.info('  Process step 1/3 output to {}'.format(
+                    combo_logger.info('  Process step 1 output to {}'.format(
                         outfile1))
                     merger.reset_logger(s1dir, logbasename)
                     in_delimiter = PROVIDER_DELIMITER
@@ -502,47 +506,50 @@ if __name__ == '__main__':
                         infile, outfile1, resource_ident, resource_name, 
                         resource_url, action, in_delimiter)
             # ..........................................................
-            # Step 2: rewrite filling lookup vals from itis, establishment_means 
-            # and county centroid files
-            # Identical to Step 3 for GBIF data
-            elif step == 2 and not ignore_me:
-                if os.path.exists(outfile2):
-                    combo_logger.info('  Existing step 2/3 output in {}'.format(
-                        outfile2))
+            # Step 2: Nope
+            elif step == 2:
+                combo_logger.info('Step 2 is only valid for GBIF data')
+            # ..........................................................
+            # Step 3: fill lookup vals from ITIS, establishment_means and county centroid files
+            # Identical to GBIF Step 3
+            elif step == 3 and not ignore_me:
+                if os.path.exists(outfile3):
+                    combo_logger.info('  Existing step 3 output in {}'.format(
+                        outfile3))
                 else:
-                    combo_logger.info('  Process step 2/3 output to {}'.format(
-                        outfile2))
+                    combo_logger.info('  Process step 3 output to {}'.format(
+                        outfile3))
                     logfname = os.path.join(s2dir, '{}.log'.format(logbasename))
                     logger = get_logger(logbasename, logfname)
                     bfiller = BisonFiller(logger)
                     bfiller.update_itis_estmeans_centroid(
                         itis2_lut_fname, estmeans_fname, terrestrial_shpname, 
-                        outfile1, outfile2, from_gbif=False)
+                        outfile1, outfile3, from_gbif=False)
             # ..........................................................
-            # Step 3: of CSV transform, split and process large files in parallel
-            # Identical to Step 4 for GBIF data
-            elif step == 3 and not ignore_me:
-                if os.path.exists(outfile3):
-                    combo_logger.info('  Existing step 3/3 output in {}'.format(
-                        outfile3))
+            # Step 4: split and process large files in parallel
+            # Identical to GBIF Step 4
+            elif step == 4 and not ignore_me:
+                if os.path.exists(outfile4):
+                    combo_logger.info('  Existing step 4 output in {}'.format(
+                        outfile4))
                 else:
-                    lcount = get_line_count(outfile2)
+                    lcount = get_line_count(outfile3)
                     if lcount < LOGINTERVAL:
-                        combo_logger.info('  Process step 3/3 output to {}'.format(
-                            outfile3))
+                        combo_logger.info('  Process step 4 output to {}'.format(
+                            outfile4))
                         logfname = os.path.join(s3dir, '{}.log'.format(logbasename))
                         logger = get_logger(logbasename, logfname)
                         bfiller = BisonFiller(logger)
                         bfiller.update_point_in_polygons(
-                            terr_data, marine_data, ancillary_path, outfile2, outfile3)
+                            terr_data, marine_data, ancillary_path, outfile3, outfile4)
                     else:
-                        combo_logger.info('  Parallel Process step 3/3 ({} lines) output to {}'
-                                    .format(lcount, outfile3))
+                        combo_logger.info('  Parallel Process step 4 ({} lines) output to {}'
+                                    .format(lcount, outfile4))
                         # Create chunk input files for parallel processing
                         csv_filename_pairs, header = get_chunk_files(
-                             outfile2, out_csv_filename=outfile3)
-                        step_parallel(outfile2, terr_data, marine_data, ancillary_path,
-                                      outfile3, from_gbif=False)
+                             outfile3, out_csv_filename=outfile4)
+                        step_parallel(outfile3, terr_data, marine_data, ancillary_path,
+                                      outfile4, from_gbif=False)
             # ..........................................................
             # Step 99: fix something
             elif step == 99 and not ignore_me:
@@ -554,53 +561,219 @@ if __name__ == '__main__':
                         outfile99))
                     merger.reset_logger(fixdir, logbasename)
                     merger.rewrite_bison_data(
-                        outfile3, outfile99, resource_ident, resource_name, 
+                        outfile4, outfile99, resource_ident, resource_name, 
                         resource_url, action, BISON_DELIMITER)
                             
             else:
                 print('Ignore {} {}'.format(resource_ident, fname))
-            
-            # TODO: Test and Update old_resources to ensure that constant values
-            # from tickets are included and corrections updated for existing records
-            # Check that all resource_id values contain ticket identifier for 
-            # newly added resources or 440,xxxxxx
-                    
-#             elif step == 10:
-#                 merger.test_bison_encoding_resource(
-#                         infile, resource_ident, resource_name, resource_url, 
-#                         action)
-#                 correction_info = merger.get_correction_info()
-#                 logger.info(correction_info)
-#             
-#             elif step == 13:
-#                 logger = get_logger(logbasename, logfname)
-#                 bf = BisonFiller(pass3_fname, log=logger)
-#                 # Pass 4 of CSV transform, final step, point-in-polygon intersection
-#                 ((terr_data_src, terrlyr, terrindex, terrfeats, terr_bison_fldnames), 
-#                  (eez_data_src, eezlyr, marindex, marfeats, 
-#                   mar_bison_fldnames)) = bf.test_point_in_polygons(
-#                       ancillary_path, pass4_fname)
 
         
 """
 
-# /tank/data/bison/2019/Terr/occurrence_lines_5000-10000.csv --step=4
-
-
-/tank/data/bison/2019/CA_USTerr_gbif/occurrence_lines_1-10000001.csv
-
 
 import os
+from concurrent.futures import ProcessPoolExecutor
+from multiprocessing import cpu_count
+import time
+
 from common.bisonfill import BisonFiller
-from common.constants import (BISON_DELIMITER, ANCILLARY_DIR, ANCILLARY_FILES, 
-                              ProviderActions)
-from common.tools import get_logger
+from common.constants import (
+    BISON_DELIMITER, ProviderActions, LOGINTERVAL, ANCILLARY_DIR, TEMP_DIR, 
+    OUTPUT_DIR, PROVIDER_DELIMITER)
+from common.inputdata import ANCILLARY_FILES
+from common.intersect_one import intersect_csv_and_shapefiles
+from common.tools import get_logger, get_line_count, get_header
+
 from gbif.gbifmod import GBIFReader
+
 from provider.providermod import BisonMerger
 
-input_data = '/tank/data/bison/2019/Terr/occurrence_lines_30000001-40000001.csv'
-input_data = '/tank/data/bison/2019/Terr/occurrence_lines_5000-10000.csv'
-step = 4
+from common.dataload import *
+
+
+data_source = 'gbif'
+input_data = '/tank/data/bison/2019/CA_USTerr_gbif/occurrence_lines_10000001-20000001.csv'
+input_data = '/tank/data/bison/2019/CA_USTerr_gbif/occurrence_lines_20000001-30000001.csv'
+step = 1
+
+# if data_source == 'gbif':
+workpath, basefname_wext = os.path.split(input_data)
+#     workpath = input_data
+    
+basepath, _ = os.path.split(workpath)
+ancillary_path = os.path.join(basepath, ANCILLARY_DIR)
+
+overwrite = True
+tmppath = os.path.join(workpath, TEMP_DIR)
+outpath = os.path.join(workpath, OUTPUT_DIR)
+
+terrestrial_shpname = os.path.join(
+    ancillary_path, ANCILLARY_FILES['terrestrial']['file'])
+
+estmeans_fname = os.path.join(
+    ancillary_path, ANCILLARY_FILES['establishment_means']['file'])
+
+marine_shpname = os.path.join(ancillary_path, 
+                              ANCILLARY_FILES['marine']['file'])
+
+terr_data = ANCILLARY_FILES['terrestrial']
+marine_data = ANCILLARY_FILES['marine']
+itis2_lut_fname = os.path.join(
+    ancillary_path, ANCILLARY_FILES['itis']['file'])
+
+resource_lut_fname = os.path.join(
+    ancillary_path, ANCILLARY_FILES['resource']['file'])
+
+provider_lut_fname = os.path.join(
+    ancillary_path, ANCILLARY_FILES['provider']['file'])
+
+merged_dataset_lut_fname = os.path.join(ancillary_path, 'merged_dataset_lut.csv')
+merged_org_lut_fname = os.path.join(ancillary_path, 'merged_organization_lut.csv')
+
+# if data_source == 'gbif':
+basefname, ext = os.path.splitext(basefname_wext)
+logbasename = 'step{}-{}'.format(step, basefname)
+logfname = os.path.join(tmppath, '{}.log'.format(logbasename))
+
+nametaxa_fname = os.path.join(tmppath, 'step1_{}_sciname_taxkey_list.csv'
+                              .format(basefname))
+
+canonical_lut_fname = os.path.join(tmppath, 'step2_{}_canonical_lut.csv'
+                                   .format(basefname))        
+
+s1dir = os.path.join(tmppath, 's1-gbif2bison')
+s2dir = os.path.join(tmppath, 's2-scinames')
+s3dir = os.path.join(tmppath, 's3-itisescent')
+s4dir = os.path.join(tmppath, 's4-geo')
+fixdir = os.path.join(tmppath, 's99-fix')
+
+pass1_fname = os.path.join(s1dir, '{}.csv'.format(basefname))
+pass2_fname = os.path.join(s2dir, '{}.csv'.format(basefname))
+pass3_fname = os.path.join(s3dir, '{}.csv'.format(basefname))
+pass4_fname = os.path.join(s4dir, '{}.csv'.format(basefname))
+
+(resource_count_fname, provider_count_fname, 
+ track_providers) = do_track_providers(step, basefname, outpath)
+
+start_time = time.time()
+# # ..........................................................
+# # Step 1: assemble metadata, initial rewrite to BISON format
+
+logger = get_logger(logbasename, logfname)
+gr = GBIFReader(workpath, logger)
+
+gr.write_dataset_org_lookup(
+    merged_dataset_lut_fname, resource_lut_fname, 
+    merged_org_lut_fname, provider_lut_fname, 
+    outdelimiter=BISON_DELIMITER)
+
+# ..........................................................
+# ..........................................................
+# gr.transform_gbif_to_bison(
+#     input_data, 
+#     merged_dataset_lut_fname, 
+#     merged_org_lut_fname, 
+#     nametaxa_fname, pass1_fname)
+
+(gbif_interp_fname, merged_dataset_lut_fname, merged_org_lut_fname, 
+    nametaxa_fname, pass1_fname) = (input_data, merged_dataset_lut_fname, 
+    merged_org_lut_fname, nametaxa_fname, pass1_fname)
+
+from common.constants import (BISON_DELIMITER, ENCODING, 
+        LOGINTERVAL, PROHIBITED_VALS, LEGACY_ID_DEFAULT, EXTRA_VALS_KEY,
+        ALLOWED_TYPE, BISON_ORDERED_DATALOAD_FIELD_TYPE, BISON_IPT_PREFIX, 
+        MERGED_RESOURCE_LUT_FIELDS, MERGED_PROVIDER_LUT_FIELDS)
+from common.lookup import Lookup, VAL_TYPE
+from common.tools import (get_csv_reader, get_csv_dict_reader, get_csv_writer, 
+                          open_csv_files, makerow)
+
+from gbif.constants import (GBIF_DELIMITER, TERM_CONVERT, META_FNAME, 
+                            BISON_GBIF_MAP, OCC_ID_FLD,
+                            CLIP_CHAR, BISON_ORG_UUID, 
+                            GBIF_CONVERT_TEMP_FIELD_TYPE, 
+                            GBIF_NAMEKEY_TEMP_FIELD, GBIF_NAMEKEY_TEMP_TYPE)
+from gbif.gbifmeta import GBIFMetaReader
+from gbif.gbifapi import GbifAPI
+
+self = gr
+gm_rdr = GBIFMetaReader(self._log)
+gbif_header = gm_rdr.get_field_list(self._meta_fname)
+
+self._infields.extend(list(GBIF_CONVERT_TEMP_FIELD_TYPE.keys()))
+for fldname, fldmeta in GBIF_CONVERT_TEMP_FIELD_TYPE.items():
+    self._fields[fldname] = fldmeta
+
+self._infields.append(GBIF_NAMEKEY_TEMP_FIELD)
+self._fields[GBIF_NAMEKEY_TEMP_FIELD] = GBIF_NAMEKEY_TEMP_TYPE
+
+self._outfields.append(GBIF_NAMEKEY_TEMP_FIELD)
+
+dataset_by_uuid = Lookup.initFromFile(merged_dataset_lut_fname, 
+    ['gbif_datasetkey', 'dataset_id'], BISON_DELIMITER, valtype=VAL_TYPE.DICT, 
+    encoding=ENCODING)
+
+dataset_by_legacyid = Lookup.initFromFile(merged_dataset_lut_fname, 
+    ['OriginalResourceID', 'gbif_legacyid'], BISON_DELIMITER, valtype=VAL_TYPE.DICT, 
+    encoding=ENCODING)
+
+org_by_uuid = Lookup.initFromFile(merged_org_lut_fname, 
+    ['gbif_organizationKey'], BISON_DELIMITER, valtype=VAL_TYPE.DICT, 
+    encoding=ENCODING)
+
+org_by_legacyid = Lookup.initFromFile(merged_org_lut_fname, 
+    ['OriginalProviderID', 'gbif_legacyid'], BISON_DELIMITER, valtype=VAL_TYPE.DICT, 
+    encoding=ENCODING)
+
+if os.path.exists(nametaxa_fname):
+    self._log.info('Read name metadata ...')
+    nametaxas = Lookup.initFromFile(
+        nametaxa_fname, None, BISON_DELIMITER, valtype=VAL_TYPE.SET, 
+        encoding=ENCODING)
+else:
+    nametaxas = Lookup(valtype=VAL_TYPE.SET, encoding=ENCODING)
+
+recno = 0
+dict_reader, inf, writer, outf = open_csv_files(
+    gbif_interp_fname, GBIF_DELIMITER, ENCODING, 
+    infields=gbif_header, outfname=pass1_fname, 
+    outfields=self._outfields, outdelimiter=BISON_DELIMITER)
+
+# for orig_rec in dict_reader:
+orig_rec = next(dict_reader)
+
+recno += 1
+brec = self._create_rough_bisonrec(orig_rec)
+biline = self._complete_bisonrec_pass1(
+    brec, dataset_by_uuid, org_by_uuid, org_by_legacyid, 
+    nametaxas)
+
+dskey = brec['datasetKey']
+dsvals = dataset_by_uuid.lut[dskey]
+
+if biline:
+    writer.writerow(biline)
+    self._track_provider_resources(brec)
+
+                    
+except Exception as e:
+self._log.error('Failed on line {}, e = {}'.format(recno, e))
+finally:
+inf.close()
+outf.close()
+
+#         self.write_resource_provider_stats(pass1_fname)
+self._log.info('Missing organization ids: {}'.format(self._missing_orgs))    
+self._log.info('Missing dataset ids: {}'.format(self._missing_datasets))    
+
+# Write all lookup values
+if len(nametaxas.lut) > 0:
+nametaxas.write_lookup(
+    nametaxa_fname, ['scientificName', 'taxonKeys'], BISON_DELIMITER)            
+
+# ..........................................................
+
+gr.write_resource_provider_stats(
+    resource_count_fname, provider_count_fname)
 
 
 """
