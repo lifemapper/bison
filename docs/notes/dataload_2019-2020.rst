@@ -63,12 +63,18 @@ Common Data Processing
    system correctly, process and all records for ingest
 #. Re-read all records, both BISON-provider and GBIF, to assemble list or 
    lookup tables for Solr:
+   
    * vernacular names, 2 columns: 
+
      * itis_common_name
      * itis_tsn
+
    * scientific_names, 1 column:
+
      * clean_provided_scientific_name
+
    * provider, multiple columns:
+
      * name
      * provider_url
      * description
@@ -80,7 +86,9 @@ Common Data Processing
      * BISONProviderID
      * OriginalProviderID
      * organization_id
+
    * resource: 
+
      * BISONProviderID
      * name
      * display_name
@@ -100,6 +108,7 @@ Common Data Processing
      * owningorganization_id
      * provider_url
      * provider_name
+
 #. Deliver to Denver, compressed into a one or more files, the final processed 
    (BISON-provider or gbif chunk) files.
 #. Denver will uncompress and load each file individually.
