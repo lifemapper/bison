@@ -399,3 +399,51 @@ Misc Notes:
 * Use ‘$’ delimiter in CSV output
 
 
+Lookup Tables to assemble for Denver
+--------------------------------------
+#. Re-read all records, both BISON-provider and GBIF, to assemble list or 
+   lookup tables for Solr:
+   * vernacular names(2 columns): 
+     * itis_common_name
+     * itis_tsn
+   * scientific_names(1 column):
+     * clean_provided_scientific_name
+   * provider (merge old BISON provider table with new BISON organization metadata):
+     * name
+     * provider_url
+     * description
+     * website_url
+     * created
+     * modified 
+     * deleted
+     * display_name
+     * BISONProviderID
+     * OriginalProviderID
+     * organization_id
+   * resource (merge old BISON resource table with new GBIF dataset metadata): 
+     * BISONProviderID
+     * name
+     * display_name
+     * description
+     * rights
+     * citation
+     * logo_url
+     * created
+     * modified
+     * deleted
+     * website_url
+     * override_citation
+     * provider_id
+     * OriginalResourceID
+     * BISONResourceID
+     * dataset_id
+     * owningorganization_id
+     * provider_url
+     * provider_name
+
+ * scientific_names: 1 column, bison_name filled with clean_provided_scientific_name
+ * merge old BISON resoure table with new GBIF dataset metadata,
+   add count for each resource
+ * merge old BISON provider table with new BISON organization metadata,
+   add count for each provider
+ 

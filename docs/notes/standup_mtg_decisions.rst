@@ -10,7 +10,7 @@ Participants::
 Add lookup tables for Solr cores, create after processing records
 
  * vernacular_names: 2 columns, vernacular, tsn filled with itis_common_name, itis_tsn
- * scientific_names2: 1 column, bison_name filled with clean_provided_scientific_name
+ * scientific_names: 1 column, bison_name filled with clean_provided_scientific_name
  
 2019 July data load meeting in Denver
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -26,8 +26,6 @@ Establishment means
 Participants:: 
   Annie, Shayne, Derek, Aimee, Linda
 
-Create provider/resource lookup tables, after processing records
+Create provider/resource lookup tables for Denver, will need to re-read records
+b/c not currently aggregating record counts per provider/resource
 
- * merge old BISON resoure table with new GBIF dataset metadata
- * merge old BISON provider table with new BISON organization metadata 
- * add counts

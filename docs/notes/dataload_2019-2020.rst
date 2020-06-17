@@ -1,8 +1,8 @@
 
 .. highlight:: rest
 
-BISON data load Oct 2019
-=======================
+BISON data load 2019/2020
+==========================
 .. contents::  
 
 .. _GBIF Data Processing: docs/notes/gbif_process.rst
@@ -12,7 +12,7 @@ BISON data load Oct 2019
 Overview Process
 -----------------
    
-BISON Data Provider Data Load
+BISON-Provider Processing
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Prior to Common Processing:
@@ -38,13 +38,10 @@ Prior to Common Processing:
 #. Next, do `Common Data Processing`_
 #. Compress the final processed dataset files into a single file for 
    upload/download.  Denver will uncompress and load each dataset individually.
-#. After confirmation that the smoke-test data loads into the BISON staging 
-   system correctly, provide the updated-BISON-provider-records to Denver for 
-   ingest
 
 
-GBIF Data Load
-~~~~~~~~~~~~~~
+GBIF Data Processing
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 #. Process a portion (~10 million records) of a GBIF data download for a "smoke test" 
    and provide to Denver for data load into BISON staging. 
@@ -55,3 +52,54 @@ GBIF Data Load
    system correctly, re-download GBIF US and Canada/US Territories datasets, and 
    process.
 #. Provide the smaller, fully-processed 'chunk' files to Denver for ingest 
+
+Common Data Processing
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+#. Next, do `Common Data Processing`_
+#. Provide data for a "smoketest" - a subset of the GBIF and a subset of 
+   BISON-provider datasets
+#. After confirmation that the smoketest data loads into the BISON staging 
+   system correctly, process and all records for ingest
+#. Re-read all records, both BISON-provider and GBIF, to assemble list or 
+   lookup tables for Solr:
+   * vernacular names, 2 columns: 
+     * itis_common_name
+     * itis_tsn
+   * scientific_names, 1 column:
+     * clean_provided_scientific_name
+   * provider, multiple columns:
+     * name
+     * provider_url
+     * description
+     * website_url
+     * created
+     * modified 
+     * deleted
+     * display_name
+     * BISONProviderID
+     * OriginalProviderID
+     * organization_id
+   * resource: 
+     * BISONProviderID
+     * name
+     * display_name
+     * description
+     * rights
+     * citation
+     * logo_url
+     * created
+     * modified
+     * deleted
+     * website_url
+     * override_citation
+     * provider_id
+     * OriginalResourceID
+     * BISONResourceID
+     * dataset_id
+     * owningorganization_id
+     * provider_url
+     * provider_name
+#. Deliver to Denver, compressed into a one or more files, the final processed 
+   (BISON-provider or gbif chunk) files.
+#. Denver will uncompress and load each file individually.
