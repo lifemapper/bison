@@ -4,6 +4,10 @@
 # 74804557 occurrence.txt
 # bash /state/partition1/git/bison/src/gbif/chunkfile.sh occurrence.txt 74804557 10000000
 #
+# [astewart@badenov US_gbif]$ wc -l occurrence.txt 
+# 52258497 occurrence.txt
+
+#
 # Example command
 # sed -e '1,5000d;10000q' occurrence.txt > occurrence_lines_5000-10000.csv
 

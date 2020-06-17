@@ -715,8 +715,6 @@ class GBIFReader(object):
         try:            
             for orig_rec in dict_reader:
                 recno += 1
-                if recno == 3140:
-                    print('here we are')
                 if orig_rec is None:
                     break
                 elif (recno % LOGINTERVAL) == 0:
