@@ -68,7 +68,8 @@ ITIS_NAMESPACE = '{http://itis_service.itis.usgs.gov}'
 ITIS_DATA_NAMESPACE = '{http://data.itis_service.itis.usgs.gov/xsd}'
 W3_NAMESPACE =  '{http://www.w3.org/2001/XMLSchema-instance}'
 
-BISON_IPT_PREFIX = 'https://bison.usgs.gov/ipt/resource?r='
+BISON_IPT_PREFIX = 'https://bison.usgs.gov/ipt'
+BISON_IPT_TAIL = 'resource?r='
 BISON_VALUES = {'provider': 'BISON',
                 'provider_url': 'https://bison.usgs.gov',
                 'provider_id': '440',
@@ -210,9 +211,11 @@ BISON_ORDERED_DATALOAD_FIELD_TYPE = OrderedDict(
 
 class FieldContent(Enum):
     legacy_bison = auto()
+    new_bison = auto()
     current_gbif = auto()
 
 MERGED_PROVIDER_LUT_FIELDS = (
+    # merged table columns from BISON db table
     ('name', FieldContent.legacy_bison),
     ('provider_url', FieldContent.legacy_bison), 
     ('description', FieldContent.legacy_bison),
@@ -226,7 +229,7 @@ MERGED_PROVIDER_LUT_FIELDS = (
     ('OriginalProviderID', FieldContent.legacy_bison),          # BISON provider legacy id
     # Query with UUID first
     ('organization_id', FieldContent.legacy_bison),             # GBIF organization UUID
-
+    # merged table columns from GBIF
     ('gbif_organizationKey', FieldContent.current_gbif),
     ('gbif_legacyid', FieldContent.current_gbif),               # --> provider_id field
     ('gbif_title', FieldContent.current_gbif),                  # --> record provider field
@@ -235,9 +238,15 @@ MERGED_PROVIDER_LUT_FIELDS = (
     ('gbif_citation', FieldContent.current_gbif), 
     ('gbif_created', FieldContent.current_gbif), 
     ('gbif_modified', FieldContent.current_gbif), 
+    # NEW merged table columns for BISON db
+    ('bison_provider_uuid', FieldContent.new_bison),                    # --> resource_url field 
+    ('bison_provider_legacy_id', FieldContent.new_bison),                    # --> resource_url field 
+    ('bison_provider_name', FieldContent.new_bison),                    # --> resource_url field 
+    ('bison_provider_url', FieldContent.new_bison),                    # --> resource_url field 
 )
 
 MERGED_RESOURCE_LUT_FIELDS = (
+    # columns from BISON db table
     ('BISONProviderID', FieldContent.legacy_bison), 
     ('name', FieldContent.legacy_bison), 
     ('display_name', FieldContent.legacy_bison), 
@@ -253,12 +262,11 @@ MERGED_RESOURCE_LUT_FIELDS = (
     ('provider_id', FieldContent.legacy_bison),                 # BISON provider legacy id
     ('OriginalResourceID', FieldContent.legacy_bison),          # BISON resource legacy id
     ('BISONResourceID', FieldContent.legacy_bison),
-    # Query with UUID for GBIF dataload
     ('dataset_id', FieldContent.legacy_bison),                  # GBIF dataset UUID
     ('owningorganization_id', FieldContent.legacy_bison),       # GBIF organization UUID
     ('provider_url', FieldContent.legacy_bison),
     ('provider_name', FieldContent.legacy_bison),
-
+    # merged table columns from GBIF
     ('gbif_datasetkey', FieldContent.current_gbif),             # GBIF dataset UUID
     ('gbif_legacyid', FieldContent.current_gbif),               # --> resource_id field
     ('gbif_publishingOrganizationKey', FieldContent.current_gbif), # GBIF organization UUID
@@ -268,6 +276,15 @@ MERGED_RESOURCE_LUT_FIELDS = (
     ('gbif_citation', FieldContent.current_gbif), 
     ('gbif_created', FieldContent.current_gbif), 
     ('gbif_modified', FieldContent.current_gbif), 
+    # NEW merged table columns for BISON db
+    ('bison_resource_uuid', FieldContent.new_bison),                    # --> resource_url field 
+    ('bison_resource_legacy_id', FieldContent.new_bison),                    # --> resource_url field 
+    ('bison_resource_name', FieldContent.new_bison),                    # --> resource_url field 
+    ('bison_resource_url', FieldContent.new_bison),                    # --> resource_url field 
+    ('bison_provider_uuid', FieldContent.new_bison),                    # --> resource_url field 
+    ('bison_provider_legacy_id', FieldContent.new_bison),                    # --> resource_url field 
+    ('bison_provider_name', FieldContent.new_bison),                    # --> resource_url field 
+    ('bison_provider_url', FieldContent.new_bison),                    # --> resource_url field 
 )
 
 # BISON provider data from solr core

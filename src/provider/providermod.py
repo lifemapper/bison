@@ -38,82 +38,92 @@ class BisonMerger(object):
         else:
             self._log.info(msg)
     # ...............................................
-    def _get_rewrite_val(self, resource_ident, rec, key, const_val):
+    def _get_rewrite_vals(self, rec, const_id, const_name, const_url):
         """
         @note: If both dataset-provided and record values are present, 
                record value takes precedence.
         """
-        rec_val = rec[key]
-        
-        if not rec_val:
-            return const_val
-        
-        if not const_val:
-            return rec_val
-        
-        if rec_val != const_val:
-            # keep shorter urls if in constant value 
-            if key == 'resource_url':
-                close_enough = (
-                    rec_val == const_val.replace('resource', 'resource.do'))
-                if not close_enough:
-                    close_enough = (
-                        rec_val == const_val.replace('resource', 'manage/resource'))
-                    
-            elif key == 'resource_id':
-                # These data have incorrect val in resource_id
-                if resource_ident == 'nycity-tree-census-2015':
-                    return resource_ident
-                # Some files contain resource_id without provider_id
-                close_enough = ('440,' + rec_val == const_val)
-            else:
-                close_enough = False
-
-            # Fill with constant if close
-            if close_enough:
-                return const_val
+        rec_res_name = rec['resource']
+        if not rec_res_name:
+            # Constant resource_name if missing from record
+            res_name = const_name
+        else:
+            # Record resource_name if there
+            res_name = rec_res_name
+            if rec_res_name != const_name:
+                self._log.info('Why does record val {} != ticket name {}??'.format(
+                    rec_res_name, const_name))
             
+        # resource_url should always be consistent IPT url with resource_id
+        rec_res_url = rec['resource_url']
+        res_url = const_url
+        if rec_res_url != const_url:
+            # keep shorter urls if in constant value
+            parts = rec_res_url.split('=')
+            if len(parts) != 2:
+                self._log.info('record resource_url {} does not parse correctly. Correct val {}'
+                               .format(rec_res_url, const_url))
             else:
-                # Save all values that occur in this dataset for name/url/ident
-                # to rewrite resources table later
-                try:
-                    corrected_vals = self._resource_table[resource_ident]
-                except:
-                    self._resource_table[resource_ident] = {key: set([rec_val])}
-                else:
-                    try:
-                        corrected_vals[key]
-                    except:
-                        corrected_vals[key] = set([rec_val])
-                    else:
-                        corrected_vals[key].add(rec_val)
-                    
-                return rec_val
+                urlprefix, url_resource_id = parts
+                if url_resource_id != const_id:
+                    self._log.info('record resource_url {} does not have the correct endpoint {}'
+                                   .format(rec_res_url, const_id))
+                elif urlprefix != BISON_IPT_PREFIX:
+                    self._log.info('record resource_url {} does not start with BISON_IPT_PREFIX. Correct val {}'
+                                   .format(rec_res_url, const_url))
+
+        return res_name, res_url
 
     # ...............................................
-    def _replace_resource(self, rec, resource_ident, resource_name, resource_url, 
-                          action):
+    def _replace_resource(self, rec, action, const_res_id, const_res_name):
+        """Update the resource values from Jira ticket description.
+        
+        Note: 
+            function modifies or deletes original dict
         """
-        @summary: Update the resource values from Jira ticket description.
-                  Update the provider values with default BISON provider values.
-        @note: function modifies or deletes original dict
-        """            
         if rec is not None:
-            # Take original ticket values
+            const_res_url = '{}/resource?r={}'.format(
+                BISON_IPT_PREFIX, const_res_id)
+            # Replace all resource_ids with new value (remove legacy val)
+            rec['resource_id'] = const_res_id
+            # New or renamed datasets get new name and url
             if action in (ProviderActions.add, ProviderActions.rename, 
                           ProviderActions.replace_rename):
-                rec['resource_id'] = resource_ident
-                rec['resource'] = resource_name
-                rec['resource_url'] = resource_url
-            # If record val <> lookup val, saves for lookup modification
+                rec['resource_name'] = const_res_name
+                rec['resource_url'] = const_res_url
+            # Replace or Rewrite datasets
             else:
-                rec['resource_id'] = self._get_rewrite_val(
-                    resource_ident, rec, 'resource_id', resource_ident)
-                rec['resource'] = self._get_rewrite_val(
-                    resource_ident, rec, 'resource', resource_name)
-                rec['resource_url'] = self._get_rewrite_val(
-                    resource_ident, rec, 'resource_url', resource_url) 
-            
+                # resource_name can remain even if it doesn't match ticket
+                if not rec['resource']:
+                    rec['resource'] = const_res_name
+                else:
+                    if rec['resource'] != const_res_name:
+                        self._log.info('Why does record val {} != ticket name {}??'.format(
+                            rec['resource'], const_res_name))
+
+                # resource_url should always be constant
+                rec_res_url = rec['resource_url']
+                if rec_res_url != const_res_url:
+                    rec['resource_url'] = const_res_url
+                    # Fix, then log why mismatch
+                    _, url_res_id = self._parse_bison_url(rec_res_url)
+                    if url_res_id != const_res_id:
+                        self._log.info('URL {} does not end with {}'
+                                       .format(rec_res_url, const_res_id))
+                    
+    # ...............................................
+    def _parse_bison_url(self, bison_url):
+        urlprefix = resource_id = None
+        parts = bison_url.split('=')
+        if len(parts) != 2:
+            self._log.info('URL {} does not parse correctly'.format(bison_url))
+        else:
+            urlprefix, resource_id = parts
+            if urlprefix != BISON_IPT_PREFIX:
+                self._log.info('URL {} does not start with BISON_IPT_PREFIX'
+                               .format(bison_url))
+        return urlprefix, resource_id
+
     # ...............................................
     def read_resources(self, merged_resource_lut_fname):
         old_resources = Lookup.initFromFile(merged_resource_lut_fname, 
@@ -122,7 +132,7 @@ class BisonMerger(object):
                                             valtype=VAL_TYPE.DICT, 
                                             encoding=ENCODING)
         return old_resources
-    
+
     # ...............................................
     def _get_old_resource_vals(self, legacy_ident, old_resources):
         try:
@@ -160,59 +170,53 @@ class BisonMerger(object):
                 rec[fld] = val.strip('\"')
 
     # ...............................................
-    def _rewrite_recs(self, infname, outfname, resource_ident, resource_name, 
-                      resource_url, action, in_delimiter):
-        dl_fields = list(BISON_ORDERED_DATALOAD_FIELD_TYPE.keys())
-        try:
-#             # Open incomplete BISON CSV file as input
-#             dict_reader, inf = get_csv_dict_reader(
-#                 infname, in_delimiter, ENCODING, fieldnames=dl_fields,
-#                 ignore_quotes=True)
-#             csv_writer, outf = get_csv_writer(outfname, BISON_DELIMITER, ENCODING)
-#             # write header
-#             csv_writer.writerow(dl_fields)
-
-            dict_reader, inf, csv_writer, outf = open_csv_files(
-                infname, in_delimiter, ENCODING, outfname=outfname, 
-                outfields=dl_fields, outdelimiter=BISON_DELIMITER)
-            recno = 0
-            for rec in dict_reader:
-                recno += 1
-                self._fill_bison_constant_fields(rec)
-                
-                self._replace_resource(
-                    rec, resource_ident, resource_name, resource_url, action)
-                
-                row = makerow(rec, dl_fields)
-                csv_writer.writerow(row)
-        except:
-            raise 
-        finally:
-            inf.close()
-            outf.close()
-    
-    # ...............................................
-    def rewrite_bison_data(self, infile, outfile, resource_ident, resource_name, 
-                           resource_url, action, in_delimiter):
+    def rewrite_bison_data(self, infile, outfile, resource_key, resource_pvals, 
+                           in_delimiter):
         if not os.path.exists(infile):
             raise Exception('File {} does not exist'.format(infile))
-
+        
+        action = resource_pvals['action']
+        const_res_id = resource_pvals['resource_id']
+        const_res_name = resource_pvals['resource_name']
+        if not const_res_name:
+            raise Exception('{} must have resource_name {}'.format(
+                resource_key, const_res_id, const_res_name))
+        
         if action not in (ProviderActions.wait, ProviderActions.unknown):
-            
             # Step 1: rewrite with updated resource/provider values
             self.loginfo("""{} for ticket {},
                 infile {} to outfile {}
-                with name {}, url {}""".format(
-                    action, resource_ident, infile, outfile, resource_name, 
-                    resource_url))
-
-            self._rewrite_recs(
-                infile, outfile, resource_ident, resource_name, resource_url, 
-                action, in_delimiter)
+                with name {}, id {}""".format(
+                    action, resource_key, infile, outfile, const_res_name, 
+                    const_res_id))
             
+            dl_fields = list(BISON_ORDERED_DATALOAD_FIELD_TYPE.keys())
+            try:
+                dict_reader, inf, csv_writer, outf = open_csv_files(
+                    infile, in_delimiter, ENCODING, outfname=outfile, 
+                    outfields=dl_fields, outdelimiter=BISON_DELIMITER)
+                recno = 0
+                for rec in dict_reader:
+                    recno += 1
+#                     self._remove_outer_quotes(rec)
+                    self._fill_bison_constant_fields(rec)
+                    # Pull the id from the URL in the first record
+                    if const_res_id is None:
+                        _, const_res_id = self._parse_bison_url(
+                            rec['resource_url'])
+                    self._replace_resource(
+                        rec, action, const_res_id, const_res_name)
+                    
+                    row = makerow(rec, dl_fields)
+                    csv_writer.writerow(row)
+            except:
+                raise 
+            finally:
+                inf.close()
+                outf.close()
         else:
             self.loginfo('Unknown action {} for input {}, ({})'.format(
-                action, resource_name, resource_ident))
+                action, const_res_name, resource_key))
 
     # ...............................................
     def assemble_files(self, inpath, old_resources):
@@ -255,8 +259,8 @@ class BisonMerger(object):
                     provider_datasets[legacy_ident] = {
                         'action': ProviderActions.rewrite, 
                         'ticket': 'Existing data',
-                        'resource': resource_name,
-                        'resource_url': resource_url,
+                        'resource_name': resource_name,
+                        'resource_id': None,
                         'filename': basefname}
                 else:
                     self.loginfo('Dataset {} {} will be {} by {}'.format(

@@ -454,7 +454,7 @@ class BisonFiller(object):
                 self.itistsns.lut[key]['common_name'] = cname
             
     # ...............................................
-    def _track_provider_resources(self, rec):
+    def _track_legacy_provider_resources(self, rec):
         bison_legacyid = rec['resource_id']
         parts = bison_legacyid.split(',')
         if len(parts) != 2:
@@ -472,15 +472,95 @@ class BisonFiller(object):
                 self._active_providers[resource_legacyid] = 1
 
     # ...............................................
+    def _track_provider_resources(self, rec):
+        resource_id = rec['resource_id']
+        provider_id = rec['provider_id']
+        try:
+            self._active_resources[provider_id] += 1
+        except:
+            self._active_resources[provider_id] = 1
+        try:
+            self._active_providers[resource_id] += 1
+        except:
+            self._active_providers[resource_id] = 1
+
+    # ...............................................
     def write_resource_provider_stats(self, resource_count_fname, 
                                       provider_count_fname):
         # Write record count per resource and provider
-        with open(resource_count_fname, 'w', encoding=ENCODING) as f:
-            for legacy_id, count in self._active_resources.items():
-                f.write('{}{}{}'.format(legacy_id, BISON_DELIMITER, count))
-        with open(provider_count_fname, 'w', encoding=ENCODING) as f:
-            for legacy_id, count in self._active_providers.items():
-                f.write('{}{}{}'.format(legacy_id, BISON_DELIMITER, count))
+        writer, f = get_csv_writer(
+            resource_count_fname, BISON_DELIMITER, ENCODING)
+        for legacy_id, count in self._active_resources.items():
+            writer.writerow([legacy_id, count])
+        f.close()
+
+        writer, f = get_csv_writer(
+            provider_count_fname, BISON_DELIMITER, ENCODING)
+        for legacy_id, count in self._active_providers.items():
+            writer.writerow([legacy_id, count])
+        f.close
+
+    # ...............................................
+    def count_provider_resource(self, fname):
+        """Read a CSV file of pre-processed BISON data, aggregating record 
+        counts for providers and resources.
+        
+        Results:
+            A CSV file of provider and resource record counts
+        """
+        recno = 0
+        try:
+            dict_reader, inf = get_csv_dict_reader(
+                fname, BISON_DELIMITER, ENCODING)
+            for rec in dict_reader:
+                recno += 1
+                self._track_provider_resources(rec)    
+                if (recno % LOGINTERVAL) == 0:
+                    self._log.info('*** Record number {} ***'.format(recno))                                    
+        except Exception as e:
+            self._log.error('Failed reading data from line {} in {}: {}'
+                            .format(recno, fname, e))                    
+        finally:
+            inf.close()
+                        
+    # ...............................................
+    def walk_data(self, infname, terr_data, marine_data, ancillary_path, 
+                  merged_dataset_lut_fname, merged_org_lut_fname):
+        """Read a CSV file of pre-processed BISON data, examining records"""
+        if not os.path.exists(infname):
+            raise Exception('File {} does not exist to walk'.format(infname))
+        if self.is_open():
+            self.close()
+            
+        self.initialize_geospatial_data(terr_data, marine_data, ancillary_path)
+        dataset_by_uuid = Lookup.initFromFile(merged_dataset_lut_fname, 
+            ['gbif_datasetkey', 'dataset_id'], BISON_DELIMITER, valtype=VAL_TYPE.DICT, 
+            encoding=ENCODING)
+#         dataset_by_legacyid = Lookup.initFromFile(merged_dataset_lut_fname, 
+#             ['OriginalResourceID', 'gbif_legacyid'], BISON_DELIMITER, valtype=VAL_TYPE.DICT, 
+#             encoding=ENCODING)
+        org_by_uuid = Lookup.initFromFile(merged_org_lut_fname, 
+            ['gbif_organizationKey'], BISON_DELIMITER, valtype=VAL_TYPE.DICT, 
+            encoding=ENCODING)
+#         org_by_legacyid = Lookup.initFromFile(merged_org_lut_fname, 
+#             ['OriginalProviderID', 'gbif_legacyid'], BISON_DELIMITER, valtype=VAL_TYPE.DICT, 
+#             encoding=ENCODING)
+
+        recno = 0
+        try:
+            dict_reader, inf = get_csv_dict_reader(
+                infname, BISON_DELIMITER, ENCODING)
+            for rec in dict_reader:
+                recno += 1
+                self._track_provider_resources(rec)    
+                if (recno % LOGINTERVAL) == 0:
+                    self._log.info('*** Record number {} ***'.format(recno))                                    
+        except Exception as e:
+            self._log.error('Failed reading data from line {} in {}: {}'
+                            .format(recno, infname, e))                    
+        finally:
+            inf.close()
+                        
 
     # ...............................................                
     def _remove_outer_quotes(self, rec):
@@ -502,14 +582,6 @@ class BisonFiller(object):
 
         dl_fields = list(BISON_ORDERED_DATALOAD_FIELD_TYPE.keys())
         try:
-#             # Open incomplete BISON CSV file as input
-#             dict_reader, inf = get_csv_dict_reader(
-#                 infname, in_delimiter, ENCODING, fieldnames=dl_fields,
-#                 ignore_quotes=True)
-#             csv_writer, outf = get_csv_writer(outfname, BISON_DELIMITER, ENCODING)
-#             # write header
-#             csv_writer.writerow(dl_fields)
-
             dict_reader, inf, csv_writer, outf = open_csv_files(
                 infname, in_delimiter, ENCODING, outfname=outfname, 
                 outfields=dl_fields, outdelimiter=BISON_DELIMITER)
