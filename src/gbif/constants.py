@@ -123,14 +123,10 @@ GBIF_CONVERT_TEMP_FIELD_TYPE = {
 #      {'pgtype': ALLOWED_TYPE.varchar, 'max_len': None},
 #      'collectionID': 
 #      {'pgtype': ALLOWED_TYPE.varchar, 'max_len': None},
-    'datasetKey':
-    {'pgtype': ALLOWED_TYPE.varchar, 'max_len': None},
+#     'datasetKey':
+#     {'pgtype': ALLOWED_TYPE.varchar, 'max_len': None},
      }
 
-# GBIF_CONVERT_TEMP_FIELDS = ['occurrenceStatus', 'locality', 'habitat', 
-#                             'ownerInstitutionCode', 'collectionCode', 
-#                             'institutionID',  'collectionID', 'datasetKey'
-#                             ]
 GBIF_NAMEKEY_TEMP_FIELD = 'taxonKey'
 GBIF_NAMEKEY_TEMP_TYPE = {'pgtype': ALLOWED_TYPE.integer}
 
@@ -145,7 +141,6 @@ BISON_GBIF_MAP = {
     'habitat': NS.dwc + 'habitat',
     # Direct mapping, ties to original GBIF occ rec and dataset
     'gbifID': NS.gbif + 'gbifID',
-    'datasetKey': NS.gbif + 'datasetKey',
     # Direct mapping
     'basis_of_record': NS.dwc + 'basisOfRecord',
     'occurrence_date': NS.dwc + 'eventDate',
@@ -168,8 +163,7 @@ BISON_GBIF_MAP = {
     'general_comments': NS.dwc + 'eventRemarks',
     'occurrence_id': NS.dwc + 'occurrenceID',
     'id': NS.gbif + 'gbifID',
-#     # To be replaced with legacy organization, or GBIF Rest Url + datasetKey
-#     'resource_id': NS.gbif + 'datasetKey',
+    'resource_id': NS.gbif + 'datasetKey',
     'provided_common_name': NS.dwc + 'vernacularName',
     'kingdom': NS.dwc + 'kingdom',
     'coordinate_precision': NS.dwc + 'coordinatePrecision',   

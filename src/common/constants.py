@@ -82,14 +82,7 @@ ANCILLARY_DIR = 'ancillary'
 
 ISO_COUNTRY_CODES = ('AS', 'CA', 'FM', 'GU', 'MH', 'MP', 'PR', 'P', 'UM', 'US', 'VI')
 
-class ProviderActions(Enum):
-    add = auto()
-    rename = auto()
-    replace = auto()
-    replace_rename = auto()
-    rewrite = auto()
-    wait = auto()
-    unknown = auto()
+PROVIDER_ACTIONS = ('add', 'rename', 'replace', 'replace_rename', 'rewrite')
     
 # class BISON_PROVIDER_VALUE(object):
 #     legacyid = '440'

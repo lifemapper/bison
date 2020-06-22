@@ -110,58 +110,41 @@ class GBIFReader(object):
         # GBIF Dataset <--> BISON resource, values from datasets LUT  
         # LUT = BISON resource table merged with GBIF dataset API
         # Header in MERGED_RESOURCE_LUT_FIELDS
-        dskey = rec['datasetKey']
-        dataset_title = dataset_meta_url = ''
-        gbif_org_uuid = legacy_org_id = None
-        if dskey is not None:                    
+        gbif_ds_uuid = rec['resource_id']
+        resource_name = resource_url = ''
+        gbif_org_uuid = None
+        if gbif_ds_uuid is not None:                    
             try:
-                ds_metavals = dataset_by_uuid.lut[dskey]
+                ds_metavals = dataset_by_uuid.lut[gbif_ds_uuid]
             except:
-                self._missing_datasets.add(dskey)
+                self._missing_datasets.add(gbif_ds_uuid)
             else:
                 # Get organization UUID from metadata
                 gbif_org_uuid = ds_metavals['bison_provider_uuid']
-                legacy_org_id = ds_metavals['bison_provider_legacy_id']
-                # Resource legacyid
-                legacy_dataset_id = ds_metavals['bison_resource_legacy_id']
-                dataset_title = ds_metavals['bison_resource_name']
-                dataset_meta_url = ds_metavals['bison_resource_url']
-                    
+                resource_name = ds_metavals['bison_resource_name']
+                resource_url = ds_metavals['bison_resource_url']
+                # Remove BISON records
                 if gbif_org_uuid == BISON_ORG_UUID:
-                    if (dataset_meta_url is not None 
-                          and dataset_meta_url.startswith(BISON_IPT_PREFIX)):
+                    if (resource_url is not None 
+                          and resource_url.startswith(BISON_IPT_PREFIX)):
                         self._log.info('Discard rec {}: dataset URL {}'
-                                       .format(rec[OCC_ID_FLD], dataset_meta_url))
+                                       .format(rec[OCC_ID_FLD], resource_url))
                         rec = None
                 else:
                     # Log other bison urls
-                    if dataset_meta_url.find('bison.') >= 0:
+                    if resource_url.find('bison.') >= 0:
                         self._log.info('In rec {}, found provider {} url {}'
                                        .format(rec[OCC_ID_FLD], gbif_org_uuid, 
-                                               dataset_meta_url))
+                                               resource_url))
         if rec is not None:
-            # if no legacy id, use GBIF uuids, if no UUID, use default to indicate missing
-            if legacy_org_id in (None, '', LEGACY_ID_DEFAULT):
-                if gbif_org_uuid not in (None, ''):
-                    legacy_org_id = gbif_org_uuid
-                else:
-                    legacy_org_id = LEGACY_ID_DEFAULT
-            if legacy_dataset_id in (None, '', LEGACY_ID_DEFAULT):
-                if dskey not in (None, ''):
-                    legacy_dataset_id = dskey
-                else:
-                    legacy_dataset_id = LEGACY_ID_DEFAULT
-            # Concat old org and dataset ids for bison resource id 
-            bison_resource_id = '{},{}'.format(legacy_org_id, legacy_dataset_id)
-            rec['resource_id'] = bison_resource_id
-            rec['resource'] = dataset_title
-            rec['resource_url'] = dataset_meta_url
+            rec['resource'] = resource_name
+            rec['resource_url'] = resource_url
                             
-        return rec, gbif_org_uuid, legacy_org_id
+        return rec, gbif_org_uuid
 
     # ...............................................
-    def _discard_bison_add_resource_provider(self, rec, dataset_by_uuid, 
-                                             org_by_uuid, org_by_legacyid):
+    def _discard_bison_add_resource_provider(self, rec, 
+                                             dataset_by_uuid, org_by_uuid):
         """Update the resource values from dataset key and metadata LUT.
         
         Returns:
@@ -173,9 +156,8 @@ class GBIFReader(object):
             Discard records with bison url for dataset or organization homepage.
         """
         if rec is not None:
-            title = url = legacy_org_id = ''
-            rec, gbif_org_uuid, legacy_org_id = self._replace_resource_vals(
-                rec, dataset_by_uuid)
+            title = url = ''
+            rec, gbif_org_uuid = self._replace_resource_vals(rec, dataset_by_uuid)
             if rec is not None:
                 # Lookup UUID
                 org_metavals = None
@@ -184,40 +166,26 @@ class GBIFReader(object):
                         org_metavals = org_by_uuid.lut[gbif_org_uuid]
                     except:
                         self._missing_orgs.add(gbif_org_uuid)
-                        # OR Lookup legacy id
-                        if legacy_org_id not in (None, ''):
-                            try:
-                                org_metavals = org_by_legacyid.lut[legacy_org_id]
-                            except:
-                                self._missing_orgs.add(legacy_org_id)
                     if org_metavals is not None:
                         # Save title and url from GBIF-returned value
-                        title = org_metavals['gbif_title']
-                        url = org_metavals['gbif_url']
+                        title = org_metavals['bison_provider_name']
+                        url = org_metavals['bison_provider_url']
     
-                rec['provider_id'] = legacy_org_id
+                rec['provider_id'] = gbif_org_uuid
                 rec['provider'] = title
                 rec['provider_url'] = url                
         return rec
     
     # ...............................................
     def _track_provider_resources(self, rec):
-        bison_legacyid = rec['resource_id']
-        parts = bison_legacyid.split(',')
-        if len(parts) != 2:
-            self._log.warning('legacyid {} failed to parse'.format(bison_legacyid))
-        else:
-            provider_legacyid = parts[0]
-            resource_legacyid = parts[1]
-            try:
-                self._active_resources[provider_legacyid] += 1
-            except:
-                self._active_resources[provider_legacyid] = 1
-            try:
-                self._active_providers[resource_legacyid] += 1
-            except:
-                self._active_providers[resource_legacyid] = 1
-        
+        try:
+            self._active_resources[rec['provider_id']] += 1
+        except:
+            self._active_resources[rec['provider_id']] = 1
+        try:
+            self._active_providers[rec['resource_id']] += 1
+        except:
+            self._active_providers[rec['resource_id']] = 1
 
     # ...............................................
     def _update_point(self, brec):
@@ -376,7 +344,7 @@ class GBIFReader(object):
             finally:
                 inf.close()
             if datadict:
-                estmeans = Lookup.initFromDict(datadict, valtype=VAL_TYPE.STRING)
+                estmeans = Lookup.init_from_dict(datadict, valtype=VAL_TYPE.STRING)
         return estmeans
         
     # ...............................................
@@ -563,10 +531,6 @@ class GBIFReader(object):
         """
         gid = grec['gbifID']
         brec = {}
-        
-#         if gid in ['2031886996']:
-#             print('Problematic record with gbifid {}'.format(gid))
-        
         try:
             extravals = grec[EXTRA_VALS_KEY]
         except Exception:
@@ -587,59 +551,7 @@ class GBIFReader(object):
             brec[bfld] = val
                 
         return brec
-    
-    # ...............................................
-    def _complete_bisonrec_pass1(self, brec, dataset_by_uuid, org_by_uuid, 
-                                 org_by_legacyid, nametaxas):
-        """
-        @summary: Create a list of values, ordered by BISON-requested fields in 
-                     ORDERED_OUT_FIELDS, with individual values and/or entire record
-                     modified according to BISON needs.
-        @param iline: A CSV record of GBIF-interpreted DarwinCore occurrence data
-        @return: list of ordered fields containing BISON-interpreted values for 
-                    a single GBIF occurrence record. 
-        """
-        biline = []
-        # Fill resource (gbif dataset) then provider (gbif organization) values
-        # Discard records with bison url for dataset or provider
-        brec = self._discard_bison_add_resource_provider(
-            brec, dataset_by_uuid, org_by_uuid, org_by_legacyid)
-            
-        if brec is not None:
-            # Save scientificName / TaxonID for later lookup and replace
-            nametaxas.save_to_lookup(brec['provided_scientific_name'], 
-                                     brec['taxonKey'])
-            # create the ordered row
-            biline = makerow(brec, self._outfields)
-#             for fld in self._outfields:
-#                 if not brec[fld]:
-#                     biline.append('')
-#                 else:
-#                     biline.append(brec[fld])
-        return biline
-    
-    # ...............................................
-    def _create_rough_bisonrec(self, orig_rec):
-        """
-        @summary: Create a dictionary with individual values and/or entire record
-                  modified according to BISON needs.
-        @param orig_rec: dictionary of a GBIF DarwinCore occurrence record
-        @return: dictionary of BISON-interpreted values for a single GBIF 
-                 occurrence record. 
-        """
-        brec = self._gbif_to_bison(orig_rec)        
-        # Check full record
-        brec = self._test_for_discard(brec)
-        if brec is not None:
-            self._control_vocabulary(brec)
-            # Fill some fields with best non-blank option
-            self._update_second_choices(brec)
-            # Format eventDate and fill missing year
-            self._update_dates(brec)
-            # Modify lat/lon vals if necessary
-            self._update_point(brec)            
-        return brec
-
+        
     # ...............................................
     def transform_gbif_to_bison(self, gbif_interp_fname, 
                                 merged_resource_lut_fname, merged_provider_lut_fname, 
@@ -668,25 +580,19 @@ class GBIFReader(object):
             self._fields[fldname] = fldmeta
         self._infields.append(GBIF_NAMEKEY_TEMP_FIELD)
         self._fields[GBIF_NAMEKEY_TEMP_FIELD] = GBIF_NAMEKEY_TEMP_TYPE
-
         self._outfields.append(GBIF_NAMEKEY_TEMP_FIELD)
 
-        dataset_by_uuid = Lookup.initFromFile(merged_resource_lut_fname, 
+        dataset_by_uuid = Lookup.init_from_file(merged_resource_lut_fname, 
             ['gbif_datasetkey', 'dataset_id'], BISON_DELIMITER, valtype=VAL_TYPE.DICT, 
             encoding=ENCODING)
-#         dataset_by_legacyid = Lookup.initFromFile(merged_resource_lut_fname, 
-#             ['OriginalResourceID', 'gbif_legacyid'], BISON_DELIMITER, valtype=VAL_TYPE.DICT, 
-#             encoding=ENCODING)
-        org_by_uuid = Lookup.initFromFile(merged_provider_lut_fname, 
+        org_by_uuid = Lookup.init_from_file(merged_provider_lut_fname, 
             ['gbif_organizationKey'], BISON_DELIMITER, valtype=VAL_TYPE.DICT, 
             encoding=ENCODING)
-        org_by_legacyid = Lookup.initFromFile(merged_provider_lut_fname, 
-            ['OriginalProviderID', 'gbif_legacyid'], BISON_DELIMITER, valtype=VAL_TYPE.DICT, 
-            encoding=ENCODING)
+
         # Read any existing name/taxonkey values for lookup
         if os.path.exists(nametaxa_fname):
             self._log.info('Read name metadata ...')
-            nametaxas = Lookup.initFromFile(
+            nametaxas = Lookup.init_from_file(
                 nametaxa_fname, None, BISON_DELIMITER, valtype=VAL_TYPE.SET, 
                 encoding=ENCODING)
         else:
@@ -704,13 +610,27 @@ class GBIFReader(object):
                     break
                 elif (recno % LOGINTERVAL) == 0:
                     self._log.info('*** Record number {} ***'.format(recno))
-                # Create new record or empty list
-                brec = self._create_rough_bisonrec(orig_rec)
-                biline = self._complete_bisonrec_pass1(
-                    brec, dataset_by_uuid, org_by_uuid, org_by_legacyid, 
-                    nametaxas)
-                # Write new record
-                if biline:
+                # Create new record
+                brec = self._gbif_to_bison(orig_rec)        
+                brec = self._test_for_discard(brec)
+                if brec is not None:
+                    self._control_vocabulary(brec)
+                    self._update_second_choices(brec)
+                    # Format eventDate and fill missing year
+                    self._update_dates(brec)
+                    # Modify lat/lon vals if necessary
+                    self._update_point(brec)       
+                    # Fill resource (gbif dataset) then provider (gbif organization) values
+                    # Discard records with bison url for dataset or provider
+                    brec = self._discard_bison_add_resource_provider(
+                        brec, dataset_by_uuid, org_by_uuid)
+                        
+                if brec is not None:
+                    # Save scientificName / TaxonID for later lookup and replace
+                    nametaxas.save_to_lookup(
+                        brec['provided_scientific_name'], brec['taxonKey'])
+                    # Write new ordered row
+                    biline = makerow(brec, self._outfields)
                     writer.writerow(biline)
                     self._track_provider_resources(brec)
 
@@ -721,7 +641,6 @@ class GBIFReader(object):
             inf.close()
             outf.close()
             
-#         self.write_resource_provider_stats(pass1_fname)
         self._log.info('Missing organization ids: {}'.format(self._missing_orgs))    
         self._log.info('Missing dataset ids: {}'.format(self._missing_datasets))    
 
@@ -747,18 +666,12 @@ class GBIFReader(object):
             self.close()
         if not os.path.exists(infname):
             raise Exception('Missing input file {}!'.format(infname))            
-#         dataset_by_uuid = Lookup.initFromFile(merged_resource_lut_fname, 
-#             ['gbif_datasetkey', 'dataset_id'], BISON_DELIMITER, valtype=VAL_TYPE.DICT, 
-#             encoding=ENCODING)
-#         dataset_by_legacyid = Lookup.initFromFile(merged_resource_lut_fname, 
-#             ['OriginalResourceID', 'gbif_legacyid'], BISON_DELIMITER, valtype=VAL_TYPE.DICT, 
-#             encoding=ENCODING)
-#         org_by_uuid = Lookup.initFromFile(merged_provider_lut_fname, 
-#             ['gbif_organizationKey'], BISON_DELIMITER, valtype=VAL_TYPE.DICT, 
-#             encoding=ENCODING)
-#         org_by_legacyid = Lookup.initFromFile(merged_provider_lut_fname, 
-#             ['OriginalProviderID', 'gbif_legacyid'], BISON_DELIMITER, valtype=VAL_TYPE.DICT, 
-#             encoding=ENCODING)
+        dataset_by_uuid = Lookup.init_from_file(merged_resource_lut_fname, 
+            ['gbif_datasetkey', 'dataset_id'], BISON_DELIMITER, valtype=VAL_TYPE.DICT, 
+            encoding=ENCODING)
+        org_by_uuid = Lookup.init_from_file(merged_provider_lut_fname, 
+            ['gbif_organizationKey'], BISON_DELIMITER, valtype=VAL_TYPE.DICT, 
+            encoding=ENCODING)
         recno = 0
         dict_reader, inf = get_csv_dict_reader(infname, BISON_DELIMITER, ENCODING)
         try:            
@@ -1046,96 +959,6 @@ class GBIFReader(object):
             merged_provider_lut_fname))
 
     # ...............................................
-    def _write_org_lookup_OLD(self, org_uuids, gbifapi, old_providers, org_lut_fname, 
-                          outdelimiter):
-        """
-        @summary: Create lookup table for: 
-                  BISON provider (GBIF organization) from GBIF organizationKey 
-                  and BISON-provided provider table (containing legacy ids)
-        @postcondition: A file has been written containing dataset metadata 
-                        for each dataset
-        """
-        providers = Lookup(valtype=VAL_TYPE.DICT, encoding=ENCODING)
-        header = None
-        for uuid in org_uuids:
-            try:
-                oldvals = old_providers.lut[uuid]
-            except:
-                self._log.warning('{} missing from BISON provider table for legacyid'
-                                  .format(uuid))
-                old_legacy_id = LEGACY_ID_DEFAULT
-            else:
-                old_legacy_id = oldvals['legacyid']
-            # query_for_organization returns dictionary including UUID
-            rec = gbifapi.query_for_organization(uuid)
-            # old legacy id takes precedence
-            new_legacy_id = rec['legacyid']
-            if new_legacy_id == LEGACY_ID_DEFAULT:
-                legacy_id = old_legacy_id 
-            elif old_legacy_id == LEGACY_ID_DEFAULT:
-                legacy_id = new_legacy_id
-            else:
-                legacy_id = old_legacy_id
-                if new_legacy_id != old_legacy_id:
-                    print('Provider old_legacy_id {} != gbif organization legacy id {}'
-                          .format(old_legacy_id, new_legacy_id))
-            rec['legacyid'] = legacy_id
-
-            if header is None and rec:
-                header = list(rec.keys())
-            providers.save_to_lookup(uuid, rec)
-        providers.write_lookup(org_lut_fname, header, outdelimiter)
-        self._log.info('Wrote organization metadata to {}'.format(org_lut_fname))
-
-#     # ...............................................
-#     def _write_dataset_lookup_OLD(self, gbifapi, resources, dataset_lut_fname, 
-#                               outdelimiter):
-#         """
-#         @summary: Create lookup table for: 
-#                   BISON resource (GBIF dataset) from GBIF datasetKey and 
-#                   BISON-provided resource table (containing legacy ids)
-#         @return: Dataset Lookup
-#         @postcondition: A file has been written containing dataset metadata 
-#                         for each dataset
-#         """
-#         # Gather dataset and organization UUIDs from EML files downloaded with 
-#         # raw data
-#         datasets = Lookup(valtype=VAL_TYPE.DICT, encoding=ENCODING)
-#         dsuuids = self._get_dataset_uuids()
-#         header = None
-#         for uuid in dsuuids:
-#             try:
-#                 oldvals = resources.lut[uuid]
-#             except:
-#                 self._log.warning('{} missing from BISON resources table for legacyid'
-#                                   .format(uuid))
-#                 old_legacy_id = LEGACY_ID_DEFAULT
-#             else:
-#                 old_legacy_id = oldvals['legacyid']
-#             # query_for_dataset returns dictionary including UUID
-#             rec = gbifapi.query_for_dataset(uuid)
-#             # old legacy id takes precedence
-#             new_legacy_id = rec['legacyid']
-#             if new_legacy_id == LEGACY_ID_DEFAULT:
-#                 legacy_id = old_legacy_id 
-#             elif old_legacy_id == LEGACY_ID_DEFAULT:
-#                 legacy_id = new_legacy_id
-#             else:
-#                 legacy_id = old_legacy_id
-#                 if new_legacy_id != old_legacy_id:
-#                     print('Resource old_legacy_id {} != gbif dataset legacy id {}'
-#                           .format(old_legacy_id, new_legacy_id))
-#             rec['legacyid'] = legacy_id
-#             
-#             if header is None and rec:
-#                 header = list(rec.keys())
-#             datasets.save_to_lookup(uuid, rec)
-#         datasets.write_lookup(dataset_lut_fname, header, outdelimiter)
-#         # Query/save dataset information
-#         self._log.info('Wrote dataset metadata to {}'.format(dataset_lut_fname))
-#         return datasets
-#             
-    # ...............................................
     def _write_merged_resource_lookup(self, gbifapi, old_resources, 
                                      merged_resource_lut_fname, outdelimiter):
         """Write a lookup table for BISON resources (GBIF dataset).
@@ -1252,7 +1075,7 @@ class GBIFReader(object):
             self._log.info('Merged output file {} exists!'.format(
                 merged_resource_lut_fname))
         else:
-            old_resources = Lookup.initFromFile(resource_lut_fname, 
+            old_resources = Lookup.init_from_file(resource_lut_fname, 
                                                 ['OriginalResourceID'],
                                                 BISON_DELIMITER, 
                                                 valtype=VAL_TYPE.DICT, 
@@ -1263,7 +1086,7 @@ class GBIFReader(object):
         if os.path.exists(merged_provider_lut_fname):
             self._log.info('Output file {} exists!'.format(merged_provider_lut_fname))
         else:
-            old_providers = Lookup.initFromFile(provider_lut_fname, 
+            old_providers = Lookup.init_from_file(provider_lut_fname, 
                                                 ['OriginalProviderID'],
                                                 BISON_DELIMITER, 
                                                 valtype=VAL_TYPE.DICT, 
@@ -1392,12 +1215,12 @@ class GBIFReader(object):
             # Read existing lookup
             self._log.info('Output LUT file {} exists'.format(name_lut_fname))
             self._read_name_lookup(name_lut_fname)
-            canonical_lut = Lookup.initFromDict(self._nametaxa, 
+            canonical_lut = Lookup.init_from_dict(self._nametaxa, 
                                                 valtype=VAL_TYPE.STRING, 
                                                 encoding=ENCODING)
         else:
             # Read name/taxonIDs dictionary for name resolution
-            nametaxa = Lookup.initFromFile(nametaxa_fname, ['scientificName'], 
+            nametaxa = Lookup.init_from_file(nametaxa_fname, ['scientificName'], 
                                            delimiter, valtype=VAL_TYPE.SET)
             # Create name LUT with messyname/canonical from GBIF parser and save to file
             name_dict, name_fails = self._write_parsed_names(name_lut_fname, 
@@ -1406,7 +1229,7 @@ class GBIFReader(object):
             # Append taxonkeys/canonical from GBIF taxonkey webservice to name LUT and file
             self._append_resolved_taxkeys(name_dict, name_lut_fname, 
                                           name_fails, nametaxa)
-            canonical_lut = Lookup.initFromDict(name_dict, 
+            canonical_lut = Lookup.init_from_dict(name_dict, 
                                                 valtype=VAL_TYPE.STRING, 
                                                 encoding=ENCODING)
         
