@@ -2,12 +2,12 @@ import glob
 import os
 
 from common.constants import (
-    BISON_ORDERED_DATALOAD_FIELD_TYPE, BISON_VALUES, ProviderActions,
+    BISON_ORDERED_DATALOAD_FIELD_TYPE, BISON_VALUES, PROVIDER_ACTIONS,
     PROVIDER_DELIMITER, BISON_DELIMITER, ENCODING, BISON_IPT_PREFIX)
 from common.inputdata import BISON_PROVIDER
 from common.lookup import Lookup, VAL_TYPE
-from common.tools import (get_logger, makerow, open_csv_files, 
-                          get_csv_dict_reader, get_csv_writer)
+from common.tools import (
+    get_logger, makerow, open_csv_files, get_csv_dict_reader)
 
 EXISTING_DATASET_FILE_PREFIX = 'bison_'
 # .............................................................................
@@ -75,22 +75,19 @@ class BisonMerger(object):
         return res_name, res_url
 
     # ...............................................
-    def _replace_resource(self, rec, action, const_res_id, const_res_name):
+    def _replace_resource(self, rec, action, new_res_id, const_res_name, std_res_url):
         """Update the resource values from Jira ticket description.
         
         Note: 
             function modifies or deletes original dict
         """
         if rec is not None:
-            const_res_url = '{}/resource?r={}'.format(
-                BISON_IPT_PREFIX, const_res_id)
             # Replace all resource_ids with new value (remove legacy val)
-            rec['resource_id'] = const_res_id
+            rec['resource_id'] = new_res_id
             # New or renamed datasets get new name and url
-            if action in (ProviderActions.add, ProviderActions.rename, 
-                          ProviderActions.replace_rename):
+            if action in ('add', 'rename', 'replace_rename'):
                 rec['resource_name'] = const_res_name
-                rec['resource_url'] = const_res_url
+                rec['resource_url'] = std_res_url
             # Replace or Rewrite datasets
             else:
                 # resource_name can remain even if it doesn't match ticket
@@ -103,30 +100,40 @@ class BisonMerger(object):
 
                 # resource_url should always be constant
                 rec_res_url = rec['resource_url']
-                if rec_res_url != const_res_url:
-                    rec['resource_url'] = const_res_url
+                if rec_res_url != std_res_url:
+                    rec['resource_url'] = std_res_url
                     # Fix, then log why mismatch
                     _, url_res_id = self._parse_bison_url(rec_res_url)
-                    if url_res_id != const_res_id:
+                    if url_res_id != new_res_id:
                         self._log.info('URL {} does not end with {}'
-                                       .format(rec_res_url, const_res_id))
+                                       .format(rec_res_url, new_res_id))
                     
     # ...............................................
     def _parse_bison_url(self, bison_url):
-        urlprefix = resource_id = None
+        standard_resource_url = new_resource_id = None
         parts = bison_url.split('=')
         if len(parts) != 2:
             self._log.info('URL {} does not parse correctly'.format(bison_url))
         else:
-            urlprefix, resource_id = parts
-            if urlprefix != BISON_IPT_PREFIX:
+            urlprefix, new_resource_id = parts
+            if not urlprefix.startswith(BISON_IPT_PREFIX):
                 self._log.info('URL {} does not start with BISON_IPT_PREFIX'
                                .format(bison_url))
-        return urlprefix, resource_id
+            else:
+                # Standardize URL
+                standard_resource_url = self._standardize_bison_url(
+                    new_resource_id)
+        return standard_resource_url, new_resource_id
+
+    # ...............................................
+    def _standardize_bison_url(self, bison_resource_id):
+        standard_resource_url = '{}/resource?r={}'.format(
+            BISON_IPT_PREFIX, bison_resource_id)
+        return standard_resource_url
 
     # ...............................................
     def read_resources(self, merged_resource_lut_fname):
-        old_resources = Lookup.initFromFile(merged_resource_lut_fname, 
+        old_resources = Lookup.init_from_file(merged_resource_lut_fname, 
                                             ['BISONResourceID'], #'legacyid',
                                             BISON_DELIMITER, 
                                             valtype=VAL_TYPE.DICT, 
@@ -176,19 +183,20 @@ class BisonMerger(object):
             raise Exception('File {} does not exist'.format(infile))
         
         action = resource_pvals['action']
-        const_res_id = resource_pvals['resource_id']
+        new_res_id = resource_pvals['resource_id']
         const_res_name = resource_pvals['resource_name']
+        const_res_url = resource_pvals['resource_url']
         if not const_res_name:
             raise Exception('{} must have resource_name {}'.format(
-                resource_key, const_res_id, const_res_name))
+                resource_key, new_res_id, const_res_name))
         
-        if action not in (ProviderActions.wait, ProviderActions.unknown):
+        if action in PROVIDER_ACTIONS:
             # Step 1: rewrite with updated resource/provider values
             self.loginfo("""{} for ticket {},
                 infile {} to outfile {}
                 with name {}, id {}""".format(
                     action, resource_key, infile, outfile, const_res_name, 
-                    const_res_id))
+                    new_res_id))
             
             dl_fields = list(BISON_ORDERED_DATALOAD_FIELD_TYPE.keys())
             try:
@@ -200,12 +208,9 @@ class BisonMerger(object):
                     recno += 1
 #                     self._remove_outer_quotes(rec)
                     self._fill_bison_constant_fields(rec)
-                    # Pull the id from the URL in the first record
-                    if const_res_id is None:
-                        _, const_res_id = self._parse_bison_url(
-                            rec['resource_url'])
+
                     self._replace_resource(
-                        rec, action, const_res_id, const_res_name)
+                        rec, action, new_res_id, const_res_name, const_res_url)
                     
                     row = makerow(rec, dl_fields)
                     csv_writer.writerow(row)
@@ -219,7 +224,61 @@ class BisonMerger(object):
                 action, const_res_name, resource_key))
 
     # ...............................................
-    def assemble_files(self, inpath, old_resources):
+    def _pull_resource_from_db_or_records(self, fname, legacy_ident, 
+                                          db_resource_name, db_resource_url):
+        # Default - standardize db values
+        new_resource_id = legacy_ident
+        res_name = db_resource_name
+        res_url = db_resource_url
+        db_std_res_url, db_new_resource_id = self._parse_bison_url(
+            db_resource_url)
+        if db_std_res_url is not None:
+            self.loginfo('Dataset {} has good URL in db {} '
+                         .format(legacy_ident, db_resource_url))
+            new_resource_id = db_new_resource_id
+            res_url = db_resource_url
+        else:
+            self.loginfo('Dataset {} has non-standard URL in db {} '.format(
+                legacy_ident, db_resource_url))
+
+        # Check standardize record values, override db with record values
+        try:
+            dict_reader, inf = get_csv_dict_reader(
+                fname, BISON_DELIMITER, ENCODING)
+            _ = next(dict_reader)
+            rec = next(dict_reader)
+            for rec in dict_reader:
+                rec_resource_url = rec['resource_url']
+                rec_std_res_url, rec_new_resource_id = self._parse_bison_url(
+                    rec_resource_url)
+                if rec_std_res_url is not None:
+                    self.loginfo('Dataset {} has good URL in rec {} '
+                                 .format(legacy_ident, rec_resource_url))
+                    new_resource_id = rec_new_resource_id
+                    res_url = rec_std_res_url
+                    res_name = rec['resource']
+                    break
+                else:
+                    self.loginfo('Dataset {} has non-standard URL in rec {} '.format(
+                        legacy_ident, rec_resource_url))
+        except:
+            raise
+        finally:
+            inf.close()
+            
+        if db_std_res_url is not None and rec_std_res_url is not None:
+            if db_std_res_url != rec_std_res_url:
+                self.loginfo('Dataset {} has mismatched URL in db {} and rec {}'.format(
+                    legacy_ident, db_resource_url, rec_resource_url))
+                
+        if db_new_resource_id != rec_new_resource_id:
+            self.loginfo('Dataset {} has mismatched id in db {} and rec {}'.format(
+                legacy_ident, db_new_resource_id, rec_new_resource_id))
+            
+        return new_resource_id, res_name, res_url
+
+    # ...............................................
+    def assemble_files(self, inpath, db_resources):
         """
         Add existing provider data (resource_ident, resource_name, resource_url)
         from the BISON database to metadata and actions for new provider input 
@@ -230,6 +289,10 @@ class BisonMerger(object):
             values name, url, action, and new input filename.  
         """
         provider_datasets = BISON_PROVIDER.copy()
+        for key, vals in provider_datasets.items():
+            vals['legacy_id'] = key
+            vals['resource_url'] = self._standardize_bison_url(vals['resource_id'])
+            provider_datasets[key] = vals
         
         prefix = os.path.join(inpath, EXISTING_DATASET_FILE_PREFIX)
         existing_prov_filenames = glob.glob(prefix + '440,10*.csv')
@@ -240,27 +303,26 @@ class BisonMerger(object):
                 try:
                     newdata = provider_datasets[legacy_ident]
                 except:
-                    # Pull resource_name and resource_url from old resources
-                    # database table for datasets without ticket and new data 
-                    resource_name, resource_url = self._get_old_resource_vals(
-                        legacy_ident, old_resources)
-                    
-                    if not resource_name:
-                        self.loginfo('Dataset {} missing name'.format(
-                            legacy_ident))                        
-                    elif not resource_url.startswith(BISON_IPT_PREFIX):
-                        self.loginfo('Dataset {} has unexpected URL {}'
-                                       .format(legacy_ident, resource_url))
+                    # For datasets without ticket and new data 
+                    # Pull resource values from old table
+                    db_resource_name, db_resource_url = \
+                        self._get_old_resource_vals(legacy_ident, db_resources)                    
+                    # Pull resource values old records
+                    (new_resource_id, resource_name, 
+                     resource_url) = self._pull_resource_from_db_or_records(
+                         fn, legacy_ident, db_resource_name, db_resource_url)
                         
                     _, basefname = os.path.split(fn)
                     self.loginfo('Existing dataset {} {} will be rewritten'
                                    .format(legacy_ident, basefname))
                     
                     provider_datasets[legacy_ident] = {
-                        'action': ProviderActions.rewrite, 
+                        'legacy_id': legacy_ident,
+                        'action': 'rewrite', 
                         'ticket': 'Existing data',
                         'resource_name': resource_name,
-                        'resource_id': None,
+                        'resource_id': new_resource_id,
+                        'resource_url': resource_url,
                         'filename': basefname}
                 else:
                     self.loginfo('Dataset {} {} will be {} by {}'.format(
@@ -273,7 +335,7 @@ class BisonMerger(object):
         if not os.path.exists(infile):
             raise Exception('File {} does not exist'.format(infile))
 
-        if action not in (ProviderActions.wait, ProviderActions.unknown):
+        if action in PROVIDER_ACTIONS:
             # Step 1: rewrite with updated resource/provider values
             self.loginfo("""
             ident {}, 
@@ -318,12 +380,12 @@ class BisonMerger(object):
         import csv
         delimiter = PROVIDER_DELIMITER
         # Rewrite data from existing database, with $ delimiter
-        if action in (ProviderActions.rename, ProviderActions.rewrite):
+        if action in ('rename', 'rewrite'):
             delimiter = BISON_DELIMITER
 
         try:
             # Fill resource/provider values, use BISON_DELIMITER
-            if action == ProviderActions.add:
+            if action == 'add':
                 pass
             try:
                 f = open(infile, 'r', encoding=ENCODING)

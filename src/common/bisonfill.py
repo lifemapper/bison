@@ -28,7 +28,7 @@ import time
 
 from common.constants import (BISON_DELIMITER, ENCODING, LOGINTERVAL, 
                               PROHIBITED_CHARS, PROHIBITED_SNAME_CHARS, 
-                              PROHIBITED_VALS, LEGACY_ID_DEFAULT,
+                              PROHIBITED_VALS, 
                               BISON_VALUES, BISON_SQUID_FLD, ITIS_KINGDOMS, 
                               ISO_COUNTRY_CODES, 
                               BISON_ORDERED_DATALOAD_FIELD_TYPE)
@@ -89,7 +89,7 @@ class BisonFiller(object):
     def initialize_itis_estmeans_centroid(self, itis2_lut_fname, estmeans_fname, 
                                           terrestrial_shpname):
         if self.itistsns is None:
-            self.itistsns = Lookup.initFromFile(
+            self.itistsns = Lookup.init_from_file(
                 itis2_lut_fname, ['scientific_name'], ',', valtype=VAL_TYPE.DICT, 
                 encoding=ENCODING, ignore_quotes=False)
             self._fix_itis_values()
@@ -146,7 +146,7 @@ class BisonFiller(object):
             finally:
                 inf.close()
             if datadict:
-                estmeans = Lookup.initFromDict(datadict, valtype=VAL_TYPE.STRING)
+                estmeans = Lookup.init_from_dict(datadict, valtype=VAL_TYPE.STRING)
         return estmeans
         
     # ...............................................
@@ -197,7 +197,7 @@ class BisonFiller(object):
                             datadict[key] = (coords[0], coords[1])
             terrlyr.ResetReading()
             if datadict:
-                centroids = Lookup.initFromDict(datadict, valtype=VAL_TYPE.TUPLE)
+                centroids = Lookup.init_from_dict(datadict, valtype=VAL_TYPE.TUPLE)
         return centroids
 
     # ...............................................
@@ -241,7 +241,8 @@ class BisonFiller(object):
                         fldvals[fn] = self.terrfeats[tfid][fn]
                     # NEW: First 2 chars of county fips code is state fips code
                     # only in US data (Canada codes are 4 chars)
-                    if len(fldvals['calculated_fips']) == 5:
+                    if (len(fldvals['calculated_fips']) == 5 
+                        and rec['iso_country_code'] != 'CA'):
                         state_fips = fldvals['calculated_fips'][-2:]
                         fldvals['calculated_state_fips'] = state_fips    
                 # If > 1 polygon, clear all values
@@ -533,16 +534,16 @@ class BisonFiller(object):
             self.close()
             
         self.initialize_geospatial_data(terr_data, marine_data, ancillary_path)
-        dataset_by_uuid = Lookup.initFromFile(merged_dataset_lut_fname, 
+        dataset_by_uuid = Lookup.init_from_file(merged_dataset_lut_fname, 
             ['gbif_datasetkey', 'dataset_id'], BISON_DELIMITER, valtype=VAL_TYPE.DICT, 
             encoding=ENCODING)
-#         dataset_by_legacyid = Lookup.initFromFile(merged_dataset_lut_fname, 
+#         dataset_by_legacyid = Lookup.init_from_file(merged_dataset_lut_fname, 
 #             ['OriginalResourceID', 'gbif_legacyid'], BISON_DELIMITER, valtype=VAL_TYPE.DICT, 
 #             encoding=ENCODING)
-        org_by_uuid = Lookup.initFromFile(merged_org_lut_fname, 
+        org_by_uuid = Lookup.init_from_file(merged_org_lut_fname, 
             ['gbif_organizationKey'], BISON_DELIMITER, valtype=VAL_TYPE.DICT, 
             encoding=ENCODING)
-#         org_by_legacyid = Lookup.initFromFile(merged_org_lut_fname, 
+#         org_by_legacyid = Lookup.init_from_file(merged_org_lut_fname, 
 #             ['OriginalProviderID', 'gbif_legacyid'], BISON_DELIMITER, valtype=VAL_TYPE.DICT, 
 #             encoding=ENCODING)
 
@@ -1060,7 +1061,7 @@ class BisonFiller(object):
 #         if os.path.exists(dataset_lut_fname):
 #             self._log.info('Output file {} exists!'.format(dataset_lut_fname))
 #         else:
-#             old_resources = Lookup.initFromFile(resource_lut_fname, GBIF_UUID_KEY, 
+#             old_resources = Lookup.init_from_file(resource_lut_fname, GBIF_UUID_KEY, 
 #                                             ANCILLARY_DELIMITER, valtype=VAL_TYPE.DICT, 
 #                                             encoding=ENCODING)
 #             datasets = self._write_dataset_lookup(gbifapi, old_resources,
@@ -1070,7 +1071,7 @@ class BisonFiller(object):
 #         if os.path.exists(org_lut_fname):
 #             self._log.info('Output file {} exists!'.format(org_lut_fname))
 #         else:
-#             old_providers = Lookup.initFromFile(provider_lut_fname, GBIF_UUID_KEY, 
+#             old_providers = Lookup.init_from_file(provider_lut_fname, GBIF_UUID_KEY, 
 #                                             ANCILLARY_DELIMITER, valtype=VAL_TYPE.DICT, 
 #                                             encoding=ENCODING)
 #     
@@ -1162,7 +1163,7 @@ if __name__ == '__main__':
 #     pass3_fname = os.path.join(tmppath, 'step3_itis_geo_estmeans_{}.csv'.format(gbif_basefname))
     
     gr = BisonFiller(logger)            
-    gr.itistsns = Lookup.initFromFile(
+    gr.itistsns = Lookup.init_from_file(
         itis2_lut_fname, ['scientific_name'], ',', valtype=VAL_TYPE.DICT, 
         encoding=ENCODING, ignore_quotes=False)
     gr._fix_itis_values()

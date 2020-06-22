@@ -29,7 +29,7 @@ class Lookup(object):
         
     # ...............................................
     @classmethod
-    def initFromDict(cls, lookupdict, valtype=VAL_TYPE.DICT, encoding=ENCODING):
+    def init_from_dict(cls, lookupdict, valtype=VAL_TYPE.DICT, encoding=ENCODING):
         """
         @summary: Constructor
         """
@@ -39,14 +39,16 @@ class Lookup(object):
 
     # ...............................................
     @classmethod
-    def initFromFile(cls, lookup_fname, prioritized_keyfld_lst, delimiter, valtype=VAL_TYPE.DICT, 
-                     encoding=ENCODING, ignore_quotes=True):
+    def init_from_file(cls, lookup_fname, prioritized_keyfld_lst, delimiter, 
+                       valtype=VAL_TYPE.DICT, encoding=ENCODING, 
+                       ignore_quotes=True):
         """
         @summary: Constructor
         """
         lookup = Lookup(valtype=valtype, encoding=encoding)
         lookup.read_lookup(
-            lookup_fname, prioritized_keyfld_lst, delimiter, ignore_quotes=ignore_quotes)
+            lookup_fname, prioritized_keyfld_lst, delimiter, 
+            ignore_quotes=ignore_quotes)
         return lookup
 
     # ...............................................
@@ -78,6 +80,15 @@ class Lookup(object):
                     print('Ignore conflicting value for key {}, new val {} and existing val {}'
                           .format(key, val, existingval))
                 
+    # ...............................................
+    def _get_field_names(self):
+        fldnames = None
+        if self.valtype == VAL_TYPE.DICT:
+            fldnames = set()
+            for key, vals in self.lut.items():
+                for fn, val in vals.items():
+                    fldnames.add(fn)
+        return fldnames
 
     # ...............................................
     def write_lookup(self, fname, header, delimiter):
@@ -89,8 +100,9 @@ class Lookup(object):
             if self.valtype == VAL_TYPE.DICT:
                 # Write all vals in dict, assumes each dictionary-value has the same keys
                 if header is None:
-                    writer, outf = get_csv_dict_writer(fname, delimiter, self.encoding, 
-                                                    header, fmode=fmode)
+                    header = self._get_field_names()
+                    writer, outf = get_csv_dict_writer(
+                        fname, delimiter, self.encoding, header, fmode=fmode)
                     if fmode == 'w':
                         writer.writeheader()
                     for key, ddict in self.lut.items():
