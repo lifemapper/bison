@@ -243,7 +243,7 @@ class BisonFiller(object):
                     # only in US data (Canada codes are 4 chars)
                     if (len(fldvals['calculated_fips']) == 5 
                         and rec['iso_country_code'] != 'CA'):
-                        state_fips = fldvals['calculated_fips'][-2:]
+                        state_fips = fldvals['calculated_fips'][:2]
                         fldvals['calculated_state_fips'] = state_fips    
                 # If > 1 polygon, clear all values
                 else:
