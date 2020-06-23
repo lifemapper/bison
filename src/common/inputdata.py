@@ -110,7 +110,8 @@ BISON_PROVIDER = {
     {'action': 'add',
      'ticket': 'BISON-989',
      'resource_name': 'New York City Tree Census - 2015',
-     # Fixed from resource_url contents in records (urlprefix = 'https://bison.usgs.gov/ipt/resource?r=')
+     # Fixed from resource_url contents in records 
+     # urlprefix = 'https://bison.usgs.gov/ipt' + '/resource?r='
      'resource_id': 'nycity-tree-census-2015',
      'filename': 'FINAL-nycitytreecensus-2015-09Apr2020.txt'},
     

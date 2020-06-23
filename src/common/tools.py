@@ -11,7 +11,6 @@ import time
 
 from common.constants import (LOG_FORMAT, LOG_DATE_FORMAT, LOGFILE_MAX_BYTES,
                               LOGFILE_BACKUP_COUNT, EXTRA_VALS_KEY)
-from _collections import OrderedDict
 
 REQUIRED_FIELDS = ['STATE_NAME', 'NAME', 'STATE_FIPS', 'CNTY_FIPS', 'PRNAME', 
      'CDNAME', 'CDUID']
@@ -168,20 +167,6 @@ def makerow(rec, outfields):
             row.append('')
     return row
 
-# # ...............................................
-# def makerec(rec, outfields):
-#     newrec = OrderedDict()
-#     for fld in outfields:
-#         try:
-#             val = rec[fld]
-#             if val in (None, 'None'):
-#                 newrec[fld] = ''
-#             else:
-#                 newrec[fld] = val
-#         # Add output fields not present in record
-#         except:
-#             newrec[fld] = ''
-#     return newrec
 
 # ...............................................
 def open_csv_files(infname, delimiter, encoding, ignore_quotes=True, 

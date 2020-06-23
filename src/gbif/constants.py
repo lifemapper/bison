@@ -48,7 +48,7 @@ class GBIF_DSET_KEYS(object):
     if Org key is BISON_ORG_UUID = 'c3ad790a-d426-4ac1-8e32-da61f81f0117'
     and identifiers/(one of numbered children with 
                      type=URL
-                     identifier=https://bison.usgs.gov/ipt/resource?r=*
+                     identifier=BISON_IPT_PREFIX*
     """
     apitype = 'dataset'
     # First 'save' key is organization UUID
