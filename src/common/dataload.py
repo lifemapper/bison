@@ -505,7 +505,7 @@ if __name__ == '__main__':
                 ignore_me = True
                 combo_logger.info('Wait to process {}'.format(resource_key))
             else:
-                if fname is None:
+                if not fname:
                     fname = 'bison_{}.csv'.format(resource_key)
                     outfname = fname
                 else:
@@ -553,7 +553,7 @@ if __name__ == '__main__':
                 else:
                     combo_logger.info('  Process step 3 output to {}'.format(
                         outfile3))
-                    logfname = os.path.join(s2dir, '{}.log'.format(logbasename))
+                    logfname = os.path.join(s3dir, '{}.log'.format(logbasename))
                     logger = get_logger(logbasename, logfname)
                     bfiller = BisonFiller(logger)
                     bfiller.update_itis_estmeans_centroid(

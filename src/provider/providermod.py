@@ -3,7 +3,7 @@ import os
 
 from common.constants import (
     BISON_ORDERED_DATALOAD_FIELD_TYPE, BISON_VALUES, PROVIDER_ACTIONS,
-    PROVIDER_DELIMITER, BISON_DELIMITER, ENCODING, BISON_IPT_PREFIX)
+    PROVIDER_DELIMITER, BISON_DELIMITER, ENCODING, BISON_IPT_PREFIX, IPT_QUERY)
 from common.inputdata import BISON_PROVIDER
 from common.lookup import Lookup, VAL_TYPE
 from common.tools import (
@@ -127,8 +127,8 @@ class BisonMerger(object):
 
     # ...............................................
     def _standardize_bison_url(self, bison_resource_id):
-        standard_resource_url = '{}/resource?r={}'.format(
-            BISON_IPT_PREFIX, bison_resource_id)
+        standard_resource_url = '{}/{}{}'.format(
+            BISON_IPT_PREFIX, IPT_QUERY, bison_resource_id)
         return standard_resource_url
 
     # ...............................................
@@ -203,6 +203,7 @@ class BisonMerger(object):
                 dict_reader, inf, csv_writer, outf = open_csv_files(
                     infile, in_delimiter, ENCODING, outfname=outfile, 
                     outfields=dl_fields, outdelimiter=BISON_DELIMITER)
+                _ = next(dict_reader)
                 recno = 0
                 for rec in dict_reader:
                     recno += 1
