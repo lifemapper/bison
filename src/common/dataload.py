@@ -281,11 +281,15 @@ if __name__ == '__main__':
         '--step', type=int, default=1, choices=[1,2,3,4,99,1000], help=stephelp)
     parser.add_argument(
         '--resource', type=str, default=None, 
-        help='resource_id for regular processing of a single bison-provider dataset')
+        help='resource_id for testing or processing of a single bison-provider dataset')
+    parser.add_argument(
+        '--teststep', type=str, default=None, 
+        help='step for which to test/examine output')
     args = parser.parse_args()
     data_source = args.data_source
     input_data = args.input_data
     step = args.step
+    teststep = args.teststep
     resource_id = args.resource
     fixme = ['440,100045', '440,100061', 'emammal', 'nplichens']
 
@@ -342,6 +346,7 @@ if __name__ == '__main__':
     s3dir = os.path.join(tmppath, 's3-itisescent')
     s4dir = os.path.join(tmppath, 's4-geo')
     fixdir = os.path.join(tmppath, 's99-fix')
+    
     # For GBIF processing, steps 1-4, files of name lookup and list for creation 
     if data_source == 'gbif':
         if step <= 4:
@@ -451,8 +456,19 @@ if __name__ == '__main__':
         # ..........................................................
         # Step 1000: test something
         elif step == 1000:
-            logger.info('  Test step 1000 on {}'.format(in_fname))
-            logfname = os.path.join(s3dir, '{}.log'.format(logbasename))
+            if teststep is None:
+                test_fname = os.path.join(outpath, '{}.csv'.format(basefname))
+            elif teststep == 1:
+                test_fname = pass1_fname
+            elif teststep == 2:
+                test_fname = pass2_fname
+            elif teststep == 3:
+                test_fname = pass3_fname
+            elif teststep == 4:
+                test_fname = pass4_fname
+
+            logger.info('  Test step 1000 on {}'.format(test_fname))
+            logfname = os.path.join(tmppath, '{}.log'.format(logbasename))
             logger = get_logger(logbasename, logfname)
             bfiller = BisonFiller(logger)
             bfiller.walk_data(
@@ -474,6 +490,7 @@ if __name__ == '__main__':
             
             
     elif data_source == 'provider':
+        fixme = ['440,100045', '440,100061', 'emammal', 'nplichens']
         bisonprov_lut_fname = os.path.join(ancillary_path, 'bisonprovider_meta_lut.csv')
         # No step 2 for BISON provider data
         if step <= 4:
@@ -483,7 +500,6 @@ if __name__ == '__main__':
         combo_logfname = os.path.join(tmppath, '{}.log'.format(combo_logbasename))
         combo_logger = get_logger(combo_logbasename, combo_logfname)
         merger = BisonMerger(combo_logger)
-        old_resources = merger.read_resources(merged_resource_lut_fname)
         # Pull metadata from ticket first, 
         # if missing, fill with old provider table data second
         if os.path.exists(bisonprov_lut_fname):
@@ -491,11 +507,16 @@ if __name__ == '__main__':
                 bisonprov_lut_fname, ['legacy_id'], BISON_DELIMITER, 
                 VAL_TYPE.DICT, ENCODING)
         else:
+            old_resources = merger.read_resources(merged_resource_lut_fname)
             bisonprov_dataload_metadata = merger.assemble_files(workpath, old_resources)
             bisonprov_dataload = Lookup.init_from_dict(bisonprov_dataload_metadata)
             bisonprov_dataload.write_lookup(bisonprov_lut_fname, None, BISON_DELIMITER)
         for resource_key, resource_pvals in bisonprov_dataload.lut.items():
+#             ignore_me = True
+#             if resource_key in fixme: 
+#                 ignore_me = False
             ignore_me = False
+            # resource_id from command option
             if resource_id is not None and resource_id != resource_key:
                 ignore_me = True
             fname = resource_pvals['filename']
@@ -587,25 +608,30 @@ if __name__ == '__main__':
             # ..........................................................
             # Step 99: fix something
             elif step == 99 and not ignore_me:
-                os.makedirs(fixdir, mode=0o775, exist_ok=True)
-                outfile99 = os.path.join(fixdir, outfname)
+#                 os.makedirs(fixdir, mode=0o775, exist_ok=True)
+#                 outfile99 = os.path.join(fixdir, outfname)
+                outfile99 = os.path.join(outpath, outfname)
                 if not os.path.exists(outfile99):
-                    combo_logger.info('  Re-write step 3 output with fix to {}'.format(
+                    combo_logger.info('  Re-write step 4 output with fix to {}'.format(
                         outfile99))
                     merger.reset_logger(fixdir, logbasename)
-                    merger.rewrite_bison_data(
-                        outfile4, outfile99, resource_key, resource_pvals, 
-                        BISON_DELIMITER)
+                    merger.fix_bison_data(
+                        outfile4, outfile99, resource_key, resource_pvals)
             # ..........................................................
             # Step 1000: test something
             elif step == 1000 and not ignore_me:
-                combo_logger.info('  Process step 4 output to {}'.format(
-                    outfile4))
-                logfname = os.path.join(s3dir, '{}.log'.format(logbasename))
-                logger = get_logger(logbasename, logfname)
-                bfiller = BisonFiller(logger)
-                bfiller.update_point_in_polygons(
-                    terr_data, marine_data, ancillary_path, outfile3, outfile4)
+                if teststep is None:
+                    test_fname = os.path.join(outpath, outfname)
+                elif teststep == 1:
+                    test_fname = outfile1
+                elif teststep == 2:
+                    print('Step 2 is invalid for bison provider data')
+                elif teststep == 3:
+                    test_fname = outfile3
+                elif teststep == 4:
+                    test_fname = outfile4
+                combo_logger.info('  Test output {}'.format(test_fname))
+                merger.test_bison_data(test_fname, resource_key, resource_pvals)
 
             else:
                 print('Ignore {} {}'.format(resource_key, fname))

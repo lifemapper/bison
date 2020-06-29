@@ -2,12 +2,13 @@ import glob
 import os
 
 from common.constants import (
-    BISON_ORDERED_DATALOAD_FIELD_TYPE, BISON_VALUES, PROVIDER_ACTIONS,
-    PROVIDER_DELIMITER, BISON_DELIMITER, ENCODING, BISON_IPT_PREFIX, IPT_QUERY)
+    BISON2020_FIELD_DEF, BISONEXPORT_TO_BISON2020_MAP, BISON_VALUES, 
+    PROVIDER_ACTIONS, PROVIDER_DELIMITER, BISON_DELIMITER, ENCODING, 
+    BISON_IPT_PREFIX, IPT_QUERY)
 from common.inputdata import BISON_PROVIDER
 from common.lookup import Lookup, VAL_TYPE
 from common.tools import (
-    get_logger, makerow, open_csv_files, get_csv_dict_reader)
+    get_logger, makerow, open_csv_files, get_csv_dict_reader, get_csv_writer)
 
 EXISTING_DATASET_FILE_PREFIX = 'bison_'
 # .............................................................................
@@ -86,7 +87,7 @@ class BisonMerger(object):
             rec['resource_id'] = new_res_id
             # New or renamed datasets get new name and url
             if action in ('add', 'rename', 'replace_rename'):
-                rec['resource_name'] = const_res_name
+                rec['resource'] = const_res_name
                 rec['resource_url'] = std_res_url
             # Replace or Rewrite datasets
             else:
@@ -158,6 +159,19 @@ class BisonMerger(object):
     
     # ...............................................
     # ...............................................
+    def _map_old_to_new_rec(self, oldrec):
+        newrec = {}
+        for key in BISON2020_FIELD_DEF.keys():
+            try:
+                newrec[key] = oldrec[key]
+            except:
+                newrec[key] = None
+        for oldfld, newfld in BISONEXPORT_TO_BISON2020_MAP.items():
+            if newfld is not None:
+                newrec[newfld] = oldrec[oldfld]
+        return newrec
+
+    # ...............................................
     def _fill_bison_constant_fields(self, rec):
         for key, const_val in BISON_VALUES.items():
             if key == 'provider_url':
@@ -198,7 +212,7 @@ class BisonMerger(object):
                     action, resource_key, infile, outfile, const_res_name, 
                     new_res_id))
             
-            dl_fields = list(BISON_ORDERED_DATALOAD_FIELD_TYPE.keys())
+            dl_fields = list(BISON2020_FIELD_DEF.keys())
             try:
                 dict_reader, inf, csv_writer, outf = open_csv_files(
                     infile, in_delimiter, ENCODING, outfname=outfile, 
@@ -207,6 +221,8 @@ class BisonMerger(object):
                 recno = 0
                 for rec in dict_reader:
                     recno += 1
+                    if action == 'rewrite':
+                        rec = self._map_old_to_new_rec(rec)
 #                     self._remove_outer_quotes(rec)
                     self._fill_bison_constant_fields(rec)
 
@@ -220,6 +236,91 @@ class BisonMerger(object):
             finally:
                 inf.close()
                 outf.close()
+        else:
+            self.loginfo('Unknown action {} for input {}, ({})'.format(
+                action, const_res_name, resource_key))
+
+    # ...............................................
+    def fix_bison_data(self, infile, outfile, resource_key, resource_pvals):
+        if not os.path.exists(infile):
+            raise Exception('File {} does not exist'.format(infile))
+        
+        action = resource_pvals['action']
+        new_res_id = resource_pvals['resource_id']
+        const_res_name = resource_pvals['resource_name']
+        const_res_url = resource_pvals['resource_url']
+        if not const_res_name:
+            raise Exception('{} must have resource_name {}'.format(
+                resource_key, new_res_id, const_res_name))
+        
+        if action in PROVIDER_ACTIONS:
+            # Step 1: rewrite with updated resource/provider values
+            self.loginfo("""{} for ticket {},
+                infile {} to outfile {}
+                with name {}, id {}""".format(
+                    action, resource_key, infile, outfile, const_res_name, 
+                    new_res_id))
+            
+            dl_fields = list(BISON2020_FIELD_DEF.keys())
+            try:
+                # Open incomplete BISON CSV file as input
+                dict_reader, inf = get_csv_dict_reader(
+                    infile, BISON_DELIMITER, ENCODING)
+                header = next(dict_reader)
+                csv_writer, outf = get_csv_writer(outfile, BISON_DELIMITER, ENCODING)
+                csv_writer.writerow(header)
+                recno = 0
+                for rec in dict_reader:
+                    recno += 1
+                    self._fill_bison_constant_fields(rec)
+
+                    self._replace_resource(
+                        rec, action, new_res_id, const_res_name, const_res_url)
+                    
+                    row = makerow(rec, dl_fields)
+                    csv_writer.writerow(row)
+            except:
+                raise 
+            finally:
+                inf.close()
+                outf.close()
+        else:
+            self.loginfo('Unknown action {} for input {}, ({})'.format(
+                action, const_res_name, resource_key))
+
+    # ...............................................
+    def test_bison_data(self, infile, resource_key, resource_pvals):
+        if not os.path.exists(infile):
+            raise Exception('File {} does not exist'.format(infile))
+        
+        action = resource_pvals['action']
+        new_res_id = resource_pvals['resource_id']
+        const_res_name = resource_pvals['resource_name']
+        if not const_res_name:
+            raise Exception('{} must have resource_name {}'.format(
+                resource_key, new_res_id, const_res_name))
+        
+        if action in PROVIDER_ACTIONS:
+            # Step 1: rewrite with updated resource/provider values
+            self.loginfo('Test ticket {}, infile {} with name {}, id {}'.format(
+                action, resource_key, infile, const_res_name, new_res_id))
+            
+            try:
+                # Open incomplete BISON CSV file as input
+                dict_reader, inf = get_csv_dict_reader(
+                    infile, BISON_DELIMITER, ENCODING)
+                header = next(dict_reader)
+                recno = 0
+                for rec in dict_reader:
+                    recno += 1
+                    if rec['id'] in [
+                        '2083946119', '2083948929', '2083946482', '2083946120']:
+                        print('common names = {}'.format(
+                            rec['itis_common_name']))
+            except:
+                raise 
+            finally:
+                inf.close()
         else:
             self.loginfo('Unknown action {} for input {}, ({})'.format(
                 action, const_res_name, resource_key))
@@ -417,5 +518,3 @@ class BisonMerger(object):
             raise 
         finally:
             f.close()
-    
-

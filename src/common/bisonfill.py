@@ -31,7 +31,7 @@ from common.constants import (BISON_DELIMITER, ENCODING, LOGINTERVAL,
                               PROHIBITED_VALS, 
                               BISON_VALUES, BISON_SQUID_FLD, ITIS_KINGDOMS, 
                               ISO_COUNTRY_CODES, 
-                              BISON_ORDERED_DATALOAD_FIELD_TYPE)
+                              BISON2020_FIELD_DEF)
 from common.inputdata import ANCILLARY_FILES
 from common.lookup import Lookup, VAL_TYPE
 from common.tools import (
@@ -53,7 +53,7 @@ class BisonFiller(object):
         self._log = log        
         # Ordered output fields
         # Individual steps may add/remove temporary fields for input/output
-        self._infields = list(BISON_ORDERED_DATALOAD_FIELD_TYPE.keys())
+        self._infields = list(BISON2020_FIELD_DEF.keys())
         # Write these fields after processing for next step
         self._outfields = self._infields.copy()
         self._files = []
@@ -581,7 +581,7 @@ class BisonFiller(object):
         else:
             raise Exception('  {} output exists'.format(outfname))
 
-        dl_fields = list(BISON_ORDERED_DATALOAD_FIELD_TYPE.keys())
+        dl_fields = list(BISON_2020_FIELD_DEF.keys())
         try:
             dict_reader, inf, csv_writer, outf = open_csv_files(
                 infname, in_delimiter, ENCODING, outfname=outfname, 

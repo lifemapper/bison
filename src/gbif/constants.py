@@ -133,6 +133,46 @@ GBIF_NAMEKEY_TEMP_TYPE = {'pgtype': ALLOWED_TYPE.integer}
 # First pass mapping from GBIF data fields to BISON data fields plus a few 
 # fields replaced in later computation
 # Fields without a GBIF fieldname will be computed on a following pass
+GBIF_TO_BISON2020_MAP = {
+    # Temporary fields for calculations, discard before final output
+    NS.gbif + 'taxonKey': 'taxonKey',
+    NS.dwc + 'occurrenceStatus': 'occurrenceStatus',
+    NS.dwc + 'locality': 'locality',
+    NS.dwc + 'habitat': 'habitat',
+    # Direct mapping, ties to original GBIF occ rec and dataset
+    NS.gbif + 'gbifID': 'gbifID',
+    # Direct mapping
+    NS.dwc + 'basisOfRecord': 'basis_of_record',
+    NS.dwc + 'eventDate': 'occurrence_date',
+    NS.dwc + 'year': 'year',
+    NS.dwc + 'verbatimEventDate': 'verbatim_event_date',
+    NS.dwc + 'occurrenceID': 'occurrence_url',
+    NS.dwc + 'catalogNumber': 'catalog_number', 
+    NS.dwc + 'recordedBy': 'collector',
+    NS.dwc + 'recordNumber': 'collector_number',
+    NS.dwc + 'scientificName': 'provided_scientific_name',
+    NS.dwc + 'taxonID': 'provided_tsn',
+    NS.dwc +  'decimalLatitude': 'latitude',
+    NS.dwc + 'decimalLongitude': 'longitude',
+    NS.dwc + 'verbatimElevation' : 'verbatim_elevation', 
+    NS.dwc + 'verbatimDepth': 'verbatim_depth',
+    NS.dwc + 'county': 'provided_county_name', 
+    NS.dwc + 'higherGeographyID': 'provided_fips',
+    NS.dwc + 'stateProvince': 'provided_state_name',
+    NS.dwc + 'associatedReferences': 'associated_references',
+    NS.dwc + 'eventRemarks': 'general_comments',
+    NS.dwc + 'occurrenceID': 'occurrence_id',
+    NS.gbif + 'gbifID': 'id',
+    NS.gbif + 'datasetKey': 'resource_id',
+    NS.dwc + 'vernacularName': 'provided_common_name',
+    NS.dwc + 'kingdom': 'kingdom',
+    NS.dwc + 'coordinatePrecision': 'coordinate_precision',   
+    NS.dwc + 'coordinateUncertaintyInMeters': 'coordinate_uncertainty',
+    NS.dwc + 'verbatimLocality': 'verbatim_locality',
+    NS.dwc + 'countryCode': 'iso_country_code',
+    NS.dc + 'license': 'license'
+    }
+
 BISON_GBIF_MAP = {
     # Temporary fields for calculations, discard before final output
     'taxonKey': NS.gbif + 'taxonKey',
