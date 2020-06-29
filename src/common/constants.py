@@ -76,7 +76,7 @@ IPT_QUERY = 'resource?r='
 
 BISON_VALUES = {'provider': 'BISON',
                 'provider_url': 'https://bison.usgs.gov',
-                'provider_id': '440',
+                'provider_id': 'BISON',
                 'license' : 'http://creativecommons.org/publicdomain/zero/1.0/legalcode',
                 }
 
@@ -99,7 +99,7 @@ class ALLOWED_TYPE(Enum):
     double_precision = auto()
     
 
-BISON_ORDERED_DATALOAD_FIELD_TYPE = OrderedDict(
+BISON2020_FIELD_DEF = OrderedDict(
     {'id': {'pgtype': ALLOWED_TYPE.integer},
      'clean_provided_scientific_name': 
      {'pgtype': ALLOWED_TYPE.varchar, 'max_len': None},
@@ -175,7 +175,6 @@ BISON_ORDERED_DATALOAD_FIELD_TYPE = OrderedDict(
      {'pgtype': ALLOWED_TYPE.varchar, 'max_len': None},
      'general_comments': 
      {'pgtype': ALLOWED_TYPE.varchar, 'max_len': None},
-    # TODO: ???
      'occurrence_id': 
      {'pgtype': ALLOWED_TYPE.varchar, 'max_len': None},
      'provider_id': 
@@ -287,73 +286,26 @@ MERGED_RESOURCE_LUT_FIELDS = (
 # BISON provider data from solr core
 BISON_PROVIDER_UNIQUE_COLS=('provider', 'resource_id', 'resource_url') 
 
-# BISONPROVIDER values are column names in the bison.csv file provided by
-# Denver developers for existing BISON provider data records.  These column
-# names appear to come from postgres tables.  
-# The mapping consists of an ordered list of tuples, where the first value 
-# is the column name in bison.csv and the optional second value is the BISON 
-# field name to match.  
-#   * Tuples in the mapping with a single value in the tuple
-#     have the same field name in both BISON and BISONPROVIDER.
-#   * Tuples in the mapping with the 2nd value None, have no matching BISON fieldname
-BISONPROVIDER_BISON_MAP = [
-('dataset_key', None),
-('catalogue_number', None),
-('clean_provided_scientific_name', 'scientific_name'), 
-('provided_scientific_name',),
-('longitude', ), 
-('latitude', 'latitude'), 
-('iso_country_code', 'iso_country_code'),
-('taxon_key', None), 
-('year',),
-('basis_of_record',),
-('provider',), 
-('provider_id',), 
-('resource',), 
-('resource_id',), 
-('occurrence_date',),
-('collector',), 
-('county_original', 'provided_county_name'), 
-('state_original', 'provided_state_name'), 
-# Mismatch, postgres has computedcountyfips
-('countycomputedfips', 'calculated_fips'),
-('statecomputedfips', 'calculated_state_fips'),
-('centroid',), 
-('hierarchy_string', ), 
-('tsns', 'valid_accepted_tsn'), 
-('amb',), 
-('provided_tsn', ), 
-('collectornumber', 'collector_number'), 
-('valid_accepted_scientific_name', ), 
-# Duplicated above in tsns/valid_accepted_scientific_name
-('valid_accepted_tsn',), 
-('provided_common_name',), 
-('itis_common_name',), 
-('kingdom',), 
-('itis_tsn',), 
-('geodetic_datum',), 
-('coordinate_precision',), 
-('coordinate_uncertainty',), 
-('verbatim_elevation',), 
-('verbatim_depth',), 
-('verbatim_locality',), 
-('verbatim_event_date',), 
-('provided_fips',), 
-('calculated_county_name',), 
-('calculated_state_name',), 
-('provider_url',), 
-('resource_url',), 
-('occurrence_url',), 
-('thumb_url',), 
-('associated_media',), 
-('associated_references',), 
-('general_comments',), 
-('bison_id', None), 
-('license',), 
-('calculated_mrgid', 'mrgid'), 
-('calculated_waterbody',), 
-('establishment_means',), 
-('id', None), 
-('tmpid', None)
-]
+# The mapping consists of a dictionary of fieldnames in the exported file (keys)
+# and the fieldnames they match in BISON2020.  If the BISON2020 field is None, 
+# the input field will be ignored. Fields in BISON2020 which do not appear in
+# dictionary values match the identical field in the BISON export file.
+BISONEXPORT_TO_BISON2020_MAP = {
+    'dataset_key': None,
+    'catalogue_number': 'catalog_number',
+    'scientific_name': 'clean_provided_scientific_name',
+    'taxon_key': None, 
+    'county_original': 'provided_county_name',
+    'state_original': 'provided_state_name', 
+    'countycomputedfips': 'calculated_fips',
+    'statecomputedfips': 'calculated_state_fips',
+    # Duplicated: 'valid_accepted_tsn' also exists in old 
+    #     but 'tsns' --> 'valid_accepted_tsn' in new
+    #     This value is overwritten if the ITIS lookup succeeds
+    'tsns': 'valid_accepted_tsn', 
+    'collectornumber': 'collector_number', 
+    'bison_id': None, 
+    'calculated_mrgid': 'mrgid', 
+    'tmpid': None
+    }
 

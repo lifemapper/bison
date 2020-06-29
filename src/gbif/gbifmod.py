@@ -26,14 +26,14 @@ import time
 
 from common.constants import (BISON_DELIMITER, ENCODING, 
         LOGINTERVAL, PROHIBITED_VALS, LEGACY_ID_DEFAULT, EXTRA_VALS_KEY,
-        ALLOWED_TYPE, BISON_ORDERED_DATALOAD_FIELD_TYPE, BISON_IPT_PREFIX, 
+        ALLOWED_TYPE, BISON2020_FIELD_DEF, BISON_IPT_PREFIX, 
         MERGED_RESOURCE_LUT_FIELDS, MERGED_PROVIDER_LUT_FIELDS)
 from common.lookup import Lookup, VAL_TYPE
 from common.tools import (get_csv_reader, get_csv_dict_reader, get_csv_writer, 
                           open_csv_files, makerow)
 
 from gbif.constants import (GBIF_DELIMITER, TERM_CONVERT, META_FNAME, 
-                            BISON_GBIF_MAP, OCC_ID_FLD,
+                            GBIF_TO_BISON2020_MAP, OCC_ID_FLD,
                             CLIP_CHAR, BISON_ORG_UUID, 
                             GBIF_CONVERT_TEMP_FIELD_TYPE, 
                             GBIF_NAMEKEY_TEMP_FIELD, GBIF_NAMEKEY_TEMP_TYPE)
@@ -69,15 +69,15 @@ class GBIFReader(object):
         self._meta_fname = os.path.join(self.workpath, META_FNAME)
         # Save these fields during processing to fill or compute from GBIF data
         # Individual steps may add/remove temporary fields for input/output
-        self._fields = BISON_ORDERED_DATALOAD_FIELD_TYPE.copy()
-        self._infields = list(BISON_ORDERED_DATALOAD_FIELD_TYPE.keys())
+        self._fields = BISON2020_FIELD_DEF.copy()
+        self._infields = list(BISON2020_FIELD_DEF.keys())
         # Write these fields after processing for next step
-        self._outfields = list(BISON_ORDERED_DATALOAD_FIELD_TYPE.keys())
+        self._outfields = list(BISON2020_FIELD_DEF.keys())
         # Map of gbif fields to save onto bison fieldnames
         self._gbif_bison_map = {}
         
             
-        for bfld, gfld in BISON_GBIF_MAP.items():
+        for gfld, bfld in GBIF_TO_BISON2020_MAP.items():
             # remove namespace designation
             gbiffld = gfld[gfld.rfind(CLIP_CHAR)+1:]
             self._gbif_bison_map[gbiffld] = bfld
