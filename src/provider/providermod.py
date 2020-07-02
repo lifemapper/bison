@@ -186,10 +186,18 @@ class BisonMerger(object):
     def _remove_outer_quotes(self, rec):
         for fld, val in rec.items():
             if isinstance(val, str):
-                if val.index('\"'):
+                if val.find('\"') >= 0:
                     self.loginfo('here is one!')
                 rec[fld] = val.strip('\"')
 
+    # ...............................................                
+    def _remove_internal_delimiters(self, rec):
+        for fld, val in rec.items():
+            if isinstance(val, str):
+                if val.find(BISON_DELIMITER) >= 0:
+                    print ('Delimiter in val {}'.format(val))
+                    rec[fld] = val.replace(BISON_DELIMITER, '')
+    
     # ...............................................
     def rewrite_bison_data(self, infile, outfile, resource_key, resource_pvals, 
                            in_delimiter):
@@ -223,7 +231,8 @@ class BisonMerger(object):
                     recno += 1
                     if action == 'rewrite':
                         rec = self._map_old_to_new_rec(rec)
-#                     self._remove_outer_quotes(rec)
+                        
+                    self._remove_internal_delimiters(rec)
                     self._fill_bison_constant_fields(rec)
 
                     self._replace_resource(
@@ -272,10 +281,7 @@ class BisonMerger(object):
                 recno = 0
                 for rec in dict_reader:
                     recno += 1
-                    self._fill_bison_constant_fields(rec)
-
-                    self._replace_resource(
-                        rec, action, new_res_id, const_res_name, const_res_url)
+                    self._remove_internal_delimiters(rec)
                     
                     row = makerow(rec, dl_fields)
                     csv_writer.writerow(row)
@@ -311,16 +317,16 @@ class BisonMerger(object):
                     infile, BISON_DELIMITER, ENCODING)
                 header = next(dict_reader)
                 recno = 0
+                probrecs = 0
                 for rec in dict_reader:
                     recno += 1
-                    if rec['id'] in [
-                        '2083946119', '2083948929', '2083946482', '2083946120']:
-                        print('common names = {}'.format(
-                            rec['itis_common_name']))
+                    self._remove_internal_delimiters(rec)
             except:
                 raise 
             finally:
                 inf.close()
+                print ('Found {} problem records out of {} total'.format(
+                    probrecs, recno))
         else:
             self.loginfo('Unknown action {} for input {}, ({})'.format(
                 action, const_res_name, resource_key))
