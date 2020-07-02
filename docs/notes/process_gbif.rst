@@ -68,15 +68,41 @@ through all records three times, to satisfy data dependencies in later steps.
 
 Prep: Resource and Provider LUT
 ======================================================
-#. Merge 2 old provider and resource tables with current GBIF metadata
-  
+#. Merge 2 old provider and resource tables with current GBIF metadata.
+
+   * BISON provider == GBIF organization
+   * BISON resource == GBIF dataset
    * Input: existing provider and resource tables from BISON database
-   * Input: dataset EML files from GBIF download
-   * Merge these datasets, calling GBIF APIs to  Create Resource LUT and list of 
-     publishingOrganization UUIDs from GBIF dataset API + dataset UUID.  
-     Fill legacyid from existing resource table or dataset metadata. If legacyid
-     does not exist for a new dataset, put default value (-9999) in the 
-     table to indicate it does not exist.
+   * Input: dataset and organization metadata from GBIF
+   
+     * dataset GBIF API query for dataset UUIDs in the dataset EML filenames
+     * organization GBIF API query for publishingOrganizationKey in the dataset API results
+     
+   * Create merged tables by first copying the old BISON provider and resource 
+     records into merged table.
+   * Add the GBIF organziation API results to the provider records, naming fields 
+     with 'gbif_' + fieldname
+   * Add the GBIF dataset API results to the resources records, naming fields 
+     with 'gbif_' + fieldname
+   * Now have merged_organization_lut.csv and merged_dataset_lut.csv   
+   * Choose the values to take precedence when creating the lookup table (NOT
+     in the code logic when filling the field).  
+     
+     * Add fields to be used for field values in dataload with 'bison_' + fieldname.
+     * New 'bison_' fields  in the lookup table are filled first with fields 
+       from the old table.  If new data is returned from the GBIF API, that 
+       overrides the old data.
+       
+     * New 'bison_' fields  in the lookup table are used to populate the 
+       dataload fields.
+       
+       * bison_provider_uuid (provider_id)
+       * bison_provider_name (provider)
+       * bison_provider_url (provider_url)
+       * resource (bison_resource_name)
+       * resource_id  (bison_resource_uuid)
+       * resource_url  (bison_resource_url)
+   
    * Create Provider LUT from GBIF publisher API + publishingOrganization UUID.
      Fill legacyid from existing provider table or organization metadata. 
    * If a legacyid does not exist for a provider or resource, use the GBIF UUID
