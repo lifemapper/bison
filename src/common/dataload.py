@@ -456,24 +456,14 @@ if __name__ == '__main__':
         # ..........................................................
         # Step 1000: test something
         elif step == 1000:
-            if teststep is None:
-                test_fname = os.path.join(outpath, '{}.csv'.format(basefname))
-            elif teststep == 1:
-                test_fname = pass1_fname
-            elif teststep == 2:
-                test_fname = pass2_fname
-            elif teststep == 3:
-                test_fname = pass3_fname
-            elif teststep == 4:
-                test_fname = pass4_fname
-
-            logger.info('  Test step 1000 on {}'.format(test_fname))
-            logfname = os.path.join(tmppath, '{}.log'.format(logbasename))
-            logger = get_logger(logbasename, logfname)
-            bfiller = BisonFiller(logger)
-            bfiller.walk_data(
-                in_fname, terr_data, marine_data, ancillary_path, 
-                merged_resource_lut_fname, merged_provider_lut_fname)
+            outfile = os.path.join(outpath, '{}.csv'.format(basefname))
+            if os.path.exists(outfile):
+                logfname = os.path.join(tmppath, '{}.log'.format(logbasename))
+                logger = get_logger(logbasename, logfname)
+                bfiller = BisonFiller(logger)
+                bfiller.walk_data(
+                    in_fname, terr_data, marine_data, ancillary_path, 
+                    merged_resource_lut_fname, merged_provider_lut_fname)
 
 
         else:
@@ -608,30 +598,20 @@ if __name__ == '__main__':
             # ..........................................................
             # Step 99: fix something
             elif step == 99 and not ignore_me:
-#                 os.makedirs(fixdir, mode=0o775, exist_ok=True)
-#                 outfile99 = os.path.join(fixdir, outfname)
-                outfile99 = os.path.join(outpath, outfname)
-                if not os.path.exists(outfile99):
+                outfile = os.path.join(outpath, outfname)
+                if not os.path.exists(outfile):
                     combo_logger.info('  Re-write step 4 output with fix to {}'.format(
-                        outfile99))
+                        outfile))
                     merger.reset_logger(fixdir, logbasename)
                     merger.fix_bison_data(
-                        outfile4, outfile99, resource_key, resource_pvals)
+                        outfile4, outfile, resource_key, resource_pvals)
             # ..........................................................
             # Step 1000: test something
             elif step == 1000 and not ignore_me:
-                if teststep is None:
-                    test_fname = os.path.join(outpath, outfname)
-                elif teststep == 1:
-                    test_fname = outfile1
-                elif teststep == 2:
-                    print('Step 2 is invalid for bison provider data')
-                elif teststep == 3:
-                    test_fname = outfile3
-                elif teststep == 4:
-                    test_fname = outfile4
-                combo_logger.info('  Test output {}'.format(test_fname))
-                merger.test_bison_data(test_fname, resource_key, resource_pvals)
+                outfile = os.path.join(outpath, outfname)
+                if os.path.exists(outfile):
+                    combo_logger.info('  Test output {}'.format(outfile))
+                    merger.test_bison_data(outfile, resource_key, resource_pvals)
 
             else:
                 print('Ignore {} {}'.format(resource_key, fname))
