@@ -21,6 +21,9 @@ ANCILLARY_FILES = {
     'resource': {'file': 'resource.csv'},
     'provider': {'file': 'provider.csv'}}
 
+USDA_PLANTS_URL = 'https://plants.sc.egov.usda.gov'
+USDA_PLANTS_ID = 'USDA_PLANTS'
+
 BISON_PROVIDER = {
     
     # X my.usgs.gov/jira/browse/BISON-402
@@ -150,14 +153,16 @@ BISON_PROVIDER = {
      'resource_id': 'usgs-pwrc-bbl-canada-province',
      'filename': 'bison_bbl_ca_province_ordered_final_UTF-8.txt'},
     
-    # TODO: correct ticket - changed URL to use https
+    # TODO: correct ticket to replace_rename 
+    #       fix URL and resource_id, name stays same
     # X my.usgs.gov/jira/browse/BISON-998
     # No IPT url?
     '440,1066':
-    {'action': 'replace',
+    {'action': 'replace_rename',
      'ticket': 'BISON-1066',
      'resource_name': 'USDA - PLANTS Database',
-     'resource_id': 'https://plants.usda.gov/java/citePlants',
+#      'resource_id': 'https://plants.usda.gov/java/citePlants',
+     'resource_id': USDA_PLANTS_ID,
      'filename': 'bison_USDA_Plants_2019-12-19.txt'},
     
     # closed
@@ -256,7 +261,7 @@ Correction table
 440,100025
   resource_name:  {'Kauai Invasive Species Committee - Pest Surveys - 2001-2011'}
 
-440,100045
+440,
   resource_id:  {'usgs-pwrc-bird-phenology-program'}
 
 440,100030

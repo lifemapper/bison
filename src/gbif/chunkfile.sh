@@ -5,7 +5,8 @@
 # bash /state/partition1/git/bison/src/gbif/chunkfile.sh occurrence.txt 74804557 10000000
 #
 # [astewart@badenov US_gbif]$ wc -l occurrence.txt 
-# 52258497 occurrence.txt
+# 468177858 occurrence.txt
+# bash /state/partition1/git/bison/src/gbif/chunkfile.sh occurrence.txt 468177858 50000000
 
 #
 # Example command

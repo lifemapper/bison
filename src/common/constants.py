@@ -74,11 +74,11 @@ USGS_NAS_IPT_PREFIX = 'https://nas.er.usgs.gov/ipt'
 BISON_IPT_PREFIX = 'https://bison.usgs.gov/ipt'
 IPT_QUERY = 'resource?r='
 
-BISON_VALUES = {'provider': 'BISON',
-                'provider_url': 'https://bison.usgs.gov',
-                'provider_id': 'BISON',
-                'license' : 'http://creativecommons.org/publicdomain/zero/1.0/legalcode',
-                }
+BISON_PROVIDER_VALUES = {
+    'provider_url': 'https://bison.usgs.gov',
+    'provider_id': 'BISON',
+    'license' : 'http://creativecommons.org/publicdomain/zero/1.0/legalcode'
+}
 
 TEMP_DIR = 'tmp'
 OUTPUT_DIR = 'output'
