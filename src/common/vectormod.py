@@ -1,16 +1,5 @@
 from osgeo import ogr
 import os
-import rtree
-import time
-
-from common.constants import (BISON_DELIMITER, ENCODING, LOGINTERVAL, 
-                              PROHIBITED_CHARS, PROHIBITED_SNAME_CHARS, 
-                              PROHIBITED_VALS, 
-                              BISON_VALUES, BISON_SQUID_FLD, ITIS_KINGDOMS, 
-                              ISO_COUNTRY_CODES)
-from common.inputdata import ANCILLARY_FILES
-from common.lookup import Lookup, VAL_TYPE
-from common.tools import (get_csv_dict_reader, open_csv_files, get_logger)
 
 # .............................................................................
 # ...............................................

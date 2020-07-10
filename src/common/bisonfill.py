@@ -26,12 +26,10 @@ import os
 import rtree
 import time
 
-from common.constants import (BISON_DELIMITER, ENCODING, LOGINTERVAL, 
-                              PROHIBITED_CHARS, PROHIBITED_SNAME_CHARS, 
-                              PROHIBITED_VALS, 
-                              BISON_VALUES, BISON_SQUID_FLD, ITIS_KINGDOMS, 
-                              ISO_COUNTRY_CODES, 
-                              BISON2020_FIELD_DEF)
+from common.constants import (
+    BISON_DELIMITER, ENCODING, LOGINTERVAL, BISON_PROVIDER_VALUES,
+    PROHIBITED_CHARS, PROHIBITED_SNAME_CHARS, PROHIBITED_VALS, BISON_SQUID_FLD, 
+    ITIS_KINGDOMS, ISO_COUNTRY_CODES, BISON2020_FIELD_DEF)
 from common.inputdata import ANCILLARY_FILES
 from common.lookup import Lookup, VAL_TYPE
 from common.tools import (
@@ -892,7 +890,8 @@ class BisonFiller(object):
             
     # ...............................................
     def _test_bison_provider_fields(self, rec, recno, squid):
-        for key, val in BISON_VALUES:
+        # USDA and BISON have different values
+        for key, val in BISON_PROVIDER_VALUES:
             if rec[key] != val:
                 self._log.error('Editing Record {}, {}, from bad BISON {} value {} to {}'
                                 .format(recno, squid, key, rec[key], val))
@@ -1171,5 +1170,3 @@ if __name__ == '__main__':
     # Use Derek D. generated ITIS lookup itis2_lut_fname
 #     gr.update_itis_geo_estmeans(itis2_lut_fname, terrestrial_shpname, 
 #                                 marine_shpname, estmeans_fname)
-"""
-"""

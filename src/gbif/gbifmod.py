@@ -39,7 +39,6 @@ from gbif.constants import (GBIF_DELIMITER, TERM_CONVERT, META_FNAME,
                             GBIF_NAMEKEY_TEMP_FIELD, GBIF_NAMEKEY_TEMP_TYPE)
 from gbif.gbifmeta import GBIFMetaReader
 from gbif.gbifapi import GbifAPI
-from old.gbifProvider import provider
         
 # .............................................................................
 class GBIFReader(object):
@@ -205,17 +204,19 @@ class GBIFReader(object):
         if prov_meta is not None:
             if (prov_meta['bison_provider_name'] != rec['provider'] or 
                 prov_meta['bison_provider_url'] != rec['provider_url']):
-                self._log.error('Bad provider {} vals {}, should be {}'.format(
-                    prov_id, rec['provider'], rec['provider_url'], 
-                    prov_meta['bison_provider_name'], 
-                    prov_meta['bison_provider_url']))
+                self._log.error('Bad provider {} vals {}, {}, should be {}, {}'
+                                .format(prov_id, rec['provider'], 
+                                        rec['provider_url'], 
+                                        prov_meta['bison_provider_name'], 
+                                        prov_meta['bison_provider_url']))
         if res_meta is not None:
             if (res_meta['bison_resource_name'] != rec['resource'] or 
                 res_meta['bison_resource_url'] != rec['resource_url']):
-                self._log.error('Bad provider {} vals {}, should be {}'.format(
-                    prov_id, rec['resource'], rec['resource_url'], 
-                    prov_meta['bison_resource_name'], 
-                    prov_meta['bison_resource_url']))
+                self._log.error('Bad resource {} vals {}, {}, should be {}, {}'
+                                .format(res_id, rec['resource'], 
+                                        rec['resource_url'], 
+                                        res_meta['bison_resource_name'], 
+                                        res_meta['bison_resource_url']))
                 
     # ...............................................
     def _update_point(self, brec):

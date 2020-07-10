@@ -2,10 +2,10 @@ import glob
 import os
 
 from common.constants import (
-    BISON2020_FIELD_DEF, BISONEXPORT_TO_BISON2020_MAP, BISON_VALUES, 
-    PROVIDER_ACTIONS, PROVIDER_DELIMITER, BISON_DELIMITER, ENCODING, 
+    BISON2020_FIELD_DEF, BISONEXPORT_TO_BISON2020_MAP, 
+    BISON_PROVIDER_VALUES, PROVIDER_ACTIONS, PROVIDER_DELIMITER, BISON_DELIMITER, ENCODING, 
     BISON_IPT_PREFIX, IPT_QUERY)
-from common.inputdata import BISON_PROVIDER
+from common.inputdata import BISON_PROVIDER, USDA_PLANTS_ID, USDA_PLANTS_URL
 from common.lookup import Lookup, VAL_TYPE
 from common.tools import (
     get_logger, makerow, open_csv_files, get_csv_dict_reader, get_csv_writer)
@@ -172,8 +172,8 @@ class BisonMerger(object):
         return newrec
 
     # ...............................................
-    def _fill_bison_constant_fields(self, rec):
-        for key, const_val in BISON_VALUES.items():
+    def _fill_provider_constant_fields(self, rec):
+        for key, const_val in BISON_PROVIDER_VALUES.items():
             if key == 'provider_url':
                 rval = rec[key]
                 if not rval.startswith(const_val):
@@ -225,7 +225,6 @@ class BisonMerger(object):
                 dict_reader, inf, csv_writer, outf = open_csv_files(
                     infile, in_delimiter, ENCODING, outfname=outfile, 
                     outfields=dl_fields, outdelimiter=BISON_DELIMITER)
-                _ = next(dict_reader)
                 recno = 0
                 for rec in dict_reader:
                     recno += 1
@@ -233,7 +232,7 @@ class BisonMerger(object):
                         rec = self._map_old_to_new_rec(rec)
                         
                     self._remove_internal_delimiters(rec)
-                    self._fill_bison_constant_fields(rec)
+                    self._fill_provider_constant_fields(rec)
 
                     self._replace_resource(
                         rec, action, new_res_id, const_res_name, const_res_url)
@@ -399,7 +398,10 @@ class BisonMerger(object):
         provider_datasets = BISON_PROVIDER.copy()
         for key, vals in provider_datasets.items():
             vals['legacy_id'] = key
-            vals['resource_url'] = self._standardize_bison_url(vals['resource_id'])
+            if vals['resource_id'] == USDA_PLANTS_ID:
+                vals['resource_url'] = USDA_PLANTS_URL
+            else:
+                vals['resource_url'] = self._standardize_bison_url(vals['resource_id'])
             provider_datasets[key] = vals
         
         prefix = os.path.join(inpath, EXISTING_DATASET_FILE_PREFIX)
@@ -407,6 +409,7 @@ class BisonMerger(object):
         
         if existing_prov_filenames is not None:
             for fn in existing_prov_filenames:
+                # USDA Plants is 440, 1066
                 legacy_ident = fn[len(prefix):-4]
                 try:
                     newdata = provider_datasets[legacy_ident]

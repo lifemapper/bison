@@ -480,7 +480,10 @@ if __name__ == '__main__':
             
             
     elif data_source == 'provider':
-        fixme = ['440,100045', '440,100061', 'emammal', 'nplichens']
+        # 1066: USDA_PLANTS, 100045: rewrite, 100061: replace, 
+        # 100032: replace_rename, emammal: add, nplichens: add
+#         FIXME = ['440,1066', '440,100045', '440,100061', 'emammal', 'nplichens']
+        FIXME = ['440,1066']
         bisonprov_lut_fname = os.path.join(ancillary_path, 'bisonprovider_meta_lut.csv')
         # No step 2 for BISON provider data
         if step <= 4:
@@ -502,12 +505,11 @@ if __name__ == '__main__':
             bisonprov_dataload = Lookup.init_from_dict(bisonprov_dataload_metadata)
             bisonprov_dataload.write_lookup(bisonprov_lut_fname, None, BISON_DELIMITER)
         for resource_key, resource_pvals in bisonprov_dataload.lut.items():
-#             ignore_me = True
-#             if resource_key in fixme: 
-#                 ignore_me = False
             ignore_me = False
             # resource_id from command option
             if resource_id is not None and resource_id != resource_key:
+                ignore_me = True
+            elif resource_key not in FIXME: 
                 ignore_me = True
             fname = resource_pvals['filename']
             action = resource_pvals['action']
