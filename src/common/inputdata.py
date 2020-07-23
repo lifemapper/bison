@@ -112,7 +112,7 @@ BISON_PROVIDER = {
     'nycity-tree-census-2015':
     {'action': 'add',
      'ticket': 'BISON-989',
-     'resource_name': 'New York City Tree Census - 2015',
+     'resource_name': 'New York City Street Tree Census - 2015',
      # Fixed from resource_url contents in records 
      # urlprefix = 'https://bison.usgs.gov/ipt' + '/resource?r='
      'resource_id': 'nycity-tree-census-2015',
