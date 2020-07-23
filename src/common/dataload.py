@@ -175,11 +175,7 @@ def step_parallel(in_csv_filename, terrestrial_data, marine_data, ancillary_path
         lgfile_linecount, smfile_linecount, out_csv_filename))
     
 # .............................................................................
-def do_track_providers(step, basefname, outpath):
-    resource_count_fname = os.path.join(
-        outpath,  '{}.count.resource.txt'.format(basefname))
-    provider_count_fname = os.path.join(
-        outpath,  '{}.count.provider.txt'.format(basefname))
+def do_track_providers(resource_count_fname, provider_count_fname):
     # If both exist, do nothing
     if (os.path.exists(resource_count_fname) and 
         os.path.exists(provider_count_fname)):
@@ -188,8 +184,6 @@ def do_track_providers(step, basefname, outpath):
         track_providers = False
     else:
         track_providers = True
-    # If just starting or only one exists, delete both
-    if step == 1 or track_providers:
         if os.path.exists(resource_count_fname):
             print('Deleting {}'.format(resource_count_fname))
             os.remove(resource_count_fname)
@@ -326,14 +320,17 @@ if __name__ == '__main__':
         ancillary_path, ANCILLARY_FILES['provider']['file'])
     merged_resource_lut_fname = os.path.join(ancillary_path, 'merged_dataset_lut.csv')
     merged_provider_lut_fname = os.path.join(ancillary_path, 'merged_organization_lut.csv')
+    resource_count_fname = os.path.join(
+        outpath,  '{}.count.resource.csv'.format(data_source))
+    provider_count_fname = os.path.join(
+        outpath,  '{}.count.provider.csv'.format(data_source))
 
     if (not os.path.exists(merged_provider_lut_fname) or
         not os.path.exists(merged_resource_lut_fname)):
         logbasename = 'prep_resource_provider'
         logfname = os.path.join(tmppath, '{}.log'.format(logbasename))
         logger = get_logger(logbasename, logfname)
-        if data_source != 'gbif':
-            gr = GBIFReader('/tank/data/bison/2019/CA_USTerr_gbif', logger)
+        gr = GBIFReader('/tank/data/bison/2019/CA_USTerr_gbif', logger)
         # Merge existing provider and resource metadata with GBIF dataset 
         # metadata files and GBIF API-returned metadata
         gr.resolve_provider_resource_for_lookup(
@@ -353,8 +350,8 @@ if __name__ == '__main__':
             for sdir in (s1dir, s2dir, s3dir, s4dir):
                 os.makedirs(sdir, mode=0o775, exist_ok=True)
         basefname, ext = os.path.splitext(basefname_wext)
-        logbasename = 'step{}-{}'.format(step, basefname)
-        logfname = os.path.join(tmppath, '{}.log'.format(logbasename))
+#         logbasename = 'step{}-{}'.format(step, basefname)
+#         logfname = os.path.join(tmppath, '{}.log'.format(logbasename))
 
         nametaxa_fname = os.path.join(tmppath, 'step1_{}_sciname_taxkey_list.csv'
                                       .format(basefname))
@@ -367,16 +364,19 @@ if __name__ == '__main__':
         pass3_fname = os.path.join(s3dir, '{}.csv'.format(basefname))
         pass4_fname = os.path.join(s4dir, '{}.csv'.format(basefname))
         
-        (resource_count_fname, provider_count_fname, 
-         track_providers) = do_track_providers(step, basefname, outpath)
+        track_providers = do_track_providers(
+            resource_count_fname, provider_count_fname)
         
         start_time = time.time()
         # ..........................................................
         # Step 1: assemble metadata, initial rewrite to BISON format, (GBIF-only)
-        # fill resource/provider, check coords (like provider step 1)
+        # fill resource/prov0ider, check coords (like provider step 1)
         if step == 1:
-            logger = get_logger(logbasename, logfname)
+            logfname = os.path.join(s1dir, '{}.log'.format(basefname))
+            logger = get_logger(basefname, logfname)
             gr = GBIFReader(workpath, logger)
+            gr.read_resource_provider_stats(
+                resource_count_fname, provider_count_fname)
             # initial conversion of GBIF to BISON fields and standardization
             # Discard records from BISON org, bison IPT
             gr.transform_gbif_to_bison(
@@ -386,11 +386,12 @@ if __name__ == '__main__':
                 nametaxa_fname, pass1_fname)
             
             gr.write_resource_provider_stats(
-                resource_count_fname, provider_count_fname)
+                resource_count_fname, provider_count_fname, overwrite=True)
         # ..........................................................
         # Step 2: assemble and parse names, rewrite records with clean names
         elif step == 2:
-            logger = get_logger(logbasename, logfname)
+            logfname = os.path.join(s2dir, '{}.log'.format(basefname))
+            logger = get_logger(basefname, logfname)
             gr = GBIFReader(workpath, logger)
             # Reread output ONLY if missing gbif name/taxkey 
             if not os.path.exists(nametaxa_fname):
@@ -403,22 +404,18 @@ if __name__ == '__main__':
                 pass1_fname, pass2_fname, canonical_lut, 
                 track_providers=track_providers)
             
-            gr.write_resource_provider_stats(
-                resource_count_fname, provider_count_fname)
         # ..........................................................
         # Step 3: rewrite records filling ITIS fields, establishment_means, and 
         # county centroids for records without coordinates 
         elif step == 3:
-            logger = get_logger(logbasename, logfname)
+            logfname = os.path.join(s3dir, '{}.log'.format(basefname))
+            logger = get_logger(basefname, logfname)
             bf = BisonFiller(logger)
             # No discards
             bf.update_itis_estmeans_centroid(
                 itis2_lut_fname, estmeans_fname, terrestrial_shpname, 
                 pass2_fname, pass3_fname, from_gbif=True,
                 track_providers=track_providers)
-            if track_providers:
-                bf.write_resource_provider_stats(
-                    resource_count_fname, provider_count_fname)
         # ..........................................................
         # Step 4: split into smaller files, parallel process 
         # Identify enclosing terrestrial or marine polygons, rewrite with 
@@ -427,7 +424,8 @@ if __name__ == '__main__':
             # No discards
             lcount = get_line_count(pass3_fname)
             if lcount < LOGINTERVAL:
-                logger = get_logger(logbasename, logfname)
+                logfname = os.path.join(s4dir, '{}.log'.format(basefname))
+                logger = get_logger(basefname, logfname)
                 bf = BisonFiller(logger)
                 logger.info('  Process step 4 output to {}'.format(
                     pass4_fname))
@@ -438,28 +436,29 @@ if __name__ == '__main__':
                     pass3_fname, terr_data, marine_data, ancillary_path, 
                     pass4_fname, from_gbif=True)
             
-            if track_providers:
-                logger = get_logger(logbasename, logfname)
-                bf = BisonFiller(logger)
-                bf.count_provider_resource(pass4_fname)
-                bf.write_resource_provider_stats(
-                    resource_count_fname, provider_count_fname)
+#             if track_providers:
+#                 logger = get_logger(logbasename, logfname)
+#                 bf = BisonFiller(logger)
+#                 bf.count_provider_resource(pass4_fname)
+#                 bf.write_resource_provider_stats(
+#                     resource_count_fname, provider_count_fname)
 
-        # ..........................................................
-        # Step 99: fix something
-        elif step == 99:
-            infile = os.path.join(s4dir, 'occurrence_lines_1-2000.csv')
-            fixfile = os.path.join(fixdir, 'occurrence_lines_1-2000.csv')
-            logger = get_logger(logbasename, logfname)
-            bf = BisonFiller(logger)
-            bf.rewrite_recs(infile, fixfile, BISON_DELIMITER)
+#         # ..........................................................
+#         # Step 99: fix something
+#         elif step == 99:
+#             infile = os.path.join(s4dir, 'occurrence_lines_1-2000.csv')
+#             fixfile = os.path.join(fixdir, 'occurrence_lines_1-2000.csv')
+#             logfname = os.path.join(fixdir, '{}.log'.format(basefname))
+#             logger = get_logger(basefname, logfname)
+#             bf = BisonFiller(logger)
+#             bf.rewrite_recs(infile, fixfile, BISON_DELIMITER)
         # ..........................................................
         # Step 1000: test something
         elif step == 1000:
             outfile = os.path.join(outpath, '{}.csv'.format(basefname))
             if os.path.exists(outfile):
-                logfname = os.path.join(tmppath, '{}.log'.format(logbasename))
-                logger = get_logger(logbasename, logfname)
+                logfname = os.path.join(outpath, '{}.log'.format(basefname))
+                logger = get_logger(basefname, logfname)
                 bfiller = BisonFiller(logger)
                 bfiller.walk_data(
                     in_fname, terr_data, marine_data, ancillary_path, 
@@ -520,20 +519,20 @@ if __name__ == '__main__':
             else:
                 if not fname:
                     fname = 'bison_{}.csv'.format(resource_key)
-                    outfname = fname
+                    basefname = fname
                 else:
                     # New input files have .txt extension
-                    outfname = '{}.csv'.format(os.path.splitext(fname)[0])
+                    basefname = '{}.csv'.format(os.path.splitext(fname)[0])
                 combo_logger.info('{}: {} {}'.format(
                     resource_key, action, fname))
                 infile = os.path.join(workpath, fname)
                 if not os.path.exists(infile):
                     raise Exception('File {} does not exist for {}'
                                     .format(fname, resource_key))
-                outfile1 = os.path.join(s1dir, outfname)
-                outfile3 = os.path.join(s3dir, outfname)            
-                outfile4 = os.path.join(s4dir, outfname)
-                logbasename = '{}.step{}'.format(outfname, step)                
+                outfile1 = os.path.join(s1dir, basefname)
+                outfile3 = os.path.join(s3dir, basefname)            
+                outfile4 = os.path.join(s4dir, basefname)
+                logbasename = '{}.step{}'.format(basefname, step)                
             # ..........................................................
             # Step 1: rewrite, handle quotes, fill ticket/constant vals for 
             # resource/provider
@@ -600,7 +599,7 @@ if __name__ == '__main__':
             # ..........................................................
             # Step 99: fix something
             elif step == 99 and not ignore_me:
-                outfile = os.path.join(outpath, outfname)
+                outfile = os.path.join(outpath, basefname)
                 if not os.path.exists(outfile):
                     combo_logger.info('  Re-write step 4 output with fix to {}'.format(
                         outfile))
@@ -610,7 +609,7 @@ if __name__ == '__main__':
             # ..........................................................
             # Step 1000: test something
             elif step == 1000 and not ignore_me:
-                outfile = os.path.join(outpath, outfname)
+                outfile = os.path.join(outpath, basefname)
                 if os.path.exists(outfile):
                     combo_logger.info('  Test output {}'.format(outfile))
                     merger.test_bison_data(outfile, resource_key, resource_pvals)
