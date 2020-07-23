@@ -177,8 +177,7 @@ class GBIFReader(object):
         return rec
     
     # ...............................................
-    def _track_provider_resources(self, rec, provider_lut=None, 
-                                  resource_lut=None):
+    def _track_provider_resources(self, rec, providers=None, resources=None):
         prov_meta = res_meta = None
         prov_id = rec['provider_id']
         res_id = rec['resource_id']
@@ -191,13 +190,13 @@ class GBIFReader(object):
         except:
             self._active_providers[rec['resource_id']] = 1
         # Check for bad ID
-        if provider_lut is not None and resource_lut is not None:
+        if providers is not None and resources is not None:
             try:
-                prov_meta = provider_lut[prov_id]
+                prov_meta = providers.lut[prov_id]
             except:
                 self._log.error('Lookup missing provider_id {}'.format(prov_id))
             try:
-                res_meta = resource_lut[res_id]
+                res_meta = resources.lut[res_id]
             except:
                 self._log.error('Lookup missing resource_id {}'.format(res_id))
         # Check for bad name, url
@@ -684,7 +683,8 @@ class GBIFReader(object):
                     # Write new ordered row
                     biline = makerow(brec, self._outfields)
                     writer.writerow(biline)
-                    self._track_provider_resources(brec)
+                    self._track_provider_resources(
+                        brec, providers=org_by_uuid, resources=dataset_by_uuid)
 
                                 
         except Exception as e:
@@ -740,6 +740,51 @@ class GBIFReader(object):
             
     # ...............................................
     def write_resource_provider_stats(self, resource_count_fname, 
+                                      provider_count_fname, overwrite=True):
+        """Write counts for each provider and resource (GBIF organization and 
+        dataset), identified by the UUIDs assigned by GBIF.
+        
+        Args:
+            resource_count_fname: file for resource/dataset record counts
+            provider_count_fname: file for provider/organization record counts
+        """
+        if os.path.exists(resource_count_fname) and overwrite is True:
+            os.remove(resource_count_fname)
+        if os.path.exists(resource_count_fname):
+            self._log.info('File exists: {}'.format(resource_count_fname))
+        else:
+            try:
+                writer, outf = get_csv_writer(
+                    resource_count_fname, BISON_DELIMITER, ENCODING, fmode='w')
+                writer.writerow(['dataset_uuid', 'count'])
+                for uuid, count in self._active_resources.items():
+                    writer.writerow([uuid, count])    
+            except Exception as e:
+                raise Exception(
+                    'Failed to write {}: {}'.format(resource_count_fname, e))
+            finally:
+                outf.close()
+                
+        if os.path.exists(provider_count_fname) and overwrite is True:
+            os.remove(provider_count_fname)            
+        if os.path.exists(provider_count_fname):
+            self._log.info('File exists: {}'.format(provider_count_fname))
+        else:
+            try:
+                writer, outf = get_csv_writer(
+                    provider_count_fname, BISON_DELIMITER, ENCODING, fmode='w')
+                writer.writerow(['organization_uuid', 'count'])
+                for uuid, count in self._active_providers.items():
+                    writer.writerow([uuid, count])    
+            except Exception as e:
+                raise Exception(
+                    'Failed to write {}: {}'.format(provider_count_fname, e))
+            finally:
+                outf.close()
+
+
+    # ...............................................
+    def read_resource_provider_stats(self, resource_count_fname, 
                                       provider_count_fname):
         """Write counts for each provider and resource (GBIF organization and 
         dataset), identified by the UUIDs assigned by GBIF.
@@ -748,13 +793,32 @@ class GBIFReader(object):
             resource_count_fname: file for resource/dataset record counts
             provider_count_fname: file for provider/organization record counts
         """
-        # Write record count per resource and provider
-        with open(resource_count_fname, 'w', encoding=ENCODING) as f:
-            for dataset_uuid, count in self._active_resources.items():
-                f.write('{}{}{}'.format(dataset_uuid, BISON_DELIMITER, count))
-        with open(provider_count_fname, 'w', encoding=ENCODING) as f:
-            for provider_uuid, count in self._active_providers.items():
-                f.write('{}{}{}'.format(provider_uuid, BISON_DELIMITER, count))
+        if os.path.exists(resource_count_fname):
+            try:
+                drdr, inf = get_csv_dict_reader(
+                    resource_count_fname, BISON_DELIMITER, ENCODING)
+                for rec in drdr:
+                    uuid = rec['dataset_uuid']
+                    ct = rec['count']
+                    self._active_resources[uuid] = ct
+            except Exception as e:
+                self._log.error('Failed reading data in {}: {}'
+                                .format(resource_count_fname, e))
+            finally:
+                inf.close()
+        if os.path.exists(provider_count_fname):
+            try:
+                drdr, inf = get_csv_dict_reader(
+                    provider_count_fname, BISON_DELIMITER, ENCODING)
+                for rec in drdr:
+                    uuid = rec['organization_uuid']
+                    ct = rec['count']
+                    self._active_providers[uuid] = ct
+            except Exception as e:
+                self._log.error('Failed reading data in {}: {}'
+                                .format(resource_count_fname, e))
+            finally:
+                inf.close()
 
 #     # ...............................................
 #     def find_gbif_record(self, gbifid):
@@ -890,7 +954,8 @@ class GBIFReader(object):
                     row = self._makerow(rec)
                     writer.writerow(row)
                     if track_providers:
-                        self._track_provider_resources(rec)
+                        self._track_provider_resources(
+                            rec)
                     
                 if (recno % LOGINTERVAL) == 0:
                     self._log.info('*** Record number {} ***'.format(recno))
@@ -903,17 +968,17 @@ class GBIFReader(object):
             outf.close()
         
     # ...............................................
-    def _get_dataset_uuids(self):
+    def _get_dataset_uuids(self, dataset_path):
         """
         @summary: Get dataset UUIDs from downloaded dataset EML filenames.
         @param dataset_pth: absolute path to the dataset EML files
         """
         import glob
         uuids = set()
-        dsfnames = glob.glob(os.path.join(self._dataset_pth, '*.xml'))
+        dsfnames = glob.glob(os.path.join(dataset_path, '*.xml'))
         if dsfnames is not None:
-            start = len(self._dataset_pth)
-            if not self._dataset_pth.endswith(os.pathsep):
+            start = len(dataset_path)
+            if not dataset_path.endswith(os.pathsep):
                 start += 1
             stop = len('.xml')
             for fn in dsfnames:
@@ -1018,7 +1083,11 @@ class GBIFReader(object):
             merged_resource_lut_fname: output file for the merged table
             outdelimiter: field value separator for the output file
         """
-        ds_uuids = self._get_dataset_uuids()
+        big_ds_uuids = self._get_dataset_uuids(
+            '/tank/data/bison/2019/CA_USTerr_gbif/dataset')
+        sm_ds_uuids = self._get_dataset_uuids(
+            '/tank/data/bison/2019/US_gbif/dataset')
+        ds_uuids = big_ds_uuids.union(sm_ds_uuids)
         resolved_uuids = set()
         merged_lut = Lookup(valtype=VAL_TYPE.DICT, encoding=ENCODING)
         header = [fld for (fld, _) in MERGED_RESOURCE_LUT_FIELDS]
