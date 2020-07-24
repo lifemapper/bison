@@ -26,6 +26,11 @@ class BisonMerger(object):
         self._provider_table = {}
         
     # ...............................................
+    def reset_logger2(self, logger):
+        self._log = None
+        self._log = logger
+
+    # ...............................................
     def reset_logger(self, outdir, logname):
         self._log = None
         logfname = os.path.join(outdir, '{}.log'.format(logname))

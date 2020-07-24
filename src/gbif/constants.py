@@ -34,6 +34,8 @@ BISON_ORG_UUID = 'c3ad790a-d426-4ac1-8e32-da61f81f0117'
 
 USDA_BEE_ORG_UUID = '1e26a630-7203-11dc-a0d8-b8a03c50a862'
 
+GBIF_DATASET_PATHS = ['/tank/data/bison/2019/CA_USTerr_gbif/dataset',
+                 '/tank/data/bison/2019/US_gbif/dataset']
 
 # .............................................................................
 class GBIF_ORG_KEYS(object):

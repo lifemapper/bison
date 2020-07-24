@@ -77,6 +77,11 @@ class BisonFiller(object):
         self._log = logger
         
     # ...............................................
+    def reset_logger2(self, logger):
+        self._log = None
+        self._log = logger
+        
+    # ...............................................
     def loginfo(self, msg):
         if self._log is None:
             print(msg)

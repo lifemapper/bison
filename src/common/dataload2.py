@@ -22,8 +22,6 @@
              02110-1301, USA.
 """
 import os
-from concurrent.futures import ProcessPoolExecutor
-from multiprocessing import cpu_count
 import time
 
 from common.bisonfill import BisonFiller
@@ -31,12 +29,10 @@ from common.constants import (
     BISON_DELIMITER, LOGINTERVAL, ANCILLARY_DIR, TEMP_DIR, 
     OUTPUT_DIR, PROVIDER_DELIMITER, PROVIDER_ACTIONS, ENCODING)
 from common.inputdata import ANCILLARY_FILES
-from common.intersect_one import intersect_csv_and_shapefiles
 from common.lookup import Lookup, VAL_TYPE
-from common.tools import get_logger, get_line_count, get_header
-
+from common.tools import (get_logger, get_line_count)
+from common.geo_intersect import step_parallel
 from gbif.gbifmod import GBIFReader
-
 from provider.providermod import BisonMerger
 
 # .............................................................................
@@ -46,29 +42,33 @@ class DataLoader(object):
     coordinates, terrestrial or marine boundaries, and establishment_means.
     """
     # ...............................................
-    def __init__(self, data_source, input_data, step, resource_id=None):
+    def __init__(self, data_source, input_data, resource_id=None):
         """
         @summary: Constructor
         """    
         if not os.path.exists(input_data):
             raise Exception('Input file {} does not exist'.format(input_data))
         elif os.path.isdir(input_data):
-            workpath = input_data.rstrip(os.path.sep)
+            self.workpath = input_data.rstrip(os.path.sep)
             self.rawdata_fname = None
         elif os.path.isfile(input_data):
             self.rawdata_fname = input_data
-            workpath, basefname_wext = os.path.split(self.rawdata_fname)
+            self.workpath, basefname_wext = os.path.split(self.rawdata_fname)
         # filename w/o path or extension
         self.basefname, _ = os.path.splitext(basefname_wext)
-            
+                
         self._test_resource_id = resource_id
-            
-        self.basepath, _ = os.path.split(workpath)
+        # basepath contains bison provider and GBIF data
+        # workpath is specific to dataset and contains raw data files
+        # <some_path>/basepath/workpath
+        self.basepath, _ = os.path.split(self.workpath)
         self.ancillary_path = os.path.join(self.basepath, ANCILLARY_DIR)
-        self.tmppath = os.path.join(workpath, TEMP_DIR)
-        self.outpath = os.path.join(workpath, OUTPUT_DIR)
+        self.tmppath = os.path.join(self.workpath, TEMP_DIR)
+        self.outpath = os.path.join(self.workpath, OUTPUT_DIR)
         os.makedirs(self.tmppath, mode=0o775, exist_ok=True)
         os.makedirs(self.outpath, mode=0o775, exist_ok=True)
+
+        self.logger = self._get_logger_for_processing(self.tmppath, basefname='dataloader')
     
         # ancillary data for record update    
         self.terrestrial_shpname = os.path.join(
@@ -106,26 +106,35 @@ class DataLoader(object):
         if data_source == 'gbif':
             os.makedirs(self.s2dir, mode=0o775, exist_ok=True)
         
-        # All filled in _prep_xxxx function
+        # All filled in _prep_gbif or _prep_bisonprov/set_bisonprov function
         self.pass1_fname = None
         self.pass2_fname = None
         self.pass3_fname = None
         self.pass4_fname = None
-        self.logger = None
         self.action = None
         self.bisonprov_dataload = None
         self.track_providers = None 
         
         if data_source == 'gbif':
-            self._prep_gbif(step, resource_lut_fname, provider_lut_fname)
+            self._prep_gbif(resource_lut_fname, provider_lut_fname)
         elif data_source == 'provider':
             self._prep_bisonprov()
         
     # ...............................................
-    def _prep_gbif(self, step, resource_lut_fname, provider_lut_fname):
-        self.logger = self._get_step_logger(step)
+    def _get_logger_for_processing(self, absfilename_or_path, basefname=None):
+        if basefname is None:
+            basefname = self.basefname
+        if os.path.isdir(absfilename_or_path):
+            pth = absfilename_or_path
+        else:
+            pth, _ = os.path.split(absfilename_or_path)
+        logfname = os.path.join(pth, '{}.log'.format(basefname))
+        logger = get_logger(self.basefname, logfname)
+        return logger
+            
+    # ...............................................
+    def _prep_gbif(self, resource_lut_fname, provider_lut_fname):
         self.track_providers = self._do_track_providers()
-        self.logger = self._get_step_logger(self.pass1_fname)
         # Output CSV files of all records after initial creation or field replacements
         self.pass1_fname = os.path.join(self.s1dir, '{}.csv'.format(self.basefname))
         self.pass2_fname = os.path.join(self.s2dir, '{}.csv'.format(self.basefname))
@@ -134,16 +143,40 @@ class DataLoader(object):
 
         if (not os.path.exists(self.merged_provider_lut_fname) or
             not os.path.exists(self.merged_resource_lut_fname)):
-            logbasename = 'prep_resource_provider'
-            logfname = os.path.join(self.tmppath, '{}.log'.format(logbasename))
-            logger = get_logger(logbasename, logfname)
-            gr = GBIFReader('/tank/data/bison/2019/CA_USTerr_gbif', logger)
+            gr = GBIFReader(self.workpath, self.logger)
             # Merge existing provider and resource metadata with GBIF dataset 
             # metadata files and GBIF API-returned metadata
             gr.resolve_provider_resource_for_lookup(
                 self.merged_resource_lut_fname, resource_lut_fname, 
                 self.merged_provider_lut_fname, provider_lut_fname, 
                 outdelimiter=BISON_DELIMITER)
+
+    # ...............................................
+    def _prep_bisonprov(self):
+        self.action = None
+
+    # ...............................................
+    def reset_bisonprov(self, resource_pvals):
+        fname = resource_pvals['filename']
+                 
+        if not fname:
+            # filename w/o path or extension
+            self.basefname = 'bison_{}'.format(resource_key)
+            self.rawdata_fname = os.path.join(
+                self.workpath, '{}.csv'.format(self.basefname))
+        else:
+            # New input files have .txt extension
+            self.basefname = os.path.basename(fname)
+            self.rawdata_fname = os.path.join(self.workpath, fname)
+            
+        self.logger.info('{}: {} {}'.format(
+            resource_key, self.action, fname))
+        if not os.path.exists(self.rawdata_fname):
+            raise Exception('File {} does not exist for {}'
+                            .format(fname, resource_key))
+        self.pass1_fname = os.path.join(self.s1dir, '{}.csv'.format(self.basefname))
+        self.pass3_fname = os.path.join(self.s3dir, '{}.csv'.format(self.basefname))            
+        self.pass4_fname = os.path.join(self.s4dir, '{}.csv'.format(self.basefname))
         
     # .............................................................................
     def _do_track_providers(self):
@@ -166,221 +199,197 @@ class DataLoader(object):
     def process_gbif_step1(self):
         # Step 1: assemble metadata, initial rewrite to BISON format, (GBIF-only)
         # fill resource/prov0ider, check coords (like provider step 1)
-        logger = self._get_step_logger(self.pass1_fname)
-        gr = GBIFReader(self.datapath, logger)
-        gr.read_resource_provider_stats(
-            self.resource_count_fname, self.provider_count_fname)
-        # initial conversion of GBIF to BISON fields and standardization
-        # Discard records from BISON org, bison IPT
-        gr.transform_gbif_to_bison(
-            self.rawdata_fname, 
-            self.merged_resource_lut_fname, 
-            self.merged_provider_lut_fname, 
-            self.nametaxa_fname, self.pass1_fname)
-        
-        gr.write_resource_provider_stats(
-            self.resource_count_fname, self.provider_count_fname, overwrite=True)
+        if not os.path.exists(self.pass1_fname):
+            task_logger = self._get_logger_for_processing(self.pass1_fname)
+            gr = GBIFReader(self.workpath, task_logger)
+            gr.read_resource_provider_stats(
+                self.resource_count_fname, self.provider_count_fname)
+            # initial conversion of GBIF to BISON fields and standardization
+            # Discard records from BISON org, bison IPT
+            gr.transform_gbif_to_bison(
+                self.rawdata_fname, 
+                self.merged_resource_lut_fname, 
+                self.merged_provider_lut_fname, 
+                self.nametaxa_fname, self.pass1_fname)
+            
+            gr.write_resource_provider_stats(
+                self.resource_count_fname, self.provider_count_fname, overwrite=True)
+        else:
+            self.logger.info('Output file for step 1 exists: {}'.format(
+                self.pass1_fname))
 
     # ...............................................
     def process_gbif_step2(self):
         # Step 2: assemble and parse names, rewrite records with clean names
-        logger = self._get_step_logger(self.pass2_fname)
-        gr = GBIFReader(self.datapath, logger)
-        # Reread output ONLY if missing gbif name/taxkey 
-        if not os.path.exists(self.nametaxa_fname):
-            gr.gather_name_input(self.pass1_fname, self.nametaxa_fname)
-            
-        canonical_lut = gr.resolve_canonical_taxonkeys_for_lookup(
-            self.nametaxa_fname, self.canonical_lut_fname)
-        # Discard records with no clean name
-        gr.update_bison_names(
-            self.pass1_fname, self.pass2_fname, canonical_lut, 
-            track_providers=self.track_providers)
-            
+        if not os.path.exists(self.pass2_fname):
+            task_logger = self._get_logger_for_processing(self.pass2_fname)
+            gr = GBIFReader(self.workpath, task_logger)
+            # Reread output ONLY if missing gbif name/taxkey 
+            if not os.path.exists(self.nametaxa_fname):
+                gr.gather_name_input(self.pass1_fname, self.nametaxa_fname)
+                
+            canonical_lut = gr.resolve_canonical_taxonkeys_for_lookup(
+                self.nametaxa_fname, self.canonical_lut_fname)
+            # Discard records with no clean name
+            gr.update_bison_names(
+                self.pass1_fname, self.pass2_fname, canonical_lut, 
+                track_providers=self.track_providers)
+        else:
+            self.logger.info('Output file for step 2 exists: {}'.format(
+                self.pass2_fname))
+
     # ...............................................
     def process_gbif_step3(self):
         # Step 3: rewrite records filling ITIS fields, establishment_means, and 
         # county centroids for records without coordinates 
-        logger = self._get_step_logger(self.pass3_fname)
-        bf = BisonFiller(logger)
-        # No discards
-        bf.update_itis_estmeans_centroid(
-            self.itis2_lut_fname, self.estmeans_fname, self.terrestrial_shpname, 
-            self.pass2_fname, self.pass3_fname, from_gbif=True,
-            track_providers=self.track_providers)
-
-    # ...............................................
-    def _get_step_logger(self, step):
-        if step == 1:
-            stepdir = self.s1dir
-        elif step == 2:
-            stepdir = self.s2dir
-        elif step == 3:
-            stepdir = self.s3dir
-        elif step == 4:
-            stepdir = self.s4dir        
-        logfname = os.path.join(stepdir, '{}.log'.format(self.basefname))
-        logger = get_logger(self.basefname, logfname)
-        return logger
+        if not os.path.exists(self.pass3_fname):
+            task_logger = self._get_logger_for_processing(self.pass3_fname)
+            bf = BisonFiller(task_logger)
+            # No discards
+            bf.update_itis_estmeans_centroid(
+                self.itis2_lut_fname, self.estmeans_fname, self.terrestrial_shpname, 
+                self.pass2_fname, self.pass3_fname, from_gbif=True,
+                track_providers=self.track_providers)
+        else:
+            self.logger.info('Output file for step 3 exists: {}'.format(
+                self.pass3_fname))
 
     # ...............................................
     def process_gbif_step4(self):
-        # Step 4: split into smaller files, parallel process 
-        # Identify enclosing terrestrial or marine polygons, rewrite with 
-        # calculated state/county/fips or mrgid/eez 
-        terr_data = ANCILLARY_FILES['terrestrial']
-        marine_data = ANCILLARY_FILES['marine']
-        # No discards
-        lcount = get_line_count(self.pass3_fname)
-        if lcount < LOGINTERVAL:
-            logger = self._get_step_logger(self.pass4_fname)
-            bf = BisonFiller(logger)
-            logger.info('  Process step 4 output to {}'.format(
-                self.pass4_fname))
-            bf.update_point_in_polygons(
-                self.terr_data, self.marine_data, self.ancillary_path, 
-                self.pass3_fname, self.pass4_fname)
-        else:
-            step_parallel(
-                self.pass3_fname, terr_data, marine_data, self.ancillary_path, 
-                self.pass4_fname, from_gbif=True)
-            
-
-#         # ..........................................................
-#         # Step 99: fix something
-#         elif step == 99:
-#             infile = os.path.join(s4dir, 'occurrence_lines_1-2000.csv')
-#             fixfile = os.path.join(fixdir, 'occurrence_lines_1-2000.csv')
-#             logfname = os.path.join(fixdir, '{}.log'.format(basefname))
-#             logger = get_logger(basefname, logfname)
-#             bf = BisonFiller(logger)
-#             bf.rewrite_recs(infile, fixfile, BISON_DELIMITER)
-#         # ..........................................................
-#         # Step 1000: test something
-#         elif step == 1000:
-#             outfile = os.path.join(outpath, '{}.csv'.format(basefname))
-#             if os.path.exists(outfile):
-#                 logfname = os.path.join(outpath, '{}.log'.format(basefname))
-#                 logger = get_logger(basefname, logfname)
-#                 bfiller = BisonFiller(logger)
-#                 bfiller.walk_data(
-#                     in_fname, terr_data, marine_data, ancillary_path, 
-#                     merged_resource_lut_fname, merged_provider_lut_fname)
-
-    # ...............................................
-    def _prep_bisonprov(self):
-        self.action = None
-        bisonprov_lut_fname = os.path.join(
-            self.ancillary_path, 'bisonprovider_meta_lut.csv')
-        combo_logbasename = 'step{}-provider'.format(step)
-        combo_logfname = os.path.join(
-            self.tmppath, '{}.log'.format(combo_logbasename))
-        combo_logger = get_logger(combo_logbasename, combo_logfname)
-        self.logger = combo_logger
-        
-        merger = BisonMerger(combo_logger)
-        # Pull metadata from ticket first, 
-        # if missing, fill with old provider table data second
-        if os.path.exists(bisonprov_lut_fname):
-            self.bisonprov_dataload = Lookup.init_from_file(
-                bisonprov_lut_fname, ['legacy_id'], BISON_DELIMITER, 
-                VAL_TYPE.DICT, ENCODING)
-        else:
-            old_resources = merger.read_resources(self.merged_resource_lut_fname)
-            bisonprov_dataload_metadata = merger.assemble_files(
-                self.workpath, old_resources)
-            self.bisonprov_dataload = Lookup.init_from_dict(
-                bisonprov_dataload_metadata)
-            self.bisonprov_dataload.write_lookup(
-                bisonprov_lut_fname, None, BISON_DELIMITER)
-
-    # ...............................................
-    def set_bisonprov(self, resource_pvals):
-        fname = resource_pvals['filename']
-        self.action = resource_pvals['action']
-         
-        if self.action not in PROVIDER_ACTIONS:
-            self.logger.info('Wait to process {}'.format(resource_key))
-        else:
-            if not fname:
-                # filename w/o path or extension
-                self.basefname = 'bison_{}'.format(resource_key)
+        if not os.path.exists(self.pass4_fname):
+            # Step 4: split into smaller files, parallel process 
+            # Identify enclosing terrestrial or marine polygons, rewrite with 
+            # calculated state/county/fips or mrgid/eez 
+            terr_data = ANCILLARY_FILES['terrestrial']
+            marine_data = ANCILLARY_FILES['marine']
+            # No discards
+            lcount = get_line_count(self.pass3_fname)
+            if lcount < LOGINTERVAL:
+                self.logger.info('  Process step 4 output to {}'.format(
+                    self.pass4_fname))
+                task_logger = self._get_logger_for_processing(self.pass4_fname)
+                bf = BisonFiller(task_logger)
+                bf.update_point_in_polygons(
+                    terr_data, marine_data, self.ancillary_path, 
+                    self.pass3_fname, self.pass4_fname)
             else:
-                # New input files have .txt extension
-                self.basefname = os.path.basename(fname)
-            self.logger.info('{}: {} {}'.format(
-                resource_key, self.action, fname))
-            infile = os.path.join(self.basepath, fname)
-            if not os.path.exists(infile):
-                raise Exception('File {} does not exist for {}'
-                                .format(fname, resource_key))
-            self.pass1_fname = os.path.join(self.s1dir, '{}.csv'.format(self.basefname))
-            self.pass3_fname = os.path.join(self.s3dir, '{}.csv'.format(self.basefname))            
-            self.pass4_fname = os.path.join(self.s4dir, '{}.csv'.format(self.basefname))
+                step_parallel(
+                    self.pass3_fname, terr_data, marine_data, self.ancillary_path, 
+                    self.pass4_fname, from_gbif=True)
+        else:
+            self.logger.info('Output file for step 4 exists: {}'.format(
+                self.pass4_fname))
+
+
+#     # ...............................................
+#     def process_gbif_fix(self):
+#         # Step 99: fix something
+#         infile = os.path.join(self.pass4_fname, 'occurrence_lines_1-2000.csv')
+#         task_logger = self._get_logger_for_processing(self.pass4_fname)
+#         fixfile = os.path.join(fixdir, 'occurrence_lines_1-2000.csv')
+#         logfname = os.path.join(fixdir, '{}.log'.format(basefname))
+#         logger = get_logger(basefname, logfname)
+#         bf = BisonFiller(logger)
+#         bf.rewrite_recs(infile, fixfile, BISON_DELIMITER)
+# 
+#     # ...............................................
+#     def process_gbif_test(self):
+#         # Step 1000: test something
+#         outfile = os.path.join(outpath, '{}.csv'.format(basefname))
+#         if os.path.exists(outfile):
+#             logfname = os.path.join(outpath, '{}.log'.format(basefname))
+#             logger = get_logger(basefname, logfname)
+#             bfiller = BisonFiller(logger)
+#             bfiller.walk_data(
+#                 in_fname, terr_data, marine_data, ancillary_path, 
+#                 merged_resource_lut_fname, merged_provider_lut_fname)
+
+    # ...............................................
+    def process_bisonprov_step1(self):
+        if not os.path.exists(self.pass1_fname):
+            # Step 1: rewrite, handle quotes, fill ticket/constant vals for 
+            # resource/provider    
+            # Same process as GBIF Step 1, different resource/provider inputs
+            self.logger.info('  Process step 1 output to {}'.format(
+                self.pass1_fname))
+            task_logger = self._get_logger_for_processing(self.pass1_fname)
+            merger = BisonMerger(task_logger)
+
+            # if missing, fill with old provider table data second
+            bisonprov_lut_fname = os.path.join(
+                self.ancillary_path, 'bisonprovider_meta_lut.csv')
+            if os.path.exists(bisonprov_lut_fname):
+                self.bisonprov_dataload = Lookup.init_from_file(
+                    bisonprov_lut_fname, ['legacy_id'], BISON_DELIMITER, 
+                    VAL_TYPE.DICT, ENCODING)
+            else:
+                old_resources = merger.read_resources(self.merged_resource_lut_fname)
+                bisonprov_dataload_metadata = merger.assemble_files(
+                    self.workpath, old_resources)
+                self.bisonprov_dataload = Lookup.init_from_dict(
+                    bisonprov_dataload_metadata)
+                self.bisonprov_dataload.write_lookup(
+                    bisonprov_lut_fname, None, BISON_DELIMITER)
+
+            # Standardize provider/resource and with first pass checks
+            in_delimiter = PROVIDER_DELIMITER
+            if self.action in ('rename', 'rewrite'):
+                in_delimiter = BISON_DELIMITER
+            merger.rewrite_bison_data(
+                self.rawdata_fname, self.pass1_fname, resource_key, 
+                resource_pvals, in_delimiter)
+        else:
+            self.logger.info('Output file for step 1 exists: {}'.format(
+                self.pass1_fname))
             
-#             # ..........................................................
-#             # Step 1: rewrite, handle quotes, fill ticket/constant vals for 
-#             # resource/provider
-#             # Same process as GBIF Step 1, different resource/provider inputs
-#             if step == 1 and not ignore_me:
-#                 if os.path.exists(outfile1):
-#                     combo_logger.info('  Existing step 1 output in {}'.format(
-#                         outfile1))
-#                 else:
-#                     combo_logger.info('  Process step 1 output to {}'.format(
-#                         outfile1))
-#                     merger.reset_logger(s1dir, logbasename)
-#                     in_delimiter = PROVIDER_DELIMITER
-#                     if action in ('rename', 'rewrite'):
-#                         in_delimiter = BISON_DELIMITER
-#                     merger.rewrite_bison_data(
-#                         infile, outfile1, resource_key, resource_pvals, 
-#                         in_delimiter)
+            
 #             # ..........................................................
 #             # Step 2: Nope
 #             elif step == 2:
 #                 combo_logger.info('Step 2 is only valid for GBIF data')
-#             # ..........................................................
-#             # Step 3: fill lookup vals from ITIS, establishment_means and county centroid files
-#             # Identical to GBIF Step 3
-#             elif step == 3 and not ignore_me:
-#                 if os.path.exists(outfile3):
-#                     combo_logger.info('  Existing step 3 output in {}'.format(
-#                         outfile3))
-#                 else:
-#                     combo_logger.info('  Process step 3 output to {}'.format(
-#                         outfile3))
-#                     logfname = os.path.join(s3dir, '{}.log'.format(logbasename))
-#                     logger = get_logger(logbasename, logfname)
-#                     bfiller = BisonFiller(logger)
-#                     bfiller.update_itis_estmeans_centroid(
-#                         itis2_lut_fname, estmeans_fname, terrestrial_shpname, 
-#                         outfile1, outfile3, from_gbif=False)
-#             # ..........................................................
-#             # Step 4: split and process large files in parallel
-#             # Identical to GBIF Step 4
-#             elif step == 4 and not ignore_me:
-#                 if os.path.exists(outfile4):
-#                     combo_logger.info('  Existing step 4 output in {}'.format(
-#                         outfile4))
-#                 else:
-#                     lcount = get_line_count(outfile3)
-#                     if lcount < LOGINTERVAL:
-#                         combo_logger.info('  Process step 4 output to {}'.format(
-#                             outfile4))
-#                         logfname = os.path.join(s3dir, '{}.log'.format(logbasename))
-#                         logger = get_logger(logbasename, logfname)
-#                         bfiller = BisonFiller(logger)
-#                         bfiller.update_point_in_polygons(
-#                             terr_data, marine_data, ancillary_path, outfile3, outfile4)
-#                     else:
-#                         combo_logger.info('  Parallel Process step 4 ({} lines) output to {}'
-#                                     .format(lcount, outfile4))
-#                         # Create chunk input files for parallel processing
-#                         csv_filename_pairs, header = get_chunk_files(
-#                              outfile3, out_csv_filename=outfile4)
-#                         step_parallel(outfile3, terr_data, marine_data, ancillary_path,
-#                                       outfile4, from_gbif=False)
+    # ...............................................
+    def process_bisonprov_step3(self):
+        if not os.path.exists(self.pass3_fname):
+            # Step 3: fill lookup vals from ITIS, establishment_means and county centroid files
+            # Identical to GBIF Step 3
+            self.logger.info('  Process step 3 output to {}'.format(
+                self.pass3_fname))
+            task_logger = self._get_logger_for_processing(self.pass3_fname)
+            bfiller = BisonFiller(task_logger)
+            bfiller.update_itis_estmeans_centroid(
+                self.itis2_lut_fname, self.estmeans_fname, 
+                self.terrestrial_shpname, self.pass1_fname, self.pass3_fname, 
+                from_gbif=False)
+        else:
+            self.logger.info('Output file for step 3 exists: {}'.format(
+                self.pass3_fname))
+
+    # ...............................................
+    def process_bisonprov_step4(self):
+        if not os.path.exists(self.pass4_fname):
+            # Step 4: split and process large files in parallel
+            # Identical to GBIF Step 4
+            terr_data = ANCILLARY_FILES['terrestrial']
+            marine_data = ANCILLARY_FILES['marine']
+
+            lcount = get_line_count(self.pass3_fname)
+            if lcount < LOGINTERVAL:
+                self.logger.info('  Process step 4 output to {}'.format(
+                    self.pass4_fname))
+                task_logger = self._get_logger_for_processing(self.pass4_fname)
+                bfiller = BisonFiller(task_logger)
+                bfiller.update_point_in_polygons(
+                    terr_data, marine_data, self.ancillary_path, 
+                    self.pass3_fname, self.pass4_fname)
+            else:
+                self.logger.info('  Parallel Process step 4 ({} lines) output to {}'
+                            .format(lcount, self.pass4_fname))
+                # Create chunk input files for parallel processing
+#                 csv_filename_pairs, header = get_chunk_files(
+#                      self.pass3_fname, out_csv_filename=self.pass4_fname)
+                step_parallel(
+                    self.pass3_fname, terr_data, marine_data, 
+                    self.ancillary_path, self.pass4_fname, from_gbif=False)
 #             # ..........................................................
 #             # Step 99: fix something
 #             elif step == 99 and not ignore_me:
@@ -402,158 +411,6 @@ class DataLoader(object):
 #             else:
 #                 print('Ignore {} {}'.format(resource_key, fname))
 
-# .............................................................................
-def _get_process_count():
-    return cpu_count() - 2
-
-# .............................................................................
-def _find_chunk_files(big_csv_filename, out_csv_filename):
-    """ Finds multiple smaller input csv files from a large input csv file, 
-    if they exist, and return these filenames, paired with output filenames 
-    for the results of processing these files. """
-    cpus2use = _get_process_count()
-    in_base_filename, _ = os.path.splitext(big_csv_filename)
-    # Construct provider filenames from outfilename and separate in/out paths
-    out_fname_noext, ext = os.path.splitext(out_csv_filename)
-    outpth, basename = os.path.split(out_fname_noext)
-    out_base_filename = os.path.join(outpth, basename)
-        
-    total_lines = get_line_count(big_csv_filename) - 1
-    chunk_size = int(total_lines / cpus2use)
-    
-    csv_filename_pairs = []
-    start = 1
-    stop = chunk_size
-    while start <= total_lines:
-        in_filename = '{}_chunk-{}-{}{}'.format(in_base_filename, start, stop, ext)
-        out_filename =  '{}_chunk-{}-{}{}'.format(out_base_filename, start, stop, ext)
-        if os.path.exists(in_filename):
-            csv_filename_pairs.append((in_filename, out_filename))
-        else:
-            # Return basenames if files are not present
-            csv_filename_pairs = [(in_base_filename, out_base_filename)]
-            print('Missing file {}'.format(in_filename))
-            break
-        start = stop + 1
-        stop = start + chunk_size - 1
-    return csv_filename_pairs, chunk_size
-
-# .............................................................................
-def get_chunk_files(big_csv_filename, out_csv_filename):
-    """ Creates multiple smaller input csv files from a large input csv file, and 
-    return these filenames, paired with output filenames for the results of 
-    processing these files. """
-    csv_filename_pairs, chunk_size = _find_chunk_files(
-        big_csv_filename, out_csv_filename)
-    # First pair is existing files OR basenames
-    if os.path.exists(csv_filename_pairs[0][0]):
-        header = get_header(big_csv_filename)
-        return csv_filename_pairs, header
-    else:
-        in_base_filename = csv_filename_pairs[0][0]
-        out_base_filename = csv_filename_pairs[0][1]
-    
-    csv_filename_pairs = []
-    try:
-        bigf = open(big_csv_filename, 'r', encoding='utf-8')
-        header = bigf.readline()
-        line = bigf.readline()
-        curr_recno = 1
-        while line != '':
-            # Reset vars for next chunk
-            start = curr_recno
-            stop = start + chunk_size - 1
-            in_filename = '{}_chunk-{}-{}.csv'.format(in_base_filename, start, stop)
-            out_filename =  '{}_chunk-{}-{}.csv'.format(out_base_filename, start, stop)
-            csv_filename_pairs.append((in_filename, out_filename))
-            try:
-                # Start writing the smaller file
-                inf = open(in_filename, 'w', encoding='utf-8')
-                inf.write('{}'.format(header))
-                while curr_recno <= stop:
-                    if line != '':
-                        inf.write('{}'.format(line))
-                        line = bigf.readline()
-                        curr_recno += 1
-                    else:
-                        curr_recno = stop + 1
-            except Exception as inner_err:
-                print('Failed in inner loop {}'.format(inner_err))
-                raise
-            finally:
-                inf.close()
-    except Exception as outer_err:
-        print('Failed to do something {}'.format(outer_err))
-        raise
-    finally:
-        bigf.close()
-    
-    return csv_filename_pairs, header
-        
-# .............................................................................
-def step_parallel(in_csv_filename, terrestrial_data, marine_data, ancillary_path,
-                  out_csv_filename, from_gbif=True):
-    """Main method for parallel execution of geo-referencing script"""
-    csv_filename_pairs, header = get_chunk_files(
-         in_csv_filename, out_csv_filename=out_csv_filename)
-    
-#     in_csv_fn, out_csv_fn = csv_filename_pairs[0]
-#     intersect_csv_and_shapefiles(in_csv_fn, terrestrial_data, 
-#                 marine_data, ancillary_path, out_csv_fn, False)
- 
-    with ProcessPoolExecutor() as executor:
-        for in_csv_fn, out_csv_fn in csv_filename_pairs:
-            executor.submit(
-                intersect_csv_and_shapefiles, in_csv_fn, terrestrial_data, 
-                marine_data, ancillary_path, out_csv_fn, from_gbif)
-    
-    try:
-        outf = open(out_csv_filename, 'w', encoding='utf-8')
-        outf.write('{}'.format(header))
-        smfile_linecount = 0
-        for _, small_csv_fn in csv_filename_pairs:
-            curr_linecount = get_line_count(small_csv_fn) - 1
-            print('Appending {} records from {}'.format(
-                curr_linecount, small_csv_fn))
-            # Do not count header
-            smfile_linecount += (curr_linecount)
-            lineno = 0
-            try:
-                for line in open(small_csv_fn, 'r', encoding='utf-8'):
-                    # Skip header in each file
-                    if lineno == 0:
-                        pass
-                    else:
-                        outf.write('{}'.format(line))
-                    lineno += 1
-            except Exception as inner_err:
-                print('Failed to write {} to merged file; {}'.format(small_csv_fn, inner_err))
-    except Exception as outer_err:
-        print('Failed to write to {}; {}'.format(out_csv_filename, outer_err))
-    finally:
-        outf.close()
-    
-    lgfile_linecount = get_line_count(out_csv_filename) - 1
-    print('Total {} of {} records written to {}'.format(
-        lgfile_linecount, smfile_linecount, out_csv_filename))
-    
-# .............................................................................
-def do_track_providers(resource_count_fname, provider_count_fname):
-    # If both exist, do nothing
-    if (os.path.exists(resource_count_fname) and 
-        os.path.exists(provider_count_fname)):
-        print('Files {} and {} exist'.format(
-            resource_count_fname, provider_count_fname))
-        track_providers = False
-    else:
-        track_providers = True
-        if os.path.exists(resource_count_fname):
-            print('Deleting {}'.format(resource_count_fname))
-            os.remove(resource_count_fname)
-        if os.path.exists(provider_count_fname):
-            print('Deleting {}'.format(provider_count_fname))
-            os.remove(provider_count_fname)
-    return resource_count_fname, provider_count_fname, track_providers
     
 # .............................................................................
 stephelp="""
@@ -635,7 +492,7 @@ if __name__ == '__main__':
                           or tested.
                         """)
     parser.add_argument(
-        '--step', type=int, default=1, choices=[1,2,3,4,99,1000], help=stephelp)
+        '--step', type=int, default=1, choices=[0, 1,2,3,4,99,1000], help=stephelp)
     parser.add_argument(
         '--resource', type=str, default=None, 
         help='resource_id for testing or processing of a single bison-provider dataset')
@@ -647,9 +504,10 @@ if __name__ == '__main__':
     input_data = args.input_data
     step = args.step
     teststep = args.teststep
-    resource_id = args.resource
-    dl = DataLoader(data_source, input_data, step, resource_id=resource_id)
-
+    test_resource_id = args.resource
+    dl = DataLoader(data_source, input_data, resource_id=test_resource_id)
+    
+    start_time = time.time()
     if data_source == 'gbif':
         start_time = time.time()
         if step == 1:
@@ -660,34 +518,65 @@ if __name__ == '__main__':
             dl.process_gbif_step3()
         elif step == 4:
             dl.process_gbif_step4()
+        elif step == 0:
+            dl.process_gbif_step1()
+            dl.process_gbif_step2()
+            dl.process_gbif_step3()
+            dl.process_gbif_step4()
         else:
             print('No step {} for data_source {}'.format(step, data_source))
             
-        # Log time elapsed for steps 1-4 
-        minutes = (time.time() - start_time) / 60
-        try:
-            dl.logger.info('Elapsed minutes {} for step {}, file {}'.format(
-                minutes, step, input_data))
-        except:
-            print('Elapsed minutes {} for step {}, file {}'.format(
-                minutes, step, input_data))
+#         # Log time elapsed for steps 1-4 
+#         minutes = (time.time() - start_time) / 60
+#         try:
+#             dl.logger.info('Elapsed minutes {} for step {}, file {}'.format(
+#                 minutes, step, input_data))
+#         except:
+#             print('Elapsed minutes {} for step {}, file {}'.format(
+#                 minutes, step, input_data))
             
             
     elif data_source == 'provider':
         dl.prep_bisonprov()
-        # 1066: USDA_PLANTS, 100045: rewrite, 100061: replace, 
-        # 100032: replace_rename, emammal: add, nplichens: add
-#         FIXME = ['440,1066', '440,100045', '440,100061', 'emammal', 'nplichens']
-        FIXME = []
+#         SEE_ONLY_ME = ['440,1066', '440,100045', '440,100061', 'emammal', 'nplichens']
+        SEE_ONLY_ME = None
         for resource_key, resource_pvals in dl.bisonprov_dataload.lut.items():
             start_time = time.time()
-            ignore_me = False
+            # 2 ways to limit processing 
             # resource_id from command option
-            if resource_id is not None and resource_id != resource_key:
+            ignore_me = False
+            if test_resource_id is not None and test_resource_id != resource_key:
                 ignore_me = True
-            elif resource_key not in FIXME: 
+            elif SEE_ONLY_ME and resource_key not in SEE_ONLY_ME: 
                 ignore_me = True
-            dl.set_bisonprov(resource_pvals)
+                
+            action = resource_pvals['action']
+            if action in PROVIDER_ACTIONS and not ignore_me:
+                dl.reset_bisonprov(resource_key, resource_pvals)
+                if step == 1:
+                    dl.process_bisonprov_step1()
+                elif step == 3:
+                    dl.process_bisonprov_step3()
+                elif step == 4:
+                    dl.process_bisonprov_step4()
+                elif step == 0:
+                    dl.process_bisonprov_step1()
+                    dl.process_bisonprov_step3()
+                    dl.process_bisonprov_step4()
+                else:
+                    print('No step {} for data_source {}'.format(step, data_source))
+            else:
+                dl.logger.info('Ignore dataset {} with action {}'.format(
+                    resource_key, action))
+
+    minutes = (time.time() - start_time) / 60
+    try:
+        dl.logger.info('Elapsed minutes {} for step {}, file {}'.format(
+            minutes, step, input_data))
+    except:
+        print('Elapsed minutes {} for step {}, file {}'.format(
+            minutes, step, input_data))
+
 """
 
 

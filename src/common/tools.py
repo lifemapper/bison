@@ -2,6 +2,7 @@ import csv
 import glob
 import logging
 from logging.handlers import RotatingFileHandler
+from multiprocessing import cpu_count
 import os
 from osgeo import ogr, osr
 import rtree
@@ -24,6 +25,94 @@ def get_line_count(filename):
     temp = info.split(b'\n')[0]
     line_count = int(temp.split()[0])
     return line_count
+
+# .............................................................................
+def get_process_count():
+    return cpu_count() - 2
+
+# .............................................................................
+def _find_chunk_files(big_csv_filename, out_csv_filename):
+    """ Finds multiple smaller input csv files from a large input csv file, 
+    if they exist, and return these filenames, paired with output filenames 
+    for the results of processing these files. """
+    cpus2use = get_process_count()
+    in_base_filename, _ = os.path.splitext(big_csv_filename)
+    # Construct provider filenames from outfilename and separate in/out paths
+    out_fname_noext, ext = os.path.splitext(out_csv_filename)
+    outpth, basename = os.path.split(out_fname_noext)
+    out_base_filename = os.path.join(outpth, basename)
+        
+    total_lines = get_line_count(big_csv_filename) - 1
+    chunk_size = int(total_lines / cpus2use)
+    
+    csv_filename_pairs = []
+    start = 1
+    stop = chunk_size
+    while start <= total_lines:
+        in_filename = '{}_chunk-{}-{}{}'.format(in_base_filename, start, stop, ext)
+        out_filename =  '{}_chunk-{}-{}{}'.format(out_base_filename, start, stop, ext)
+        if os.path.exists(in_filename):
+            csv_filename_pairs.append((in_filename, out_filename))
+        else:
+            # Return basenames if files are not present
+            csv_filename_pairs = [(in_base_filename, out_base_filename)]
+            print('Missing file {}'.format(in_filename))
+            break
+        start = stop + 1
+        stop = start + chunk_size - 1
+    return csv_filename_pairs, chunk_size
+
+# .............................................................................
+def get_chunk_files(big_csv_filename, out_csv_filename):
+    """ Creates multiple smaller input csv files from a large input csv file, and 
+    return these filenames, paired with output filenames for the results of 
+    processing these files. """
+    csv_filename_pairs, chunk_size = _find_chunk_files(
+        big_csv_filename, out_csv_filename)
+    # First pair is existing files OR basenames
+    if os.path.exists(csv_filename_pairs[0][0]):
+        header = get_header(big_csv_filename)
+        return csv_filename_pairs, header
+    else:
+        in_base_filename = csv_filename_pairs[0][0]
+        out_base_filename = csv_filename_pairs[0][1]
+    
+    csv_filename_pairs = []
+    try:
+        bigf = open(big_csv_filename, 'r', encoding='utf-8')
+        header = bigf.readline()
+        line = bigf.readline()
+        curr_recno = 1
+        while line != '':
+            # Reset vars for next chunk
+            start = curr_recno
+            stop = start + chunk_size - 1
+            in_filename = '{}_chunk-{}-{}.csv'.format(in_base_filename, start, stop)
+            out_filename =  '{}_chunk-{}-{}.csv'.format(out_base_filename, start, stop)
+            csv_filename_pairs.append((in_filename, out_filename))
+            try:
+                # Start writing the smaller file
+                inf = open(in_filename, 'w', encoding='utf-8')
+                inf.write('{}'.format(header))
+                while curr_recno <= stop:
+                    if line != '':
+                        inf.write('{}'.format(line))
+                        line = bigf.readline()
+                        curr_recno += 1
+                    else:
+                        curr_recno = stop + 1
+            except Exception as inner_err:
+                print('Failed in inner loop {}'.format(inner_err))
+                raise
+            finally:
+                inf.close()
+    except Exception as outer_err:
+        print('Failed to do something {}'.format(outer_err))
+        raise
+    finally:
+        bigf.close()
+    
+    return csv_filename_pairs, header
 
 # .............................................................................
 def get_header(filename):

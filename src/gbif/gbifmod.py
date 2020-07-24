@@ -24,19 +24,20 @@
 import os
 import time
 
-from common.constants import (BISON_DELIMITER, ENCODING, 
-        LOGINTERVAL, PROHIBITED_VALS, LEGACY_ID_DEFAULT, EXTRA_VALS_KEY,
-        ALLOWED_TYPE, BISON2020_FIELD_DEF, BISON_IPT_PREFIX, 
-        MERGED_RESOURCE_LUT_FIELDS, MERGED_PROVIDER_LUT_FIELDS)
+from common.constants import (
+    BISON_DELIMITER, ENCODING, LOGINTERVAL, PROHIBITED_VALS, LEGACY_ID_DEFAULT, 
+    EXTRA_VALS_KEY, ALLOWED_TYPE, BISON2020_FIELD_DEF, BISON_IPT_PREFIX, 
+    MERGED_RESOURCE_LUT_FIELDS, MERGED_PROVIDER_LUT_FIELDS)
 from common.lookup import Lookup, VAL_TYPE
-from common.tools import (get_csv_reader, get_csv_dict_reader, get_csv_writer, 
-                          open_csv_files, makerow)
+from common.tools import (
+    get_csv_reader, get_csv_dict_reader, get_csv_writer, open_csv_files, 
+    makerow)
 
-from gbif.constants import (GBIF_DELIMITER, TERM_CONVERT, META_FNAME, 
-                            GBIF_TO_BISON2020_MAP, OCC_ID_FLD,
-                            CLIP_CHAR, BISON_ORG_UUID, 
-                            GBIF_CONVERT_TEMP_FIELD_TYPE, 
-                            GBIF_NAMEKEY_TEMP_FIELD, GBIF_NAMEKEY_TEMP_TYPE)
+from gbif.constants import (
+    GBIF_DATASET_PATHS, GBIF_DELIMITER, TERM_CONVERT, META_FNAME, 
+    GBIF_TO_BISON2020_MAP, OCC_ID_FLD, CLIP_CHAR, BISON_ORG_UUID, 
+    GBIF_CONVERT_TEMP_FIELD_TYPE, GBIF_NAMEKEY_TEMP_FIELD, 
+    GBIF_NAMEKEY_TEMP_TYPE)
 from gbif.gbifmeta import GBIFMetaReader
 from gbif.gbifapi import GbifAPI
         
@@ -64,9 +65,8 @@ class GBIFReader(object):
         """
         self._log = logger
         # Remove any trailing /
-        self.workpath = workpath.rstrip(os.sep)
-        self._dataset_pth = os.path.join(self.workpath, 'dataset')
-        self._meta_fname = os.path.join(self.workpath, META_FNAME)
+        workpath.rstrip(os.sep)
+        self._meta_fname = os.path.join(workpath, META_FNAME)
         # Save these fields during processing to fill or compute from GBIF data
         # Individual steps may add/remove temporary fields for input/output
         self._fields = BISON2020_FIELD_DEF.copy()
@@ -984,7 +984,7 @@ class GBIFReader(object):
             for fn in dsfnames:
                 uuids.add(fn[start:-stop])
         self._log.info('Read {} dataset UUIDs from filenames in {}'
-                       .format(len(uuids), self._dataset_pth))
+                       .format(len(uuids), dataset_path))
         return uuids
     
     # ...............................................
@@ -1083,11 +1083,11 @@ class GBIFReader(object):
             merged_resource_lut_fname: output file for the merged table
             outdelimiter: field value separator for the output file
         """
-        big_ds_uuids = self._get_dataset_uuids(
-            '/tank/data/bison/2019/CA_USTerr_gbif/dataset')
-        sm_ds_uuids = self._get_dataset_uuids(
-            '/tank/data/bison/2019/US_gbif/dataset')
-        ds_uuids = big_ds_uuids.union(sm_ds_uuids)
+        all_ds_uuids = set()
+        for dpth in GBIF_DATASET_PATHS:
+            curr_ds_uuids = self._get_dataset_uuids(dpth)
+            all_ds_uuids = all_ds_uuids.union(curr_ds_uuids)
+        
         resolved_uuids = set()
         merged_lut = Lookup(valtype=VAL_TYPE.DICT, encoding=ENCODING)
         header = [fld for (fld, _) in MERGED_RESOURCE_LUT_FIELDS]
@@ -1135,7 +1135,7 @@ class GBIFReader(object):
             merged_lut.save_to_lookup(legacyid, merged_rec)
             
         # Next, get metadata for any UUIDs not in old table
-        unresolved_uuids = ds_uuids.difference(resolved_uuids)
+        unresolved_uuids = all_ds_uuids.difference(resolved_uuids)
         for uuid in unresolved_uuids:
             newrec = gbifapi.query_for_dataset(uuid)
             if newrec:
