@@ -54,8 +54,6 @@ class DataLoader(object):
         elif os.path.isfile(input_data):
             self.rawdata_fname = input_data
             self.workpath, basefname_wext = os.path.split(self.rawdata_fname)
-        # filename w/o path or extension
-        self.basefname, _ = os.path.splitext(basefname_wext)
                 
         self._test_resource_id = resource_id
         # basepath contains bison provider and GBIF data
@@ -90,11 +88,9 @@ class DataLoader(object):
             self.outpath,  '{}.count.resource.csv'.format(data_source))
         self.provider_count_fname = os.path.join(
             self.outpath,  '{}.count.provider.csv'.format(data_source))
+        self.bisonprov_dataload_fname = os.path.join(
+            self.ancillary_path, 'bisonprovider_meta_lut.csv')
 
-        self.nametaxa_fname = os.path.join(self.tmppath, 'step1_{}_sciname_taxkey_list.csv'
-                                      .format(self.basefname))
-        self.canonical_lut_fname = os.path.join(self.tmppath, 'step2_{}_canonical_lut.csv'
-                                           .format(self.basefname))        
 
         self.s1dir = os.path.join(self.tmppath, 's1-rewrite')
         self.s2dir = os.path.join(self.tmppath, 's2-scinames')
@@ -106,7 +102,10 @@ class DataLoader(object):
         if data_source == 'gbif':
             os.makedirs(self.s2dir, mode=0o775, exist_ok=True)
         
-        # All filled in _prep_gbif or _prep_bisonprov/set_bisonprov function
+        # All filled in prep_gbif or prep_bisonprov/set_bisonprov function
+        self.basefname = None
+        self.nametaxa_fname = None
+        self.canonical_lut_fname = None        
         self.pass1_fname = None
         self.pass2_fname = None
         self.pass3_fname = None
@@ -116,9 +115,9 @@ class DataLoader(object):
         self.track_providers = None 
         
         if data_source == 'gbif':
-            self._prep_gbif(resource_lut_fname, provider_lut_fname)
+            self.prep_gbif(resource_lut_fname, provider_lut_fname, basefname_wext)
         elif data_source == 'provider':
-            self._prep_bisonprov()
+            self.prep_bisonprov()
         
     # ...............................................
     def _get_logger_for_processing(self, absfilename_or_path, basefname=None):
@@ -129,11 +128,17 @@ class DataLoader(object):
         else:
             pth, _ = os.path.split(absfilename_or_path)
         logfname = os.path.join(pth, '{}.log'.format(basefname))
-        logger = get_logger(self.basefname, logfname)
+        logger = get_logger(basefname, logfname)
         return logger
             
     # ...............................................
-    def _prep_gbif(self, resource_lut_fname, provider_lut_fname):
+    def prep_gbif(self, resource_lut_fname, provider_lut_fname, basefname_wext):
+        # filename w/o path or extension
+        self.basefname, _ = os.path.splitext(basefname_wext)
+        self.nametaxa_fname = os.path.join(self.tmppath, 'step1_{}_sciname_taxkey_list.csv'
+                                      .format(self.basefname))
+        self.canonical_lut_fname = os.path.join(self.tmppath, 'step2_{}_canonical_lut.csv'
+                                           .format(self.basefname))        
         self.track_providers = self._do_track_providers()
         # Output CSV files of all records after initial creation or field replacements
         self.pass1_fname = os.path.join(self.s1dir, '{}.csv'.format(self.basefname))
@@ -152,13 +157,28 @@ class DataLoader(object):
                 outdelimiter=BISON_DELIMITER)
 
     # ...............................................
-    def _prep_bisonprov(self):
-        self.action = None
+    def prep_bisonprov(self):
+        task_logger = self._get_logger_for_processing('assemble_bprov_dataload')
+        merger = BisonMerger(task_logger)
+        # if missing, fill with old provider table data second
+        if os.path.exists(self.bisonprov_dataload_fname):
+            self.bisonprov_dataload = Lookup.init_from_file(
+                self.bisonprov_dataload_fname, ['legacy_id'], BISON_DELIMITER, 
+                VAL_TYPE.DICT, ENCODING)
+        else:
+            old_resources = merger.read_resources(self.merged_resource_lut_fname)
+            bisonprov_dataload_metadata = merger.assemble_files(
+                self.workpath, old_resources)
+            self.bisonprov_dataload = Lookup.init_from_dict(
+                bisonprov_dataload_metadata)
+            self.bisonprov_dataload.write_lookup(
+                self.bisonprov_dataload_fname, None, BISON_DELIMITER)
 
     # ...............................................
-    def reset_bisonprov(self, resource_pvals):
-        fname = resource_pvals['filename']
-                 
+    def reset_bisonprov(self, resource_key, resource_pvals):
+        self.action = resource_pvals['action']
+        
+        fname = resource_pvals['filename']                 
         if not fname:
             # filename w/o path or extension
             self.basefname = 'bison_{}'.format(resource_key)
@@ -315,21 +335,21 @@ class DataLoader(object):
             task_logger = self._get_logger_for_processing(self.pass1_fname)
             merger = BisonMerger(task_logger)
 
-            # if missing, fill with old provider table data second
-            bisonprov_lut_fname = os.path.join(
-                self.ancillary_path, 'bisonprovider_meta_lut.csv')
-            if os.path.exists(bisonprov_lut_fname):
-                self.bisonprov_dataload = Lookup.init_from_file(
-                    bisonprov_lut_fname, ['legacy_id'], BISON_DELIMITER, 
-                    VAL_TYPE.DICT, ENCODING)
-            else:
-                old_resources = merger.read_resources(self.merged_resource_lut_fname)
-                bisonprov_dataload_metadata = merger.assemble_files(
-                    self.workpath, old_resources)
-                self.bisonprov_dataload = Lookup.init_from_dict(
-                    bisonprov_dataload_metadata)
-                self.bisonprov_dataload.write_lookup(
-                    bisonprov_lut_fname, None, BISON_DELIMITER)
+#             # if missing, fill with old provider table data second
+#             bisonprov_lut_fname = os.path.join(
+#                 self.ancillary_path, 'bisonprovider_meta_lut.csv')
+#             if os.path.exists(bisonprov_lut_fname):
+#                 self.bisonprov_dataload = Lookup.init_from_file(
+#                     bisonprov_lut_fname, ['legacy_id'], BISON_DELIMITER, 
+#                     VAL_TYPE.DICT, ENCODING)
+#             else:
+#                 old_resources = merger.read_resources(self.merged_resource_lut_fname)
+#                 bisonprov_dataload_metadata = merger.assemble_files(
+#                     self.workpath, old_resources)
+#                 self.bisonprov_dataload = Lookup.init_from_dict(
+#                     bisonprov_dataload_metadata)
+#                 self.bisonprov_dataload.write_lookup(
+#                     bisonprov_lut_fname, None, BISON_DELIMITER)
 
             # Standardize provider/resource and with first pass checks
             in_delimiter = PROVIDER_DELIMITER
@@ -526,22 +546,11 @@ if __name__ == '__main__':
         else:
             print('No step {} for data_source {}'.format(step, data_source))
             
-#         # Log time elapsed for steps 1-4 
-#         minutes = (time.time() - start_time) / 60
-#         try:
-#             dl.logger.info('Elapsed minutes {} for step {}, file {}'.format(
-#                 minutes, step, input_data))
-#         except:
-#             print('Elapsed minutes {} for step {}, file {}'.format(
-#                 minutes, step, input_data))
-            
-            
     elif data_source == 'provider':
-        dl.prep_bisonprov()
-#         SEE_ONLY_ME = ['440,1066', '440,100045', '440,100061', 'emammal', 'nplichens']
+#         SEE_ONLY_ME = ['nycity-tree-census-2005']
         SEE_ONLY_ME = None
         for resource_key, resource_pvals in dl.bisonprov_dataload.lut.items():
-            start_time = time.time()
+            this_start_time = time.time()
             # 2 ways to limit processing 
             # resource_id from command option
             ignore_me = False
@@ -569,13 +578,17 @@ if __name__ == '__main__':
                 dl.logger.info('Ignore dataset {} with action {}'.format(
                     resource_key, action))
 
-    minutes = (time.time() - start_time) / 60
+            these_minutes = (time.time() - this_start_time) / 60
+            dl.logger.info('Elapsed minutes {} for step {}, resource {}'.format(
+                these_minutes, step, resource_key))
+
+    all_minutes = (time.time() - start_time) / 60
     try:
-        dl.logger.info('Elapsed minutes {} for step {}, file {}'.format(
-            minutes, step, input_data))
+        dl.logger.info('Elapsed minutes {} for step {}, input {}'.format(
+            all_minutes, step, input_data))
     except:
-        print('Elapsed minutes {} for step {}, file {}'.format(
-            minutes, step, input_data))
+        print('Elapsed minutes {} for step {}, input {}'.format(
+            all_minutes, step, input_data))
 
 """
 
