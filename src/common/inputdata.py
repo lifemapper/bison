@@ -118,6 +118,14 @@ BISON_PROVIDER = {
      'resource_id': 'nycity-tree-census-2015',
      'filename': 'FINAL-nycitytreecensus-2015-09Apr2020.txt'},
     
+    # X my.usgs.gov/jira/browse/BISON-1061
+    'nycity-tree-census-2005':
+    {'action': 'add',
+     'ticket': 'BISON-1061',
+     'resource_name': 'New York City Street Tree Census - 2005',
+     'resource_id': 'nycity-tree-census-2005',
+     'filename': 'nyctreecensus2005_24Jul2020.txt'},
+    
     # X my.usgs.gov/jira/browse/BISON-993
     'usgs-warc-suwanneemoccasinshell':
     {'action': 'add',
