@@ -234,7 +234,7 @@ BISON_PROVIDER = {
      'ticket': 'BISON-1053',
      'resource_name': 'USGS PIERC - Hawaii Forest Bird Survey - Plants',
      'resource_id': 'usgs_pierc_hfbs1',
-     'filename': None},
+     'filename': 'bison_440,100050.csv'},
     
     # X my.usgs.gov/jira/browse/BISON-1075
     # old name = USGS PIERC - Hawaii Forest Bird Survey Database 
@@ -243,7 +243,7 @@ BISON_PROVIDER = {
      'ticket': 'BISON-1075',
      'resource_name': 'USGS PIERC - Hawaii Forest Bird Survey - Birds',
      'resource_id': 'usgs-pierc-hfbs-birds',
-     'filename': None},
+     'filename': 'bison_440,100075.csv'},
     
     # X my.usgs.gov/jira/browse/BISON-1067
     'nps-nisims':
