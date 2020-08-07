@@ -504,13 +504,15 @@ if __name__ == "__main__":
                         help="""Processing stage:
                         - gather: gather unique sort/group values in a summary
                           file to identify how best to proceed.
-                        - group: Split large file into multiple files,
-                          each containing only records of a single group value. 
-                          The number of group files must be small enough for the
-                          system to have them all open at the same time.
-                          Use "gather" to evaluate the dataset first.
-                        - split (only used for GBIF downloads with a file 
+                        - split: create multiple files, each sorted on a single
+                          column (only used for GBIF downloads with a file 
                           containing multiple sorted sections)
+                        - group: create multiple files, each containing only 
+                          records with a single group value. The number of group 
+                          files must be small enough for the system to have all
+                          open at the same time.  Use "gather" to evaluate the 
+                          dataset first. (only used for BISON provider data
+                          containing ~100 groups)
                         - merge: merge multiple sorted files into a single 
                           sorted file.
                         """ )
