@@ -584,7 +584,7 @@ class BisonFiller(object):
         else:
             raise Exception('  {} output exists'.format(outfname))
 
-        dl_fields = list(BISON_2020_FIELD_DEF.keys())
+        dl_fields = list(BISON2020_FIELD_DEF.keys())
         try:
             dict_reader, inf, csv_writer, outf = open_csv_files(
                 infname, in_delimiter, ENCODING, outfname=outfname, 
