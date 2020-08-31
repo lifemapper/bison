@@ -186,7 +186,7 @@ class DataLoader(object):
                 self.workpath, '{}.csv'.format(self.basefname))
         else:
             # New input files have .txt extension
-            self.basefname = os.path.basename(fname)
+            self.basefname, _ = os.path.splitext(fname)
             self.rawdata_fname = os.path.join(self.workpath, fname)
             
         self.logger.info('{}: {} {}'.format(
