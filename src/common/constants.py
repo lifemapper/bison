@@ -77,6 +77,7 @@ IPT_QUERY = 'resource?r='
 BISON_PROVIDER_VALUES = {
     'provider_url': 'https://bison.usgs.gov',
     'provider_id': 'BISON',
+    'provider_legacy_id': '440',
     'license' : 'http://creativecommons.org/publicdomain/zero/1.0/legalcode'
 }
 

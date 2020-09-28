@@ -654,7 +654,7 @@ class GBIFReader(object):
             gbif_interp_fname, GBIF_DELIMITER, ENCODING, 
             infields=gbif_header, outfname=pass1_fname, 
             outfields=self._outfields, outdelimiter=BISON_DELIMITER)
-        try:            
+        try:    
             for orig_rec in dict_reader:
                 recno += 1
                 if orig_rec is None:

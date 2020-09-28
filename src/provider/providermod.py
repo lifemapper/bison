@@ -140,7 +140,7 @@ class BisonMerger(object):
     # ...............................................
     def read_resources(self, merged_resource_lut_fname):
         old_resources = Lookup.init_from_file(merged_resource_lut_fname, 
-                                            ['BISONResourceID'], #'legacyid',
+                                            ['BISONResourceID', 'gbif_datasetkey'], #'legacyid',
                                             BISON_DELIMITER, 
                                             valtype=VAL_TYPE.DICT, 
                                             encoding=ENCODING)
