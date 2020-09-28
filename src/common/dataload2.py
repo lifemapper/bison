@@ -26,7 +26,8 @@ import time
 
 from common.bisonfill import BisonFiller
 from common.constants import (
-    BISON_DELIMITER, LOGINTERVAL, ANCILLARY_DIR, TEMP_DIR, 
+    BISON_DELIMITER, BISON_PROVIDER_VALUES, BISON_IPT_PREFIX, IPT_QUERY, 
+    LOGINTERVAL, ANCILLARY_DIR, TEMP_DIR, MERGED_RESOURCE_LUT_FIELDS,
     OUTPUT_DIR, PROVIDER_DELIMITER, PROVIDER_ACTIONS, ENCODING)
 from common.inputdata import ANCILLARY_FILES
 from common.lookup import Lookup, VAL_TYPE
@@ -82,15 +83,18 @@ class DataLoader(object):
             self.ancillary_path, ANCILLARY_FILES['resource']['file'])
         provider_lut_fname = os.path.join(
             self.ancillary_path, ANCILLARY_FILES['provider']['file'])
-        self.merged_resource_lut_fname = os.path.join(self.ancillary_path, 'merged_dataset_lut.csv')
-        self.merged_provider_lut_fname = os.path.join(self.ancillary_path, 'merged_organization_lut.csv')
+        
+        self.merged_resource_lut_fname = os.path.join(
+            self.ancillary_path, ANCILLARY_FILES['resource']['latest_file'])
+        self.merged_provider_lut_fname = os.path.join(
+            self.ancillary_path, ANCILLARY_FILES['provider']['latest_file'])
+
         self.resource_count_fname = os.path.join(
             self.outpath,  '{}.count.resource.csv'.format(data_source))
         self.provider_count_fname = os.path.join(
             self.outpath,  '{}.count.provider.csv'.format(data_source))
         self.bisonprov_dataload_fname = os.path.join(
             self.ancillary_path, 'bisonprovider_meta_lut.csv')
-
 
         self.s1dir = os.path.join(self.tmppath, 's1-rewrite')
         self.s2dir = os.path.join(self.tmppath, 's2-scinames')
@@ -117,6 +121,9 @@ class DataLoader(object):
         if data_source == 'gbif':
             self.prep_gbif(resource_lut_fname, provider_lut_fname, basefname_wext)
         elif data_source == 'provider':
+            self.prep_bisonprov()
+        elif data_source == 'all':
+            self.create_providers_resources(resource_lut_fname, provider_lut_fname)
             self.prep_bisonprov()
         
     # ...............................................
@@ -213,7 +220,33 @@ class DataLoader(object):
                 os.remove(self.resource_count_fname)
             if os.path.exists(self.provider_count_fname):
                 print('Deleting {}'.format(self.provider_count_fname))
-                os.remove(self.provider_count_fname)        
+                os.remove(self.provider_count_fname)
+                
+    # ...............................................
+    def create_providers_resources(self, resource_lut_fname, provider_lut_fname):
+        # Step 1: assemble metadata, initial rewrite to BISON format, (GBIF-only)
+        # fill resource/prov0ider, check coords (like provider step 1)
+        logger = self._get_logger_for_processing(self.ancillary_path, 'create_prov_res')
+        gr = GBIFReader(self.workpath, self.logger)
+
+        # Update resource, provider filenames to force new creation
+        today = time.localtime()
+        dtstr = '{}.{}.{}'.format(today.tm_year, today.tm_mon, today.tm_mday)
+        self.merged_resource_lut_fname = os.path.join(
+            self.ancillary_path, 'provider_table.{}.csv'.format(dtstr))
+        self.merged_provider_lut_fname = os.path.join(
+            self.ancillary_path, 'provider_table.{}.csv'.format(dtstr))
+        logger.info("Update 'latest_file' in ANCILLARY_FILES 'provider' and 'resource'")
+        
+        gr.resolve_provider_resource_for_lookup(
+            self.merged_resource_lut_fname, resource_lut_fname, 
+            self.merged_provider_lut_fname, provider_lut_fname, 
+            outdelimiter=BISON_DELIMITER)
+        
+        gr = GBIFReader(self.workpath, logger)
+        gr.write_resource_provider_stats(
+            self.resource_count_fname, self.provider_count_fname, overwrite=True)
+
         
     # ...............................................
     def process_gbif_step1(self):
@@ -323,6 +356,50 @@ class DataLoader(object):
 #             bfiller.walk_data(
 #                 in_fname, terr_data, marine_data, ancillary_path, 
 #                 merged_resource_lut_fname, merged_provider_lut_fname)
+
+    # ...............................................
+    def fill_bisonprov_columns(self, base_outfname):
+        resource_url_prefix = '{}/{}'.format(BISON_IPT_PREFIX, IPT_QUERY)
+        provider_id = BISON_PROVIDER_VALUES['provider_id']
+        provider_legacy_id = BISON_PROVIDER_VALUES['provider_legacy_id']
+        provider_url = BISON_PROVIDER_VALUES['provider_url']
+        
+        task_logger = self._get_logger_for_processing('fill_bisonprov_columns')
+        merger = BisonMerger(task_logger)
+        resources = merger.read_resources(self.merged_resource_lut_fname)
+
+        for resource_key, resource_pvals in self.bisonprov_dataload.lut.items():
+            action = resource_pvals['action']
+            if action in PROVIDER_ACTIONS:
+                try:
+                    vals = resources.lut[resource_key]
+                except:
+                    vals = {}
+                res_legacy_id = ''    
+                if resource_key.startswith('440,'):
+                    res_legacy_id = resource_key.split(',')[1]
+                # Construct from inputdata.py
+                vals['bison_resource_uuid'] = resource_pvals['resource_id']
+                vals['bison_resource_legacy_id'] = res_legacy_id
+                vals['bison_resource_name'] = resource_pvals['resource_name']
+                vals['bison_resource_url'] = '{}{}'.format(
+                    resource_url_prefix, resource_pvals['resource_id'])
+                # Constants
+                vals['bison_provider_uuid'] = provider_id
+                vals['bison_provider_legacy_id'] = provider_legacy_id
+                vals['bison_provider_name'] = provider_id
+                vals['bison_provider_url'] = provider_url
+                resources.lut[resource_key] = vals
+            else:
+                dl.logger.info('Ignore dataset {} with action {}'.format(
+                    resource_key, action))
+
+        # Save dataset information
+        header = [fld for (fld, _) in MERGED_RESOURCE_LUT_FIELDS]
+        new_resource_fname = os.path.join(dl.ancillary_path, base_outfname)
+        resources.write_lookup(new_resource_fname, header, BISON_DELIMITER)
+        task_logger.info('Wrote dataset metadata to {}'.format(
+            new_resource_fname))
 
     # ...............................................
     def process_bisonprov_step1(self):
@@ -547,76 +624,77 @@ if __name__ == '__main__':
             print('No step {} for data_source {}'.format(step, data_source))
             
     elif data_source == 'provider':
-#         SEE_ONLY_ME = ['nycity-tree-census-2005']
-        SEE_ONLY_ME = None
-        for resource_key, resource_pvals in dl.bisonprov_dataload.lut.items():
-            this_start_time = time.time()
-            # 2 ways to limit processing 
-            # resource_id from command option
-            ignore_me = False
-            if test_resource_id is not None and test_resource_id != resource_key:
-                ignore_me = True
-            elif SEE_ONLY_ME and resource_key not in SEE_ONLY_ME: 
-                ignore_me = True
-                
-            action = resource_pvals['action']
-            if action in PROVIDER_ACTIONS and not ignore_me:
-                dl.reset_bisonprov(resource_key, resource_pvals)
-                if step == 1:
-                    dl.process_bisonprov_step1()
-                elif step == 3:
-                    dl.process_bisonprov_step3()
-                elif step == 4:
-                    dl.process_bisonprov_step4()
-                elif step == 0:
-                    dl.process_bisonprov_step1()
-                    dl.process_bisonprov_step3()
-                    dl.process_bisonprov_step4()
+        if step == 1000:
+            dl.create_providers_resources(resource_lut_fname, provider_lut_fname)
+        else:
+            SEE_ONLY_ME = None
+            for resource_key, resource_pvals in dl.bisonprov_dataload.lut.items():
+                this_start_time = time.time()
+                # 2 ways to limit processing 
+                # resource_id from command option
+                ignore_me = False
+                if test_resource_id is not None and test_resource_id != resource_key:
+                    ignore_me = True
+                elif SEE_ONLY_ME and resource_key not in SEE_ONLY_ME: 
+                    ignore_me = True
+                    
+                action = resource_pvals['action']
+                if action in PROVIDER_ACTIONS and not ignore_me:
+                    dl.reset_bisonprov(resource_key, resource_pvals)
+                    if step == 1:
+                        dl.process_bisonprov_step1()
+                    elif step == 3:
+                        dl.process_bisonprov_step3()
+                    elif step == 4:
+                        dl.process_bisonprov_step4()
+                    elif step == 0:
+                        dl.process_bisonprov_step1()
+                        dl.process_bisonprov_step3()
+                        dl.process_bisonprov_step4()
+                    else:
+                        print('No step {} for data_source {}'.format(step, data_source))
                 else:
-                    print('No step {} for data_source {}'.format(step, data_source))
-            else:
-                dl.logger.info('Ignore dataset {} with action {}'.format(
-                    resource_key, action))
-
-            these_minutes = (time.time() - this_start_time) / 60
-            dl.logger.info('Elapsed minutes {} for step {}, resource {}'.format(
-                these_minutes, step, resource_key))
-
-    all_minutes = (time.time() - start_time) / 60
-    try:
-        dl.logger.info('Elapsed minutes {} for step {}, input {}'.format(
-            all_minutes, step, input_data))
-    except:
-        print('Elapsed minutes {} for step {}, input {}'.format(
-            all_minutes, step, input_data))
+                    dl.logger.info('Ignore dataset {} with action {}'.format(
+                        resource_key, action))
+    
+                these_minutes = (time.time() - this_start_time) / 60
+                dl.logger.info('Elapsed minutes {} for step {}, resource {}'.format(
+                    these_minutes, step, resource_key))
+    
+        all_minutes = (time.time() - start_time) / 60
+        try:
+            dl.logger.info('Elapsed minutes {} for step {}, input {}'.format(
+                all_minutes, step, input_data))
+        except:
+            print('Elapsed minutes {} for step {}, input {}'.format(
+                all_minutes, step, input_data))
 
 """
-
-
 import os
-from concurrent.futures import ProcessPoolExecutor
-from multiprocessing import cpu_count
 import time
-
 from common.bisonfill import BisonFiller
 from common.constants import (
-    BISON_DELIMITER, PROVIDER_ACTIONS, LOGINTERVAL, ANCILLARY_DIR, TEMP_DIR, 
-    OUTPUT_DIR, PROVIDER_DELIMITER)
+    BISON_DELIMITER, BISON_PROVIDER_VALUES, BISON_IPT_PREFIX, IPT_QUERY, 
+    LOGINTERVAL, ANCILLARY_DIR, TEMP_DIR, MERGED_RESOURCE_LUT_FIELDS,
+    OUTPUT_DIR, PROVIDER_DELIMITER, PROVIDER_ACTIONS, ENCODING)
 from common.inputdata import ANCILLARY_FILES
-from common.intersect_one import intersect_csv_and_shapefiles
-from common.tools import get_logger, get_line_count, get_header
-
+from common.lookup import Lookup, VAL_TYPE
+from common.tools import (get_logger, get_line_count)
+from common.geo_intersect import step_parallel
 from gbif.gbifmod import GBIFReader
-
 from provider.providermod import BisonMerger
-
-from common.dataload import *
-
+from common.dataload2 import *
 
 data_source = 'gbif'
-input_data = '/tank/data/bison/2019/CA_USTerr_gbif/occurrence_lines_10000001-20000001.csv'
 input_data = '/tank/data/bison/2019/CA_USTerr_gbif/occurrence_lines_20000001-30000001.csv'
-step = 1
+
+
+data_source = 'provider'
+input_data = '/tank/data/bison/2019/provider'
+step = 1000
+
+dl = DataLoader(data_source, input_data)
+
 
 
 # ..........................................................

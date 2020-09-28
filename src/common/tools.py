@@ -563,7 +563,7 @@ def write_shapefile(new_dataset, new_layer, feature_sets, calc_nongeo_fields):
     # for each set of features
     for feats in feature_sets:
         # for each feature
-        for oldfid, feat_vals in feats.items():
+        for _, feat_vals in feats.items():
             # create new feature for every simple geometry
             simple_geoms = feat_vals['geometries']
             for wkt in simple_geoms:
