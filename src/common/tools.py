@@ -817,32 +817,82 @@ if __name__ == '__main__':
                                 calc_eez_fields, intersect_filename)
     
 """
-pth = '/tank/data/bison/2019/ancillary'
-grid_sfname = 'world_grid_5.shp'
-shp_filename = os.path.join(pth, grid_sfname)
+import csv
+
+enc = 'utf-8'
+delimiter = '$'
+EXTRA_VALS_KEY = 'rest'
+fname = '/tank/data/bison/2020/ancillary/resource.csv'
 
 
-pth, basename = os.path.split(shp_filename)
-idxname, _ = os.path.splitext(basename)
-idx_filename = os.path.join(pth, idxname)
+f.close()
+rdr = None
+f = open(fname, 'r', encoding=enc)
 
-prop = rtree.index.Property()
-prop.set_filename(idx_filename)
+rec = next(f)
+tmpflds = rec.split(delimiter)
+fieldnames = [fld.strip() for fld in tmpflds]
 
-driver = ogr.GetDriverByName("ESRI Shapefile")
-datasrc = driver.Open(shp_filename, 0)
-lyr = datasrc.GetLayer()
-spindex = rtree.index.Index(idxname, interleaved=False, properties=prop)
 
-for fid in range(0, lyr.GetFeatureCount()):
-    feat = lyr.GetFeature(fid)
-    geom = feat.geometry()
-    wkt = geom.ExportToWkt()
-    # OGR returns xmin, xmax, ymin, ymax
-    xmin, xmax, ymin, ymax = geom.GetEnvelope()
-    # Rtree takes xmin, xmax, ymin, ymax IFF interleaved = False
-    spindex.insert(fid, (xmin, xmax, ymin, ymax), obj=wkt)
+rdr = csv.DictReader(
+    f, fieldnames=fieldnames, restkey=EXTRA_VALS_KEY, 
+    escapechar='\\', delimiter=delimiter)
+    
+r =  {}
+p =  {}
+while rec is not None:
+    rec = next(rdr)
+    provid = rec['provider_id']
+    resid = rec['OriginalResourceID']
+    if resid == '12678':
+        print('Res {}, prov {}'.format(resid, provid))
+    try:
+        r[resid].add(provid)
+    except:
+        r[resid] = set([provid])
+    try:
+        p[provid].append(resid)
+    except:
+        p[provid] = set([resid])
 
-spindex.close()
+dupes = {}
+for k, v in r.items():
+    if len(v) > 1:
+        dupes[k] = v
+
+for k, v in dupes.items():
+    print(k,v)
+
+provs2ress = {}
+for resid, provset in dupes.items():
+    provstr = ','.join(provset)
+    try:
+        provs2ress[provstr].add(resid)
+    except:
+        provs2ress[provstr] = set([resid])
+
+for k, v in provs2ress.items():
+    print(k,v)
+
+
+stop = False
+while not stop and rdr.line_num <= 2788:
+    rec = next(rdr)
+    if rec['OriginalResourceID'] == '12678':
+        stop = True
+        print(rdr.line_num)
+
+if not stop:
+    print (rdr.line_num, rec['OriginalResourceID'])
+        
+for i in range(861):
+    rec = next(rdr)
+
+
+
+NONONONO
+rdr = csv.DictReader(
+    f, fieldnames=fieldnames, quoting=csv.QUOTE_NONE,
+    escapechar='\\', restkey=EXTRA_VALS_KEY, delimiter=delimiter)
 
 """

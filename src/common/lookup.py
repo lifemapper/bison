@@ -157,7 +157,7 @@ class Lookup(object):
                                 self.lut[datakey] = data
                                 break
                         if not datakey:
-                            print('No {} for record {}'.format(datakey, data))
+                            print('No {} for record {}'.format(keyfld, data))
                 finally:
                     inf.close()
                 print('no_old_legacy {}  no_new_legacy (default -9999) {}'

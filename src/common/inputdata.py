@@ -19,9 +19,9 @@ ANCILLARY_FILES = {
 #              'itis_lookup_csv-05-2020.csv'},
     # From existing database
     'resource': {'file': 'resource.csv',
-                 'latest_file': 'resource_table.2020.09.17.csv'},
+                 'latest_file': 'resource_table.2020.10.15.csv'},
     'provider': {'file': 'provider.csv',
-                 'latest_file': 'provider_table.2020.08.07.csv'}}
+                 'latest_file': 'provider_table.2020.10.15.csv'}}
 
 USDA_PLANTS_URL = 'https://plants.sc.egov.usda.gov'
 USDA_PLANTS_ID = 'USDA_PLANTS'
