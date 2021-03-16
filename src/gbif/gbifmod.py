@@ -1162,8 +1162,8 @@ class GBIFReader(object):
             
     # ...............................................
     def resolve_provider_resource_for_lookup(
-            self, merged_resource_lut_fname, resource_lut_fname, 
-            merged_provider_lut_fname, provider_lut_fname, 
+            self, orig_resource_fname, orig_provider_fname,
+            merged_gbif_resource_fname, merged_gbif_provider_fname,
             outdelimiter=BISON_DELIMITER):
         """Write merged BISON resource and provider lookup tables to files.
            
@@ -1176,12 +1176,12 @@ class GBIFReader(object):
               and resource fields in BISON record.
         
         Args:
-            merged_resource_lut_fname: output file for the merged dataset table
-            resource_lut_fname: input file containing existing BISON resource
+            orig_resource_fname: input file containing existing BISON resource
+                db table. 
+            orig_provider_fname: input file containing existing BISON provider
                 db table.
-            merged_provider_lut_fname: output file for the merged organization table
-            provider_lut_fname: input file containing existing BISON provider
-                db table.
+            merged_gbif_resource_fname: output file for the merged dataset table
+            merged_gbif_provider_fname: output file for the merged organization table
             outdelimiter: field value separator for the output files
            
         Results:
@@ -1194,26 +1194,22 @@ class GBIFReader(object):
             population.
         """
         gbifapi = GbifAPI()
-        if os.path.exists(merged_resource_lut_fname):
+        if os.path.exists(merged_gbif_resource_fname):
             self._log.info('Merged output file {} exists!'.format(
-                merged_resource_lut_fname))
+                merged_gbif_resource_fname))
         else:
-            old_resources = Lookup.init_from_file(resource_lut_fname, 
-                                                ['OriginalResourceID'],
-                                                BISON_DELIMITER, 
-                                                valtype=VAL_TYPE.DICT, 
-                                                encoding=ENCODING)
+            old_resources = Lookup.init_from_file(
+                orig_resource_fname, ['OriginalResourceID'], BISON_DELIMITER, 
+                valtype=VAL_TYPE.DICT, encoding=ENCODING, ignore_quotes=False)
             merged_datasets = self._write_merged_resource_lookup(
-                gbifapi, old_resources, merged_resource_lut_fname, outdelimiter)
+                gbifapi, old_resources, merged_gbif_resource_fname, outdelimiter)
             
-        if os.path.exists(merged_provider_lut_fname):
-            self._log.info('Output file {} exists!'.format(merged_provider_lut_fname))
+        if os.path.exists(merged_gbif_provider_fname):
+            self._log.info('Output file {} exists!'.format(merged_gbif_provider_fname))
         else:
-            old_providers = Lookup.init_from_file(provider_lut_fname, 
-                                                ['OriginalProviderID'],
-                                                BISON_DELIMITER, 
-                                                valtype=VAL_TYPE.DICT, 
-                                                encoding=ENCODING)
+            old_providers = Lookup.init_from_file(
+                orig_provider_fname, ['OriginalProviderID'], BISON_DELIMITER, 
+                valtype=VAL_TYPE.DICT, encoding=ENCODING, ignore_quotes=False)
     
             # --------------------------------------
             # Gather organization UUIDs from dataset metadata assembled (LUT or file)
@@ -1228,10 +1224,10 @@ class GBIFReader(object):
             except Exception:             
                 gmetardr = GBIFMetaReader(self._log)
                 org_uuids = gmetardr.get_organization_uuids(
-                    merged_resource_lut_fname)
+                    merged_gbif_resource_fname)
                 
             self._write_merged_provider_lookup(
-                org_uuids, gbifapi, old_providers, merged_provider_lut_fname, 
+                org_uuids, gbifapi, old_providers, merged_gbif_provider_fname, 
                 outdelimiter)
             
             

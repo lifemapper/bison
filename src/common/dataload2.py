@@ -27,7 +27,8 @@ import time
 from common.bisonfill import BisonFiller
 from common.constants import (
     BISON_DELIMITER, BISON_PROVIDER_VALUES, BISON_IPT_PREFIX, IPT_QUERY, 
-    LOGINTERVAL, ANCILLARY_DIR, TEMP_DIR, MERGED_RESOURCE_LUT_FIELDS,
+    LOGINTERVAL, ANCILLARY_DIR, TEMP_DIR, 
+    MERGED_PROVIDER_LUT_FIELDS, MERGED_RESOURCE_LUT_FIELDS,
     OUTPUT_DIR, PROVIDER_DELIMITER, PROVIDER_ACTIONS, ENCODING)
 from common.inputdata import ANCILLARY_FILES
 from common.lookup import Lookup, VAL_TYPE
@@ -84,9 +85,9 @@ class DataLoader(object):
         provider_lut_fname = os.path.join(
             self.ancillary_path, ANCILLARY_FILES['provider']['file'])
         
-        self.merged_resource_lut_fname = os.path.join(
+        self.merged_resource_fname = os.path.join(
             self.ancillary_path, ANCILLARY_FILES['resource']['latest_file'])
-        self.merged_provider_lut_fname = os.path.join(
+        self.merged_provider_fname = os.path.join(
             self.ancillary_path, ANCILLARY_FILES['provider']['latest_file'])
 
         self.resource_count_fname = os.path.join(
@@ -122,9 +123,9 @@ class DataLoader(object):
             self.prep_gbif(resource_lut_fname, provider_lut_fname, basefname_wext)
         elif data_source == 'provider':
             self.prep_bisonprov()
-        elif data_source == 'all':
-            self.create_providers_resources(resource_lut_fname, provider_lut_fname)
-            self.prep_bisonprov()
+#         elif data_source == 'all':
+#             self.create_providers_resources(resource_lut_fname, provider_lut_fname)
+#             self.prep_bisonprov()
         
     # ...............................................
     def _get_logger_for_processing(self, absfilename_or_path, basefname=None):
@@ -139,7 +140,7 @@ class DataLoader(object):
         return logger
             
     # ...............................................
-    def prep_gbif(self, resource_lut_fname, provider_lut_fname, basefname_wext):
+    def prep_gbif(self, orig_resource_fname, orig_provider_fname, basefname_wext):
         # filename w/o path or extension
         self.basefname, _ = os.path.splitext(basefname_wext)
         self.nametaxa_fname = os.path.join(self.tmppath, 'step1_{}_sciname_taxkey_list.csv'
@@ -153,14 +154,14 @@ class DataLoader(object):
         self.pass3_fname = os.path.join(self.s3dir, '{}.csv'.format(self.basefname))
         self.pass4_fname = os.path.join(self.s4dir, '{}.csv'.format(self.basefname))
 
-        if (not os.path.exists(self.merged_provider_lut_fname) or
-            not os.path.exists(self.merged_resource_lut_fname)):
+        if (not os.path.exists(self.merged_provider_fname) or
+            not os.path.exists(self.merged_resource_fname)):
             gr = GBIFReader(self.workpath, self.logger)
             # Merge existing provider and resource metadata with GBIF dataset 
             # metadata files and GBIF API-returned metadata
             gr.resolve_provider_resource_for_lookup(
-                self.merged_resource_lut_fname, resource_lut_fname, 
-                self.merged_provider_lut_fname, provider_lut_fname, 
+                orig_resource_fname, orig_provider_fname, 
+                self.merged_provider_fname, self.merged_resource_fname, 
                 outdelimiter=BISON_DELIMITER)
 
     # ...............................................
@@ -173,7 +174,7 @@ class DataLoader(object):
                 self.bisonprov_dataload_fname, ['legacy_id'], BISON_DELIMITER, 
                 VAL_TYPE.DICT, ENCODING)
         else:
-            old_resources = merger.read_resources(self.merged_resource_lut_fname)
+            old_resources = merger.read_resources(self.merged_resource_fname)
             bisonprov_dataload_metadata = merger.assemble_files(
                 self.workpath, old_resources)
             self.bisonprov_dataload = Lookup.init_from_dict(
@@ -223,31 +224,63 @@ class DataLoader(object):
                 os.remove(self.provider_count_fname)
                 
     # ...............................................
-    def create_providers_resources(self, resource_lut_fname, provider_lut_fname):
-        # Step 1: assemble metadata, initial rewrite to BISON format, (GBIF-only)
-        # fill resource/prov0ider, check coords (like provider step 1)
-        logger = self._get_logger_for_processing(self.ancillary_path, 'create_prov_res')
+    def create_gbif_providers_resources(
+            self, merged_gbif_resource_fname, merged_gbif_provider_fname):
+#         logger = self._get_logger_for_processing(self.ancillary_path, 'create_prov_res')
         gr = GBIFReader(self.workpath, self.logger)
 
-        # Update resource, provider filenames to force new creation
-        today = time.localtime()
-        dtstr = '{}.{}.{}'.format(today.tm_year, today.tm_mon, today.tm_mday)
-        self.merged_resource_lut_fname = os.path.join(
-            self.ancillary_path, 'provider_table.{}.csv'.format(dtstr))
-        self.merged_provider_lut_fname = os.path.join(
-            self.ancillary_path, 'provider_table.{}.csv'.format(dtstr))
-        logger.info("Update 'latest_file' in ANCILLARY_FILES 'provider' and 'resource'")
+        orig_resource_fname = os.path.join(
+            self.ancillary_path, ANCILLARY_FILES['resource']['file'])
+        orig_provider_fname = os.path.join(
+            self.ancillary_path, ANCILLARY_FILES['provider']['file'])
         
+        # Write GBIF organization/dataset to provider/resource files
         gr.resolve_provider_resource_for_lookup(
-            self.merged_resource_lut_fname, resource_lut_fname, 
-            self.merged_provider_lut_fname, provider_lut_fname, 
+            orig_resource_fname, orig_provider_fname,
+            merged_gbif_resource_fname, merged_gbif_provider_fname,  
             outdelimiter=BISON_DELIMITER)
         
-        gr = GBIFReader(self.workpath, logger)
-        gr.write_resource_provider_stats(
-            self.resource_count_fname, self.provider_count_fname, overwrite=True)
-
         
+    # ...............................................
+    def update_bison_providers_resources(
+            self, merged_gbif_resource_fname, merged_gbif_provider_fname,
+            all_resource_fname, all_provider_fname):
+            
+        all_resources = Lookup.init_from_file(
+            merged_gbif_resource_fname, ['bison_resource_uuid'], 
+            BISON_DELIMITER, valtype=VAL_TYPE.DICT, encoding=ENCODING)
+        all_providers = Lookup.init_from_file(
+            merged_gbif_provider_fname, ['bison_provider_uuid'], 
+            BISON_DELIMITER, valtype=VAL_TYPE.DICT, encoding=ENCODING)
+
+        # Add one record for "BISON" provider
+        prov_rec = {}
+        prov_rec['bison_provider_uuid'] = BISON_PROVIDER_VALUES['provider_id']
+        prov_rec['bison_provider_legacy_id'] = BISON_PROVIDER_VALUES['provider_legacy_id']
+        prov_rec['bison_provider_name'] = BISON_PROVIDER_VALUES['provider_id']
+        prov_rec['bison_provider_url'] = BISON_PROVIDER_VALUES['provider_url']
+        all_providers.save_to_lookup(
+            BISON_PROVIDER_VALUES['provider_id'], prov_rec)
+        header = [fld for (fld, _) in MERGED_PROVIDER_LUT_FIELDS]
+        all_providers.write_lookup(all_provider_fname, header, BISON_DELIMITER)
+        
+        # Add one record for each "BISON" resource
+        for resource_key, resource_pvals in self.bisonprov_dataload.lut.items():
+            rec = {}
+            rec['bison_provider_uuid'] = BISON_PROVIDER_VALUES['provider_id']
+            rec['bison_provider_legacy_id'] = BISON_PROVIDER_VALUES['provider_legacy_id']
+            rec['bison_provider_name'] = BISON_PROVIDER_VALUES['provider_id']
+            rec['bison_provider_url'] = BISON_PROVIDER_VALUES['provider_url']
+            rec['bison_resource_uuid'] = resource_key
+            rec['bison_resource_legacy_id'] = resource_pvals['legacy_id']
+            rec['bison_resource_name'] = resource_pvals['resource_name']
+            rec['bison_resource_url'] = resource_pvals['resource_url']
+            all_resources.save_to_lookup(resource_key, rec)
+
+        header = [fld for (fld, _) in MERGED_RESOURCE_LUT_FIELDS]
+        all_resources.write_lookup(all_resource_fname, header, BISON_DELIMITER)
+
+
     # ...............................................
     def process_gbif_step1(self):
         # Step 1: assemble metadata, initial rewrite to BISON format, (GBIF-only)
@@ -261,8 +294,8 @@ class DataLoader(object):
             # Discard records from BISON org, bison IPT
             gr.transform_gbif_to_bison(
                 self.rawdata_fname, 
-                self.merged_resource_lut_fname, 
-                self.merged_provider_lut_fname, 
+                self.merged_resource_fname, 
+                self.merged_provider_fname, 
                 self.nametaxa_fname, self.pass1_fname)
             
             gr.write_resource_provider_stats(
@@ -366,7 +399,7 @@ class DataLoader(object):
         
         task_logger = self._get_logger_for_processing('fill_bisonprov_columns')
         merger = BisonMerger(task_logger)
-        resources = merger.read_resources(self.merged_resource_lut_fname)
+        resources = merger.read_resources(self.merged_resource_fname)
 
         for resource_key, resource_pvals in self.bisonprov_dataload.lut.items():
             action = resource_pvals['action']
@@ -420,7 +453,7 @@ class DataLoader(object):
 #                     bisonprov_lut_fname, ['legacy_id'], BISON_DELIMITER, 
 #                     VAL_TYPE.DICT, ENCODING)
 #             else:
-#                 old_resources = merger.read_resources(self.merged_resource_lut_fname)
+#                 old_resources = merger.read_resources(self.merged_resource_fname)
 #                 bisonprov_dataload_metadata = merger.assemble_files(
 #                     self.workpath, old_resources)
 #                 self.bisonprov_dataload = Lookup.init_from_dict(
@@ -625,7 +658,28 @@ if __name__ == '__main__':
             
     elif data_source == 'provider':
         if step == 1000:
-            dl.create_providers_resources(resource_lut_fname, provider_lut_fname)
+            # Update resource, provider filenames to force new creation
+            today = time.localtime()
+            dtstr = '{}.{}.{}'.format(today.tm_year, today.tm_mon, today.tm_mday)
+            # Temp files for only GBIF providers/resources
+            merged_gbif_resource_fname = os.path.join(
+                dl.ancillary_path, 'resource_gbif.{}.csv'.format(dtstr))
+            merged_gbif_provider_fname = os.path.join(
+                dl.ancillary_path, 'provider_gbif.{}.csv'.format(dtstr))
+            # Final files for GBIF and BISON providers/resources
+            all_resource_fname = os.path.join(
+                dl.ancillary_path, 'resources.{}.csv'.format(dtstr))
+            all_provider_fname = os.path.join(
+                dl.ancillary_path, 'providers.{}.csv'.format(dtstr))
+            
+            # Merge old providers/resources with GBIF organizations/datasets
+            dl.create_gbif_providers_resources(
+                merged_gbif_resource_fname, merged_gbif_provider_fname)
+            # Merge just-created merged old and GBIF with BISON providers
+            dl.update_bison_providers_resources(
+                 merged_gbif_resource_fname, merged_gbif_provider_fname,
+                 all_resource_fname, all_provider_fname)
+            
         else:
             SEE_ONLY_ME = None
             for resource_key, resource_pvals in dl.bisonprov_dataload.lut.items():

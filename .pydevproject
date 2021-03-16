@@ -8,6 +8,5 @@
 <pydev_pathproperty name="org.python.pydev.PROJECT_EXTERNAL_SOURCE_PATH">
 <path>/opt/python/lib/python3.6</path>
 <path>/opt/python/lib/python3.6/site-packages</path>
-<path>/opt/python/lib/python3.6/site-packages/requests-2.22.0-py3.6.egg</path>
 </pydev_pathproperty>
 </pydev_project>
