@@ -27,7 +27,7 @@ import xml.etree.ElementTree as ET
 from common.constants import (BISON_DELIMITER, ENCODING)
 from common.tools import (get_csv_dict_reader, get_csv_writer)
                             
-from gbif.constants import (INTERPRETED, CLIP_CHAR, NAMESPACE, GBIF_ORG_FOREIGN_KEY)
+from gbif.constants import (INTERPRETED, CLIP_CHAR, NAMESPACE)
 from gbif.gbifapi import GbifAPI
         
 # .............................................................................
