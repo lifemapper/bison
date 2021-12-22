@@ -1,0 +1,3 @@
+requests
+# gdal (must be in system python, fails in virtenv)
+rtree
