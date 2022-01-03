@@ -5,8 +5,8 @@ import os
 from random import randint
 from time import sleep
 
-from riis.common import BisonFiller
-from riis.common import get_logger
+from bison.common import BisonFiller
+from bison.common import get_logger
 
 # .............................................................................
 def intersect_csv_and_shapefiles(in_csv_filename, geodata1, geodata2,

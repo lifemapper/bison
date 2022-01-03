@@ -24,12 +24,12 @@
 import os
 import time
 
-from riis.common import (
+from bison.common import (
     BISON_DELIMITER, ENCODING, LOGINTERVAL, PROHIBITED_VALS, LEGACY_ID_DEFAULT,
     EXTRA_VALS_KEY, ALLOWED_TYPE, BISON2020_FIELD_DEF, BISON_IPT_PREFIX,
     MERGED_RESOURCE_LUT_FIELDS, MERGED_PROVIDER_LUT_FIELDS)
-from riis.common import Lookup, VAL_TYPE
-from riis.common import (
+from bison.common import Lookup, VAL_TYPE
+from bison.common import (
     get_csv_reader, get_csv_dict_reader, get_csv_writer, open_csv_files,
     makerow)
 

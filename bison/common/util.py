@@ -2,7 +2,7 @@
 import csv
 import sys
 
-from riis.common.constants import ENCODING
+from bison.common.constants import ENCODING
 
 # .............................................................................
 def get_csv_writer(datafile, delimiter, fmode="w"):

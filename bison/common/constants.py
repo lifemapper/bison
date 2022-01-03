@@ -2,6 +2,8 @@
 
 BISON_DELIMITER = "$"
 ENCODING = "utf-8"
+LINENO_FLD = "LINENO"
+ERR_SEPARATOR = "------------"
 
 
 class GBIF:
@@ -96,23 +98,21 @@ class NS:
 
 
 class RIIS:
-    """Constants for the US Register of Introduced and Invasive Species, US-RIISm data.
-
-    aka Non-Native Species List, NNSL
-    """
-
-    DATA_DIR = "../data"
+    """Constants for the US Register of Introduced and Invasive Species, US-RIIS data."""
+    DATA_DIR = "data"
     DATA_EXT = "csv"
     DELIMITER = ","
     QUOTECHAR = '"'
     # Metadata about fields
     DATA_DICT_FNAME = "US-RIIS_DataDictionary"
-    # Authority References Metadata
-    # Total 5952 lines
-    AUTHORITY_FNAME = "US-RIIS_AuthorityReferences"
-    AUTHORITY_KEY = "Authority"
-    AUTHORITY_COUNT = 5951
-    AUTHORITY_HEADER = [
+
+
+class RIIS_AUTHORITY:
+    """Authority References Metadata"""
+    FNAME = "US-RIIS_AuthorityReferences"
+    KEY = "Authority"
+    DATA_COUNT = 5951
+    HEADER = [
         "Authority",
         "associatedReferences",
         "Source Type",
@@ -129,11 +129,21 @@ class RIIS:
         "Pages",
         "Publication Remarks",
     ]
-    # Introduced or Invasive Species List
-    # Total 15265 lines
-    SPECIES_FNAME = "US-RIIS_MasterList"
-    SPECIES_COUNT = 15264
-    SPECIES_HEADER = [
+
+
+class RIIS_SPECIES:
+    """Introduced or Invasive Species List"""
+    FNAME = "US-RIIS_MasterList"
+    DATA_COUNT = 15264
+    KEY = "occurrenceID"
+    GBIF_KEY = "GBIF taxonKey"
+    ITIS_KEY = "ITIS TSN"
+    LOCALITY_FLD = "locality"
+    SCINAME_FLD = "scientificName"
+    SCIAUTHOR_FLD = "scientificNameAuthorship"
+    ASSESSMENT_FLD = "Introduced or Invasive"
+    TAXON_AUTHORITY_FLD = "taxonomicStatus"
+    HEADER = [
         "locality",
         "scientificName",
         "scientificNameAuthorship",

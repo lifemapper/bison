@@ -1,13 +1,13 @@
 import glob
 import os
 
-from riis.common import (
+from bison.common import (
     BISON2020_FIELD_DEF, BISONEXPORT_TO_BISON2020_MAP,
     BISON_PROVIDER_VALUES, PROVIDER_ACTIONS, PROVIDER_DELIMITER, BISON_DELIMITER, ENCODING,
     BISON_IPT_PREFIX, IPT_QUERY)
-from riis.common import BISON_PROVIDER, USDA_PLANTS_ID, USDA_PLANTS_URL
-from riis.common import Lookup, VAL_TYPE
-from riis.common import (
+from bison.common import BISON_PROVIDER, USDA_PLANTS_ID, USDA_PLANTS_URL
+from bison.common import Lookup, VAL_TYPE
+from bison.common import (
     get_logger, makerow, open_csv_files, get_csv_dict_reader, get_csv_writer)
 
 EXISTING_DATASET_FILE_PREFIX = 'bison_'

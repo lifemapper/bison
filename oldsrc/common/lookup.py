@@ -1,8 +1,8 @@
 import os
 
-from riis.common import ENCODING
-from riis.common import (get_csv_dict_reader, get_csv_dict_writer,
-                         get_csv_reader, get_csv_writer, getLine, makerow)
+from bison.common import ENCODING
+from bison.common import (get_csv_dict_reader, get_csv_dict_writer,
+                          get_csv_reader, get_csv_writer, getLine, makerow)
 
 class VAL_TYPE:
     DICT = 1
