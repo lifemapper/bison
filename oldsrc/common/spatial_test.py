@@ -3,10 +3,10 @@ import os
 import rtree
 import time
 
-from common.constants import (BISON_DELIMITER, ENCODING, 
-                              ANCILLARY_DIR, ANCILLARY_FILES,)
-from common.bisonfill import BisonFiller
-from common.tools import (get_csv_dict_reader, get_csv_dict_writer, get_logger)
+from riis.common import (BISON_DELIMITER, ENCODING,
+                         ANCILLARY_DIR, ANCILLARY_FILES, )
+from riis.common import BisonFiller
+from riis.common import (get_csv_dict_reader, get_csv_dict_writer)
 
 testsize = 10000
 gbif_interp_file='/tank/data/bison/2019/Terr/occurrence_lines_5000-10000.txt'
@@ -17,24 +17,24 @@ outdir = 'out'
 # ...............................................
 def rewrite_records(infname, outfname):
     self = BisonFiller(infname)
-     
+
     drdr, inf = get_csv_dict_reader(infname, BISON_DELIMITER, ENCODING)
     self._files.append(inf)
-     
+
     deleteme = []
     for fld in self._bison_ordered_flds:
         if fld not in drdr.fieldnames:
             deleteme.append(fld)
-     
+
     for fld in deleteme:
         self._bison_ordered_flds.remove(fld)
-     
-    dwtr, outf = get_csv_dict_writer(outfname, BISON_DELIMITER, ENCODING, 
+
+    dwtr, outf = get_csv_dict_writer(outfname, BISON_DELIMITER, ENCODING,
                                   self._bison_ordered_flds)
-     
+
     dwtr.writeheader()
     self._files.append(outf)
-     
+
     recno = 0
     for rec in drdr:
         rec.pop('taxonKey')
@@ -100,7 +100,7 @@ def get_geofields_with_rtree(lon, lat, terrindex, terrfeats):
     terr_count = 0
     pt = ogr.Geometry(ogr.wkbPoint)
     pt.AddPoint(lon, lat)
-    
+
     for tfid in list(terrindex.intersection((lon, lat))):
         fips = county = state = eez = mrgid = None
 #         feat = terrfeats[tfid]['feature']
@@ -115,11 +115,11 @@ def get_geofields_with_rtree(lon, lat, terrindex, terrfeats):
             else:
                 terr_count += 1
                 fips = county = state = None
-                break            
+                break
     return (fips, county, state)
 # ...............................................
-#     
-# 
+#
+#
 # ...............................................
 def create_marine_index(eezlyr, idx_eez, idx_mg):
     marindex = rtree.index.Index(interleaved=False)
@@ -129,13 +129,13 @@ def create_marine_index(eezlyr, idx_eez, idx_mg):
         geom = feat.GetGeometryRef()
         xmin, xmax, ymin, ymax = geom.GetEnvelope()
         marindex.insert(fid, (xmin, xmax, ymin, ymax))
-        marfeats[fid] = {'feature': feat, 
-                         'geom': geom, 
-                         'eez': feat.GetFieldAsString(idx_eez), 
+        marfeats[fid] = {'feature': feat,
+                         'geom': geom,
+                         'eez': feat.GetFieldAsString(idx_eez),
                          'mrgid': feat.GetFieldAsString(idx_mg)}
     return marindex, marfeats
 
-# ...............................................    
+# ...............................................
 def create_terr_index(terrlyr, idx_fips, idx_cnty, idx_st):
     terrindex = rtree.index.Index(interleaved=False)
     terrfeats = {}
@@ -144,10 +144,10 @@ def create_terr_index(terrlyr, idx_fips, idx_cnty, idx_st):
         geom = feat.GetGeometryRef()
         xmin, xmax, ymin, ymax = geom.GetEnvelope()
         terrindex.insert(fid, (xmin, xmax, ymin, ymax))
-        terrfeats[fid] = {'feature': feat, 
-                          'geom': geom, 
-                          'fips': feat.GetFieldAsString(idx_fips), 
-                          'county': feat.GetFieldAsString(idx_cnty), 
+        terrfeats[fid] = {'feature': feat,
+                          'geom': geom,
+                          'fips': feat.GetFieldAsString(idx_fips),
+                          'county': feat.GetFieldAsString(idx_cnty),
                           'state': feat.GetFieldAsString(idx_st)}
     return terrindex, terrfeats
 
@@ -158,7 +158,7 @@ def create_terr_index(terrlyr, idx_fips, idx_cnty, idx_st):
 # infname = '/tank/data/bison/2019/Terr/tmp/step4_occurrence_lines_1-10000001.csv'
 # outfname = '/tank/data/bison/2019/Terr/tmp/smoketest_1-2638050.csv'
 # rewrite_records(infname, outfname)
-# 
+#
 # driver = ogr.GetDriverByName("ESRI Shapefile")
 # terr_data_src = driver.Open(terrestrial_shpname, 0)
 # terrlyr = terr_data_src.GetLayer()
@@ -166,7 +166,7 @@ def create_terr_index(terrlyr, idx_fips, idx_cnty, idx_st):
 # idx_fips = terr_def.GetFieldIndex('FIPS')
 # idx_cnty = terr_def.GetFieldIndex('COUNTY_NAM')
 # idx_st = terr_def.GetFieldIndex('STATE_NAME')
-# 
+#
 # eez_data_src = driver.Open(marine_shpname, 0)
 # eezlyr = eez_data_src.GetLayer()
 # eez_def = eezlyr.GetLayerDefn()
@@ -176,31 +176,31 @@ def create_terr_index(terrlyr, idx_fips, idx_cnty, idx_st):
 # # ...............................................
 # def rewrite_records(infname, outfname):
 #     self = BisonFiller(infname)
-#      
+#
 #     drdr, inf = get_csv_dict_reader(infname, BISON_DELIMITER, ENCODING)
 #     self._files.append(inf)
-#      
+#
 #     deleteme = []
 #     for fld in self._bison_ordered_flds:
 #         if fld not in drdr.fieldnames:
 #             deleteme.append(fld)
-#      
+#
 #     for fld in deleteme:
 #         self._bison_ordered_flds.remove(fld)
-#      
-#     dwtr, outf = get_csv_dict_writer(outfname, BISON_DELIMITER, ENCODING, 
+#
+#     dwtr, outf = get_csv_dict_writer(outfname, BISON_DELIMITER, ENCODING,
 #                                   self._bison_ordered_flds)
-#      
+#
 #     dwtr.writeheader()
 #     self._files.append(outf)
-#      
+#
 #     recno = 0
 #     for rec in drdr:
 #         rec.pop('taxonKey')
 #         dwtr.writerow(rec)
 #         recno += 1
 #         print(recno)
-# 
+#
 # # ...............................................
 # def get_coords(rec):
 #     slon = rec['longitude']
@@ -211,8 +211,8 @@ def create_terr_index(terrlyr, idx_fips, idx_cnty, idx_st):
 #     except:
 #         lon = lat = None
 #     return lon, lat
-# 
-# 
+#
+#
 # # ...............................................
 # def read_some_points(infname, count):
 #     recno = 0
@@ -231,7 +231,7 @@ def create_terr_index(terrlyr, idx_fips, idx_cnty, idx_st):
 #     finally:
 #         inf.close()
 #     return points
-# 
+#
 # # ...............................................
 # def get_geofields_wo_rtree(lon, lat, terrlyr, idx_fips, idx_cnty, idx_st):
 #     fips = county = state = None
@@ -252,14 +252,14 @@ def create_terr_index(terrlyr, idx_fips, idx_cnty, idx_st):
 #             break
 #     terrlyr.ResetReading()
 #     return (fips, county, state)
-# 
+#
 # # ...............................................
 # def get_geofields_with_rtree(lon, lat, terrindex, terrfeats):
 #     fips = county = state = None
 #     terr_count = 0
 #     pt = ogr.Geometry(ogr.wkbPoint)
 #     pt.AddPoint(lon, lat)
-#     
+#
 #     for tfid in list(terrindex.intersection((lon, lat))):
 #         fips = county = state = eez = mrgid = None
 # #         feat = terrfeats[tfid]['feature']
@@ -274,11 +274,11 @@ def create_terr_index(terrlyr, idx_fips, idx_cnty, idx_st):
 #             else:
 #                 terr_count += 1
 #                 fips = county = state = None
-#                 break            
+#                 break
 #     return (fips, county, state)
 # # ...............................................
-# #     
-# # 
+# #
+# #
 # # ...............................................
 # def create_marine_index(eezlyr, idx_eez, idx_mg):
 #     marindex = rtree.index.Index(interleaved=False)
@@ -288,13 +288,13 @@ def create_terr_index(terrlyr, idx_fips, idx_cnty, idx_st):
 #         geom = feat.GetGeometryRef()
 #         xmin, xmax, ymin, ymax = geom.GetEnvelope()
 #         marindex.insert(fid, (xmin, xmax, ymin, ymax))
-#         marfeats[fid] = {'feature': feat, 
-#                          'geom': geom, 
-#                          'eez': feat.GetFieldAsString(idx_eez), 
+#         marfeats[fid] = {'feature': feat,
+#                          'geom': geom,
+#                          'eez': feat.GetFieldAsString(idx_eez),
 #                          'mrgid': feat.GetFieldAsString(idx_mg)}
 #     return marindex, marfeats
-# 
-# # ...............................................    
+#
+# # ...............................................
 # def create_terr_index(terrlyr, idx_fips, idx_cnty, idx_st):
 #     terrindex = rtree.index.Index(interleaved=False)
 #     terrfeats = {}
@@ -303,10 +303,10 @@ def create_terr_index(terrlyr, idx_fips, idx_cnty, idx_st):
 #         geom = feat.GetGeometryRef()
 #         xmin, xmax, ymin, ymax = geom.GetEnvelope()
 #         terrindex.insert(fid, (xmin, xmax, ymin, ymax))
-#         terrfeats[fid] = {'feature': feat, 
-#                           'geom': geom, 
-#                           'fips': feat.GetFieldAsString(idx_fips), 
-#                           'county': feat.GetFieldAsString(idx_cnty), 
+#         terrfeats[fid] = {'feature': feat,
+#                           'geom': geom,
+#                           'fips': feat.GetFieldAsString(idx_fips),
+#                           'county': feat.GetFieldAsString(idx_cnty),
 #                           'state': feat.GetFieldAsString(idx_st)}
 #     return terrindex, terrfeats
 
@@ -315,15 +315,15 @@ def create_terr_index(terrlyr, idx_fips, idx_cnty, idx_st):
 # ...............................................
 
 # ...............................................
-if __name__ == '__main__':    
+if __name__ == '__main__':
     inpath, gbif_fname = os.path.split(gbif_interp_file)
     # one level up
     datapth, _ = os.path.split(inpath)
     tmppath = os.path.join(inpath, tmpdir)
     outpath = os.path.join(inpath, outdir)
     outfname = 'datapath'
-    
-    # ancillary data for record update    
+
+    # ancillary data for record update
     ancillary_path = os.path.join(datapth, ANCILLARY_DIR)
     terrestrial_shpname = os.path.join(
         ancillary_path, ANCILLARY_FILES['terrestrial']['file'])
@@ -337,13 +337,13 @@ if __name__ == '__main__':
         ancillary_path, ANCILLARY_FILES['resource']['file'])
     provider_lut_fname = os.path.join(
         ancillary_path, ANCILLARY_FILES['provider']['file'])
-    
-    
+
+
     # reference files for lookups
     dataset_lut_fname = os.path.join(tmppath, 'dataset_lut.csv')
     org_lut_fname = os.path.join(tmppath, 'organization_lut.csv')
     itis1_lut_fname = os.path.join(tmppath, 'step3_itis_lut.txt')
-    
+
     driver = ogr.GetDriverByName("ESRI Shapefile")
     terr_data_src = driver.Open(terrestrial_shpname, 0)
     terrlyr = terr_data_src.GetLayer()
@@ -351,79 +351,78 @@ if __name__ == '__main__':
     idx_fips = terr_def.GetFieldIndex('FIPS')
     idx_cnty = terr_def.GetFieldIndex('COUNTY_NAM')
     idx_st = terr_def.GetFieldIndex('STATE_NAME')
-    
+
     eez_data_src = driver.Open(marine_shpname, 0)
     eezlyr = eez_data_src.GetLayer()
     eez_def = eezlyr.GetLayerDefn()
     idx_eez = eez_def.GetFieldIndex('EEZ')
     idx_mg = eez_def.GetFieldIndex('MRGID')
 
-    
+
     points = read_some_points(outfname, testsize)
     terrindex, terrfeats = create_terr_index(terrlyr, idx_fips, idx_cnty, idx_st)
     # ......................
-    
-    
+
+
     # ......................
     rtree_start = time.time()
     for i in range(len(points)):
         lon, lat = points[i]
         try:
-            (fips, county, state) = get_geofields_with_rtree(lon, lat, 
+            (fips, county, state) = get_geofields_with_rtree(lon, lat,
                                                              terrindex, terrfeats)
         except Exception as e:
             print ('Failed on record {} with {}'.format(i, e))
-    
+
     rtree_stop = time.time()
     rtree_elapsed = rtree_stop - rtree_start
     print(rtree_elapsed)
-    
-    
-    
+
+
+
     # ......................
     ogr_start = time.time()
     for i in range(len(points)):
         lon, lat = points[i]
         try:
-            (fips, county, state) = get_geofields_wo_rtree(lon, lat, terrlyr, 
+            (fips, county, state) = get_geofields_wo_rtree(lon, lat, terrlyr,
                                                            idx_fips, idx_cnty, idx_st)
         except Exception as e:
             print ('Failed on record {} with {}'.format(i, e))
-    
+
     ogr_stop = time.time()
     ogr_elapsed = ogr_stop - ogr_start
     print(ogr_elapsed)
     # ......................
-     
-    
+
+
     # ......................
     rtree_start = time.time()
     for i in range(len(points)):
         lon, lat = points[i]
         try:
-            (fips, county, state) = get_geofields_with_rtree(lon, lat, 
+            (fips, county, state) = get_geofields_with_rtree(lon, lat,
                                                              terrindex, terrfeats)
         except Exception as e:
             print ('Failed on record {} with {}'.format(i, e))
-    
+
     rtree_stop = time.time()
     rtree_elapsed = rtree_stop - rtree_start
     print(rtree_elapsed)
-    
-    
-    
+
+
+
     # ......................
     ogr_start = time.time()
     for i in range(len(points)):
         lon, lat = points[i]
         try:
-            (fips, county, state) = get_geofields_wo_rtree(lon, lat, terrlyr, 
+            (fips, county, state) = get_geofields_wo_rtree(lon, lat, terrlyr,
                                                            idx_fips, idx_cnty, idx_st)
         except Exception as e:
             print ('Failed on record {} with {}'.format(i, e))
-    
+
     ogr_stop = time.time()
     ogr_elapsed = ogr_stop - ogr_start
     print(ogr_elapsed)
     # ......................
-     

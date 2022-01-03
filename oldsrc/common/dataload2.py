@@ -2,52 +2,52 @@
 @license: gpl2
 @copyright: Copyright (C) 2019, University of Kansas Center for Research
 
-             Lifemapper Project, lifemapper [at] ku [dot] edu, 
+             Lifemapper Project, lifemapper [at] ku [dot] edu,
              Biodiversity Institute,
              1345 Jayhawk Boulevard, Lawrence, Kansas, 66045, USA
-    
-             This program is free software; you can redistribute it and/or modify 
-             it under the terms of the GNU General Public License as published by 
-             the Free Software Foundation; either version 2 of the License, or (at 
+
+             This program is free software; you can redistribute it and/or modify
+             it under the terms of the GNU General Public License as published by
+             the Free Software Foundation; either version 2 of the License, or (at
              your option) any later version.
-  
-             This program is distributed in the hope that it will be useful, but 
-             WITHOUT ANY WARRANTY; without even the implied warranty of 
-             MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU 
+
+             This program is distributed in the hope that it will be useful, but
+             WITHOUT ANY WARRANTY; without even the implied warranty of
+             MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
              General Public License for more details.
-  
-             You should have received a copy of the GNU General Public License 
-             along with this program; if not, write to the Free Software 
-             Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 
+
+             You should have received a copy of the GNU General Public License
+             along with this program; if not, write to the Free Software
+             Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
              02110-1301, USA.
 """
 import os
 import time
 
-from common.bisonfill import BisonFiller
-from common.constants import (
-    BISON_DELIMITER, BISON_PROVIDER_VALUES, BISON_IPT_PREFIX, IPT_QUERY, 
-    LOGINTERVAL, ANCILLARY_DIR, TEMP_DIR, 
+from riis.common import BisonFiller
+from riis.common import (
+    BISON_DELIMITER, BISON_PROVIDER_VALUES, BISON_IPT_PREFIX, IPT_QUERY,
+    LOGINTERVAL, ANCILLARY_DIR, TEMP_DIR,
     MERGED_PROVIDER_LUT_FIELDS, MERGED_RESOURCE_LUT_FIELDS,
     OUTPUT_DIR, PROVIDER_DELIMITER, PROVIDER_ACTIONS, ENCODING)
-from common.inputdata import ANCILLARY_FILES
-from common.lookup import Lookup, VAL_TYPE
-from common.tools import (get_logger, get_line_count)
-from common.geo_intersect import step_parallel
+from riis.common import ANCILLARY_FILES
+from riis.common import Lookup, VAL_TYPE
+from riis.common import (get_logger, get_line_count)
+from riis.common import step_parallel
 from gbif.gbifmod import GBIFReader
 from provider.providermod import BisonMerger
 
 # .............................................................................
 class DataLoader(object):
     """
-    Object for processing a Bison Provider or GBIF CSV files filling ITIS fields, 
+    Object for processing a Bison Provider or GBIF CSV files filling ITIS fields,
     coordinates, terrestrial or marine boundaries, and establishment_means.
     """
     # ...............................................
     def __init__(self, data_source, input_data, resource_id=None):
         """
         @summary: Constructor
-        """    
+        """
         if not os.path.exists(input_data):
             raise Exception('Input file {} does not exist'.format(input_data))
         elif os.path.isdir(input_data):
@@ -56,7 +56,7 @@ class DataLoader(object):
         elif os.path.isfile(input_data):
             self.rawdata_fname = input_data
             self.workpath, basefname_wext = os.path.split(self.rawdata_fname)
-                
+
         self._test_resource_id = resource_id
         # basepath contains bison provider and GBIF data
         # workpath is specific to dataset and contains raw data files
@@ -69,22 +69,22 @@ class DataLoader(object):
         os.makedirs(self.outpath, mode=0o775, exist_ok=True)
 
         self.logger = self._get_logger_for_processing(self.tmppath, basefname='dataloader')
-    
-        # ancillary data for record update    
+
+        # ancillary data for record update
         self.terrestrial_shpname = os.path.join(
             self.ancillary_path, ANCILLARY_FILES['terrestrial']['file'])
         self.estmeans_fname = os.path.join(
             self.ancillary_path, ANCILLARY_FILES['establishment_means']['file'])
-        self.marine_shpname = os.path.join(self.ancillary_path, 
+        self.marine_shpname = os.path.join(self.ancillary_path,
                                       ANCILLARY_FILES['marine']['file'])
         self.itis2_lut_fname = os.path.join(
             self.ancillary_path, ANCILLARY_FILES['itis']['file'])
-        
+
         resource_lut_fname = os.path.join(
             self.ancillary_path, ANCILLARY_FILES['resource']['file'])
         provider_lut_fname = os.path.join(
             self.ancillary_path, ANCILLARY_FILES['provider']['file'])
-        
+
         self.merged_resource_fname = os.path.join(
             self.ancillary_path, ANCILLARY_FILES['resource']['latest_file'])
         self.merged_provider_fname = os.path.join(
@@ -106,19 +106,19 @@ class DataLoader(object):
             os.makedirs(sdir, mode=0o775, exist_ok=True)
         if data_source == 'gbif':
             os.makedirs(self.s2dir, mode=0o775, exist_ok=True)
-        
+
         # All filled in prep_gbif or prep_bisonprov/set_bisonprov function
         self.basefname = None
         self.nametaxa_fname = None
-        self.canonical_lut_fname = None        
+        self.canonical_lut_fname = None
         self.pass1_fname = None
         self.pass2_fname = None
         self.pass3_fname = None
         self.pass4_fname = None
         self.action = None
         self.bisonprov_dataload = None
-        self.track_providers = None 
-        
+        self.track_providers = None
+
         if data_source == 'gbif':
             self.prep_gbif(resource_lut_fname, provider_lut_fname, basefname_wext)
         elif data_source == 'provider':
@@ -126,7 +126,7 @@ class DataLoader(object):
 #         elif data_source == 'all':
 #             self.create_providers_resources(resource_lut_fname, provider_lut_fname)
 #             self.prep_bisonprov()
-        
+
     # ...............................................
     def _get_logger_for_processing(self, absfilename_or_path, basefname=None):
         if basefname is None:
@@ -138,7 +138,7 @@ class DataLoader(object):
         logfname = os.path.join(pth, '{}.log'.format(basefname))
         logger = get_logger(basefname, logfname)
         return logger
-            
+
     # ...............................................
     def prep_gbif(self, orig_resource_fname, orig_provider_fname, basefname_wext):
         # filename w/o path or extension
@@ -146,7 +146,7 @@ class DataLoader(object):
         self.nametaxa_fname = os.path.join(self.tmppath, 'step1_{}_sciname_taxkey_list.csv'
                                       .format(self.basefname))
         self.canonical_lut_fname = os.path.join(self.tmppath, 'step2_{}_canonical_lut.csv'
-                                           .format(self.basefname))        
+                                           .format(self.basefname))
         self.track_providers = self._do_track_providers()
         # Output CSV files of all records after initial creation or field replacements
         self.pass1_fname = os.path.join(self.s1dir, '{}.csv'.format(self.basefname))
@@ -157,11 +157,11 @@ class DataLoader(object):
         if (not os.path.exists(self.merged_provider_fname) or
             not os.path.exists(self.merged_resource_fname)):
             gr = GBIFReader(self.workpath, self.logger)
-            # Merge existing provider and resource metadata with GBIF dataset 
+            # Merge existing provider and resource metadata with GBIF dataset
             # metadata files and GBIF API-returned metadata
             gr.resolve_provider_resource_for_lookup(
-                orig_resource_fname, orig_provider_fname, 
-                self.merged_provider_fname, self.merged_resource_fname, 
+                orig_resource_fname, orig_provider_fname,
+                self.merged_provider_fname, self.merged_resource_fname,
                 outdelimiter=BISON_DELIMITER)
 
     # ...............................................
@@ -171,7 +171,7 @@ class DataLoader(object):
         # if missing, fill with old provider table data second
         if os.path.exists(self.bisonprov_dataload_fname):
             self.bisonprov_dataload = Lookup.init_from_file(
-                self.bisonprov_dataload_fname, ['legacy_id'], BISON_DELIMITER, 
+                self.bisonprov_dataload_fname, ['legacy_id'], BISON_DELIMITER,
                 VAL_TYPE.DICT, ENCODING)
         else:
             old_resources = merger.read_resources(self.merged_resource_fname)
@@ -185,8 +185,8 @@ class DataLoader(object):
     # ...............................................
     def reset_bisonprov(self, resource_key, resource_pvals):
         self.action = resource_pvals['action']
-        
-        fname = resource_pvals['filename']                 
+
+        fname = resource_pvals['filename']
         if not fname:
             # filename w/o path or extension
             self.basefname = 'bison_{}'.format(resource_key)
@@ -196,20 +196,20 @@ class DataLoader(object):
             # New input files have .txt extension
             self.basefname, _ = os.path.splitext(fname)
             self.rawdata_fname = os.path.join(self.workpath, fname)
-            
+
         self.logger.info('{}: {} {}'.format(
             resource_key, self.action, fname))
         if not os.path.exists(self.rawdata_fname):
             raise Exception('File {} does not exist for {}'
                             .format(fname, resource_key))
         self.pass1_fname = os.path.join(self.s1dir, '{}.csv'.format(self.basefname))
-        self.pass3_fname = os.path.join(self.s3dir, '{}.csv'.format(self.basefname))            
+        self.pass3_fname = os.path.join(self.s3dir, '{}.csv'.format(self.basefname))
         self.pass4_fname = os.path.join(self.s4dir, '{}.csv'.format(self.basefname))
-        
+
     # .............................................................................
     def _do_track_providers(self):
         # If both exist, do nothing
-        if (os.path.exists(self.resource_count_fname) and 
+        if (os.path.exists(self.resource_count_fname) and
             os.path.exists(self.provider_count_fname)):
             print('Files {} and {} exist'.format(
                 self.resource_count_fname, self.provider_count_fname))
@@ -222,7 +222,7 @@ class DataLoader(object):
             if os.path.exists(self.provider_count_fname):
                 print('Deleting {}'.format(self.provider_count_fname))
                 os.remove(self.provider_count_fname)
-                
+
     # ...............................................
     def create_gbif_providers_resources(
             self, merged_gbif_resource_fname, merged_gbif_provider_fname):
@@ -233,24 +233,24 @@ class DataLoader(object):
             self.ancillary_path, ANCILLARY_FILES['resource']['file'])
         orig_provider_fname = os.path.join(
             self.ancillary_path, ANCILLARY_FILES['provider']['file'])
-        
+
         # Write GBIF organization/dataset to provider/resource files
         gr.resolve_provider_resource_for_lookup(
             orig_resource_fname, orig_provider_fname,
-            merged_gbif_resource_fname, merged_gbif_provider_fname,  
+            merged_gbif_resource_fname, merged_gbif_provider_fname,
             outdelimiter=BISON_DELIMITER)
-        
-        
+
+
     # ...............................................
     def update_bison_providers_resources(
             self, merged_gbif_resource_fname, merged_gbif_provider_fname,
             all_resource_fname, all_provider_fname):
-            
+
         all_resources = Lookup.init_from_file(
-            merged_gbif_resource_fname, ['bison_resource_uuid'], 
+            merged_gbif_resource_fname, ['bison_resource_uuid'],
             BISON_DELIMITER, valtype=VAL_TYPE.DICT, encoding=ENCODING)
         all_providers = Lookup.init_from_file(
-            merged_gbif_provider_fname, ['bison_provider_uuid'], 
+            merged_gbif_provider_fname, ['bison_provider_uuid'],
             BISON_DELIMITER, valtype=VAL_TYPE.DICT, encoding=ENCODING)
 
         # Add one record for "BISON" provider
@@ -263,7 +263,7 @@ class DataLoader(object):
             BISON_PROVIDER_VALUES['provider_id'], prov_rec)
         header = [fld for (fld, _) in MERGED_PROVIDER_LUT_FIELDS]
         all_providers.write_lookup(all_provider_fname, header, BISON_DELIMITER)
-        
+
         # Add one record for each "BISON" resource
         for resource_key, resource_pvals in self.bisonprov_dataload.lut.items():
             rec = {}
@@ -293,11 +293,11 @@ class DataLoader(object):
             # initial conversion of GBIF to BISON fields and standardization
             # Discard records from BISON org, bison IPT
             gr.transform_gbif_to_bison(
-                self.rawdata_fname, 
-                self.merged_resource_fname, 
-                self.merged_provider_fname, 
+                self.rawdata_fname,
+                self.merged_resource_fname,
+                self.merged_provider_fname,
                 self.nametaxa_fname, self.pass1_fname)
-            
+
             gr.write_resource_provider_stats(
                 self.resource_count_fname, self.provider_count_fname, overwrite=True)
         else:
@@ -310,15 +310,15 @@ class DataLoader(object):
         if not os.path.exists(self.pass2_fname):
             task_logger = self._get_logger_for_processing(self.pass2_fname)
             gr = GBIFReader(self.workpath, task_logger)
-            # Reread output ONLY if missing gbif name/taxkey 
+            # Reread output ONLY if missing gbif name/taxkey
             if not os.path.exists(self.nametaxa_fname):
                 gr.gather_name_input(self.pass1_fname, self.nametaxa_fname)
-                
+
             canonical_lut = gr.resolve_canonical_taxonkeys_for_lookup(
                 self.nametaxa_fname, self.canonical_lut_fname)
             # Discard records with no clean name
             gr.update_bison_names(
-                self.pass1_fname, self.pass2_fname, canonical_lut, 
+                self.pass1_fname, self.pass2_fname, canonical_lut,
                 track_providers=self.track_providers)
         else:
             self.logger.info('Output file for step 2 exists: {}'.format(
@@ -326,14 +326,14 @@ class DataLoader(object):
 
     # ...............................................
     def process_gbif_step3(self):
-        # Step 3: rewrite records filling ITIS fields, establishment_means, and 
-        # county centroids for records without coordinates 
+        # Step 3: rewrite records filling ITIS fields, establishment_means, and
+        # county centroids for records without coordinates
         if not os.path.exists(self.pass3_fname):
             task_logger = self._get_logger_for_processing(self.pass3_fname)
             bf = BisonFiller(task_logger)
             # No discards
             bf.update_itis_estmeans_centroid(
-                self.itis2_lut_fname, self.estmeans_fname, self.terrestrial_shpname, 
+                self.itis2_lut_fname, self.estmeans_fname, self.terrestrial_shpname,
                 self.pass2_fname, self.pass3_fname, from_gbif=True,
                 track_providers=self.track_providers)
         else:
@@ -343,9 +343,9 @@ class DataLoader(object):
     # ...............................................
     def process_gbif_step4(self):
         if not os.path.exists(self.pass4_fname):
-            # Step 4: split into smaller files, parallel process 
-            # Identify enclosing terrestrial or marine polygons, rewrite with 
-            # calculated state/county/fips or mrgid/eez 
+            # Step 4: split into smaller files, parallel process
+            # Identify enclosing terrestrial or marine polygons, rewrite with
+            # calculated state/county/fips or mrgid/eez
             terr_data = ANCILLARY_FILES['terrestrial']
             marine_data = ANCILLARY_FILES['marine']
             # No discards
@@ -356,11 +356,11 @@ class DataLoader(object):
                 task_logger = self._get_logger_for_processing(self.pass4_fname)
                 bf = BisonFiller(task_logger)
                 bf.update_point_in_polygons(
-                    terr_data, marine_data, self.ancillary_path, 
+                    terr_data, marine_data, self.ancillary_path,
                     self.pass3_fname, self.pass4_fname)
             else:
                 step_parallel(
-                    self.pass3_fname, terr_data, marine_data, self.ancillary_path, 
+                    self.pass3_fname, terr_data, marine_data, self.ancillary_path,
                     self.pass4_fname, from_gbif=True)
         else:
             self.logger.info('Output file for step 4 exists: {}'.format(
@@ -377,7 +377,7 @@ class DataLoader(object):
 #         logger = get_logger(basefname, logfname)
 #         bf = BisonFiller(logger)
 #         bf.rewrite_recs(infile, fixfile, BISON_DELIMITER)
-# 
+#
 #     # ...............................................
 #     def process_gbif_test(self):
 #         # Step 1000: test something
@@ -387,7 +387,7 @@ class DataLoader(object):
 #             logger = get_logger(basefname, logfname)
 #             bfiller = BisonFiller(logger)
 #             bfiller.walk_data(
-#                 in_fname, terr_data, marine_data, ancillary_path, 
+#                 in_fname, terr_data, marine_data, ancillary_path,
 #                 merged_resource_lut_fname, merged_provider_lut_fname)
 
     # ...............................................
@@ -396,7 +396,7 @@ class DataLoader(object):
         provider_id = BISON_PROVIDER_VALUES['provider_id']
         provider_legacy_id = BISON_PROVIDER_VALUES['provider_legacy_id']
         provider_url = BISON_PROVIDER_VALUES['provider_url']
-        
+
         task_logger = self._get_logger_for_processing('fill_bisonprov_columns')
         merger = BisonMerger(task_logger)
         resources = merger.read_resources(self.merged_resource_fname)
@@ -408,7 +408,7 @@ class DataLoader(object):
                     vals = resources.lut[resource_key]
                 except:
                     vals = {}
-                res_legacy_id = ''    
+                res_legacy_id = ''
                 if resource_key.startswith('440,'):
                     res_legacy_id = resource_key.split(',')[1]
                 # Construct from inputdata.py
@@ -437,8 +437,8 @@ class DataLoader(object):
     # ...............................................
     def process_bisonprov_step1(self):
         if not os.path.exists(self.pass1_fname):
-            # Step 1: rewrite, handle quotes, fill ticket/constant vals for 
-            # resource/provider    
+            # Step 1: rewrite, handle quotes, fill ticket/constant vals for
+            # resource/provider
             # Same process as GBIF Step 1, different resource/provider inputs
             self.logger.info('  Process step 1 output to {}'.format(
                 self.pass1_fname))
@@ -450,7 +450,7 @@ class DataLoader(object):
 #                 self.ancillary_path, 'bisonprovider_meta_lut.csv')
 #             if os.path.exists(bisonprov_lut_fname):
 #                 self.bisonprov_dataload = Lookup.init_from_file(
-#                     bisonprov_lut_fname, ['legacy_id'], BISON_DELIMITER, 
+#                     bisonprov_lut_fname, ['legacy_id'], BISON_DELIMITER,
 #                     VAL_TYPE.DICT, ENCODING)
 #             else:
 #                 old_resources = merger.read_resources(self.merged_resource_fname)
@@ -466,13 +466,13 @@ class DataLoader(object):
             if self.action in ('rename', 'rewrite'):
                 in_delimiter = BISON_DELIMITER
             merger.rewrite_bison_data(
-                self.rawdata_fname, self.pass1_fname, resource_key, 
+                self.rawdata_fname, self.pass1_fname, resource_key,
                 resource_pvals, in_delimiter)
         else:
             self.logger.info('Output file for step 1 exists: {}'.format(
                 self.pass1_fname))
-            
-            
+
+
 #             # ..........................................................
 #             # Step 2: Nope
 #             elif step == 2:
@@ -487,8 +487,8 @@ class DataLoader(object):
             task_logger = self._get_logger_for_processing(self.pass3_fname)
             bfiller = BisonFiller(task_logger)
             bfiller.update_itis_estmeans_centroid(
-                self.itis2_lut_fname, self.estmeans_fname, 
-                self.terrestrial_shpname, self.pass1_fname, self.pass3_fname, 
+                self.itis2_lut_fname, self.estmeans_fname,
+                self.terrestrial_shpname, self.pass1_fname, self.pass3_fname,
                 from_gbif=False)
         else:
             self.logger.info('Output file for step 3 exists: {}'.format(
@@ -509,7 +509,7 @@ class DataLoader(object):
                 task_logger = self._get_logger_for_processing(self.pass4_fname)
                 bfiller = BisonFiller(task_logger)
                 bfiller.update_point_in_polygons(
-                    terr_data, marine_data, self.ancillary_path, 
+                    terr_data, marine_data, self.ancillary_path,
                     self.pass3_fname, self.pass4_fname)
             else:
                 self.logger.info('  Parallel Process step 4 ({} lines) output to {}'
@@ -518,7 +518,7 @@ class DataLoader(object):
 #                 csv_filename_pairs, header = get_chunk_files(
 #                      self.pass3_fname, out_csv_filename=self.pass4_fname)
                 step_parallel(
-                    self.pass3_fname, terr_data, marine_data, 
+                    self.pass3_fname, terr_data, marine_data,
                     self.ancillary_path, self.pass4_fname, from_gbif=False)
 #             # ..........................................................
 #             # Step 99: fix something
@@ -537,55 +537,55 @@ class DataLoader(object):
 #                 if os.path.exists(outfile):
 #                     combo_logger.info('  Test output {}'.format(outfile))
 #                     merger.test_bison_data(outfile, resource_key, resource_pvals)
-# 
+#
 #             else:
 #                 print('Ignore {} {}'.format(resource_key, fname))
 
-    
+
 # .............................................................................
 stephelp="""
     Step number for data processing:
        1: Initial transform, checks for both GBIF and BISON-provider datafiles
           * for GBIF data files, Create lookup tables:
               * Resource/Provider lookup
-                * Query GBIF dataset API + datasetKey for dataset info for Bison 
+                * Query GBIF dataset API + datasetKey for dataset info for Bison
                   'resource' fields and (publishing)OrganizationKey.
-                * Query GBIF organization API + organizationKey for organization  
+                * Query GBIF organization API + organizationKey for organization
                   info for BISON 'provider' fields'
-              * Name info (provided_scientific_name, taxonKey) and UUIDs are saved 
+              * Name info (provided_scientific_name, taxonKey) and UUIDs are saved
                 in records for GBIF API resolution in Step 2.
           * for both GBIF and BISON-provider
               * Ecape internal quotes and removing enclosing quotes
               * Check longitude and negate if needed for US and Canada records
-              * Fill resource/provider fields from 
+              * Fill resource/provider fields from
                 * current GBIF metadata merged with BISON tables (for GBIF data)
                 * new or modified metadata from Jira tickets (for BISON provider data)
-       2: for GBIF data files only, 
+       2: for GBIF data files only,
           * Create name lookup table
-              * Query GBIF parser + scientificName if available, 
+              * Query GBIF parser + scientificName if available,
                 or GBIF species API + taxonKey --> name lookup
-          * Fill clean_provided_scientific_name field with values saved in 
+          * Fill clean_provided_scientific_name field with values saved in
             name lookup table.
-       3: Fill ITIS, Establishment_means, centroid coordinates s for records 
+       3: Fill ITIS, Establishment_means, centroid coordinates s for records
           missing coords; for both GBIF and BISON-provider datafiles
           * ITIS fields - resolve with ITIS lookup and
             clean_provided_scientific_name filled in step2
           * establishment_means - resolve with establishment
-            means lookup and ITIS TSN or 
+            means lookup and ITIS TSN or
             clean_provided_scientific_name
-          * longitude / latitude and centroid for records without lon/lat and 
+          * longitude / latitude and centroid for records without lon/lat and
             with state+county or fips from terrestrial centroid coordinates
        4: Fill fields:
-          * geo fields: calculate point-in-polygon for records with new or 
-            existing lon/lat 
-            *  resolve 1st with terrestrial shapefile US_CA_Counties_Centroids, 
+          * geo fields: calculate point-in-polygon for records with new or
+            existing lon/lat
+            *  resolve 1st with terrestrial shapefile US_CA_Counties_Centroids,
                filling calculated_state, calculated_county, calculated_fips
-            * or resolve 2nd with marine shapefile 
-              World_EEZ_v8_20140228_splitpolygons filling calculated_waterbody 
+            * or resolve 2nd with marine shapefile
+              World_EEZ_v8_20140228_splitpolygons filling calculated_waterbody
               and mrgid iff terrestrial georef returns 0 or > 1 result
        99: Fixdata
        1000: Test data
-    """        
+    """
 # ...............................................
 if __name__ == '__main__':
     """
@@ -606,28 +606,28 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser(
                 description=("""Process a GBIF occurrence dataset downloaded
-                from the GBIF occurrence web service in Darwin Core format 
+                from the GBIF occurrence web service in Darwin Core format
                 or multiple BISON provider datasets."""))
-    parser.add_argument('data_source', type=str, default='gbif', 
+    parser.add_argument('data_source', type=str, default='gbif',
                         choices=['gbif', 'provider'],
                         help="""
-                        Is input a single GBIF occurrence file or directory of 
+                        Is input a single GBIF occurrence file or directory of
                         data provider files """)
-    parser.add_argument('input_data', type=str, 
+    parser.add_argument('input_data', type=str,
                         help="""
-                        For steps 1-4: Full path and filename of original 
-                          GBIF occurrence file or directory containing files for 
-                          BISON provider merge.  
-                        For step 99 (fix) or 1000 (test): the file to be fixed 
+                        For steps 1-4: Full path and filename of original
+                          GBIF occurrence file or directory containing files for
+                          BISON provider merge.
+                        For step 99 (fix) or 1000 (test): the file to be fixed
                           or tested.
                         """)
     parser.add_argument(
         '--step', type=int, default=1, choices=[0, 1,2,3,4,99,1000], help=stephelp)
     parser.add_argument(
-        '--resource', type=str, default=None, 
+        '--resource', type=str, default=None,
         help='resource_id for testing or processing of a single bison-provider dataset')
     parser.add_argument(
-        '--teststep', type=str, default=None, 
+        '--teststep', type=str, default=None,
         help='step for which to test/examine output')
     args = parser.parse_args()
     data_source = args.data_source
@@ -636,7 +636,7 @@ if __name__ == '__main__':
     teststep = args.teststep
     test_resource_id = args.resource
     dl = DataLoader(data_source, input_data, resource_id=test_resource_id)
-    
+
     start_time = time.time()
     if data_source == 'gbif':
         start_time = time.time()
@@ -655,7 +655,7 @@ if __name__ == '__main__':
             dl.process_gbif_step4()
         else:
             print('No step {} for data_source {}'.format(step, data_source))
-            
+
     elif data_source == 'provider':
         if step == 1000:
             # Update resource, provider filenames to force new creation
@@ -671,7 +671,7 @@ if __name__ == '__main__':
                 dl.ancillary_path, 'resources.{}.csv'.format(dtstr))
             all_provider_fname = os.path.join(
                 dl.ancillary_path, 'providers.{}.csv'.format(dtstr))
-            
+
             # Merge old providers/resources with GBIF organizations/datasets
             dl.create_gbif_providers_resources(
                 merged_gbif_resource_fname, merged_gbif_provider_fname)
@@ -679,19 +679,19 @@ if __name__ == '__main__':
             dl.update_bison_providers_resources(
                  merged_gbif_resource_fname, merged_gbif_provider_fname,
                  all_resource_fname, all_provider_fname)
-            
+
         else:
             SEE_ONLY_ME = None
             for resource_key, resource_pvals in dl.bisonprov_dataload.lut.items():
                 this_start_time = time.time()
-                # 2 ways to limit processing 
+                # 2 ways to limit processing
                 # resource_id from command option
                 ignore_me = False
                 if test_resource_id is not None and test_resource_id != resource_key:
                     ignore_me = True
-                elif SEE_ONLY_ME and resource_key not in SEE_ONLY_ME: 
+                elif SEE_ONLY_ME and resource_key not in SEE_ONLY_ME:
                     ignore_me = True
-                    
+
                 action = resource_pvals['action']
                 if action in PROVIDER_ACTIONS and not ignore_me:
                     dl.reset_bisonprov(resource_key, resource_pvals)
@@ -710,11 +710,11 @@ if __name__ == '__main__':
                 else:
                     dl.logger.info('Ignore dataset {} with action {}'.format(
                         resource_key, action))
-    
+
                 these_minutes = (time.time() - this_start_time) / 60
                 dl.logger.info('Elapsed minutes {} for step {}, resource {}'.format(
                     these_minutes, step, resource_key))
-    
+
         all_minutes = (time.time() - start_time) / 60
         try:
             dl.logger.info('Elapsed minutes {} for step {}, input {}'.format(
@@ -728,7 +728,7 @@ import os
 import time
 from common.bisonfill import BisonFiller
 from common.constants import (
-    BISON_DELIMITER, BISON_PROVIDER_VALUES, BISON_IPT_PREFIX, IPT_QUERY, 
+    BISON_DELIMITER, BISON_PROVIDER_VALUES, BISON_IPT_PREFIX, IPT_QUERY,
     LOGINTERVAL, ANCILLARY_DIR, TEMP_DIR, MERGED_RESOURCE_LUT_FIELDS,
     OUTPUT_DIR, PROVIDER_DELIMITER, PROVIDER_ACTIONS, ENCODING)
 from common.inputdata import ANCILLARY_FILES

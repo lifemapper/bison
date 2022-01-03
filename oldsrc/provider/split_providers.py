@@ -1,7 +1,7 @@
 import os
 
-from common.constants import ENCODING #, BISON_PROVIDER_HEADER
-from common.tools import get_logger, get_csv_reader, get_csv_writer
+from riis.common import ENCODING #, BISON_PROVIDER_HEADER
+from riis.common import get_logger, get_csv_reader, get_csv_writer
 
 # ...............................................
 def usage():
@@ -19,12 +19,12 @@ class DataSplitter(object):
         """Split a large CSV file into individual files grouped by one column.
 
         Args:
-            infname: full pathname to a CSV file containing records to be 
+            infname: full pathname to a CSV file containing records to be
                 grouped on the value in a field of the records
             indelimiter: separator between fields of a record
-            group_col: the column name (for files with a header) or column 
+            group_col: the column name (for files with a header) or column
                 index for the field to be used for grouping
-            logname: the basename for a message logger 
+            logname: the basename for a message logger
         """
         self.messyfile = infname
         self.indelimiter = indelimiter
@@ -45,11 +45,11 @@ class DataSplitter(object):
 
         logfname = os.path.join(pth, '{}.log'.format(logname))
         self._log = get_logger(logname, logfname)
-                
+
         self.pth = pth
         self._files = {}
-        
-    
+
+
     # ...............................................
     def close(self, fname=None):
         if fname is not None:
@@ -60,7 +60,7 @@ class DataSplitter(object):
             for fname, f in self._files.items():
                 f.close()
             self._files = {}
-        
+
     # ...............................................
     def _open_group_file(self, grpval, out_delimiter):
         basefname = '{}_{}.csv'.format(self._dataname, grpval)
@@ -73,14 +73,14 @@ class DataSplitter(object):
     # ...............................................
     def gather_groupvals(self, fname):
         """
-        @summary: Split original data file with chunks of sorted data into 
+        @summary: Split original data file with chunks of sorted data into
                   multiple sorted files.
         @note: Replicate the original header on each smaller sorted file
         """
         try:
             reader, inf = get_csv_reader(self.messyfile, self.indelimiter, ENCODING)
             groups = {}
-    
+
             grpval = None
             grpcount = 0
             for row in reader:
@@ -107,7 +107,7 @@ class DataSplitter(object):
             pass
         finally:
             inf.close()
-            
+
         try:
             writer, outf = get_csv_writer(fname, self.indelimiter, ENCODING)
             writer.writerow(['groupvalue', 'count'])
@@ -117,13 +117,13 @@ class DataSplitter(object):
             pass
         finally:
             outf.close()
-            
+
     # ...............................................
     def write_group_files(self, out_delimiter):
         """
         @summary: Split large file into multiple files, each containing a header
-                  and records of a single group value. 
-        @note: The number of group files must be small enough for the system to 
+                  and records of a single group value.
+        @note: The number of group files must be small enough for the system to
                have them all open at the same time.
         @note: Use "gather" to evaluate the dataset first.
         """
@@ -152,7 +152,7 @@ class DataSplitter(object):
                         wtr = self._open_group_file(grpval, out_delimiter)
                         groupfiles[grpval] = wtr
                         wtr.writerow(header)
-                    
+
                     wtr.writerow(row)
         except Exception as e:
             raise
@@ -172,11 +172,11 @@ class DataSplitter(object):
         @summary: Sort file
         """
         self._log.info('Gathering unique sort values from file {}'.format(self.messyfile))
-        reader, inf = get_csv_reader(self.messyfile, self.indelimiter, ENCODING)        
+        reader, inf = get_csv_reader(self.messyfile, self.indelimiter, ENCODING)
 
         group_idxs = self._get_sortidxs(reader, group_cols)
         sortvals = set()
-        try:  
+        try:
             for row in reader:
                 vals = []
                 for idx in group_idxs:
@@ -191,7 +191,7 @@ class DataSplitter(object):
                       .format(len(sortvals)))
         return sortvals
 
-                        
+
     # ...............................................
     def test(self, test_fname, outdelimiter):
         """
@@ -203,7 +203,7 @@ class DataSplitter(object):
         header = next(reader)
         if header[self.group_idx] != 'gbifID':
             self._log.error('Bad header in {}'.format(test_fname))
-            
+
         currid = 0
         for row in reader:
             reccount += 1
@@ -219,10 +219,10 @@ class DataSplitter(object):
                     self._log.error('Duplicate gbifID {} on rec {}'.format(gbifid, reader.line_num))
                 else:
                     currid = gbifid
-                    
+
         self._log.info('File contained {} records'.format(reccount))
         outf.close()
-                        
+
 
 # .............................................................................
 if __name__ == "__main__":
@@ -231,7 +231,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
                 description=("""Group CSV dataset, optionally into separate files,
                 on a given field"""))
-    parser.add_argument('infile', type=str, 
+    parser.add_argument('infile', type=str,
                         help='Absolute pathname of the input delimited text file' )
     parser.add_argument('--input_delimiter', type=str, default='$',
                         help='Delimiter between fields for input file')
@@ -249,13 +249,13 @@ if __name__ == "__main__":
         print ('Input CSV file {} does not exist'.format(unsorted_file))
     else:
         scriptname, ext = os.path.splitext(os.path.basename(__file__))
-        
+
         pth, fname = os.path.split(unsorted_file)
         dataname, ext = os.path.splitext(fname)
-        logname = '{}_{}'.format(scriptname, dataname)        
+        logname = '{}_{}'.format(scriptname, dataname)
 
         gf = DataSplitter(unsorted_file, in_delimiter, group_col, logname)
-         
+
         try:
             gf.write_group_files(out_delimiter)
         finally:
@@ -270,7 +270,7 @@ python3.6 /state/partition1/git/bison/src/provider/split_providers.py \
           --group_column=resource_id
 
 import os
-from common.constants import ENCODING 
+from common.constants import ENCODING
 from common.tools import getLogger, get_csv_reader, get_csv_writer
 
 group_idx = 13
@@ -280,7 +280,7 @@ in_delimiter = '$'
 
 pth, fname = os.path.split(messyfile)
 dataname, ext = os.path.splitext(fname)
-logname = '{}_{}.log'.format('split_provider', dataname)        
+logname = '{}_{}.log'.format('split_provider', dataname)
 
 gf = DataSplitter(messyfile, in_delimiter, group_col, logname)
 reader, outf = get_csv_reader(messyfile, delimiter, ENCODING)

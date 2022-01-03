@@ -1,8 +1,8 @@
 import os
 
-from common.constants import ENCODING
-from common.tools import (get_csv_dict_reader, get_csv_dict_writer, 
-                          get_csv_reader, get_csv_writer, getLine, makerow)
+from riis.common import ENCODING
+from riis.common import (get_csv_dict_reader, get_csv_dict_writer,
+                         get_csv_reader, get_csv_writer, getLine, makerow)
 
 class VAL_TYPE:
     DICT = 1
@@ -15,8 +15,8 @@ class VAL_TYPE:
 # .............................................................................
 class Lookup(object):
     """
-    @summary: 
-    @note: 
+    @summary:
+    @note:
     """
     # ...............................................
     def __init__(self, valtype=VAL_TYPE.DICT, encoding=ENCODING):
@@ -26,7 +26,7 @@ class Lookup(object):
         self.lut = {}
         self.valtype = valtype
         self.encoding = encoding
-        
+
     # ...............................................
     @classmethod
     def init_from_dict(cls, lookupdict, valtype=VAL_TYPE.DICT, encoding=ENCODING):
@@ -39,28 +39,28 @@ class Lookup(object):
 
     # ...............................................
     @classmethod
-    def init_from_file(cls, lookup_fname, prioritized_keyfld_lst, delimiter, 
-                       valtype=VAL_TYPE.DICT, encoding=ENCODING, 
+    def init_from_file(cls, lookup_fname, prioritized_keyfld_lst, delimiter,
+                       valtype=VAL_TYPE.DICT, encoding=ENCODING,
                        ignore_quotes=True):
         """
         @summary: Constructor
         """
         lookup = Lookup(valtype=valtype, encoding=encoding)
         lookup.read_lookup(
-            lookup_fname, prioritized_keyfld_lst, delimiter, 
+            lookup_fname, prioritized_keyfld_lst, delimiter,
             ignore_quotes=ignore_quotes)
         return lookup
 
     # ...............................................
     def save_to_lookup(self, key, val):
         """
-        @summary: Save scientificName / taxonKeys for parse or query 
+        @summary: Save scientificName / taxonKeys for parse or query
         @param rec: dictionary of all fieldnames and values for this record
         @note: The GBIF name parser fails on unicode namestrings
-        @note: Invalid records with no scientificName or taxonKey were 
+        @note: Invalid records with no scientificName or taxonKey were
                discarded earlier in self._clean_input_values
-        @note: Names saved to dictionary key=sciname, val=[taxonid, ...] 
-               to avoid writing duplicates.  
+        @note: Names saved to dictionary key=sciname, val=[taxonid, ...]
+               to avoid writing duplicates.
         """
         if key is None and val is None:
             print('Missing key {} or value {}'.format(key, val))
@@ -79,7 +79,7 @@ class Lookup(object):
                 elif val != existingval:
                     print('Ignore conflicting value for key {}, new val {} and existing val {}'
                           .format(key, val, existingval))
-                
+
     # ...............................................
     def _get_field_names(self):
         fldnames = None
@@ -109,16 +109,16 @@ class Lookup(object):
                         writer.writerow(ddict)
                 # Write values from dict for header fields, insert '' when missing
                 else:
-                    writer, outf = get_csv_writer(fname, delimiter, self.encoding, 
+                    writer, outf = get_csv_writer(fname, delimiter, self.encoding,
                                                 fmode=fmode)
                     writer.writerow(header)
                     for key, rec in self.lut.items():
                         row = makerow(rec, header)
                         writer.writerow(row)
-            
+
             # Non-dictionary lookup
             else:
-                writer, outf = get_csv_writer(fname, delimiter, self.encoding, 
+                writer, outf = get_csv_writer(fname, delimiter, self.encoding,
                                             fmode=fmode)
                 if fmode == 'w' and header is not None:
                     writer.writerow(header)
@@ -135,7 +135,7 @@ class Lookup(object):
     # ...............................................
     def read_lookup(self, fname, prioritized_keyfld_lst, delimiter, ignore_quotes=True):
         '''
-        @summary: Read and populate dictionary with key = uuid and 
+        @summary: Read and populate dictionary with key = uuid and
                   val = dictionary of record values
         '''
         no_old_legacy = 0
@@ -144,7 +144,7 @@ class Lookup(object):
             if self.valtype == VAL_TYPE.DICT:
                 try:
                     rdr, inf = get_csv_dict_reader(
-                        fname, delimiter, self.encoding, 
+                        fname, delimiter, self.encoding,
                         ignore_quotes=ignore_quotes)
                 except Exception as e:
                     print('Failed reading data in {}: {}'
@@ -162,7 +162,7 @@ class Lookup(object):
                     inf.close()
                 print('no_old_legacy {}  no_new_legacy (default -9999) {}'
                       .format(no_old_legacy, no_new_legacy))
-                    
+
             elif self.valtype == VAL_TYPE.SET:
                 recno = 0
                 try:
@@ -186,5 +186,3 @@ class Lookup(object):
                     inf.close()
 #         print('Lookup table size for {}:'.format(fname))
 #         print(asizeof.asized(self.lut).format())
-
-    

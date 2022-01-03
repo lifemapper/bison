@@ -6,11 +6,11 @@ import os
 # if __name__ == '__main__':
 #     import argparse
 #     parser = argparse.ArgumentParser(
-#                 description=("""Merge US counties and Canada counties 
+#                 description=("""Merge US counties and Canada counties
 #                 shapefiles into a single shapefile, and add centroids"""))
-#     parser.add_argument('filepath', type=str, 
+#     parser.add_argument('filepath', type=str,
 #                         help="""Full path to shapefiles to merge.""")
-#     parser.add_argument('filename', type=str, 
+#     parser.add_argument('filename', type=str,
 #                         help="""Base filename for merged output shapefile.""")
 #     args = parser.parse_args()
 # filepath = args.filepath
@@ -59,7 +59,7 @@ polys = {}
 mpolys = {}
 
 feat = mar_lyr.GetNextFeature()
-while feat is not None:  
+while feat is not None:
     geom = feat.GetGeometryRef()
     pcount = geom.GetGeometryCount()
     eez = feat.GetFieldAsString(idx_eez)
@@ -80,7 +80,7 @@ polys2 = {}
 mpolys2 = {}
 
 feat2 = mar2_lyr.GetNextFeature()
-while feat2 is not None:  
+while feat2 is not None:
     geom2 = feat2.GetGeometryRef()
     pcount = geom2.GetGeometryCount()
     eez = feat2.GetFieldAsString(idx_eez)

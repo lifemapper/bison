@@ -595,7 +595,7 @@ from src.gbif.constants import *
 from src.gbif.gbifresolve import *
 
 gc = GBIFCodes()
-header = ['legacyid', 'key', 'title', 'description', 'created', 
+header = ['legacyid', 'key', 'title', 'description', 'created',
              'modified', 'homepage']
 offset = 0
 pagesize = 1000

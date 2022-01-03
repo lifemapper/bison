@@ -1,20 +1,20 @@
 import glob
 import os
 
-from common.constants import (
-    BISON2020_FIELD_DEF, BISONEXPORT_TO_BISON2020_MAP, 
-    BISON_PROVIDER_VALUES, PROVIDER_ACTIONS, PROVIDER_DELIMITER, BISON_DELIMITER, ENCODING, 
+from riis.common import (
+    BISON2020_FIELD_DEF, BISONEXPORT_TO_BISON2020_MAP,
+    BISON_PROVIDER_VALUES, PROVIDER_ACTIONS, PROVIDER_DELIMITER, BISON_DELIMITER, ENCODING,
     BISON_IPT_PREFIX, IPT_QUERY)
-from common.inputdata import BISON_PROVIDER, USDA_PLANTS_ID, USDA_PLANTS_URL
-from common.lookup import Lookup, VAL_TYPE
-from common.tools import (
+from riis.common import BISON_PROVIDER, USDA_PLANTS_ID, USDA_PLANTS_URL
+from riis.common import Lookup, VAL_TYPE
+from riis.common import (
     get_logger, makerow, open_csv_files, get_csv_dict_reader, get_csv_writer)
 
 EXISTING_DATASET_FILE_PREFIX = 'bison_'
 # .............................................................................
 class BisonMerger(object):
     """
-    @summary: 
+    @summary:
     """
     # ...............................................
     def __init__(self, logger):
@@ -24,7 +24,7 @@ class BisonMerger(object):
         self._log = logger
         self._resource_table = {}
         self._provider_table = {}
-        
+
     # ...............................................
     def reset_logger2(self, logger):
         self._log = None
@@ -46,7 +46,7 @@ class BisonMerger(object):
     # ...............................................
     def _get_rewrite_vals(self, rec, const_id, const_name, const_url):
         """
-        @note: If both dataset-provided and record values are present, 
+        @note: If both dataset-provided and record values are present,
                record value takes precedence.
         """
         rec_res_name = rec['resource']
@@ -59,7 +59,7 @@ class BisonMerger(object):
             if rec_res_name != const_name:
                 self._log.info('Why does record val {} != ticket name {}??'.format(
                     rec_res_name, const_name))
-            
+
         # resource_url should always be consistent IPT url with resource_id
         rec_res_url = rec['resource_url']
         res_url = const_url
@@ -83,8 +83,8 @@ class BisonMerger(object):
     # ...............................................
     def _replace_resource(self, rec, action, new_res_id, const_res_name, std_res_url):
         """Update the resource values from Jira ticket description.
-        
-        Note: 
+
+        Note:
             function modifies or deletes original dict
         """
         if rec is not None:
@@ -113,7 +113,7 @@ class BisonMerger(object):
                     if url_res_id != new_res_id:
                         self._log.info('URL {} does not end with {}'
                                        .format(rec_res_url, new_res_id))
-                    
+
     # ...............................................
     def _parse_bison_url(self, bison_url):
         standard_resource_url = new_resource_id = None
@@ -139,10 +139,10 @@ class BisonMerger(object):
 
     # ...............................................
     def read_resources(self, merged_resource_lut_fname):
-        old_resources = Lookup.init_from_file(merged_resource_lut_fname, 
+        old_resources = Lookup.init_from_file(merged_resource_lut_fname,
                                             ['BISONResourceID', 'gbif_datasetkey'], #'legacyid',
-                                            BISON_DELIMITER, 
-                                            valtype=VAL_TYPE.DICT, 
+                                            BISON_DELIMITER,
+                                            valtype=VAL_TYPE.DICT,
                                             encoding=ENCODING)
         return old_resources
 
@@ -159,9 +159,9 @@ class BisonMerger(object):
 
         if lut_res_name is None or lut_res_url is None:
             raise Exception('No Ticket or LUT values for {}!'.format(legacy_ident))
-            
+
         return lut_res_name, lut_res_url
-    
+
     # ...............................................
     # ...............................................
     def _map_old_to_new_rec(self, oldrec):
@@ -187,7 +187,7 @@ class BisonMerger(object):
             else:
                 rec[key] = const_val
 
-    # ...............................................                
+    # ...............................................
     def _remove_outer_quotes(self, rec):
         for fld, val in rec.items():
             if isinstance(val, str):
@@ -195,20 +195,20 @@ class BisonMerger(object):
                     self.loginfo('here is one!')
                 rec[fld] = val.strip('\"')
 
-    # ...............................................                
+    # ...............................................
     def _remove_internal_delimiters(self, rec):
         for fld, val in rec.items():
             if isinstance(val, str):
                 if val.find(BISON_DELIMITER) >= 0:
                     print ('Delimiter in val {}'.format(val))
                     rec[fld] = val.replace(BISON_DELIMITER, '')
-    
+
     # ...............................................
-    def rewrite_bison_data(self, infile, outfile, resource_key, resource_pvals, 
+    def rewrite_bison_data(self, infile, outfile, resource_key, resource_pvals,
                            in_delimiter):
         if not os.path.exists(infile):
             raise Exception('File {} does not exist'.format(infile))
-        
+
         action = resource_pvals['action']
         new_res_id = resource_pvals['resource_id']
         const_res_name = resource_pvals['resource_name']
@@ -216,36 +216,36 @@ class BisonMerger(object):
         if not const_res_name:
             raise Exception('{} must have resource_name {}'.format(
                 resource_key, new_res_id, const_res_name))
-        
+
         if action in PROVIDER_ACTIONS:
             # Step 1: rewrite with updated resource/provider values
             self.loginfo("""{} for ticket {},
                 infile {} to outfile {}
                 with name {}, id {}""".format(
-                    action, resource_key, infile, outfile, const_res_name, 
+                    action, resource_key, infile, outfile, const_res_name,
                     new_res_id))
-            
+
             dl_fields = list(BISON2020_FIELD_DEF.keys())
             try:
                 dict_reader, inf, csv_writer, outf = open_csv_files(
-                    infile, in_delimiter, ENCODING, outfname=outfile, 
+                    infile, in_delimiter, ENCODING, outfname=outfile,
                     outfields=dl_fields, outdelimiter=BISON_DELIMITER)
                 recno = 0
                 for rec in dict_reader:
                     recno += 1
                     if action == 'rewrite':
                         rec = self._map_old_to_new_rec(rec)
-                        
+
                     self._remove_internal_delimiters(rec)
                     self._fill_provider_constant_fields(rec)
 
                     self._replace_resource(
                         rec, action, new_res_id, const_res_name, const_res_url)
-                    
+
                     row = makerow(rec, dl_fields)
                     csv_writer.writerow(row)
             except:
-                raise 
+                raise
             finally:
                 inf.close()
                 outf.close()
@@ -257,7 +257,7 @@ class BisonMerger(object):
     def fix_bison_data(self, infile, outfile, resource_key, resource_pvals):
         if not os.path.exists(infile):
             raise Exception('File {} does not exist'.format(infile))
-        
+
         action = resource_pvals['action']
         new_res_id = resource_pvals['resource_id']
         const_res_name = resource_pvals['resource_name']
@@ -265,15 +265,15 @@ class BisonMerger(object):
         if not const_res_name:
             raise Exception('{} must have resource_name {}'.format(
                 resource_key, new_res_id, const_res_name))
-        
+
         if action in PROVIDER_ACTIONS:
             # Step 1: rewrite with updated resource/provider values
             self.loginfo("""{} for ticket {},
                 infile {} to outfile {}
                 with name {}, id {}""".format(
-                    action, resource_key, infile, outfile, const_res_name, 
+                    action, resource_key, infile, outfile, const_res_name,
                     new_res_id))
-            
+
             dl_fields = list(BISON2020_FIELD_DEF.keys())
             try:
                 # Open incomplete BISON CSV file as input
@@ -286,11 +286,11 @@ class BisonMerger(object):
                 for rec in dict_reader:
                     recno += 1
                     self._remove_internal_delimiters(rec)
-                    
+
                     row = makerow(rec, dl_fields)
                     csv_writer.writerow(row)
             except:
-                raise 
+                raise
             finally:
                 inf.close()
                 outf.close()
@@ -302,19 +302,19 @@ class BisonMerger(object):
     def test_bison_data(self, infile, resource_key, resource_pvals):
         if not os.path.exists(infile):
             raise Exception('File {} does not exist'.format(infile))
-        
+
         action = resource_pvals['action']
         new_res_id = resource_pvals['resource_id']
         const_res_name = resource_pvals['resource_name']
         if not const_res_name:
             raise Exception('{} must have resource_name {}'.format(
                 resource_key, new_res_id, const_res_name))
-        
+
         if action in PROVIDER_ACTIONS:
             # Step 1: rewrite with updated resource/provider values
             self.loginfo('Test ticket {}, infile {} with name {}, id {}'.format(
                 action, resource_key, infile, const_res_name, new_res_id))
-            
+
             try:
                 # Open incomplete BISON CSV file as input
                 dict_reader, inf = get_csv_dict_reader(
@@ -326,7 +326,7 @@ class BisonMerger(object):
                     recno += 1
                     self._remove_internal_delimiters(rec)
             except:
-                raise 
+                raise
             finally:
                 inf.close()
                 print ('Found {} problem records out of {} total'.format(
@@ -336,7 +336,7 @@ class BisonMerger(object):
                 action, const_res_name, resource_key))
 
     # ...............................................
-    def _pull_resource_from_db_or_records(self, fname, legacy_ident, 
+    def _pull_resource_from_db_or_records(self, fname, legacy_ident,
                                           db_resource_name, db_resource_url):
         # Default - standardize db values
         new_resource_id = legacy_ident
@@ -377,28 +377,28 @@ class BisonMerger(object):
             raise
         finally:
             inf.close()
-            
+
         if db_std_res_url is not None and rec_std_res_url is not None:
             if db_std_res_url != rec_std_res_url:
                 self.loginfo('Dataset {} has mismatched URL in db {} and rec {}'.format(
                     legacy_ident, db_resource_url, rec_resource_url))
-                
+
         if db_new_resource_id != rec_new_resource_id:
             self.loginfo('Dataset {} has mismatched id in db {} and rec {}'.format(
                 legacy_ident, db_new_resource_id, rec_new_resource_id))
-            
+
         return new_resource_id, res_name, res_url
 
     # ...............................................
     def assemble_files(self, inpath, db_resources):
         """
         Add existing provider data (resource_ident, resource_name, resource_url)
-        from the BISON database to metadata and actions for new provider input 
-        data from Jira tickets.  
-            key BISON provider id like 440,xxxxx where 
-                440 = legacy GBIF organization id and 
+        from the BISON database to metadata and actions for new provider input
+        data from Jira tickets.
+            key BISON provider id like 440,xxxxx where
+                440 = legacy GBIF organization id and
                 xxxx = legacy GBIF dataset id, an integer
-            values name, url, action, and new input filename.  
+            values name, url, action, and new input filename.
         """
         provider_datasets = BISON_PROVIDER.copy()
         for key, vals in provider_datasets.items():
@@ -408,10 +408,10 @@ class BisonMerger(object):
             else:
                 vals['resource_url'] = self._standardize_bison_url(vals['resource_id'])
             provider_datasets[key] = vals
-        
+
         prefix = os.path.join(inpath, EXISTING_DATASET_FILE_PREFIX)
         existing_prov_filenames = glob.glob(prefix + '440,10*.csv')
-        
+
         if existing_prov_filenames is not None:
             for fn in existing_prov_filenames:
                 # USDA Plants is 440, 1066
@@ -419,22 +419,22 @@ class BisonMerger(object):
                 try:
                     newdata = provider_datasets[legacy_ident]
                 except:
-                    # For datasets without ticket and new data 
+                    # For datasets without ticket and new data
                     # Pull resource values from old table
                     db_resource_name, db_resource_url = \
-                        self._get_old_resource_vals(legacy_ident, db_resources)                    
+                        self._get_old_resource_vals(legacy_ident, db_resources)
                     # Pull resource values old records
-                    (new_resource_id, resource_name, 
+                    (new_resource_id, resource_name,
                      resource_url) = self._pull_resource_from_db_or_records(
                          fn, legacy_ident, db_resource_name, db_resource_url)
-                        
+
                     _, basefname = os.path.split(fn)
                     self.loginfo('Existing dataset {} {} will be rewritten'
                                    .format(legacy_ident, basefname))
-                    
+
                     provider_datasets[legacy_ident] = {
                         'legacy_id': legacy_ident,
-                        'action': 'rewrite', 
+                        'action': 'rewrite',
                         'ticket': 'Existing data',
                         'resource_name': resource_name,
                         'resource_id': new_resource_id,
@@ -446,7 +446,7 @@ class BisonMerger(object):
         return provider_datasets
 
     # ...............................................
-    def test_bison_encoding_resource(self, infile, resource_ident, 
+    def test_bison_encoding_resource(self, infile, resource_ident,
                                      resource_name, resource_url, action):
         if not os.path.exists(infile):
             raise Exception('File {} does not exist'.format(infile))
@@ -454,24 +454,24 @@ class BisonMerger(object):
         if action in PROVIDER_ACTIONS:
             # Step 1: rewrite with updated resource/provider values
             self.loginfo("""
-            ident {}, 
+            ident {},
             infile {},
-            name {}, 
+            name {},
             url {}""".format(resource_ident, infile, resource_name, resource_url))
-            
+
             if not os.path.exists(infile):
                 self.loginfo(" Missing infile {}".format(infile))
             else:
                 self._test_header_lines(
                     infile, resource_ident, resource_name, resource_url, action)
-            
+
             correction_info = self.get_correction_info(
                 resource_ident=resource_ident)
             self.loginfo(correction_info)
-            
+
     # ...............................................
     def get_correction_info(self, resource_ident=None):
-        if resource_ident is None:             
+        if resource_ident is None:
             correction_table = '\nCorrection table\n'
             for rident, corrections in self._resource_table.items():
                 correction_table += '\n{}\n'.format(rident)
@@ -487,11 +487,11 @@ class BisonMerger(object):
                 for key, val in corrections.items():
                     correction_table += '  {}:  {}\n'.format(key, str(val))
         return correction_table
-            
+
         return correction_table
 
     # ...............................................
-    def _test_header_lines(self, infile, resource_ident, 
+    def _test_header_lines(self, infile, resource_ident,
                            resource_name, resource_url, action):
         import csv
         delimiter = PROVIDER_DELIMITER
@@ -519,16 +519,16 @@ class BisonMerger(object):
             else:
                 tmpflds = header.split(delimiter)
                 fieldnames = [fld.strip() for fld in tmpflds]
-                dict_reader = csv.DictReader(f, fieldnames=fieldnames, 
+                dict_reader = csv.DictReader(f, fieldnames=fieldnames,
                                              quoting=csv.QUOTE_NONE,
-                                             delimiter=delimiter)        
-        
+                                             delimiter=delimiter)
+
             test_count = 10
             for i in range(test_count):
                 rec = next(dict_reader)
                 self._replace_resource(
-                    rec, resource_ident, resource_name, resource_url, action)            
+                    rec, resource_ident, resource_name, resource_url, action)
         except:
-            raise 
+            raise
         finally:
             f.close()

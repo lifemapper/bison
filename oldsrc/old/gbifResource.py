@@ -57,7 +57,7 @@ for line in infile:
         print owningorganizationkey + '|' + legacyid + '|'
         print resource['publishingOrganizationKey'].replace("\n", "\\n")+'|'+line.strip()+'|'+resource['key'].replace("\n", "\\n")+'|'+resource['title'].replace("\n", "\\n")+'|'+descVal.replace("\n", "\\n")+'|'+resource['citation']['text'].replace("\n", "\\n")+'|'+rightsVal.replace("\n", "\\n")+'|'+logoVal.replace("\n", "\\n")+'|'+resource['created'].replace("\n", "\\n")+'|'+resource['modified'].replace("\n", "\\n")+'|'+homepageVal.replace("\n", "\\n")
         out.write(resource['publishingOrganizationKey'].replace("\n", "\\n")+'|'+line.strip()+'|'+resource['key'].replace("\n", "\\n")+'|'+resource['title'].replace("\n", "\\n")+'|'+descVal.replace("\n", "\\n")+'|'+resource['citation']['text'].replace("\n", "\\n")+'|'+rightsVal.replace("\n", "\\n")+'|'+logoVal.replace("\n", "\\n")+'|'+resource['created'].replace("\n", "\\n")+'|'+resource['modified'].replace("\n", "\\n")+'|'+homepageVal.replace("\n", "\\n")+'\n')
-        
+
         #l = json.dumps(data)
 
 out.close()

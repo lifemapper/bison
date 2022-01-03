@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 
-usage () 
+usage ()
 {
     echo "Usage: $0 <SUBDIR>  <INFILE_BASENAME_WO_EXT> <TOTAL_LINECOUNT>  <LINECOUNT_PER_CHUNK>"
     echo "This script is run on a subset of a GBIF occurrence download in Darwin Core format"
@@ -11,7 +11,7 @@ usage ()
     echo "   "
 }
 
-### Set variables 
+### Set variables
 set_defaults() {
     pth=/tank/data/bison/2019
     SUBDIR=$1
@@ -19,9 +19,9 @@ set_defaults() {
     THISPTH=$pth/$SUBDIR/
     INFILE=$THISPTH/$DATANAME.txt
     echo 'Input = ' $INFILE
-    
+
     PROCESS_CSV=/state/partition1/git/bison/gbif/convert2bison.py
-    
+
     THISNAME=`/bin/basename $0`
     LOG=$THISPTH/$THISNAME.log
     # Append to existing logfile
@@ -32,7 +32,7 @@ set_defaults() {
 convert_data() {
     stp=1
     while [[ $stp -le 4 ]]
-    do 
+    do
      	TimeStamp "Process ${INFILE} with step ${stp}" >> $LOG
        	# time python $PROCESS_CSV $INFILE --step=$stp >> $LOG
         TimeStamp "Step $stp complete"
@@ -51,7 +51,7 @@ TimeStamp () {
 if [ $# -ne 3 ]; then
     usage
     exit 0
-fi 
+fi
 
 set_defaults $1
 linecount=$2
@@ -61,7 +61,7 @@ TimeStamp "# Start"
 start=1
 
 while [[ $start -lt linecount ]]
-do 
+do
     stop=$((start+inc))
     if [[ $stop -ge linecount ]]; then
         stop=$linecount
@@ -72,6 +72,3 @@ do
 done
 TimeStamp "# End"
 ################################# Main #################################
-
-
- 

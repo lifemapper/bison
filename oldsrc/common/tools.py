@@ -10,10 +10,10 @@ import subprocess
 from sys import maxsize
 import time
 
-from common.constants import (LOG_FORMAT, LOG_DATE_FORMAT, LOGFILE_MAX_BYTES,
-                              LOGFILE_BACKUP_COUNT, EXTRA_VALS_KEY)
+from riis.common import (LOG_FORMAT, LOG_DATE_FORMAT, LOGFILE_MAX_BYTES,
+                         LOGFILE_BACKUP_COUNT, EXTRA_VALS_KEY)
 
-REQUIRED_FIELDS = ['STATE_NAME', 'NAME', 'STATE_FIPS', 'CNTY_FIPS', 'PRNAME', 
+REQUIRED_FIELDS = ['STATE_NAME', 'NAME', 'STATE_FIPS', 'CNTY_FIPS', 'PRNAME',
      'CDNAME', 'CDUID']
 CENTROID_FIELD = 'B_CENTROID'
 
@@ -32,8 +32,8 @@ def get_process_count():
 
 # .............................................................................
 def _find_chunk_files(big_csv_filename, out_csv_filename):
-    """ Finds multiple smaller input csv files from a large input csv file, 
-    if they exist, and return these filenames, paired with output filenames 
+    """ Finds multiple smaller input csv files from a large input csv file,
+    if they exist, and return these filenames, paired with output filenames
     for the results of processing these files. """
     cpus2use = get_process_count()
     in_base_filename, _ = os.path.splitext(big_csv_filename)
@@ -41,10 +41,10 @@ def _find_chunk_files(big_csv_filename, out_csv_filename):
     out_fname_noext, ext = os.path.splitext(out_csv_filename)
     outpth, basename = os.path.split(out_fname_noext)
     out_base_filename = os.path.join(outpth, basename)
-        
+
     total_lines = get_line_count(big_csv_filename) - 1
     chunk_size = int(total_lines / cpus2use)
-    
+
     csv_filename_pairs = []
     start = 1
     stop = chunk_size
@@ -64,8 +64,8 @@ def _find_chunk_files(big_csv_filename, out_csv_filename):
 
 # .............................................................................
 def get_chunk_files(big_csv_filename, out_csv_filename):
-    """ Creates multiple smaller input csv files from a large input csv file, and 
-    return these filenames, paired with output filenames for the results of 
+    """ Creates multiple smaller input csv files from a large input csv file, and
+    return these filenames, paired with output filenames for the results of
     processing these files. """
     csv_filename_pairs, chunk_size = _find_chunk_files(
         big_csv_filename, out_csv_filename)
@@ -76,7 +76,7 @@ def get_chunk_files(big_csv_filename, out_csv_filename):
     else:
         in_base_filename = csv_filename_pairs[0][0]
         out_base_filename = csv_filename_pairs[0][1]
-    
+
     csv_filename_pairs = []
     try:
         bigf = open(big_csv_filename, 'r', encoding='utf-8')
@@ -111,7 +111,7 @@ def get_chunk_files(big_csv_filename, out_csv_filename):
         raise
     finally:
         bigf.close()
-    
+
     return csv_filename_pairs, header
 
 # .............................................................................
@@ -130,8 +130,8 @@ def get_header(filename):
 # .............................................................................
 def get_csv_reader(datafile, delimiter, encoding):
     try:
-        f = open(datafile, 'r', encoding=encoding) 
-        reader = csv.reader(f, delimiter=delimiter, escapechar='\\', 
+        f = open(datafile, 'r', encoding=encoding)
+        reader = csv.reader(f, delimiter=delimiter, escapechar='\\',
                             quoting=csv.QUOTE_NONE)
     except Exception as e:
         raise Exception('Failed to read or open {}, ({})'
@@ -143,7 +143,7 @@ def get_csv_reader(datafile, delimiter, encoding):
 # .............................................................................
 def get_csv_writer(datafile, delimiter, encoding, fmode='w'):
     ''' Get a CSV writer that can handle encoding
-    
+
     Args:
         datafile:
         delimiter:
@@ -152,10 +152,10 @@ def get_csv_writer(datafile, delimiter, encoding, fmode='w'):
     '''
     if fmode not in ('w', 'a'):
         raise Exception('File mode must be "w" (write) or "a" (append)')
-    
+
     csv.field_size_limit(maxsize)
     try:
-        f = open(datafile, fmode, encoding=encoding) 
+        f = open(datafile, fmode, encoding=encoding)
         writer = csv.writer(
             f, escapechar='\\', delimiter=delimiter, quoting=csv.QUOTE_NONE)
     except Exception as e:
@@ -166,7 +166,7 @@ def get_csv_writer(datafile, delimiter, encoding, fmode='w'):
     return writer, f
 
 # .............................................................................
-def get_csv_dict_reader(datafile, delimiter, encoding, fieldnames=None, 
+def get_csv_dict_reader(datafile, delimiter, encoding, fieldnames=None,
                         ignore_quotes=True):
     '''
     ignore_quotes: no special processing of quote characters
@@ -183,9 +183,9 @@ def get_csv_dict_reader(datafile, delimiter, encoding, fieldnames=None,
                 escapechar='\\', restkey=EXTRA_VALS_KEY, delimiter=delimiter)
         else:
             dreader = csv.DictReader(
-                f, fieldnames=fieldnames, restkey=EXTRA_VALS_KEY, 
+                f, fieldnames=fieldnames, restkey=EXTRA_VALS_KEY,
                 escapechar='\\', delimiter=delimiter)
-            
+
     except Exception as e:
         raise Exception('Failed to read or open {}, ({})'
                         .format(datafile, str(e)))
@@ -200,10 +200,10 @@ def get_csv_dict_writer(datafile, delimiter, encoding, fldnames, fmode='w'):
     '''
     if fmode not in ('w', 'a'):
         raise Exception('File mode must be "w" (write) or "a" (append)')
-    
+
     csv.field_size_limit(maxsize)
     try:
-        f = open(datafile, fmode, encoding=encoding) 
+        f = open(datafile, fmode, encoding=encoding)
         writer = csv.DictWriter(f, fieldnames=fldnames, delimiter=delimiter,
                                 escapechar='\\', quoting=csv.QUOTE_NONE)
     except Exception as e:
@@ -219,7 +219,7 @@ def get_logger(name, fname):
     log.setLevel(logging.DEBUG)
     formatter = logging.Formatter(LOG_FORMAT, LOG_DATE_FORMAT)
     handlers = []
-    handlers.append(RotatingFileHandler(fname, maxBytes=LOGFILE_MAX_BYTES, 
+    handlers.append(RotatingFileHandler(fname, maxBytes=LOGFILE_MAX_BYTES,
                                         backupCount=LOGFILE_BACKUP_COUNT))
     handlers.append(logging.StreamHandler())
     for fh in handlers:
@@ -258,29 +258,29 @@ def makerow(rec, outfields):
 
 
 # ...............................................
-def open_csv_files(infname, delimiter, encoding, ignore_quotes=True, 
-                   infields=None, outfname=None, outfields=None, 
+def open_csv_files(infname, delimiter, encoding, ignore_quotes=True,
+                   infields=None, outfname=None, outfields=None,
                    outdelimiter=None):
-    ''' Open CSV data for reading as a dictionary (assumes a header), 
+    ''' Open CSV data for reading as a dictionary (assumes a header),
     new output file for writing (rows as a list, not dictionary)
-    
-    Args: 
-        infname: Input CSV filename.  Either a sequence of filenames must 
+
+    Args:
+        infname: Input CSV filename.  Either a sequence of filenames must
             be provided as infields or the file must begin with a header
-            to set dictionary keys. 
-        delimiter: CSV delimiter for input and optionally output 
-        encoding: Encoding for input and optionally output 
+            to set dictionary keys.
+        delimiter: CSV delimiter for input and optionally output
+        encoding: Encoding for input and optionally output
         ignore_quotes: if True, QUOTE_NONE
         infields: Optional ordered list of fieldnames, used when input file
             does not contain a header.
-        outfname: Optional output CSV file 
-        outdelimiter: Optional CSV delimiter for output if it differs from 
+        outfname: Optional output CSV file
+        outdelimiter: Optional CSV delimiter for output if it differs from
             input delimiter
-        outfields: Optional ordered list of fieldnames for output header 
+        outfields: Optional ordered list of fieldnames for output header
     '''
     # Open incomplete BISON CSV file as input
     csv_dict_reader, inf = get_csv_dict_reader(
-        infname, delimiter, encoding, fieldnames=infields, 
+        infname, delimiter, encoding, fieldnames=infields,
         ignore_quotes=ignore_quotes)
     # Optional new BISON CSV output file
     csv_writer = outf = None
@@ -292,12 +292,12 @@ def open_csv_files(infname, delimiter, encoding, ignore_quotes=True,
         if outfields:
             csv_writer.writerow(outfields)
     return (csv_dict_reader, inf, csv_writer, outf)
-        
+
 
 # ...............................................
 def getLine(csvreader, recno):
     ''' Return a line while keeping track of the line number and errors
-    
+
     Args:
         csvreader: a csv.reader object opened with a file
         recno: the current record number
@@ -331,7 +331,7 @@ def delete_shapefile(shp_filename):
     shape_extensions = ['.shp', '.shx', '.dbf', '.prj', '.sbn', '.sbx', '.fbn',
                         '.fbx', '.ain', '.aih', '.ixs', '.mxs', '.atx',
                         '.shp.xml', '.cpg', '.qix']
-    if (shp_filename is not None 
+    if (shp_filename is not None
         and os.path.exists(shp_filename) and shp_filename.endswith('.shp')):
         base, _ = os.path.splitext(shp_filename)
         similar_file_names = glob.glob(base + '.*')
@@ -346,18 +346,18 @@ def delete_shapefile(shp_filename):
     return success
 
 # .............................................................................
-def _create_empty_dataset(out_shp_filename, feature_attributes, ogr_type, 
+def _create_empty_dataset(out_shp_filename, feature_attributes, ogr_type,
                           epsg_code, overwrite=True):
     """ Create an empty ogr dataset given a set of feature attributes
-    
+
     Args:
         out_shp_filename: filename for output data
-        feature_attributes: an ordered list of feature_attributes.  
+        feature_attributes: an ordered list of feature_attributes.
             Each feature_attribute is a tuple of (field name, field type (OGR))
         ogr_type: OGR constant indicating the type of geometry for the dataset
         epsg_code: EPSG code of the spatial reference system (SRS)
         overwrite: boolean indicating if pre-existing data should be deleted.
-    
+
     """
     success = False
     if overwrite:
@@ -365,7 +365,7 @@ def _create_empty_dataset(out_shp_filename, feature_attributes, ogr_type,
     elif os.path.isfile(out_shp_filename):
         print(('Dataset exists: {}'.format(out_shp_filename)))
         return success
-    
+
     try:
         # Create the file object, a layer, and attributes
         target_srs = osr.SpatialReference()
@@ -395,10 +395,10 @@ def _create_empty_dataset(out_shp_filename, feature_attributes, ogr_type,
                     'CreateField failed for {} in {}'.format(
                         fldname, out_shp_filename))
         print('Created empty dataset with {} fields'.format(
-            len(feature_attributes)))            
+            len(feature_attributes)))
     except Exception as e:
         print('Failed to create shapefile {}'.format(out_shp_filename), e)
-                    
+
     return dataset, lyr
 
 # .............................................................................
@@ -449,7 +449,7 @@ def get_clustered_spatial_index(shp_filename):
         # Create spatial index
         prop = rtree.index.Property()
         prop.set_filename(idx_filename)
-        
+
         driver = ogr.GetDriverByName("ESRI Shapefile")
         datasrc = driver.Open(shp_filename, 0)
         lyr = datasrc.GetLayer()
@@ -476,7 +476,7 @@ def _refine_intersect(gc_wkt, poly, new_layer, feat_vals):
     if poly.Intersects(gridcell):
         intersection = poly.Intersection(gridcell)
         itxname = intersection.GetGeometryName()
-        
+
         # Split polygon/gridcell intersection into 1 or more simple polygons
         itx_polys = []
         if itxname == 'POLYGON':
@@ -533,7 +533,7 @@ def intersect_write_shapefile(new_dataset, new_layer, feats, grid_index):
             else:
                 # xmin, xmax, ymin, ymax
                 xmin, xmax, ymin, ymax = simple_geom.GetEnvelope()
-                hits = list(grid_index.intersection((xmin, xmax, ymin, ymax), 
+                hits = list(grid_index.intersection((xmin, xmax, ymin, ymax),
                                                     objects=True))
                 print ('    Loop through {} roughly intersected gridcells'.format(len(hits)))
                 for item in hits:
@@ -552,11 +552,11 @@ def intersect_write_shapefile(new_dataset, new_layer, feats, grid_index):
 # .............................................................................
 def write_shapefile(new_dataset, new_layer, feature_sets, calc_nongeo_fields):
     """ Write a shapefile given a set of features, attribute
-    
+
     Args:
         new_dataset: an OGR dataset object for the new shapefile
         new_layer: an OGR layer object with feature
-        newfield_mapping = 
+        newfield_mapping =
     """
     feat_count = 0
     new_layer_def = new_layer.GetLayerDefn()
@@ -609,7 +609,7 @@ def _read_complex_shapefile(in_shp_filename):
         lyr = dataset.GetLayer(0)
     except Exception:
         print('Unable to get layer from {}'.format(in_shp_filename))
-        raise 
+        raise
 
     (min_x, max_x, min_y, max_y) = lyr.GetExtent()
     bbox = (min_x, min_y, max_x, max_y)
@@ -627,7 +627,7 @@ def _read_complex_shapefile(in_shp_filename):
             if fldname == 'MRGID':
                 fldtype = ogr.OFTInteger
             feat_attrs.append((fldname, fldtype))
-    
+
     # Read Features
     feats = {}
     try:
@@ -649,7 +649,7 @@ def _read_complex_shapefile(in_shp_filename):
             geom = feat.geometry()
             geom_name = geom.GetGeometryName()
             centroid = geom.Centroid()
-            feat_vals[CENTROID_FIELD] = centroid.ExportToWkt() 
+            feat_vals[CENTROID_FIELD] = centroid.ExportToWkt()
             # Split multipolygon into 1 record - 1 simple polygon
             feat_wkts = []
             if geom_name == 'POLYGON':
@@ -678,20 +678,20 @@ def _read_complex_shapefile(in_shp_filename):
     except Exception as e:
         raise Exception('Failed to read features from {} ({})'.format(
             in_shp_filename, e))
-        
+
     finally:
         lyr = None
         dataset = None
-        
+
     return feats, feat_attrs, bbox
 
 # .............................................................................
 def simplify_merge_polygon_shapefiles(in_shp_filenames, calc_fields, out_shp_filename):
     ''' Merge one or more shapefiles, simplifying multipolygons into simple polygons with
     the same attribute values.
-    
+
     Args:
-        in_shp_filenames: list of one or more input shapefiles 
+        in_shp_filenames: list of one or more input shapefiles
         newfield_mapping: dictionary of new fields, fieldtypes
         out_shp_filename: output filename
     '''
@@ -725,63 +725,63 @@ def simplify_merge_polygon_shapefiles(in_shp_filenames, calc_fields, out_shp_fil
     # ......................... ? bbox .........................
     new_bbox = (min([b[0] for b in bboxes]), min([b[1] for b in bboxes]),
                 max([b[2] for b in bboxes]), max([b[3] for b in bboxes]))
-        
+
     # ......................... Create structure .........................
     out_dataset, out_layer = _create_empty_dataset(
-        out_shp_filename, out_feat_attrs, ogr.wkbPolygon, epsg_code, 
+        out_shp_filename, out_feat_attrs, ogr.wkbPolygon, epsg_code,
         overwrite=True)
-    
+
     # ......................... Write old feats to new layer  .........................
     # Calculate non-geometric fields
     # Write one or more new features for each original feature
-    calc_nongeo_fields = [k for k in calc_fields.keys() if k != CENTROID_FIELD] 
+    calc_nongeo_fields = [k for k in calc_fields.keys() if k != CENTROID_FIELD]
     write_shapefile(
         out_dataset, out_layer, features_lst, calc_nongeo_fields)
 
 
 # .............................................................................
-def intersect_polygon_with_grid(primary_shp_filename, grid_shp_filename, 
+def intersect_polygon_with_grid(primary_shp_filename, grid_shp_filename,
                                 calc_fields, out_shp_filename):
-    ''' Intersect a primary shapefile with a grid (or other simple polygon) 
-    shapefile, simplifying multipolygons in the primary shapefile into simple 
-    polygons. Intersect the simple polygons with gridcells in the second 
+    ''' Intersect a primary shapefile with a grid (or other simple polygon)
+    shapefile, simplifying multipolygons in the primary shapefile into simple
+    polygons. Intersect the simple polygons with gridcells in the second
     shapefile to further reduce polygon size and complexity.
-    
+
     Args:
-        in_shp_filenames: list of one or more input shapefiles 
+        in_shp_filenames: list of one or more input shapefiles
         grid_shp_filename: dictionary of new fields, fieldtypes
         out_shp_filename: output filename
     '''
     epsg_code = 4326
     # Open input shapefile, read layer def
     feats, feat_attrs, bbox = _read_complex_shapefile(primary_shp_filename)
-    
+
     # Add new attributes including B_CENTROID
     for calc_fldname, calc_fldtype in calc_fields.items():
         feat_attrs.append((calc_fldname, calc_fldtype))
-         
+
     # Get spatial index for grid with WKT for each cell
     grid_index = get_clustered_spatial_index(grid_shp_filename)
- 
+
     # ......................... Create structure .........................
     out_dataset, out_layer = _create_empty_dataset(
-        out_shp_filename, feat_attrs, ogr.wkbPolygon, epsg_code, 
+        out_shp_filename, feat_attrs, ogr.wkbPolygon, epsg_code,
         overwrite=True)
-       
+
     # ......................... Intersect polygons .........................
     intersect_write_shapefile(out_dataset, out_layer, feats, grid_index)
-        
+
 
 # ...............................................
 if __name__ == '__main__':
     pth = '/tank/data/bison/2019/ancillary'
-    
+
 #     # Terrestrial boundaries
 #     us_sfname = 'us_counties/us_counties.shp'
 #     can_sfname = 'can_counties/can_counties.shp'
 #     terr_outfname = 'us_can_boundaries_centroids.shp'
-#     
-#     in_terr_filenames = [os.path.join(pth, us_sfname), 
+#
+#     in_terr_filenames = [os.path.join(pth, us_sfname),
 #                         os.path.join(pth, can_sfname)]
 #     out_terr_filename = os.path.join(pth, terr_outfname)
 #     calc_terr_fields = {
@@ -790,9 +790,9 @@ if __name__ == '__main__':
 #         'B_FIPS': ogr.OFTString,
 #         CENTROID_FIELD: ogr.OFTString
 #         }
-#     simplify_merge_polygon_shapefiles(in_terr_filenames, calc_terr_fields, 
+#     simplify_merge_polygon_shapefiles(in_terr_filenames, calc_terr_fields,
 #                                       out_terr_filename)
-    
+
     # Marine boundaries
     eez_orig_sfname = 'World_EEZ_v8_20140228_splitpolygons/World_EEZ_v8_2014_HR.shp'
     grid_sfname = 'world_grid_2.5.shp'
@@ -801,21 +801,21 @@ if __name__ == '__main__':
 #     grid_sfname = 'world_grid_5.shp'
 #     eez_outfname = 'eez_gridded_boundaries_5.shp'
 #     intersect_outfname = 'gridded_eez.shp'
-    
+
     orig_eez_filename = os.path.join(pth, eez_orig_sfname)
     grid_shp_filename = os.path.join(pth, grid_sfname)
     intersect_filename = os.path.join(pth, eez_outfname)
-    
-    
+
+
 #     in_eez_filenames = [intersect_outfname]
 #     out_eez_filename = os.path.join(pth, eez_outfname)
     calc_eez_fields = {CENTROID_FIELD: ogr.OFTString}
-#     simplify_merge_polygon_shapefiles(in_eez_filenames, calc_eez_fields, 
+#     simplify_merge_polygon_shapefiles(in_eez_filenames, calc_eez_fields,
 #                                       out_eez_filename)
-    
-    intersect_polygon_with_grid(orig_eez_filename, grid_shp_filename, 
+
+    intersect_polygon_with_grid(orig_eez_filename, grid_shp_filename,
                                 calc_eez_fields, intersect_filename)
-    
+
 """
 import csv
 
@@ -835,9 +835,9 @@ fieldnames = [fld.strip() for fld in tmpflds]
 
 
 rdr = csv.DictReader(
-    f, fieldnames=fieldnames, restkey=EXTRA_VALS_KEY, 
+    f, fieldnames=fieldnames, restkey=EXTRA_VALS_KEY,
     escapechar='\\', delimiter=delimiter)
-    
+
 r =  {}
 p =  {}
 while rec is not None:
@@ -884,7 +884,7 @@ while not stop and rdr.line_num <= 2788:
 
 if not stop:
     print (rdr.line_num, rec['OriginalResourceID'])
-        
+
 for i in range(861):
     rec = next(rdr)
 

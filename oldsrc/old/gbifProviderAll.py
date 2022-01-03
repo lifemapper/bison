@@ -58,7 +58,7 @@ for provider in allArray:
     #print legacyid+','+provider['key']+','+provider['title']+','+descVal+','+provider['created']+','+provider['modified']+','+ homepageVal
 
     out.write(legacyid.replace("\n", "\\n")+'|'+provider['key'].replace("\n", "\\n")+'|'+provider['title'].replace("\n", "\\n")+'|'+descVal.replace("\n", "\\n")+'|'+provider['created'].replace("\n", "\\n")+'|'+provider['modified'].replace("\n", "\\n")+'|'+ homepageVal.replace("\n", "\\n")+'\n')
-    
+
     #l = json.dumps(data, indent=4, sort_keys=True)
     #jsonout.write( l + "\n")
 

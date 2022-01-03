@@ -44,7 +44,7 @@ def queryApi(infile, outfile, missingfile, newId):
             missingfile.write(dataset_key + "\n")
         print responseStr
         out.write(responseStr)
-    
+
         #l = json.dumps(data, indent=4, sort_keys=True)
         #jsonout.write( l + "\n")
     out.close()

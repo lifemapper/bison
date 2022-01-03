@@ -1,3 +1,8 @@
-requests
+# Python3.8
+requests>=2.22.0
 # gdal (must be in system python, fails in virtenv)
-rtree
+rtree>=0.9.7
+pre-commit
+isort
+flake8
+flake8-bugbear

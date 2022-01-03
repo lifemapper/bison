@@ -42,7 +42,7 @@ for line in infile:
 		descVal=""
 	print resource['owningOrganizationKey']+','+line.strip()+','+resource['key']+','+resource['title']+','+descVal+','+resource['citation']['text']+','+rightsVal+','+logoVal+','+resource['created']+','+resource['modified']+','+homepageVal
 	#out.write(resource['owningOrganizationKey']+','+line.strip()+','+resource['key']+','+resource['title']+','+descVal+','+resource['citation']['text']+','+rightsVal+','+logoVal+','+resource['created']+','+resource['modified']+','+homepageVal+'\n')
-	
+
 	#l = json.dumps(data)
 
 out.close()

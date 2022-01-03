@@ -2,23 +2,23 @@
 @license: gpl2
 @copyright: Copyright (C) 2019, University of Kansas Center for Research
 
-             Lifemapper Project, lifemapper [at] ku [dot] edu, 
+             Lifemapper Project, lifemapper [at] ku [dot] edu,
              Biodiversity Institute,
              1345 Jayhawk Boulevard, Lawrence, Kansas, 66045, USA
-    
-             This program is free software; you can redistribute it and/or modify 
-             it under the terms of the GNU General Public License as published by 
-             the Free Software Foundation; either version 2 of the License, or (at 
+
+             This program is free software; you can redistribute it and/or modify
+             it under the terms of the GNU General Public License as published by
+             the Free Software Foundation; either version 2 of the License, or (at
              your option) any later version.
-  
-             This program is distributed in the hope that it will be useful, but 
-             WITHOUT ANY WARRANTY; without even the implied warranty of 
-             MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU 
+
+             This program is distributed in the hope that it will be useful, but
+             WITHOUT ANY WARRANTY; without even the implied warranty of
+             MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
              General Public License for more details.
-  
-             You should have received a copy of the GNU General Public License 
-             along with this program; if not, write to the Free Software 
-             Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 
+
+             You should have received a copy of the GNU General Public License
+             along with this program; if not, write to the Free Software
+             Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
              02110-1301, USA.
 """
 from osgeo import ogr
@@ -26,13 +26,13 @@ import os
 import rtree
 import time
 
-from common.constants import (
+from riis.common import (
     BISON_DELIMITER, ENCODING, LOGINTERVAL, BISON_PROVIDER_VALUES,
-    PROHIBITED_CHARS, PROHIBITED_SNAME_CHARS, PROHIBITED_VALS, BISON_SQUID_FLD, 
+    PROHIBITED_CHARS, PROHIBITED_SNAME_CHARS, PROHIBITED_VALS, BISON_SQUID_FLD,
     ITIS_KINGDOMS, ISO_COUNTRY_CODES, BISON2020_FIELD_DEF)
-from common.inputdata import ANCILLARY_FILES
-from common.lookup import Lookup, VAL_TYPE
-from common.tools import (
+from riis.common import ANCILLARY_FILES
+from riis.common import Lookup, VAL_TYPE
+from riis.common import (
     get_csv_dict_reader, open_csv_files, delete_shapefile, get_logger,
     get_csv_writer, makerow)
 
@@ -48,7 +48,7 @@ class BisonFiller(object):
         """
         @summary: Constructor
         """
-        self._log = log        
+        self._log = log
         # Ordered output fields
         # Individual steps may add/remove temporary fields for input/output
         self._infields = list(BISON2020_FIELD_DEF.keys())
@@ -58,29 +58,29 @@ class BisonFiller(object):
         self.itistsns = None
         self.estmeans = None
         self.centroids = None
-        
+
         self.terrindex = None
         self.terrfeats = None
         self.terr_bison_fldnames = None
         self.marindex = None
         self.marfeats = None
         self.mar_bison_fldnames = None
-        
+
         self._active_resources = {}
         self._active_providers = {}
-        
+
     # ...............................................
     def reset_logger(self, outdir, logname):
         self._log = None
         logfname = os.path.join(outdir, '{}.log'.format(logname))
         logger = get_logger(logname, logfname)
         self._log = logger
-        
+
     # ...............................................
     def reset_logger2(self, logger):
         self._log = None
         self._log = logger
-        
+
     # ...............................................
     def loginfo(self, msg):
         if self._log is None:
@@ -89,20 +89,20 @@ class BisonFiller(object):
             self._log.info(msg)
 
     # ...............................................
-    def initialize_itis_estmeans_centroid(self, itis2_lut_fname, estmeans_fname, 
+    def initialize_itis_estmeans_centroid(self, itis2_lut_fname, estmeans_fname,
                                           terrestrial_shpname):
         if self.itistsns is None:
             self.itistsns = Lookup.init_from_file(
-                itis2_lut_fname, ['scientific_name'], ',', valtype=VAL_TYPE.DICT, 
+                itis2_lut_fname, ['scientific_name'], ',', valtype=VAL_TYPE.DICT,
                 encoding=ENCODING, ignore_quotes=False)
             self._fix_itis_values()
-            
+
         if self.estmeans is None:
             self.estmeans = self._read_estmeans_lookup(estmeans_fname)
-            
+
         if self.centroids is None:
             self.centroids = self._read_centroid_lookup(terrestrial_shpname)
-                
+
     # ...............................................
     def _makerow(self, rec):
         row = []
@@ -116,11 +116,11 @@ class BisonFiller(object):
     # ...............................................
     def _read_estmeans_lookup(self, estmeans_fname):
         '''
-        @summary: Read and populate dictionary with establishmentMeans 
-          (concatenated list of one or more AK, HI, L48).  Keys are TSN if 
+        @summary: Read and populate dictionary with establishmentMeans
+          (concatenated list of one or more AK, HI, L48).  Keys are TSN if
           it exists, scientificName if TSN is blank.
         @note: inputfile is tab delimited values with header:
-                    scientificName    TSN    AK    HI    L48    estmeansref        
+                    scientificName    TSN    AK    HI    L48    estmeansref
         '''
         estmeans = None
         datadict = {}
@@ -135,7 +135,7 @@ class BisonFiller(object):
                     for fld in ['AK', 'HI', 'L48']:
                         if rec[fld] != '':
                             emlst.append(rec[fld])
-                    emstr = sep.join(emlst)                    
+                    emstr = sep.join(emlst)
                     if tsn != '':
                         datadict[tsn] = emstr
                     elif sciname != '':
@@ -151,14 +151,14 @@ class BisonFiller(object):
             if datadict:
                 estmeans = Lookup.init_from_dict(datadict, valtype=VAL_TYPE.STRING)
         return estmeans
-        
+
     # ...............................................
     def _read_centroid_lookup(self, terrestrial_shpname):
         '''
-        @summary: Read and populate dictionary with key = concatenated string of 
+        @summary: Read and populate dictionary with key = concatenated string of
             state name, county name, fips code = tuple of centroid coordinates
-        @note: The input shapefile has been modified to split original polygons 
-            with unique state/county/fips combination into multiple polygons 
+        @note: The input shapefile has been modified to split original polygons
+            with unique state/county/fips combination into multiple polygons
             with the same state/county/fips and centroid values
         '''
         driver = ogr.GetDriverByName("ESRI Shapefile")
@@ -171,7 +171,7 @@ class BisonFiller(object):
                 terrestrial_shpname))
         else:
             terrlyr = terr_data_src.GetLayer()
-    
+
             centroids = None
             datadict = {}
             for feat in terrlyr:
@@ -189,11 +189,11 @@ class BisonFiller(object):
                     self._log.error('Failed to read coordinates from {}'.format(
                         centroid))
                 else:
-                    # fill coordinates for search combo of 
+                    # fill coordinates for search combo of
                     #     state + county or fips
                     for key in [';'.join([state, county]), fips]:
                         try:
-                            # Add key only once (there are multiple polygons 
+                            # Add key only once (there are multiple polygons
                             #     for each state/county/fips combo)
                             datadict[key]
                         except:
@@ -223,15 +223,15 @@ class BisonFiller(object):
                 f.close()
             except Exception:
                 pass
-            
+
     # ...............................................
     def _fill_geofields(self, rec, lon, lat):
         msgs = []
         fldvals = {}
         pt = ogr.Geometry(ogr.wkbPoint)
         pt.AddPoint(lon, lat)
-        
-        terr_intersect_fids = list(self.terrindex.intersection((lon, lat)))        
+
+        terr_intersect_fids = list(self.terrindex.intersection((lon, lat)))
         terr_count = 0
         start = time.time()
         for tfid in terr_intersect_fids:
@@ -244,10 +244,10 @@ class BisonFiller(object):
                         fldvals[fn] = self.terrfeats[tfid][fn]
                     # NEW: First 2 chars of county fips code is state fips code
                     # only in US data (Canada codes are 4 chars)
-                    if (len(fldvals['calculated_fips']) == 5 
+                    if (len(fldvals['calculated_fips']) == 5
                         and rec['iso_country_code'] != 'CA'):
                         state_fips = fldvals['calculated_fips'][:2]
-                        fldvals['calculated_state_fips'] = state_fips    
+                        fldvals['calculated_state_fips'] = state_fips
                 # If > 1 polygon, clear all values
                 else:
                     fldvals = {}
@@ -256,7 +256,7 @@ class BisonFiller(object):
         if ogr_seconds > 0.75:
             msgs.append('Terr fid intersect {}; point {}, {}; OGR time {} '.format(
                 terr_intersect_fids, lon, lat, ogr_seconds))
-        
+
         match_count = terr_count
         if match_count != 1:
             mar_intersect_fids = list(self.marindex.intersection((lon, lat)))
@@ -295,7 +295,7 @@ class BisonFiller(object):
             rec['longitude'] = ''
             rec['latitude'] = ''
         lon, lat = self._get_coords(rec)
-        # Fill missing coordinates 
+        # Fill missing coordinates
         #     or refill previously computed to county centroid
         if lon is None:
             pfips = rec['provided_fips'].strip()
@@ -318,8 +318,8 @@ class BisonFiller(object):
                     rec['geodetic_datum'] = 'WGS84'
                     break
             # DO NOT discard rec without coords and state/province
-        
-        
+
+
 #     # ...............................................
 #     def _get_itisfields(self, name, itis_svc):
 #         # Get tsn, acceptedTSN, accepted_name, kingdom
@@ -332,7 +332,7 @@ class BisonFiller(object):
 #                     break
 #         else:
 #             accepted_tsn = tsn
-#         
+#
 #         for v in (tsn, accepted_name, kingdom, accepted_tsn):
 #             if v is not None:
 #                 row = [tsn, accepted_name, kingdom, accepted_tsn]
@@ -343,19 +343,19 @@ class BisonFiller(object):
 #             common_names_str = ';'.join(common_names)
 #             row.append(common_names_str)
 #         return row
-#     
+#
 #     # ...............................................
 #     def write_itis_lookup(self, cleanname_fname, itis_lut_fname):
 #         if self.is_open():
 #             self.close()
-#         header = ['clean_provided_scientific_name', 'itis_tsn', 
-#                   'valid_accepted_scientific_name', 'valid_accepted_tsn', 
+#         header = ['clean_provided_scientific_name', 'itis_tsn',
+#                   'valid_accepted_scientific_name', 'valid_accepted_tsn',
 #                   'kingdom', 'itis_common_name']
 #         itis_svc = ITISSvc()
 #         recno = 0
 #         try:
 #             inf = open(cleanname_fname, 'r', encoding=ENCODING)
-#             csvwriter, outf = get_csv_writer(itis_lut_fname, BISON_DELIMITER, 
+#             csvwriter, outf = get_csv_writer(itis_lut_fname, BISON_DELIMITER,
 #                                            ENCODING, 'w')
 #             self._files.extend([inf, outf])
 #             csvwriter.writerow(header)
@@ -368,10 +368,10 @@ class BisonFiller(object):
 #                     csvwriter.writerow(row)
 #         except Exception as e:
 #             self._log.error('Failed reading from line {} {} or writing to {}; {}'
-#                             .format(recno, cleanname_fname, itis_lut_fname, e))                    
+#                             .format(recno, cleanname_fname, itis_lut_fname, e))
 #         finally:
-#             self.close()            
-#             
+#             self.close()
+#
 
     # ...............................................
     def _clean_kingdom(self, rec):
@@ -438,9 +438,9 @@ class BisonFiller(object):
             except:
                 print ('wtf kingdom')
                 cleanking = ''
-            
+
             self.itistsns.lut[key]['kingdom'] = cleanking
-            
+
             try:
                 cname = vals['common_name']
             except:
@@ -448,7 +448,7 @@ class BisonFiller(object):
                 cname = ''
 
             if cname == '""':
-                self.itistsns.lut[key]['common_name'] = '' 
+                self.itistsns.lut[key]['common_name'] = ''
             elif cname.find('"') >= 0:
                 print ('damn data')
                 ch_lst = []
@@ -456,7 +456,7 @@ class BisonFiller(object):
                     ch_lst.append(ch)
                 cname = ''.join(ch_lst)
                 self.itistsns.lut[key]['common_name'] = cname
-            
+
     # ...............................................
     def _track_legacy_provider_resources(self, rec):
         bison_legacyid = rec['resource_id']
@@ -489,7 +489,7 @@ class BisonFiller(object):
             self._active_providers[resource_id] = 1
 
     # ...............................................
-    def write_resource_provider_stats(self, resource_count_fname, 
+    def write_resource_provider_stats(self, resource_count_fname,
                                       provider_count_fname):
         # Write record count per resource and provider
         writer, f = get_csv_writer(
@@ -506,9 +506,9 @@ class BisonFiller(object):
 
     # ...............................................
     def count_provider_resource(self, fname):
-        """Read a CSV file of pre-processed BISON data, aggregating record 
+        """Read a CSV file of pre-processed BISON data, aggregating record
         counts for providers and resources.
-        
+
         Results:
             A CSV file of provider and resource record counts
         """
@@ -518,36 +518,36 @@ class BisonFiller(object):
                 fname, BISON_DELIMITER, ENCODING)
             for rec in dict_reader:
                 recno += 1
-                self._track_provider_resources(rec)    
+                self._track_provider_resources(rec)
                 if (recno % LOGINTERVAL) == 0:
-                    self._log.info('*** Record number {} ***'.format(recno))                                    
+                    self._log.info('*** Record number {} ***'.format(recno))
         except Exception as e:
             self._log.error('Failed reading data from line {} in {}: {}'
-                            .format(recno, fname, e))                    
+                            .format(recno, fname, e))
         finally:
             inf.close()
-                        
+
     # ...............................................
-    def walk_data(self, infname, terr_data, marine_data, ancillary_path, 
+    def walk_data(self, infname, terr_data, marine_data, ancillary_path,
                   merged_dataset_lut_fname, merged_org_lut_fname):
         """Read a CSV file of pre-processed BISON data, examining records"""
         if not os.path.exists(infname):
             raise Exception('File {} does not exist to walk'.format(infname))
         if self.is_open():
             self.close()
-            
+
         self.initialize_geospatial_data(terr_data, marine_data, ancillary_path)
-        dataset_by_uuid = Lookup.init_from_file(merged_dataset_lut_fname, 
-            ['gbif_datasetkey', 'dataset_id'], BISON_DELIMITER, valtype=VAL_TYPE.DICT, 
+        dataset_by_uuid = Lookup.init_from_file(merged_dataset_lut_fname,
+            ['gbif_datasetkey', 'dataset_id'], BISON_DELIMITER, valtype=VAL_TYPE.DICT,
             encoding=ENCODING)
-#         dataset_by_legacyid = Lookup.init_from_file(merged_dataset_lut_fname, 
-#             ['OriginalResourceID', 'gbif_legacyid'], BISON_DELIMITER, valtype=VAL_TYPE.DICT, 
+#         dataset_by_legacyid = Lookup.init_from_file(merged_dataset_lut_fname,
+#             ['OriginalResourceID', 'gbif_legacyid'], BISON_DELIMITER, valtype=VAL_TYPE.DICT,
 #             encoding=ENCODING)
-        org_by_uuid = Lookup.init_from_file(merged_org_lut_fname, 
-            ['gbif_organizationKey'], BISON_DELIMITER, valtype=VAL_TYPE.DICT, 
+        org_by_uuid = Lookup.init_from_file(merged_org_lut_fname,
+            ['gbif_organizationKey'], BISON_DELIMITER, valtype=VAL_TYPE.DICT,
             encoding=ENCODING)
-#         org_by_legacyid = Lookup.init_from_file(merged_org_lut_fname, 
-#             ['OriginalProviderID', 'gbif_legacyid'], BISON_DELIMITER, valtype=VAL_TYPE.DICT, 
+#         org_by_legacyid = Lookup.init_from_file(merged_org_lut_fname,
+#             ['OriginalProviderID', 'gbif_legacyid'], BISON_DELIMITER, valtype=VAL_TYPE.DICT,
 #             encoding=ENCODING)
 
         recno = 0
@@ -556,17 +556,17 @@ class BisonFiller(object):
                 infname, BISON_DELIMITER, ENCODING)
             for rec in dict_reader:
                 recno += 1
-                self._track_provider_resources(rec)    
+                self._track_provider_resources(rec)
                 if (recno % LOGINTERVAL) == 0:
-                    self._log.info('*** Record number {} ***'.format(recno))                                    
+                    self._log.info('*** Record number {} ***'.format(recno))
         except Exception as e:
             self._log.error('Failed reading data from line {} in {}: {}'
-                            .format(recno, infname, e))                    
+                            .format(recno, infname, e))
         finally:
             inf.close()
-                        
 
-    # ...............................................                
+
+    # ...............................................
     def _remove_outer_quotes(self, rec):
         for fld, val in rec.items():
             if isinstance(val, str):
@@ -587,7 +587,7 @@ class BisonFiller(object):
         dl_fields = list(BISON2020_FIELD_DEF.keys())
         try:
             dict_reader, inf, csv_writer, outf = open_csv_files(
-                infname, in_delimiter, ENCODING, outfname=outfname, 
+                infname, in_delimiter, ENCODING, outfname=outfname,
                 outfields=dl_fields, outdelimiter=BISON_DELIMITER)
             recno = 0
             for rec in dict_reader:
@@ -596,11 +596,11 @@ class BisonFiller(object):
                 row = makerow(rec, dl_fields)
                 csv_writer.writerow(row)
         except:
-            raise 
+            raise
         finally:
             inf.close()
             outf.close()
-    
+
     # ...............................................
     def rewrite_data(self, infile, outfile, in_delimiter):
         if not os.path.exists(infile):
@@ -608,30 +608,30 @@ class BisonFiller(object):
 
 
         self.rewrite_recs(infile, outfile, in_delimiter)
-            
+
 
     # ...............................................
     def update_itis_estmeans_centroid(
-            self, itis2_lut_fname, estmeans_fname, terrestrial_shpname, 
+            self, itis2_lut_fname, estmeans_fname, terrestrial_shpname,
             infname, outfname, from_gbif=True, track_providers=False):
         """
         @summary: Process a CSV file with 47 ordered BISON fields (and optional
-                  gbifID field for GBIF provided data) to 
-                  1) fill itis_tsn, valid_accepted_scientific_name, 
-                     valid_accepted_tsn, itis_common_name, kingdom (if blank) 
-                     with ITIS values based on clean_provided_scientific_name, 
-                  2) georeference records without coordinates or re-georeference 
-                     records previously georeferenced to county centroid, 
+                  gbifID field for GBIF provided data) to
+                  1) fill itis_tsn, valid_accepted_scientific_name,
+                     valid_accepted_tsn, itis_common_name, kingdom (if blank)
+                     with ITIS values based on clean_provided_scientific_name,
+                  2) georeference records without coordinates or re-georeference
+                     records previously georeferenced to county centroid,
                   3) fill terrestrial (state/county/fips) or marine (EEZ) fields
                      for reported/computed coordinates
-                  4) fill 'establishment_means' field for species non-native 
-                     to Alaska, Hawaii, or Lower 48 based on itis_tsn or 
+                  4) fill 'establishment_means' field for species non-native
+                     to Alaska, Hawaii, or Lower 48 based on itis_tsn or
                      clean_provided_scientific_name
-        @return: A CSV file of BISON-modified records  
+        @return: A CSV file of BISON-modified records
         """
         if self.is_open():
             self.close()
-        
+
         # Derek's LUT header
         # scientific_name, tsn, valid_accepted_scientific_name, valid_accepted_tsn,
         # hierarchy_string, common_name, amb, kingdom
@@ -639,24 +639,24 @@ class BisonFiller(object):
             itis2_lut_fname, estmeans_fname, terrestrial_shpname)
         recno = 0
         try:
-            dict_reader, inf, writer, outf = open_csv_files(infname, 
-                                                 BISON_DELIMITER, ENCODING, 
-                                                 outfname=outfname, 
+            dict_reader, inf, writer, outf = open_csv_files(infname,
+                                                 BISON_DELIMITER, ENCODING,
+                                                 outfname=outfname,
                                                  outfields=self._outfields)
-                
+
             for rec in dict_reader:
                 recno += 1
                 if from_gbif:
                     squid = rec['id']
                 else:
                     squid = rec[BISON_SQUID_FLD]
-                
+
                 # ..........................................
                 # Clean kingdom value, Fill ITIS
-                self._clean_kingdom(rec) 
+                self._clean_kingdom(rec)
                 self._fill_itisfields(rec)
                 # ..........................................
-                # Fill establishment_means from TSN or 
+                # Fill establishment_means from TSN or
                 # clean_provided_scientific_name and establishment means table
                 self._fill_estmeans_field(rec)
                 # ..........................................
@@ -669,19 +669,19 @@ class BisonFiller(object):
                     writer.writerow(row)
                 if track_providers:
                     self._track_provider_resources(rec)
-                
+
                 # Log progress occasionally
                 if (recno % LOGINTERVAL) == 0:
                     self._log.info('*** Record number {} ***'.format(recno))
-                                    
+
         except Exception as e:
             self._log.error('Failed filling data from id {}, line {}: {}'
-                            .format(squid, recno, e))                    
+                            .format(squid, recno, e))
         finally:
             inf.close()
             outf.close()
-            
-    # ...............................................    
+
+    # ...............................................
     def _create_spatial_index(self, flddata, lyr):
         lyr_def = lyr.GetLayerDefn()
         fldindexes = []
@@ -690,7 +690,7 @@ class BisonFiller(object):
             geoidx = lyr_def.GetFieldIndex(geofld)
             fldindexes.append((bisonfld, geoidx))
             bisonfldnames.append(bisonfld)
-             
+
         spindex = rtree.index.Index(interleaved=False)
         spfeats = {}
         for fid in range(0, lyr.GetFeatureCount()):
@@ -700,7 +700,7 @@ class BisonFiller(object):
             xmin, xmax, ymin, ymax = geom.GetEnvelope()
             # Rtree takes xmin, xmax, ymin, ymax IFF interleaved = False
             spindex.insert(fid, (xmin, xmax, ymin, ymax))
-            spfeats[fid] = {'feature': feat, 
+            spfeats[fid] = {'feature': feat,
                             'geom': geom}
             for name, idx in fldindexes:
                 spfeats[fid][name] = feat.GetFieldAsString(idx)
@@ -714,43 +714,43 @@ class BisonFiller(object):
             terrestrial_shpname = os.path.join(ancillary_path, terr_data['file'])
             terr_data_src = driver.Open(terrestrial_shpname, 0)
             terrlyr = terr_data_src.GetLayer()
-            (self.terrindex, 
-             self.terrfeats, 
+            (self.terrindex,
+             self.terrfeats,
              self.terr_bison_fldnames) = self._create_spatial_index(
                  terr_data['fields'], terrlyr)
-        
+
         if None in (self.marindex, self.marfeats, self.mar_bison_fldnames):
             marine_shpname = os.path.join(ancillary_path, marine_data['file'])
             eez_data_src = driver.Open(marine_shpname, 0)
             eezlyr = eez_data_src.GetLayer()
-            (self.marindex, 
-             self.marfeats, 
+            (self.marindex,
+             self.marfeats,
              self.mar_bison_fldnames) = self._create_spatial_index(
                  marine_data['fields'], eezlyr)
-            
+
     # ...............................................
-    def update_point_in_polygons(self, terr_data, marine_data, ancillary_path, 
+    def update_point_in_polygons(self, terr_data, marine_data, ancillary_path,
                                  infname, outfname, from_gbif=True):
         """
         @summary: Process a CSV file with 47 ordered BISON fields (and optional
-                  gbifID field for GBIF provided data) to 
-                  1) fill itis_tsn, valid_accepted_scientific_name, 
-                     valid_accepted_tsn, itis_common_name, kingdom (if blank) 
-                     with ITIS values based on clean_provided_scientific_name, 
-                  2) georeference records without coordinates or re-georeference 
-                     records previously georeferenced to county centroid, 
+                  gbifID field for GBIF provided data) to
+                  1) fill itis_tsn, valid_accepted_scientific_name,
+                     valid_accepted_tsn, itis_common_name, kingdom (if blank)
+                     with ITIS values based on clean_provided_scientific_name,
+                  2) georeference records without coordinates or re-georeference
+                     records previously georeferenced to county centroid,
                   3) fill terrestrial (state/county/fips) or marine (EEZ) fields
                      for reported/computed coordinates
-                  4) fill 'establishment_means' field for species non-native 
-                     to Alaska, Hawaii, or Lower 48 based on itis_tsn or 
+                  4) fill 'establishment_means' field for species non-native
+                     to Alaska, Hawaii, or Lower 48 based on itis_tsn or
                      clean_provided_scientific_name
-        @return: A CSV file of BISON-modified records  
+        @return: A CSV file of BISON-modified records
         """
         if os.path.exists(outfname):
             delete_shapefile(outfname)
         if self.is_open():
             self.close()
-            
+
         self.initialize_geospatial_data(terr_data, marine_data, ancillary_path)
 
         matches = {0: 0, 1: 0, 2: 0}
@@ -760,7 +760,7 @@ class BisonFiller(object):
             start_time = time.time()
             loop_time = start_time
             dict_reader, inf, writer, outf = open_csv_files(
-                infname, BISON_DELIMITER, ENCODING, outfname=outfname, 
+                infname, BISON_DELIMITER, ENCODING, outfname=outfname,
                 outfields=self._outfields)
             for rec in dict_reader:
                 recno += 1
@@ -769,7 +769,7 @@ class BisonFiller(object):
                 else:
                     squid = rec[BISON_SQUID_FLD]
                 lon, lat = self._get_coords(rec)
-                # Use coordinates to calc 
+                # Use coordinates to calc
                 if lon is not None:
                     # Compute geo: coordinates and polygons
                     match_count, msgs = self._fill_geofields(rec, lon, lat)
@@ -780,12 +780,12 @@ class BisonFiller(object):
                         matches[1] += 1
                     else:
                         matches[2] += 1
-                        
+
                     if msgs:
                         painful_count += 1
                         for msg in msgs:
                             self._log.info('Rec {}; {}'.format(recno, msg))
-                
+
                 # Write updated record
                 row = self._makerow(rec)
                 writer.writerow(row)
@@ -796,10 +796,10 @@ class BisonFiller(object):
                     self._log.info('*** Record number {}, painful {}, time {} ***'.format(
                         recno, painful_count, now - loop_time))
                     loop_time = now
-                
+
         except Exception as e:
             self._log.error('Failed filling data from id {}, line {}: {}'
-                            .format(squid, recno, e))                    
+                            .format(squid, recno, e))
         finally:
             inf.close()
             outf.close()
@@ -807,24 +807,24 @@ class BisonFiller(object):
                 time.time() - start_time, recno))
             self._log.info('*** Matched 0: {}, 1: {}, >1: {} records ***'.format(
                 matches[0], matches[1], matches[2]))
-            
-            
+
+
     # ...............................................
     def test_point_in_polygons(self, ancillary_path, outfname):
         """
         @summary: Process a CSV file with 47 ordered BISON fields (and optional
-                  gbifID field for GBIF provided data) to 
-                  1) fill itis_tsn, valid_accepted_scientific_name, 
-                     valid_accepted_tsn, itis_common_name, kingdom (if blank) 
-                     with ITIS values based on clean_provided_scientific_name, 
-                  2) georeference records without coordinates or re-georeference 
-                     records previously georeferenced to county centroid, 
+                  gbifID field for GBIF provided data) to
+                  1) fill itis_tsn, valid_accepted_scientific_name,
+                     valid_accepted_tsn, itis_common_name, kingdom (if blank)
+                     with ITIS values based on clean_provided_scientific_name,
+                  2) georeference records without coordinates or re-georeference
+                     records previously georeferenced to county centroid,
                   3) fill terrestrial (state/county/fips) or marine (EEZ) fields
                      for reported/computed coordinates
-                  4) fill 'establishment_means' field for species non-native 
-                     to Alaska, Hawaii, or Lower 48 based on itis_tsn or 
+                  4) fill 'establishment_means' field for species non-native
+                     to Alaska, Hawaii, or Lower 48 based on itis_tsn or
                      clean_provided_scientific_name
-        @return: A CSV file of BISON-modified records  
+        @return: A CSV file of BISON-modified records
         """
         if self.is_open():
             self.close()
@@ -838,7 +838,7 @@ class BisonFiller(object):
             terrestrial_shpname, terrlyr.GetFeatureCount()))
         terrindex, terrfeats, terr_bison_fldnames = \
             self._create_spatial_index(terr_data['fields'], terrlyr)
-        
+
         marine_data = ANCILLARY_FILES['marine']
         marine_shpname = os.path.join(ancillary_path, marine_data['file'])
         eez_data_src = driver.Open(marine_shpname, 0)
@@ -848,9 +848,9 @@ class BisonFiller(object):
         marindex, marfeats, mar_bison_fldnames = \
             self._create_spatial_index(marine_data['fields'], eezlyr)
 
-        return  ((terr_data_src, terrlyr, terrindex, terrfeats, terr_bison_fldnames), 
+        return  ((terr_data_src, terrlyr, terrindex, terrfeats, terr_bison_fldnames),
                  (eez_data_src, eezlyr, marindex, marfeats, mar_bison_fldnames))
-            
+
     # ...............................................
     def _test_other_fields(self, rec, recno, squid):
         fips = rec['provided_fips']
@@ -862,17 +862,17 @@ class BisonFiller(object):
             self._log.error('Record {}, {}, has invalid kingdom field {}'
                             .format(recno, squid, king))
 
-            
+
     # ...............................................
     def _test_bison_provider_dependent_fields(self, rec, recno, squid):
         # Both required
         if rec['itis_tsn']:
-            if (not rec['valid_accepted_scientific_name'] or 
+            if (not rec['valid_accepted_scientific_name'] or
                 not rec['valid_accepted_tsn']):
                 self._log.error("""Record {}, {}, has itis_tsn but missing
                 valid_accepted_scientific_name or valid_accepted_tsn"""
                 .format(recno, squid))
-        lat = rec['latitude'] 
+        lat = rec['latitude']
         lon = rec['longitude']
         # Neither or both
         if not ((lat and lon) or (not lat and not lon)):
@@ -885,14 +885,14 @@ class BisonFiller(object):
         # negative longitude (x), positive latitude (y)
         elif (rec['iso_country_code'] in ('US', 'CA') and lat and lon):
             if float(lon) > 0 or float(lat) < 0:
-                self._log.error("""Record {}, {}, from US or CA does not have 
+                self._log.error("""Record {}, {}, from US or CA does not have
                 negative longitude and positive latitude"""
                 .format(recno, squid))
         # Neither or both
         if rec['thumb_url'] and not rec['associated_media']:
             self._log.error('Record {}, {}, has thumb_url but missing associated_media'
             .format(recno, squid))
-            
+
     # ...............................................
     def _test_bison_provider_fields(self, rec, recno, squid):
         # USDA and BISON have different values
@@ -902,7 +902,7 @@ class BisonFiller(object):
                                 .format(recno, squid, key, rec[key], val))
                 rec[key] = val
         king = rec['kingdom']
-        if king: 
+        if king:
             if not king.lower() in ITIS_KINGDOMS:
                 self._log.error('Record {}, {}, has bad kingdom value {}'
                                 .format(recno, squid, king))
@@ -913,7 +913,7 @@ class BisonFiller(object):
         if ctry and ctry not in ISO_COUNTRY_CODES:
             self._log.error('Record {}, {}, has invalid iso_country_code {}'
                             .format(recno, squid, ctry))
-        
+
     # ...............................................
     def _test_name(self, rec, recno, squid, bad_name_chars):
         cpsn = rec['clean_provided_scientific_name']
@@ -941,7 +941,7 @@ class BisonFiller(object):
                         self._log.error('Record {}, {}, has prohibited characters in clean_provided_scientific_name {}'
                                         .format(recno, squid, cpsn))
                         break
-                        
+
     # ...............................................
     def _test_dates(self, rec, recno, squid, currdate=(2020, 1, 1)):
         yr = rec['year']
@@ -970,7 +970,7 @@ class BisonFiller(object):
                 else:
                     self._log.error('Record {}, {}, has non- simple-date format'
                                     .format(recno, squid, odate))
-            
+
         if yr is not None and yr != '':
             try:
                 year = int(yr)
@@ -980,13 +980,13 @@ class BisonFiller(object):
             except:
                 self._log.error('Record {}, {}, has invalid year {}'
                     .format(recno, squid, yr))
-                
-        
+
+
     # ...............................................
     def _test_most_fields(self, rec, recno, squid):
         test_elsewhere = ['clean_provided_scientific_name', 'occurrence_date',
                           'year', 'resource', 'provided_fips', 'kingdom']
-        count = len(rec)            
+        count = len(rec)
         if count != 47:
             self._log.error('Record {}, {}, has {} fields '
                             .format(recno, squid, count))
@@ -1009,14 +1009,14 @@ class BisonFiller(object):
         """
         @summary: Process a CSV file with 47 ordered BISON fields (and optional
                   gbifID field for GBIF provided data) to test for data correctness
-        @return: A file of BISON-modified records  
+        @return: A file of BISON-modified records
         """
         if self.is_open():
             self.close()
-            
+
         bad_name_chars = PROHIBITED_CHARS.copy()
         bad_name_chars.extend(PROHIBITED_SNAME_CHARS)
-        
+
         recno = 0
         try:
             dict_reader, inf, _, _ = open_csv_files(
@@ -1024,61 +1024,61 @@ class BisonFiller(object):
             for rec in dict_reader:
                 recno += 1
                 squid = rec[BISON_SQUID_FLD]
-                
+
                 # ..........................................
                 # Test GBIF and bison provider datasets
                 self._test_most_fields(rec, recno, squid)
                 self._test_other_fields(rec, recno, squid)
                 self._test_name(rec, recno, squid, bad_name_chars)
                 self._test_dates(rec, recno, squid)
-                
+
                 # ..........................................
                 # Test bison provider datasets
                 if not fromGbif:
                     self._test_bison_provider_fields(rec, recno, squid)
                     self._test_bison_provider_dependent_fields(rec, recno, squid)
-                    
+
                 # ..........................................
                 # Log progress occasionally
                 if (recno % LOGINTERVAL) == 0:
                     self._log.info('*** Record number {} ***'.format(recno))
-                                    
+
         except Exception as e:
             self._log.error('Failed filling data from id {}, line {}: {}'
-                            .format(squid, recno, e))                    
+                            .format(squid, recno, e))
         finally:
             inf.close()
 
 #     # ...............................................
-#     def write_dataset_org_lookup(self, dataset_lut_fname, resource_lut_fname, 
-#                                  org_lut_fname, provider_lut_fname, 
+#     def write_dataset_org_lookup(self, dataset_lut_fname, resource_lut_fname,
+#                                  org_lut_fname, provider_lut_fname,
 #                                  outdelimiter=BISON_DELIMITER):
 #         """
-#         @summary: Create lookup table for: 
-#                   BISON resource and provider from 
+#         @summary: Create lookup table for:
+#                   BISON resource and provider from
 #                   GBIF datasetKey and dataset publishingOrganizationKey
-#         @return: One file, containing dataset metadata, 
-#                            including publishingOrganization metadata 
+#         @return: One file, containing dataset metadata,
+#                            including publishingOrganization metadata
 #                            for that dataset
 #         """
 #         gbifapi = GbifAPI()
 #         if os.path.exists(dataset_lut_fname):
 #             self._log.info('Output file {} exists!'.format(dataset_lut_fname))
 #         else:
-#             old_resources = Lookup.init_from_file(resource_lut_fname, GBIF_UUID_KEY, 
-#                                             ANCILLARY_DELIMITER, valtype=VAL_TYPE.DICT, 
+#             old_resources = Lookup.init_from_file(resource_lut_fname, GBIF_UUID_KEY,
+#                                             ANCILLARY_DELIMITER, valtype=VAL_TYPE.DICT,
 #                                             encoding=ENCODING)
 #             datasets = self._write_dataset_lookup(gbifapi, old_resources,
-#                                                   dataset_lut_fname, 
+#                                                   dataset_lut_fname,
 #                                                   outdelimiter)
-#             
+#
 #         if os.path.exists(org_lut_fname):
 #             self._log.info('Output file {} exists!'.format(org_lut_fname))
 #         else:
-#             old_providers = Lookup.init_from_file(provider_lut_fname, GBIF_UUID_KEY, 
-#                                             ANCILLARY_DELIMITER, valtype=VAL_TYPE.DICT, 
+#             old_providers = Lookup.init_from_file(provider_lut_fname, GBIF_UUID_KEY,
+#                                             ANCILLARY_DELIMITER, valtype=VAL_TYPE.DICT,
 #                                             encoding=ENCODING)
-#     
+#
 #             # --------------------------------------
 #             # Gather organization UUIDs from dataset metadata assembled (LUT or file)
 #             org_uuids = set()
@@ -1088,53 +1088,53 @@ class BisonFiller(object):
 #                         org_uuids.add(ddict['publishingOrganizationKey'])
 #                     except Exception as e:
 #                         print('No publishingOrganizationKey in dataset {}'.format(key))
-#             except Exception as e:             
+#             except Exception as e:
 #                 gmetardr = GBIFMetaReader(self._log)
 #                 org_uuids = gmetardr.get_organization_uuids(dataset_lut_fname)
-#                 
-#             self._write_org_lookup(org_uuids, gbifapi, old_providers, 
+#
+#             self._write_org_lookup(org_uuids, gbifapi, old_providers,
 #                                    org_lut_fname, outdelimiter)
-            
-            
+
+
 # ...............................................
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser(
-                description=("""Parse a BISON occurrence dataset partially 
+                description=("""Parse a BISON occurrence dataset partially
                                 processed from GBIF or a BISON provider.
                                 Fill fields:
                                 - ITIS fields - resolve with ITIS lookup and
                                   clean_provided_scientific_name filled in step2
                                 - establishment_means - resolve with establishment
-                                  means lookup and ITIS TSN or 
+                                  means lookup and ITIS TSN or
                                   clean_provided_scientific_name
-                                - geo fields - resolve with (1st) terrestrial 
-                                  shapefile US_CA_Counties_Centroids 
-                                  or (2nd) marine shapefile 
+                                - geo fields - resolve with (1st) terrestrial
+                                  shapefile US_CA_Counties_Centroids
+                                  or (2nd) marine shapefile
                                   World_EEZ_v8_20140228_splitpolygons
                                   - lon/lat and centroid for records without
-                                    lon/lat or previously computed county centroid 
+                                    lon/lat or previously computed county centroid
                                     and with state+county or fips values
                                     from terrestrial centroid coordinates
-                                  - calculated state, county, FIPS, county  
-                                    fields for records with new or existing 
-                                    lon/lat 
-                                  - EEZ and mrgid (marine) for records with 
-                                    lon/lat - only if terrestrial georef returns 
+                                  - calculated state, county, FIPS, county
+                                    fields for records with new or existing
+                                    lon/lat
+                                  - EEZ and mrgid (marine) for records with
+                                    lon/lat - only if terrestrial georef returns
                                     nothing
                                  """))
-    parser.add_argument('infile', type=str, 
+    parser.add_argument('infile', type=str,
                         help="""
-                        Absolute pathname of the input BISON occurrence file 
-                        to supplement.  
+                        Absolute pathname of the input BISON occurrence file
+                        to supplement.
                         """)
-    parser.add_argument('outfile', type=str, 
+    parser.add_argument('outfile', type=str,
                         help="""
-                        Absolute pathname of the output BISON occurrence file 
+                        Absolute pathname of the output BISON occurrence file
                         """)
-    parser.add_argument('ancillary_path', type=str, 
+    parser.add_argument('ancillary_path', type=str,
                         help="""
-                        Absolute pathname of the directory with supplemental 
+                        Absolute pathname of the directory with supplemental
                         lookup and geospatial files.
                         """)
     args = parser.parse_args()
@@ -1152,26 +1152,26 @@ if __name__ == '__main__':
     outpath, outfname = os.path.split(outfile)
     basename, _ = os.path.splitext(outfname)
     os.makedirs(outpath, mode=0o775, exist_ok=True)
-    
+
     # ancillary data for record update
     estmeans_fname = os.path.join(ancillary_path, 'NonNativesIndex20190912.txt')
 #     itis1_lut_fname = os.path.join(tmppath, 'step3_itis_lut.txt')
     itis2_lut_fname = os.path.join(ancillary_path, 'itis_lookup.csv')
-    terrestrial_shpname = os.path.join(ancillary_path, 
+    terrestrial_shpname = os.path.join(ancillary_path,
                                        ANCILLARY_FILES['terrestrial']['file'])
-    marine_shpname = os.path.join(ancillary_path, 
+    marine_shpname = os.path.join(ancillary_path,
                                   ANCILLARY_FILES['marine']['file'])
     logbasename = 'bisonfill_{}'.format(basename)
     logfname = os.path.join(outpath, '{}.log'.format(logbasename))
     logger = get_logger(logbasename, logfname)
 #     pass3_fname = os.path.join(tmppath, 'step3_itis_geo_estmeans_{}.csv'.format(gbif_basefname))
-    
-    gr = BisonFiller(logger)            
+
+    gr = BisonFiller(logger)
     gr.itistsns = Lookup.init_from_file(
-        itis2_lut_fname, ['scientific_name'], ',', valtype=VAL_TYPE.DICT, 
+        itis2_lut_fname, ['scientific_name'], ',', valtype=VAL_TYPE.DICT,
         encoding=ENCODING, ignore_quotes=False)
     gr._fix_itis_values()
     # Pass 3 of CSV transform
     # Use Derek D. generated ITIS lookup itis2_lut_fname
-#     gr.update_itis_geo_estmeans(itis2_lut_fname, terrestrial_shpname, 
+#     gr.update_itis_geo_estmeans(itis2_lut_fname, terrestrial_shpname,
 #                                 marine_shpname, estmeans_fname)

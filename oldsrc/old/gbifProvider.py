@@ -37,7 +37,7 @@ for line in infile:
     print line.strip()+','+provider['key']+','+provider['title']+','+descVal+','+provider['created']+','+provider['modified']+','+ homepageVal
 
     out.write(line.strip()+'|'+provider['key']+'|'+provider['title']+'|'+descVal+'|'+provider['created']+'|'+provider['modified']+'|'+ homepageVal+'\n')
-    
+
     #l = json.dumps(data)
 
 out.close()

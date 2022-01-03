@@ -3,9 +3,9 @@ import os
 import rtree
 import time
 
-from common.constants import (BISON_DELIMITER, ENCODING, GEOREFERENCE_FILES)
-from common.bisonfill import BisonFiller
-from common.tools import (get_csv_dict_reader, get_csv_dict_writer, getLogger)
+from riis.common import (BISON_DELIMITER, ENCODING)
+from riis.common import BisonFiller
+from riis.common import (get_csv_dict_reader, get_csv_dict_writer)
 
 gbif_interp_file='/tank/data/bison/2019/AS/occurrence.txt'
 gbif_interp_file='/tank/data/bison/2019/Terr/occurrence_lines_1-10000001.txt'
@@ -49,24 +49,24 @@ idx_mg = eez_def.GetFieldIndex('MRGID')
 # ...............................................
 def rewrite_records(infname, outfname):
     self = BisonFiller(infname)
-     
+
     drdr, inf = get_csv_dict_reader(infname, BISON_DELIMITER, ENCODING)
     self._files.append(inf)
-     
+
     deleteme = []
     for fld in self._bison_ordered_flds:
         if fld not in drdr.fieldnames:
             deleteme.append(fld)
-     
+
     for fld in deleteme:
         self._bison_ordered_flds.remove(fld)
-     
-    dwtr, outf = get_csv_dict_writer(outfname, BISON_DELIMITER, ENCODING, 
+
+    dwtr, outf = get_csv_dict_writer(outfname, BISON_DELIMITER, ENCODING,
                                   self._bison_ordered_flds)
-     
+
     dwtr.writeheader()
     self._files.append(outf)
-     
+
     recno = 0
     for rec in drdr:
         rec.pop('taxonKey')
@@ -132,7 +132,7 @@ def get_geofields_with_rtree(lon, lat, terrindex, terrfeats):
     terr_count = 0
     pt = ogr.Geometry(ogr.wkbPoint)
     pt.AddPoint(lon, lat)
-    
+
     for tfid in list(terrindex.intersection((lon, lat))):
         fips = county = state = eez = mrgid = None
 #         feat = terrfeats[tfid]['feature']
@@ -147,11 +147,11 @@ def get_geofields_with_rtree(lon, lat, terrindex, terrfeats):
             else:
                 terr_count += 1
                 fips = county = state = None
-                break            
+                break
     return (fips, county, state)
 # ...............................................
-#     
-# 
+#
+#
 # ...............................................
 def create_marine_index(eezlyr, idx_eez, idx_mg):
     marindex = rtree.index.Index(interleaved=False)
@@ -161,13 +161,13 @@ def create_marine_index(eezlyr, idx_eez, idx_mg):
         geom = feat.GetGeometryRef()
         xmin, xmax, ymin, ymax = geom.GetEnvelope()
         marindex.insert(fid, (xmin, xmax, ymin, ymax))
-        marfeats[fid] = {'feature': feat, 
-                         'geom': geom, 
-                         'eez': feat.GetFieldAsString(idx_eez), 
+        marfeats[fid] = {'feature': feat,
+                         'geom': geom,
+                         'eez': feat.GetFieldAsString(idx_eez),
                          'mrgid': feat.GetFieldAsString(idx_mg)}
     return marindex, marfeats
 
-# ...............................................    
+# ...............................................
 def create_terr_index(terrlyr, idx_fips, idx_cnty, idx_st):
     terrindex = rtree.index.Index(interleaved=False)
     terrfeats = {}
@@ -176,10 +176,10 @@ def create_terr_index(terrlyr, idx_fips, idx_cnty, idx_st):
         geom = feat.GetGeometryRef()
         xmin, xmax, ymin, ymax = geom.GetEnvelope()
         terrindex.insert(fid, (xmin, xmax, ymin, ymax))
-        terrfeats[fid] = {'feature': feat, 
-                          'geom': geom, 
-                          'fips': feat.GetFieldAsString(idx_fips), 
-                          'county': feat.GetFieldAsString(idx_cnty), 
+        terrfeats[fid] = {'feature': feat,
+                          'geom': geom,
+                          'fips': feat.GetFieldAsString(idx_fips),
+                          'county': feat.GetFieldAsString(idx_cnty),
                           'state': feat.GetFieldAsString(idx_st)}
     return terrindex, terrfeats
 
@@ -208,7 +208,7 @@ rtree_start = time.time()
 for i in range(len(points)):
     lon, lat = points[i]
     try:
-        (fips, county, state) = get_geofields_with_rtree(lon, lat, 
+        (fips, county, state) = get_geofields_with_rtree(lon, lat,
                                                          terrindex, terrfeats)
     except Exception as e:
         print ('Failed on record {} with {}'.format(i, e))
@@ -224,7 +224,7 @@ ogr_start = time.time()
 for i in range(len(points)):
     lon, lat = points[i]
     try:
-        (fips, county, state) = get_geofields_wo_rtree(lon, lat, terrlyr, 
+        (fips, county, state) = get_geofields_wo_rtree(lon, lat, terrlyr,
                                                        idx_fips, idx_cnty, idx_st)
     except Exception as e:
         print ('Failed on record {} with {}'.format(i, e))
@@ -233,4 +233,3 @@ ogr_stop = time.time()
 ogr_elapsed = ogr_stop - ogr_start
 print(ogr_elapsed)
 # ......................
- 
