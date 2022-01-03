@@ -2,33 +2,33 @@
 @license: gpl2
 @copyright: Copyright (C) 2019, University of Kansas Center for Research
 
-             Lifemapper Project, lifemapper [at] ku [dot] edu, 
+             Lifemapper Project, lifemapper [at] ku [dot] edu,
              Biodiversity Institute,
              1345 Jayhawk Boulevard, Lawrence, Kansas, 66045, USA
-    
-             This program is free software; you can redistribute it and/or modify 
-             it under the terms of the GNU General Public License as published by 
-             the Free Software Foundation; either version 2 of the License, or (at 
+
+             This program is free software; you can redistribute it and/or modify
+             it under the terms of the GNU General Public License as published by
+             the Free Software Foundation; either version 2 of the License, or (at
              your option) any later version.
-  
-             This program is distributed in the hope that it will be useful, but 
-             WITHOUT ANY WARRANTY; without even the implied warranty of 
-             MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU 
+
+             This program is distributed in the hope that it will be useful, but
+             WITHOUT ANY WARRANTY; without even the implied warranty of
+             MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
              General Public License for more details.
-  
-             You should have received a copy of the GNU General Public License 
-             along with this program; if not, write to the Free Software 
-             Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 
+
+             You should have received a copy of the GNU General Public License
+             along with this program; if not, write to the Free Software
+             Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
              02110-1301, USA.
 """
 import requests
 import xml.etree.ElementTree as ET
 
-from common.constants import (ITIS_SOLR_URL, ITIS_NAME_KEY, ITIS_TSN_KEY, 
-                              ITIS_VERNACULAR_QUERY, ITIS_URL_ESCAPES, 
-                              ITIS_NAMESPACE, ITIS_DATA_NAMESPACE)
+from riis.common import (ITIS_SOLR_URL, ITIS_NAME_KEY, ITIS_TSN_KEY,
+                         ITIS_VERNACULAR_QUERY, ITIS_URL_ESCAPES,
+                         ITIS_NAMESPACE, ITIS_DATA_NAMESPACE)
 
-    
+
 # .............................................................................
 class ITISSvc(object):
     """Class to pull data from the ITIS Solr service, documentation at:
@@ -37,7 +37,7 @@ class ITISSvc(object):
 # ...............................................
     def __init__(self):
         pass
-    
+
 # ...............................................
     def _getDataFromUrl(self, url, resp_type='json'):
         """Returns a JSON dictionary or ElementTree tree """
@@ -56,7 +56,7 @@ class ITISSvc(object):
                 else:
                     data = response.text
         return data
-                     
+
 # ...............................................
     def _processRecordInfo(self, rec, header, reformat_keys=[]):
         row = []
@@ -64,26 +64,26 @@ class ITISSvc(object):
             for key in header:
                 try:
                     val = rec[key]
-                    
+
                     if type(val) is list:
                         if len(val) > 0:
                             val = val[0]
                         else:
                             val = ''
-                            
+
                     if key in reformat_keys:
                         val = self._saveNLDelCR(val)
-                        
+
                     elif key == 'citation':
                         if type(val) is dict:
                             try:
                                 val = val['text']
                             except:
                                 pass
-                        
+
                     elif key in ('created', 'modified'):
                         val = self._clipDate(val)
-                            
+
                 except KeyError:
                     val = ''
                 row.append(val)
@@ -100,7 +100,7 @@ class ITISSvc(object):
 # ...............................................
     def get_itis_vernacular(self, tsn):
         """Return vernacular names for an ITIS TSN.
-        
+
         Args:
             tsn: an ITIS code designating a taxonomic name
         """
@@ -108,7 +108,7 @@ class ITISSvc(object):
         if tsn is not None:
             url = ITIS_VERNACULAR_QUERY + str(tsn)
             root = self._getDataFromUrl(url, resp_type='xml')
-        
+
             retElt = root.find('{}return'.format(ITIS_NAMESPACE))
             if retElt is not None:
                 cnEltLst = retElt.findall('{}commonNames'.format(ITIS_DATA_NAMESPACE))
@@ -120,9 +120,9 @@ class ITISSvc(object):
 
 # ...............................................
     def get_itis_name(self, tsn):
-        """Return an ITIS taxonomic name record for the first accepted name 
+        """Return an ITIS taxonomic name record for the first accepted name
         used for an ITIS TSN (possibly designating an unaccepted name).
-        
+
         Args:
             tsn: an ITIS code designating a taxonomic name
         """
@@ -150,9 +150,9 @@ class ITISSvc(object):
 
 # ...............................................
     def get_itis_tsn(self, sciname):
-        """Return an ITIS TSN and its accepted name and kingdom for a 
+        """Return an ITIS TSN and its accepted name and kingdom for a
         scientific name.
-        
+
         Args:
             sciname: a scientific name designating a taxon
         """
@@ -161,7 +161,7 @@ class ITISSvc(object):
         escname = sciname
         for replaceStr, withStr in ITIS_URL_ESCAPES:
             escname = escname.replace(replaceStr, withStr)
-        url = '{}?q={}:{}&wt=json'.format(ITIS_SOLR_URL, ITIS_NAME_KEY, 
+        url = '{}?q={}:{}&wt=json'.format(ITIS_SOLR_URL, ITIS_NAME_KEY,
                                           escname)
         output = self._getDataFromUrl(url, resp_type='json')
         try:

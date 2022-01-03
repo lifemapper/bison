@@ -5,11 +5,11 @@ import os
 from random import randint
 from time import sleep
 
-from common.bisonfill import BisonFiller
-from common.tools import get_logger
+from riis.common import BisonFiller
+from riis.common import get_logger
 
 # .............................................................................
-def intersect_csv_and_shapefiles(in_csv_filename, geodata1, geodata2, 
+def intersect_csv_and_shapefiles(in_csv_filename, geodata1, geodata2,
                                  ancillary_path, out_csv_filename, from_gbif):
     """Intersect the records in the csv file with the two provided shapefiles.
 
@@ -28,7 +28,7 @@ def intersect_csv_and_shapefiles(in_csv_filename, geodata1, geodata2,
     bf = BisonFiller(log=logger)
     # Pass 4 of CSV transform, final step, point-in-polygon intersection
     bf.update_point_in_polygons(
-        geodata1, geodata2, ancillary_path, in_csv_filename, out_csv_filename, 
+        geodata1, geodata2, ancillary_path, in_csv_filename, out_csv_filename,
         from_gbif=from_gbif)
     # Do intersection here
     sleep(randint(0, 10))

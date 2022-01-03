@@ -11,7 +11,7 @@ set_defaults() {
 
 compress_data() {
     DATASOURCE_DIR=$1
-    
+
     PTH=$BISON_DATA_PATH/$DATASOURCE_DIR/output/
     FILES=$PTH/occ*csv
     startidx=$((${#PTH} + 2))

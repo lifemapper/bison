@@ -1,7 +1,7 @@
 import os
 
-from common.constants import ENCODING #, BISON_PROVIDER_HEADER
-from common.tools import get_logger, get_csv_reader, get_csv_writer
+from riis.common import ENCODING #, BISON_PROVIDER_HEADER
+from riis.common import get_logger, get_csv_reader, get_csv_writer
 
 # ...............................................
 def usage():
@@ -17,13 +17,13 @@ class Sorter(object):
     # ...............................................
     def __init__(self, inputFilename, delimiter, sort_col, logname):
         """
-        @param inputFilename: full pathname of a CSV file containing records 
+        @param inputFilename: full pathname of a CSV file containing records
                  uniquely identified by the first field in a record.
         @param delimiter: separator between fields of a record
         @param log: a logger to write debugging messages to a file
         @note: Original data file is composed of ~100 chunks of records, each
              chunk sorted on the gbif ID, in position 0 of each record.
-    
+
         """
         self.messyfile = inputFilename
         self.delimiter = delimiter
@@ -40,24 +40,24 @@ class Sorter(object):
 
         logfname = os.path.join(pth, '{}.log'.format(logname))
         self._log = get_logger(logname, logfname)
-                
+
         self.pth = pth
         self.splitBase = os.path.join(pth, 'split_{}'.format(self._dataname))
         self.tidyfile = os.path.join(pth, 'tidy_{}.csv'.format(self._dataname))
         self._files = {}
-        
-    
+
+
     # ...............................................
     def close(self):
         for fname, f in self._files.items():
             f.close()
         self._files = {}
-        
+
     # ...............................................
     def closeOne(self, fname):
         self._files[fname].close()
         self._files.pop(fname)
-        
+
     # ...............................................
     def _get_group_file(self, grpval):
         basefname = '{}_{}.csv'.format(self._dataname, grpval)
@@ -73,7 +73,7 @@ class Sorter(object):
         idx += 1
         newname = '{}_{}.csv'.format(basename, idx)
         # Get writer and save open file for later closing
-        writer, outf = get_csv_writer(newname, self.delimiter, ENCODING, 
+        writer, outf = get_csv_writer(newname, self.delimiter, ENCODING,
                                     doAppend=True)
         self._files[newname] = outf
 
@@ -82,7 +82,7 @@ class Sorter(object):
     # ...............................................
     def gather_groupvals(self, fname):
         """
-        @summary: Split original data file with chunks of sorted data into 
+        @summary: Split original data file with chunks of sorted data into
                   multiple sorted files.
         @note: Replicate the original header on each smaller sorted file
         """
@@ -90,7 +90,7 @@ class Sorter(object):
             reader, inf = get_csv_reader(self.messyfile, self.delimiter, ENCODING)
             header = next(reader)
             groups = {}
-    
+
             grpval = None
             grpcount = 0
             for row in reader:
@@ -117,7 +117,7 @@ class Sorter(object):
             pass
         finally:
             inf.close()
-            
+
         try:
             writer, outf = get_csv_writer(fname, self.delimiter, ENCODING)
             writer.writerow(['groupvalue', 'count'])
@@ -127,13 +127,13 @@ class Sorter(object):
             pass
         finally:
             outf.close()
-            
+
     # ...............................................
     def write_group_files(self):
         """
         @summary: Split large file into multiple files, each containing a header
-                  and records of a single group value. 
-        @note: The number of group files must be small enough for the system to 
+                  and records of a single group value.
+        @note: The number of group files must be small enough for the system to
                have them all open at the same time.
         @note: Use "gather" to evaluate the dataset first.
         """
@@ -155,18 +155,18 @@ class Sorter(object):
                         wtr = self._get_group_file(grpval)
                         groupfiles[grpval] = wtr
                         wtr.writerow(header)
-                    
+
                     wtr.writerow(row)
         except Exception as e:
             raise
         finally:
             inf.close()
-            
+
 
     # ...............................................
     def split_sorted(self):
         """
-        @summary: Split original data file with chunks of sorted data into 
+        @summary: Split original data file with chunks of sorted data into
                   multiple sorted files.
         @note: Replicate the original header on each smaller sorted file
         """
@@ -177,7 +177,7 @@ class Sorter(object):
         splitIdx = 0
         splitname = '{}_{}.csv'.format(self.splitBase, splitIdx)
         writer, outf = get_csv_writer(splitname, self.delimiter, ENCODING)
-        self._files[splitname] = outf        
+        self._files[splitname] = outf
         writer.writerow(header)
 
         currid = -1
@@ -201,7 +201,7 @@ class Sorter(object):
                     writer.writerow(row)
                 currid = gbifid
         self.closeOne(self.messyfile)
-            
+
     # ...............................................
     def _getSplitReadersFirstRecs(self):
         """
@@ -214,7 +214,7 @@ class Sorter(object):
             reader, outf = get_csv_reader(splitname, self.delimiter, ENCODING)
             self._files[splitname] = outf
             row = next(reader)
-            # If header is present, first field will not be an integer, 
+            # If header is present, first field will not be an integer,
             # so move to the next record
             try:
                 int(row[self.sort_idx])
@@ -233,7 +233,7 @@ class Sorter(object):
         header = next(reader)
         inf.close()
         return header
-    
+
     # ...............................................
     def _getSmallestRec(self, rdrRecs):
         smRdr = smRec = smId = None
@@ -269,7 +269,7 @@ class Sorter(object):
             writer.writerow(rec)
             rec = self._getSmallestRec(rdrRecs)
         self.closeOne(self.tidyfile)
-                        
+
     # ...............................................
     def _get_sortidxs(self, reader, sort_cols):
         """
@@ -297,11 +297,11 @@ class Sorter(object):
         @summary: Sort file
         """
         self._log.info('Gathering unique sort values from file {}'.format(self.messyfile))
-        reader, inf = get_csv_reader(self.messyfile, self.delimiter, ENCODING)        
+        reader, inf = get_csv_reader(self.messyfile, self.delimiter, ENCODING)
 
         sort_idxs = self._get_sortidxs(reader, sort_cols)
         sortvals = set()
-        try:  
+        try:
             for row in reader:
                 vals = []
                 for idx in sort_idxs:
@@ -325,14 +325,14 @@ class Sorter(object):
 #         reader, inf = get_csv_reader(self.messyfile, self.delimiter, ENCODING)
 #         sort_idxs = self._get_sortidxs(reader, sort_cols)
 #         sortvals = self._read_sortvals()
-# 
+#
 #         self._log.info('Writing unique sort values to file {}'.format(outfname))
 #         if os.path.exists(outfname):
 #             fmode = 'a'
 #         else:
 #             fmode = 'w'
 #         writer, outf = get_csv_writer(outfname, self.delimiter, ENCODING, fmode)
-#         try:  
+#         try:
 #             for row in reader:
 #                 vals = []
 #                 reccount += 1
@@ -344,7 +344,7 @@ class Sorter(object):
 #                            .format(self.messyfile, e))
 #         finally:
 #             inf.close()
-#         
+#
 #         try:
 #             for val in sortvals:
 #                 writer.writerow([val])
@@ -353,7 +353,7 @@ class Sorter(object):
 #         finally:
 #             outf.close()
 #         self._log.info('Wrote {} values to {}'.format(len(sortvals, outfname)))
-#                         
+#
 #     # ...............................................
 #     def gather_bison_sortvals(self, outfname, sort_cols, header=[]):
 #         """
@@ -362,7 +362,7 @@ class Sorter(object):
 #         self._log.info('Gathering unique sort values from file {}'.format(self.messyfile))
 #         self.header = header
 #         sortvals = self._read_sortvals(sort_cols)
-# 
+#
 #         self._log.info('Writing unique sort values to file {}'.format(outfname))
 #         if os.path.exists(outfname):
 #             fmode = 'a'
@@ -377,7 +377,7 @@ class Sorter(object):
 #         finally:
 #             outf.close()
 #         self._log.info('Wrote {} values to {}'.format(len(sortvals), outfname))
-                        
+
     # ...............................................
     def _get_provider_file(self, resource_id, resource_url, unique_providers):
         """
@@ -400,16 +400,16 @@ class Sorter(object):
 #         """
 #         @summary: Sort file
 #         """
-#         sort_cols=['resource_id', 'resource_url'] 
+#         sort_cols=['resource_id', 'resource_url']
 #         self.header=BISON_PROVIDER_HEADER
-#         
+#
 #         self._log.info('Gathering unique sort values from file {}'.format(self.messyfile))
-#         reader, inf = get_csv_reader(self.messyfile, self.delimiter, ENCODING)        
-# 
+#         reader, inf = get_csv_reader(self.messyfile, self.delimiter, ENCODING)
+#
 #         rid_idx, rurl_idx = self._get_sortidxs(reader, ['resource_id', 'resource_url'])
-# 
+#
 #         unique_providers = {}
-#         try:  
+#         try:
 #             for row in reader:
 #                 rid = row[rid_idx]
 # #                 rurl = row[rurl_idx]
@@ -420,7 +420,7 @@ class Sorter(object):
 #                            .format(self.messyfile, e))
 #         finally:
 #             inf.close()
-# 
+#
 #         writer, outf = get_csv_writer(outfname, self.delimiter, ENCODING, fmode)
 #         try:
 #             for vals in sortvals:
@@ -449,16 +449,16 @@ class Sorter(object):
 #             header = next(reader)
 #             self._log.info('Sort index {} in first line contains {}'
 #                                .format(self.sort_idx, header[self.sort_idx]))
-#         sortvals = set()          
+#         sortvals = set()
 #         currid = 0
 #         for row in reader:
 #             reccount += 1
 #             sv = row[self.sort_idx]
 #             sortvals.add(sv)
-#                     
+#
 #         self._log.info('File contained {} records'.format(reccount))
 #         self.closeOne(self.tidyfile)
-                        
+
     # ...............................................
     def test(self):
         """
@@ -471,7 +471,7 @@ class Sorter(object):
         header = next(reader)
         if header[self.sort_idx] != 'gbifID':
             self._log.error('Bad header in {}'.format(self.tidyfile))
-            
+
         currid = 0
         for row in reader:
             reccount += 1
@@ -487,10 +487,10 @@ class Sorter(object):
                     self._log.error('Duplicate gbifID {} on rec {}'.format(gbifid, reader.line_num))
                 else:
                     currid = gbifid
-                    
+
         self._log.info('File contained {} records'.format(reccount))
         self.closeOne(self.tidyfile)
-                        
+
 
 # .............................................................................
 if __name__ == "__main__":
@@ -498,22 +498,22 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(
                 description=("""Group or sort a CSV dataset on a given field"""))
-    parser.add_argument('unsorted_file', type=str, 
+    parser.add_argument('unsorted_file', type=str,
                         help='Absolute pathname of the input delimited text file' )
-    parser.add_argument('command', type=str, 
+    parser.add_argument('command', type=str,
                         help="""Processing stage:
                         - gather: gather unique sort/group values in a summary
                           file to identify how best to proceed.
                         - split: create multiple files, each sorted on a single
-                          column (only used for GBIF downloads with a file 
+                          column (only used for GBIF downloads with a file
                           containing multiple sorted sections)
-                        - group: create multiple files, each containing only 
-                          records with a single group value. The number of group 
+                        - group: create multiple files, each containing only
+                          records with a single group value. The number of group
                           files must be small enough for the system to have all
-                          open at the same time.  Use "gather" to evaluate the 
+                          open at the same time.  Use "gather" to evaluate the
                           dataset first. (only used for BISON provider data
                           containing ~100 groups)
-                        - merge: merge multiple sorted files into a single 
+                        - merge: merge multiple sorted files into a single
                           sorted file.
                         """ )
     parser.add_argument('--delimiter', type=str, default=',',
@@ -530,26 +530,26 @@ if __name__ == "__main__":
         print ('Input CSV file {} does not exist'.format(unsorted_file))
     else:
         scriptname, ext = os.path.splitext(os.path.basename(__file__))
-        
+
         pth, fname = os.path.split(unsorted_file)
         dataname, ext = os.path.splitext(fname)
-        logname = '{}_{}_{}.log'.format(scriptname, dataname, cmd)        
+        logname = '{}_{}_{}.log'.format(scriptname, dataname, cmd)
 
         gf = Sorter(unsorted_file, delimiter, sort_col, logname)
-         
+
         try:
-            # Use 'split' to to write records into individual files, with  
+            # Use 'split' to to write records into individual files, with
             # each file sorted on desired grouping value.  This command assumes
             # that the input file has chunks of pre-sorted data.
             if cmd  == 'split':
                 gf.split_sorted()
-            # Use 'gather' to identify the number and placement of records for 
+            # Use 'gather' to identify the number and placement of records for
             # desired grouping value
             elif cmd  == 'gather':
                 outfname = os.path.join(pth, 'summary_'+dataname+ext)
                 gf.gather_groupvals(outfname)
-            # Use 'group' to write records into individual files, with name and 
-            # contents of each file based on the same grouping value 
+            # Use 'group' to write records into individual files, with name and
+            # contents of each file based on the same grouping value
             elif cmd == 'group':
                 gf.write_group_files()
             elif cmd  == 'merge':
@@ -569,7 +569,7 @@ python3.6 /state/partition1/git/bison/src/common/csvsort.py \
           --sort_index=13
 
 import os
-from common.constants import ENCODING 
+from common.constants import ENCODING
 from common.tools import get_logger, get_csv_reader, get_csv_writer
 
 sort_idx = 13

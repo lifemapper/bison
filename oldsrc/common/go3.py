@@ -1,5 +1,5 @@
 import csv
-import sys 
+import sys
 csv.field_size_limit(sys.maxsize)
 fname = '/tank/data/bison/2019/Terr/tmp/smoketest_10m_2020_04_21.csv'
 fname = '/tank/data/bison/2019/Terr/tmp/step3_occurrence_lines_60000001-70000001_1931703-2897553.csv'
@@ -13,7 +13,7 @@ problem_id = '2031886996'
 
 i = 0
 with open(fname, 'r', encoding='utf-8') as f:
-    r = csv.reader(f, delimiter='$', quoting=csv.QUOTE_NONE)        
+    r = csv.reader(f, delimiter='$', quoting=csv.QUOTE_NONE)
     for row in r:
         if i == 0:
             header = row
@@ -36,7 +36,7 @@ locality_idx = 124
 vlocality_idx = 125
 i = 0
 with open(fname, 'r', encoding='utf-8') as f:
-    r = csv.reader(f, delimiter='\t', quoting=csv.QUOTE_NONE)        
+    r = csv.reader(f, delimiter='\t', quoting=csv.QUOTE_NONE)
     for row in r:
         gbifid = row[0]
         locality = row[locality_idx]
