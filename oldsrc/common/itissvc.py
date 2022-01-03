@@ -24,9 +24,9 @@
 import requests
 import xml.etree.ElementTree as ET
 
-from riis.common import (ITIS_SOLR_URL, ITIS_NAME_KEY, ITIS_TSN_KEY,
-                         ITIS_VERNACULAR_QUERY, ITIS_URL_ESCAPES,
-                         ITIS_NAMESPACE, ITIS_DATA_NAMESPACE)
+from bison.common import (ITIS_SOLR_URL, ITIS_NAME_KEY, ITIS_TSN_KEY,
+                          ITIS_VERNACULAR_QUERY, ITIS_URL_ESCAPES,
+                          ITIS_NAMESPACE, ITIS_DATA_NAMESPACE)
 
 
 # .............................................................................

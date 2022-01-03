@@ -2,49 +2,18 @@
 import csv
 import os
 
-from riis.common.constants import RIIS
+from bison.common.constants import (ERR_SEPARATOR, RIIS, RIIS_AUTHORITY, RIIS_SPECIES)
+from test.riis import BisonRIIS
 
-ERR_SEPARATOR = "------------"
 
-
-class TestRIISInput:
+class TestRIISInput(BisonRIIS):
     """Class for testing input authority and species files"""
 
     # .............................................................................
     def __init__(self):
         """Constructor sets the authority and species files and headers expected for BISON-RIIS processing."""
         # Construct data filenames
-        self.auth_fname = "{}.{}".format(
-            os.path.join(RIIS.DATA_DIR, RIIS.AUTHORITY_FNAME), RIIS.DATA_EXT
-        )
-        self.species_fname = "{}.{}".format(
-            os.path.join(RIIS.DATA_DIR, RIIS.SPECIES_FNAME), RIIS.DATA_EXT
-        )
-
-        # Test and clean headers of non-ascii characters
-        self.auth_header = self._clean_header(self.auth_fname, RIIS.AUTHORITY_HEADER)
-        self.species_header = self._clean_header(
-            self.species_fname, RIIS.SPECIES_HEADER
-        )
-
-    # .............................................................................
-    def _read_authorities(self) -> set:
-        """Assemble a set of unique authority identifiers for use as foreign keys in the MasterList.
-
-        Returns:
-            Set of authority identifiers valid for use as foreign keys in related datasets.
-        """
-        authorities = set()
-        with open(self.auth_fname, "r", newline="") as csvfile:
-            rdr = csv.DictReader(
-                csvfile,
-                fieldnames=self.auth_header,
-                delimiter=RIIS.DELIMITER,
-                quotechar=RIIS.QUOTECHAR,
-            )
-            for row in rdr:
-                authorities.add(row[RIIS.AUTHORITY_KEY])
-        return authorities
+        BisonRIIS.__init__(self)
 
     # .............................................................................
     def _check_species_authorities(self):
@@ -66,84 +35,13 @@ class TestRIISInput:
             for row in rdr:
                 # Skip header
                 if not rdr.line_num == 1:
-                    curr_auth = row[RIIS.AUTHORITY_KEY]
+                    curr_auth = row[RIIS_AUTHORITY.KEY]
                     if curr_auth not in authorities:
                         try:
                             missing_authorities[curr_auth].append(rdr.line_num)
                         except KeyError:
                             missing_authorities[curr_auth] = [rdr.line_num]
         return missing_authorities
-
-    # .............................................................................
-    def _only_ascii(self, name):
-        """Return a string without non-ascii characters.
-
-        Args:
-            name (str): name to strip of all non-ascii characters
-
-        Returns:
-            cleaned name string
-        """
-        good = []
-        bad = []
-        for ch in name:
-            if ch.isascii():
-                good.append(ch)
-            else:
-                bad.append(ch)
-        better_name = "".join(good)
-        return better_name
-
-    # .............................................................................
-    def _clean_header(self, fname, expected_header):
-        """Compare the actual header in fname with an expected_header.
-
-        Print warnings if actual fieldnames contain non-ascii characters.  Print errors
-        if the actual header does not contain the same fieldnames, in the same order, as
-        the expected_header.
-
-        Args:
-            fname (str): CSV data file containing header to check
-            expected_header (list): list of fieldnames expected for the data file
-
-        Returns:
-             list of fieldnames from the actual header, stripped of non-ascii characters
-        """
-        clean_header = []
-        with open(fname, "r", newline="") as csvfile:
-            rdr = csv.reader(
-                csvfile, delimiter=RIIS.DELIMITER, quotechar=RIIS.QUOTECHAR
-            )
-            header = next(rdr)
-        # Test header length
-        fld_count = len(header)
-        if fld_count != len(expected_header):
-            print(ERR_SEPARATOR)
-            print(
-                "[Error] Header has {} fields, != {} expected count".format(
-                    fld_count, len(expected_header)
-                )
-            )
-        # Test header fieldnames
-        for i in range(len(header)):
-            good_fieldname = self._only_ascii(header[i])
-            if header[i] != good_fieldname:
-                print(ERR_SEPARATOR)
-                print(
-                    '[Warning] File {}, header field {} "{}" has non-ascii characters'.format(
-                        fname, i, header[i]
-                    )
-                )
-
-            clean_header.append(good_fieldname)
-            if good_fieldname != expected_header[i]:
-                print(ERR_SEPARATOR)
-                print(
-                    "[Error] Header fieldname {} != {} expected fieldname".format(
-                        header[i], expected_header[i]
-                    )
-                )
-        return clean_header
 
     # .............................................................................
     def _examine_structure(self, fname, header, expected_row_count):
@@ -214,7 +112,7 @@ class TestRIISInput:
     def test_authority_structure(self):
         """Test the structure of the authority reference file."""
         row_count, short_lines, long_lines = self._examine_structure(
-            self.auth_fname, self.auth_header, RIIS.AUTHORITY_COUNT
+            self.auth_fname, self.auth_header, RIIS_AUTHORITY.COUNT
         )
         assert len(short_lines) == 0 and len(long_lines) == 0
 
@@ -222,7 +120,7 @@ class TestRIISInput:
     def test_species_structure(self):
         """Test the structure of the species data file."""
         row_count, short_lines, long_lines = self._examine_structure(
-            self.species_fname, self.species_header, RIIS.SPECIES_COUNT
+            self.species_fname, self.species_header, RIIS_SPECIES.COUNT
         )
         assert len(short_lines) == 0 and len(long_lines) == 0
 
@@ -237,11 +135,23 @@ class TestRIISInput:
                 print('"{}": {}'.format(auth, line_nums))
         assert len(missing_authorities) == 0
 
+    # .............................................................................
+    def test_species_records(self):
+        """Test that all foreign authority keys in the species file exist in the authority reference file."""
+        missing_authorities = self._check_species_authorities()
+        if missing_authorities:
+            print(ERR_SEPARATOR)
+            print("[Error] Missing authority:  Line number/s in species file")
+            for auth, line_nums in missing_authorities.items():
+                print('"{}": {}'.format(auth, line_nums))
+        assert len(missing_authorities) == 0
+
 
 # .............................................................................
 if __name__ == "__main__":
     # Test number of rows and columns in authority and species files
-    Tst = TestRIISInput()
+    bison_pth = '/home/astewart/git/bison'
+    Tst = TestRIISInput(bison_pth)
     Tst.test_authority_structure()
     Tst.test_species_structure()
 

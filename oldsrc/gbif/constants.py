@@ -21,7 +21,7 @@
              Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
              02110-1301, USA.
 """
-from riis.common import ALLOWED_TYPE
+from bison.common import ALLOWED_TYPE
 
 NAMESPACE = {'tdwg':   'http://rs.tdwg.org/dwc/text/',
              'gbif':   'http://rs.gbif.org/terms/1.0/',

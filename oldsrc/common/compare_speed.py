@@ -3,9 +3,9 @@ import os
 import rtree
 import time
 
-from riis.common import (BISON_DELIMITER, ENCODING)
-from riis.common import BisonFiller
-from riis.common import (get_csv_dict_reader, get_csv_dict_writer)
+from bison.common import (BISON_DELIMITER, ENCODING)
+from bison.common import BisonFiller
+from bison.common import (get_csv_dict_reader, get_csv_dict_writer)
 
 gbif_interp_file='/tank/data/bison/2019/AS/occurrence.txt'
 gbif_interp_file='/tank/data/bison/2019/Terr/occurrence_lines_1-10000001.txt'

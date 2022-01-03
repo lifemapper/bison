@@ -1,7 +1,7 @@
 import os
 
-from riis.common import ENCODING #, BISON_PROVIDER_HEADER
-from riis.common import get_logger, get_csv_reader, get_csv_writer
+from bison.common import ENCODING #, BISON_PROVIDER_HEADER
+from bison.common import get_logger, get_csv_reader, get_csv_writer
 
 # ...............................................
 def usage():

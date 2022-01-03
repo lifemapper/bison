@@ -2,11 +2,13 @@
 import os
 import requests
 
-from riis.common.constants import BISON_DELIMITER, ENCODING, GBIF
-from riis.common.util import get_csv_writer
+from bison.common.constants import BISON_DELIMITER, ENCODING, GBIF
+from bison.common.util import get_csv_writer
 
 NEWLINE = "\n"
 CR_RETURN = "\r"
+
+
 # .............................................................................
 class GbifAPI(object):
     """Pulls UUIDs and metadata for local resolution of GBIF Organizations, Providers, Resources."""

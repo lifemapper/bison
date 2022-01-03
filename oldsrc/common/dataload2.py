@@ -24,16 +24,16 @@
 import os
 import time
 
-from riis.common import BisonFiller
-from riis.common import (
+from bison.common import BisonFiller
+from bison.common import (
     BISON_DELIMITER, BISON_PROVIDER_VALUES, BISON_IPT_PREFIX, IPT_QUERY,
     LOGINTERVAL, ANCILLARY_DIR, TEMP_DIR,
     MERGED_PROVIDER_LUT_FIELDS, MERGED_RESOURCE_LUT_FIELDS,
     OUTPUT_DIR, PROVIDER_DELIMITER, PROVIDER_ACTIONS, ENCODING)
-from riis.common import ANCILLARY_FILES
-from riis.common import Lookup, VAL_TYPE
-from riis.common import (get_logger, get_line_count)
-from riis.common import step_parallel
+from bison.common import ANCILLARY_FILES
+from bison.common import Lookup, VAL_TYPE
+from bison.common import (get_logger, get_line_count)
+from bison.common import step_parallel
 from gbif.gbifmod import GBIFReader
 from provider.providermod import BisonMerger
 

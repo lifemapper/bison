@@ -24,8 +24,8 @@
 import os
 import xml.etree.ElementTree as ET
 
-from riis.common import (BISON_DELIMITER, ENCODING)
-from riis.common import (get_csv_dict_reader, get_csv_writer)
+from bison.common import (BISON_DELIMITER, ENCODING)
+from bison.common import (get_csv_dict_reader, get_csv_writer)
 
 from gbif.constants import (INTERPRETED, CLIP_CHAR, NAMESPACE)
 from gbif.gbifapi import GbifAPI

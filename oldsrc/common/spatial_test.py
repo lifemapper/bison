@@ -3,10 +3,10 @@ import os
 import rtree
 import time
 
-from riis.common import (BISON_DELIMITER, ENCODING,
-                         ANCILLARY_DIR, ANCILLARY_FILES, )
-from riis.common import BisonFiller
-from riis.common import (get_csv_dict_reader, get_csv_dict_writer)
+from bison.common import (BISON_DELIMITER, ENCODING,
+                          ANCILLARY_DIR, ANCILLARY_FILES, )
+from bison.common import BisonFiller
+from bison.common import (get_csv_dict_reader, get_csv_dict_writer)
 
 testsize = 10000
 gbif_interp_file='/tank/data/bison/2019/Terr/occurrence_lines_5000-10000.txt'

@@ -10,8 +10,8 @@ import subprocess
 from sys import maxsize
 import time
 
-from riis.common import (LOG_FORMAT, LOG_DATE_FORMAT, LOGFILE_MAX_BYTES,
-                         LOGFILE_BACKUP_COUNT, EXTRA_VALS_KEY)
+from bison.common import (LOG_FORMAT, LOG_DATE_FORMAT, LOGFILE_MAX_BYTES,
+                          LOGFILE_BACKUP_COUNT, EXTRA_VALS_KEY)
 
 REQUIRED_FIELDS = ['STATE_NAME', 'NAME', 'STATE_FIPS', 'CNTY_FIPS', 'PRNAME',
      'CDNAME', 'CDUID']

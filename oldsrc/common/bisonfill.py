@@ -26,13 +26,13 @@ import os
 import rtree
 import time
 
-from riis.common import (
+from bison.common import (
     BISON_DELIMITER, ENCODING, LOGINTERVAL, BISON_PROVIDER_VALUES,
     PROHIBITED_CHARS, PROHIBITED_SNAME_CHARS, PROHIBITED_VALS, BISON_SQUID_FLD,
     ITIS_KINGDOMS, ISO_COUNTRY_CODES, BISON2020_FIELD_DEF)
-from riis.common import ANCILLARY_FILES
-from riis.common import Lookup, VAL_TYPE
-from riis.common import (
+from bison.common import ANCILLARY_FILES
+from bison.common import Lookup, VAL_TYPE
+from bison.common import (
     get_csv_dict_reader, open_csv_files, delete_shapefile, get_logger,
     get_csv_writer, makerow)
 
