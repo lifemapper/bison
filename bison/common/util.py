@@ -30,3 +30,8 @@ def get_csv_writer(datafile, delimiter, fmode="w"):
     else:
         print("Opened file {} for write".format(datafile))
     return writer, f
+
+# .............................................................................
+if __name__ == "__main__":
+    bison_pth = '/home/astewart/git/bison'
+    print('bison path = ', bison_pth)
