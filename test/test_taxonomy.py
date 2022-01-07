@@ -10,7 +10,7 @@ class TestRIISTaxonomy(BisonRIIS):
     def __init__(self, bison_pth):
         """Constructor sets the authority and species files and headers expected for BISON-RIIS processing."""
         BisonRIIS.__init__(self, bison_pth)
-        self.species, self.bad_species = self.read_species()
+        self.read_species()
 
     # ...............................................
     def test_taxonomy_keys(self):
@@ -39,14 +39,11 @@ class TestRIISTaxonomy(BisonRIIS):
                     # assert not rec1.is_duplicate_locality(rec2)
                     j += 1
                 i += 1
-        if err_msgs:
-            print(ERR_SEPARATOR)
-            for msg in err_msgs:
-                print(msg)
+        self._print_errors("Duplicate Name-Locality records", err_msgs)
 
 
     # ...............................................
-    def test_gbif_resolution_conflict(self):
+    def test_gbif_resolution_inconsistency(self):
         """Test whether any full scientific names have more than one GBIF taxonKey"""
         err_msgs = []
         for sciname, reclist in self.species.items():
@@ -68,11 +65,7 @@ class TestRIISTaxonomy(BisonRIIS):
                     # assert reclist[i].is_gbif_match(reclist[j])
                     j += 1
                 i += 1
-        if err_msgs:
-            print(ERR_SEPARATOR)
-            print("--- GBIF key conflicts ---")
-            for msg in err_msgs:
-                print(msg)
+        self._print_errors("GBIF taxonKey conflicts", err_msgs)
 
     # ...............................................
     def test_missing_taxon_authority_resolution(self):
@@ -91,14 +84,18 @@ class TestRIISTaxonomy(BisonRIIS):
                         'Sciname {} has ITIS authority with key {} (line {})'.format(
                         sciname, rec.data[RIIS_SPECIES.TAXON_AUTHORITY_FLD],
                         rec.data[RIIS_SPECIES.GBIF_KEY], rec.data[LINENO_FLD]))
-        if err_msgs:
+        self._print_errors("Missing authority resolution", err_msgs)
+
+    # ...............................................
+    def _print_errors(self, header, msgs):
+        if msgs:
             print(ERR_SEPARATOR)
-            print("--- missing authority resolution ---")
-            for msg in err_msgs:
+            print("--- {} ---".format(header))
+            for msg in msgs:
                 print(msg)
 
     # ...............................................
-    def test_itis_resolution_conflict(self):
+    def test_itis_resolution_inconsistency(self):
         """Test whether any full scientific names have more than one GBIF taxonKey"""
         err_msgs = []
         for sciname, reclist in self.species.items():
@@ -120,19 +117,41 @@ class TestRIISTaxonomy(BisonRIIS):
                     # assert reclist[i].is_itis_match(reclist[j])
                     j += 1
                 i += 1
-        if err_msgs:
-            print(ERR_SEPARATOR)
-            print("--- ITIS tsn conflicts ---")
-            for msg in err_msgs:
-                print(msg)
+        self._print_errors("ITIS tsn conflicts", err_msgs)
+
+    # ...............................................
+    def test_gbif_resolution(self):
+        """Test whether any full scientific names have more than one GBIF taxonKey"""
+        err_msgs = []
+        count = 0
+        self.update_gbif_species()
+        for sciname, reclist in self.species.items():
+            try:
+                rec1.data[RIIS_SPECIES.NEW_GBIF_KEY]
+            except KeyError:
+                pass
+            else:
+                count += 1
+                if count > 10:
+                    break
+                rec1 = reclist[0]
+                if not rec1.consistent_gbif_resolution():
+                    msg = "Current GBIF taxonKey {} / {}".format(
+                        rec1.data[RIIS_SPECIES.NEW_GBIF_KEY],
+                        rec1.data[RIIS_SPECIES.NEW_GBIF_SCINAME_FLD])
+                    msg += " conflicts with old taxonKey {} for {}".format(
+                        rec1.data[RIIS_SPECIES.GBIF_KEY], sciname)
+                    err_msgs.append(msg)
+        self._print_errors("Changed GBIF resolution", err_msgs)
 
 
 # .............................................................................
 if __name__ == "__main__":
     bison_pth = '/home/astewart/git/bison'
     tt = TestRIISTaxonomy(bison_pth)
+    tt.test_missing_taxon_authority_resolution()
     tt.test_taxonomy_keys()
     tt.test_duplicate_name_localities()
-    tt.test_gbif_resolution_conflict()
-    tt.test_itis_resolution_conflict()
-    tt.test_missing_taxon_authority_resolution()
+    tt.test_gbif_resolution_inconsistency()
+    tt.test_itis_resolution_inconsistency()
+    tt.test_gbif_resolution()

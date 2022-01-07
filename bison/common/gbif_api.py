@@ -375,59 +375,17 @@ class GbifAPI(object):
                     val = ""
         return val
 
-    # ...............................................
-    def query_for_organization(self, org_key):
-        """Query the GBIF organization API for a single record.
-
-        Args:
-            org_key (str): GBIF organization UUID for query.
-
-        Returns:
-            dictionary of organization metadata
-        """
-        dataset_meta = {}
-        if org_key == "":
-            return dataset_meta
-        else:
-            metaurl = GBIF.ORGANIZATION_URL + org_key
-        data = self._get_data_from_url(metaurl)
-        if data is None:
-            return dataset_meta
-
-        if "key" in data:
-            key = data["key"]
-
-            title = self._get_val(data, ["title"], save_nl=True)
-            desc = self._get_val(data, ["description"], save_nl=True)
-            citation = self._get_val(data, ["citation", "text"], save_nl=True)
-            created = self._get_val(data, ["created"], save_nl=False)
-            modified = self._get_val(data, ["modified"], save_nl=False)
-
-            url = self._get_buried_url_val(data)
-            if url == "":
-                url = self._get_val_or_first_of_list(data, "homepage")
-
-            # Matches current_gbif content of MERGED_RESOURCE_LUT_FIELDS
-            dataset_meta["gbif_organizationKey"] = key
-            dataset_meta["gbif_title"] = title
-            dataset_meta["gbif_url"] = url
-            dataset_meta["gbif_description"] = desc
-            dataset_meta["gbif_citation"] = citation
-            dataset_meta["gbif_created"] = created
-            dataset_meta["gbif_modified"] = modified
-
-        return dataset_meta
 
     # ...............................................
-    def query_for_canonical(self, taxkey=None, sciname=None):
-        """Query the GBIF species service for a canonical name.
+    def query_for_name(self, taxkey=None, sciname=None, kingdom=None):
+        """Query the GBIF species service for taxonomic name elements.
 
         Args:
             taxkey (str): GBIF unique identifier for a taxonomic record
             sciname (str): Scientific name for a scientific record
 
         Returns:
-            a canonical name string
+            a dictionary of name elements
 
         Raises:
             Exception on failure provide either taxkey or sciname.
@@ -435,13 +393,15 @@ class GbifAPI(object):
         canonical = None
 
         if taxkey is not None:
-            url = GBIF.TAXON_URL + taxkey
+            url = "{}{}".format(GBIF.TAXON_URL(), taxkey)
             data = self._get_data_from_url(url)
 
         elif sciname is not None:
-            for replaceStr, withStr in GBIF.URL_ESCAPES:
-                sciname = sciname.replace(replaceStr, withStr)
-            url = GBIF.SINGLE_PARSER_URL + sciname
+            # for replaceStr, withStr in GBIF.URL_ESCAPES:
+            #     sciname = sciname.replace(replaceStr, withStr)
+            url = "{}?name={}".format(GBIF.FUZZY_TAXON_URL(), sciname)
+            if kingdom:
+                url = "{}&kingdom={}".format(url, kingdom)
             data = self._get_data_from_url(url)
             if data is not None:
                 if type(data) is list and len(data) > 0:
@@ -449,9 +409,7 @@ class GbifAPI(object):
         else:
             raise Exception("Must provide taxkey or sciname")
 
-        if "canonicalName" in data:
-            canonical = data["canonicalName"]
-        return canonical
+        return data
 
     # ...............................................
     def _post_json_to_parser(self, url, data):
@@ -586,15 +544,11 @@ class GbifAPI(object):
 
 # ...............................................
 if __name__ == "__main__":
-
-    org_uuid = "898ba450-1627-11df-bd84-b8a03c50a862"
-
-    infname = "/tank/data/bison/2019/AS/tmp/parser_in_10.txt"
-    outfname = "/tank/data/bison/2019/AS/tmp/name_parser_10.csv"
-
+    sciname = "Urochloa plantaginea (Link) R.D.Webster"
     gbifapi = GbifAPI()
 
-    rec = gbifapi.query_for_organization(org_uuid)
+    rec = gbifapi.query_for_name(sciname=sciname)
+    print(rec)
 
 """
 
