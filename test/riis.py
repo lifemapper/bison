@@ -3,6 +3,7 @@ import csv
 import os
 
 from bison.common.constants import (ERR_SEPARATOR, LINENO_FLD, RIIS, RIIS_AUTHORITY, RIIS_SPECIES)
+from bison.common.gbif_api import GbifAPI
 
 def standardize_name(sciname, sciauthor):
     return "{} {}".format(sciname, sciauthor)
@@ -11,11 +12,12 @@ def standardize_name(sciname, sciauthor):
 # .............................................................................
 class RIISRec():
     """Class for comparing relevant fields in species data records"""
-    def __init__(self, occ_key, sci_name, sci_author, taxon_authority, gbif_key, itis_key, assessment, locality, line_num):
-        """
+    def __init__(self, occ_key, kingdom, sci_name, sci_author, taxon_authority, gbif_key, itis_key, assessment, locality, line_num):
+        """Construct a small record to hold relevant data for a RIIS species/locality record
 
         Args:
             occ_key (str): identifier for this record
+            kingdom (str): kingdom for this scientific name
             sci_name (str): canonical scientific name
             sci_author (str): authorship for scientific name
             taxon_authority (str): status (Accepted) and authority to use for taxonomic resolution (ITIS or GBIF)
@@ -50,6 +52,7 @@ class RIISRec():
         self.name = standardize_name(sci_name, sci_author)
         self.data = {
             RIIS_SPECIES.KEY: occ_key,
+            RIIS_SPECIES.KINGDOM_FLD: kingdom,
             RIIS_SPECIES.SCINAME_FLD: sci_name,
             RIIS_SPECIES.SCIAUTHOR_FLD: sci_author,
             RIIS_SPECIES.TAXON_AUTHORITY_FLD: taxon_authority,
@@ -61,14 +64,16 @@ class RIISRec():
 
     # ...............................................
     def is_name_match(self, rrec):
-        """Name fields equal"""
+        """Name/kingdom fields equal"""
         return (self.data[RIIS_SPECIES.SCINAME_FLD] == rrec.data[RIIS_SPECIES.SCINAME_FLD]
+            and self.data[RIIS_SPECIES.KINGDOM_FLD] == rrec.data[RIIS_SPECIES.KINGDOM_FLD]
             and self.data[RIIS_SPECIES.SCIAUTHOR_FLD] == rrec.data[RIIS_SPECIES.SCIAUTHOR_FLD])
 
     # ...............................................
     def is_duplicate(self, rrec):
         """All fields equal except the occurrenceID and linenum, effectively a duplicate"""
         return (self.is_name_match(rrec)
+            and self.data[RIIS_SPECIES.KINGDOM_FLD] == rrec.data[RIIS_SPECIES.KINGDOM_FLD]
             and self.data[RIIS_SPECIES.GBIF_KEY] == rrec.data[RIIS_SPECIES.GBIF_KEY]
             and self.data[RIIS_SPECIES.ITIS_KEY] == rrec.data[RIIS_SPECIES.ITIS_KEY]
             and self.data[RIIS_SPECIES.ASSESSMENT_FLD] == rrec.data[RIIS_SPECIES.ASSESSMENT_FLD]
@@ -90,6 +95,11 @@ class RIISRec():
     def is_gbif_match(self, rrec):
         """Same gbif taxon resolution"""
         return (self.data[RIIS_SPECIES.GBIF_KEY] == rrec.data[RIIS_SPECIES.GBIF_KEY])
+
+    # ...............................................
+    def consistent_gbif_resolution(self):
+        """Same gbif taxon resolution"""
+        return (self.data[RIIS_SPECIES.GBIF_KEY] == self.data[RIIS_SPECIES.NEW_GBIF_KEY])
 
     # ...............................................
     def is_taxauthority_match(self, rrec):
@@ -123,6 +133,7 @@ class BisonRIIS:
         self.species_header = self._clean_header(
             self.species_fname, RIIS_SPECIES.HEADER
         )
+        self.species = None
 
     # ...............................................
     def _read_authorities(self) -> set:
@@ -152,8 +163,8 @@ class BisonRIIS:
                 and values = list of streamlined records for that species
             bad_species: Dictionary of species records
         """
-        bad_species = {}
-        species = {}
+        self.bad_species = {}
+        self.species = {}
         with open(self.species_fname, "r", newline="") as csvfile:
             rdr = csv.DictReader(
                 csvfile,
@@ -165,21 +176,89 @@ class BisonRIIS:
                 lineno = rdr.line_num
                 if lineno > 1:
                     try:
+                        # occ_key, sci_name, sci_author, taxon_authority, gbif_key, itis_key, assessment, locality, line_num)
                         rec = RIISRec(
-                            row[RIIS_SPECIES.KEY], row[RIIS_SPECIES.SCINAME_FLD],
+                            row[RIIS_SPECIES.KEY], row[RIIS_SPECIES.KINGDOM_FLD], row[RIIS_SPECIES.SCINAME_FLD],
                             row[RIIS_SPECIES.SCIAUTHOR_FLD], row[RIIS_SPECIES.TAXON_AUTHORITY_FLD],
                             row[RIIS_SPECIES.GBIF_KEY], row[RIIS_SPECIES.ITIS_KEY],
                             row[RIIS_SPECIES.ASSESSMENT_FLD], row[RIIS_SPECIES.LOCALITY_FLD], lineno)
                     except ValueError:
                         row[LINENO_FLD] = lineno
-                        bad_species[lineno] = row
+                        self.bad_species[lineno] = row
                     else:
                         try:
-                            species[rec.name].append(rec)
+                            self.species[rec.name].append(rec)
                         except KeyError:
-                            species[rec.name] = [rec]
+                            self.species[rec.name] = [rec]
 
-        return species, bad_species
+    # ...............................................
+    def _get_accepted_name_key(self, gbifrec):
+        name = None
+        key = None
+        msg = None
+        if gbifrec:
+            key_fld = "usageKey"
+            accepted_key_fld = "acceptedUsageKey"
+            stat_fld = "status"
+            try:
+                status = gbifrec[stat_fld].lower()
+            except KeyError:
+                msg = "No status key found in results {}".format(gbifrec)
+                status = None
+            else:
+                if status == "accepted":
+                    key = gbifrec[key_fld]
+                else:
+                    try:
+                        key = gbifrec[accepted_key_fld]
+                    except KeyError:
+                        msg = "No accepted key found in results {}".format(gbifrec)
+
+        return name, key, msg
+
+    # ...............................................
+    def _add_msg(self, msgdict, key, msg):
+        if msg:
+            try:
+                msgdict[key].append(msg)
+            except KeyError:
+                msgdict[key] = [msg]
+
+    # ...............................................
+    def update_gbif_species(self):
+        """Test whether any full scientific names have more than one GBIF taxonKey"""
+        msgdict = {}
+        # New fields for GBIF resolution in species records
+
+        if not self.species:
+            self.read_species()
+        count = 0
+        gbif_svc = GbifAPI()
+        for spname, reclist in self.species.items():
+            count += 1
+            if count > 20:
+                break
+            # Just get name/kingdom from first record
+            rec1 = reclist[0]
+            gbifrec = gbif_svc.query_for_name(
+                sciname=spname, kingdom=rec1.data[RIIS_SPECIES.KINGDOM_FLD])
+
+            # Get match results
+            new_key, new_name, msg = self._get_accepted_name_key(gbifrec)
+
+            # If match results are not 'accepted', query for the returned acceptedUsageKey
+            if new_key and new_name is None:
+                self._add_msg(msgdict, spname, msg)
+                gbifrec2 = gbif_svc.query_for_name(taxkey=new_key)
+                # Replace new key and name with results of 2nd query
+                new_key, new_name, msg = self._get_accepted_name_key(gbifrec2)
+
+            # Supplement all records for this species with GBIF accepted key and name
+            if new_key and new_name:
+                for sprec in reclist:
+                    sprec.data[RIIS_SPECIES.NEW_GBIF_KEY] = new_key
+                    sprec.data[RIIS_SPECIES.NEW_GBIF_SCINAME_FLD] = new_name
+
 
     # ...............................................
     def _only_ascii(self, name):

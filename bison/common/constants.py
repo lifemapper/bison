@@ -53,30 +53,35 @@ class GBIF:
     SUBSET_PREFIX = "_lines_"
     SUBSET = "0-5000"
 
-    @property
-    def DATASET_URL():
+    @classmethod
+    def DATASET_URL(cls):
         """GBIF Dataset API base URL."""
         return "{}/{}/".format(GBIF.URL, GBIF.DSET_KEYS.apitype)
 
-    @property
-    def ORGANIZATION_URL():
+    @classmethod
+    def ORGANIZATION_URL(cls):
         """GBIF Organization API base URL."""
         return "{}/{}/".format(GBIF.URL, GBIF.ORG_KEYS.apitype)
 
-    @property
-    def BATCH_PARSER_URL():
+    @classmethod
+    def BATCH_PARSER_URL(cls):
         """GBIF batch Parser API base URL."""
         return GBIF.URL + "/parser/name/"
 
-    @property
-    def SINGLE_PARSER_URL():
+    @classmethod
+    def SINGLE_PARSER_URL(cls):
         """GBIF individual parser API URL prefix."""
         return GBIF.URL + "/species/parser/name?name="
 
-    @property
-    def TAXON_URL():
+    @classmethod
+    def TAXON_URL(cls):
         """GBIF Taxon/Species API base URL."""
         return GBIF.URL + "/species/"
+
+    @classmethod
+    def FUZZY_TAXON_URL(cls):
+        """GBIF Taxon/Species API base URL."""
+        return GBIF.URL + "/species/match"
 
 
 # http://api.gbif.org/v1/parser/name?name=quercus%20berberidifolia
@@ -137,8 +142,11 @@ class RIIS_SPECIES:
     DATA_COUNT = 15264
     KEY = "occurrenceID"
     GBIF_KEY = "GBIF taxonKey"
+    NEW_GBIF_KEY = "gbif_res_taxonkey"
+    NEW_GBIF_SCINAME_FLD = "gbif_res_scientificName"
     ITIS_KEY = "ITIS TSN"
     LOCALITY_FLD = "locality"
+    KINGDOM_FLD = "kingdom"
     SCINAME_FLD = "scientificName"
     SCIAUTHOR_FLD = "scientificNameAuthorship"
     ASSESSMENT_FLD = "Introduced or Invasive"
