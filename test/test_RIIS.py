@@ -1,9 +1,8 @@
 """Test the structure, size, and content of input US-RIIS data files."""
 import csv
-import os
 
 from bison.common.constants import (ERR_SEPARATOR, RIIS, RIIS_AUTHORITY, RIIS_SPECIES)
-from test.riis import BisonRIIS
+from bison.common.riis import BisonRIIS
 
 
 class TestRIISInput(BisonRIIS):

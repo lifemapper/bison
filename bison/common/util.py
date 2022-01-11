@@ -4,6 +4,7 @@ import sys
 
 from bison.common.constants import ENCODING
 
+
 # .............................................................................
 def get_csv_writer(datafile, delimiter, fmode="w"):
     """Return a CSV writer that can handle encoding, plus the open file.
@@ -22,16 +23,46 @@ def get_csv_writer(datafile, delimiter, fmode="w"):
 
     csv.field_size_limit(sys.maxsize)
     try:
-        f = open(datafile, fmode, encoding=ENCODING)
+        f = open(datafile, fmode, newline="", encoding=ENCODING)
         writer = csv.writer(
             f, escapechar="\\", delimiter=delimiter, quoting=csv.QUOTE_NONE)
     except Exception as e:
-        raise
+        raise e
     else:
         print("Opened file {} for write".format(datafile))
     return writer, f
 
+
+# .............................................................................
+def get_csv_dict_writer(csvfile, header, delimiter, fmode="w"):
+    """Create a CSV dictionary writer, write the header, then return the writer and
+    open file handle.
+
+    Args:
+        csvfile: output CSV file for writing
+        header: header for output file
+        delimiter: field separator
+        fmode: Write ('w') or append ('a')
+
+    Returns:
+        writer (csv.DictWriter) ready to write
+        f (file handle)
+    """
+    if fmode not in ("w", "a"):
+        raise Exception("File mode must be 'w' (write) or 'a' (append)")
+
+    csv.field_size_limit(sys.maxsize)
+    try:
+        f = open(datafile, fmode, newline="", encoding=ENCODING)
+        writer = csv.DictWriter(f, fieldnames=header, delimiter=delimiter)
+    except Exception as e:
+        raise e
+    else:
+        writer.writeheader()
+        print("Opened file {} and wrote header".format(datafile))
+    return writer, f
+
+
 # .............................................................................
 if __name__ == "__main__":
-    bison_pth = '/home/astewart/git/bison'
-    print('bison path = ', bison_pth)
+    print('sys path = ', sys.path)

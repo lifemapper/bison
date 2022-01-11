@@ -1,0 +1,11 @@
+occurrenceID,kingdom,scientificName,scientificNameAuthorship,taxonomicStatus,GBIF taxonKey,ITIS TSN,Introduced or Invasive,locality,gbif_res_taxonkey,gbif_res_scientificName,LINENO
+USRIIS-AK-Plantae5768,Plantae,Achillea filipendulina,Lam.,ITIS,3120284,35426,Invasive,AK,3120284,Achillea filipendulina Lam.,2
+USRIIS-AK-Plantae6108,Plantae,Achillea ptarmica,L.,ITIS,3120333,35429,Invasive,AK,3120333,Achillea ptarmica L.,3
+USRIIS-AK-Plantae11636,Plantae,Acorus calamus,L.,ITIS,2873769,564989,Invasive,AK,2873769,Acorus calamus L.,4
+USRIIS-AK-Animalia11952,Animalia,Acyrthosiphon caraganae,"(Cholodkovsky, 1907)",GBIF,2077518,-1,Introduced,AK,2077518,"Acyrthosiphon caraganae (Cholodkovsky, 1908)",5
+USRIIS-AK-Animalia1,Animalia,Adelges piceae,"(Ratzeburg, 1844)",GBIF,2049681,-1,Invasive,AK,2049681,"Adelges piceae (Ratzeburg, 1844)",6
+USRIIS-AK-Plantae5769,Plantae,Aegopodium podagraria,L.,ITIS,3034620,29567,Invasive,AK,3034620,Aegopodium podagraria L.,7
+USRIIS-AK-Plantae6181,Plantae,Agropyron cristatum,(L.) Gaertn.,ITIS,2705196,40371,Introduced,AK,2705196,Agropyron cristatum (L.) Gaertn.,8
+USRIIS-AK-Plantae6184,Plantae,Agropyron cristatum ssp. pectinatum,(M. Bieb.) Tzvelev,ITIS,-1,182479,Invasive,AK,2705196,Agropyron cristatum (L.) Gaertn.,9
+USRIIS-AK-Plantae5770,Plantae,Agropyron desertorum,(Fisch. ex Link) Schult.,ITIS,2705200,40372,Invasive,AK,2705200,Agropyron desertorum (Fisch. ex Link) Schult.,10
+USRIIS-AK-Plantae6189,Plantae,Agrostemma githago,L.,ITIS,3085368,20230,Introduced,AK,3085368,Agrostemma githago L.,11
