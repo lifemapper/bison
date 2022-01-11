@@ -139,6 +139,7 @@ class RIIS_AUTHORITY:
 class RIIS_SPECIES:
     """Introduced or Invasive Species List"""
     FNAME = "US-RIIS_MasterList"
+    DEV_FNAME = "US-RIIS_MasterList_10"
     DATA_COUNT = 15264
     KEY = "occurrenceID"
     GBIF_KEY = "GBIF taxonKey"

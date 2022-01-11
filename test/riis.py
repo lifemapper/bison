@@ -4,6 +4,7 @@ import os
 
 from bison.common.constants import (ERR_SEPARATOR, LINENO_FLD, RIIS, RIIS_AUTHORITY, RIIS_SPECIES)
 from bison.common.gbif_api import GbifAPI
+from bison.common.util import get_csv_writer
 
 def standardize_name(sciname, sciauthor):
     return "{} {}".format(sciname, sciauthor)
@@ -127,6 +128,9 @@ class BisonRIIS:
         self.species_fname = "{}.{}".format(
             os.path.join(bison_pth, RIIS.DATA_DIR, RIIS_SPECIES.FNAME), RIIS.DATA_EXT
         )
+        self.test_species_fname = "{}.{}".format(
+            os.path.join(bison_pth, RIIS.DATA_DIR, RIIS_SPECIES.DEV_FNAME), RIIS.DATA_EXT
+        )
 
         # Test and clean headers of non-ascii characters
         self.auth_header = self._clean_header(self.auth_fname, RIIS_AUTHORITY.HEADER)
@@ -153,6 +157,7 @@ class BisonRIIS:
             for row in rdr:
                 authorities.add(row[RIIS_AUTHORITY.KEY])
         return authorities
+
 
     # ...............................................
     def read_species(self):
@@ -197,24 +202,28 @@ class BisonRIIS:
         key = None
         msg = None
         if gbifrec:
-            key_fld = "usageKey"
-            accepted_key_fld = "acceptedUsageKey"
-            stat_fld = "status"
+            sci_name_fld = "scientificName"
             try:
-                status = gbifrec[stat_fld].lower()
+                # Results from species/match?name=<name>
+                status = gbifrec["status"].lower()
+                key_fld = "usageKey"
+                accepted_key_fld = "acceptedUsageKey"
             except KeyError:
-                msg = "No status key found in results {}".format(gbifrec)
-                status = None
-            else:
-                if status == "accepted":
-                    key = gbifrec[key_fld]
-                else:
-                    try:
-                        key = gbifrec[accepted_key_fld]
-                    except KeyError:
-                        msg = "No accepted key found in results {}".format(gbifrec)
+                # Results from species/<key>
+                status = gbifrec["taxonomicStatus"].lower()
+                key_fld = "key"
+                accepted_key_fld = "nubKey"
 
-        return name, key, msg
+            if status == "accepted":
+                key = gbifrec[key_fld]
+                name = gbifrec[sci_name_fld]
+            else:
+                try:
+                    key = gbifrec[accepted_key_fld]
+                except KeyError:
+                    msg = "No accepted key found in results {}".format(gbifrec)
+
+        return key, name, msg
 
     # ...............................................
     def _add_msg(self, msgdict, key, msg):
@@ -232,12 +241,8 @@ class BisonRIIS:
 
         if not self.species:
             self.read_species()
-        count = 0
         gbif_svc = GbifAPI()
         for spname, reclist in self.species.items():
-            count += 1
-            if count > 20:
-                break
             # Just get name/kingdom from first record
             rec1 = reclist[0]
             gbifrec = gbif_svc.query_for_name(
@@ -254,10 +259,67 @@ class BisonRIIS:
                 new_key, new_name, msg = self._get_accepted_name_key(gbifrec2)
 
             # Supplement all records for this species with GBIF accepted key and name
-            if new_key and new_name:
-                for sprec in reclist:
-                    sprec.data[RIIS_SPECIES.NEW_GBIF_KEY] = new_key
-                    sprec.data[RIIS_SPECIES.NEW_GBIF_SCINAME_FLD] = new_name
+            for sprec in reclist:
+                sprec.data[RIIS_SPECIES.NEW_GBIF_KEY] = new_key
+                sprec.data[RIIS_SPECIES.NEW_GBIF_SCINAME_FLD] = new_name
+
+        # Add new fields to header
+        if RIIS_SPECIES.NEW_GBIF_KEY not in self.species_header:
+            self.species_header.append(RIIS_SPECIES.NEW_GBIF_KEY)
+        if RIIS_SPECIES.NEW_GBIF_SCINAME_FLD not in self.species_header:
+            self.species_header.append(RIIS_SPECIES.NEW_GBIF_SCINAME_FLD)
+
+    # ...............................................
+    def update_gbif_species(self):
+        """Test whether any full scientific names have more than one GBIF taxonKey"""
+        msgdict = {}
+        # New fields for GBIF resolution in species records
+
+        if not self.species:
+            self.read_species()
+        gbif_svc = GbifAPI()
+        for spname, reclist in self.species.items():
+            # Just get name/kingdom from first record
+            rec1 = reclist[0]
+            gbifrec = gbif_svc.query_for_name(
+                sciname=spname, kingdom=rec1.data[RIIS_SPECIES.KINGDOM_FLD])
+
+            # Get match results
+            new_key, new_name, msg = self._get_accepted_name_key(gbifrec)
+
+            # If match results are not 'accepted', query for the returned acceptedUsageKey
+            if new_key and new_name is None:
+                self._add_msg(msgdict, spname, msg)
+                gbifrec2 = gbif_svc.query_for_name(taxkey=new_key)
+                # Replace new key and name with results of 2nd query
+                new_key, new_name, msg = self._get_accepted_name_key(gbifrec2)
+
+            # Supplement all records for this species with GBIF accepted key and name
+            for sprec in reclist:
+                sprec.data[RIIS_SPECIES.NEW_GBIF_KEY] = new_key
+                sprec.data[RIIS_SPECIES.NEW_GBIF_SCINAME_FLD] = new_name
+
+        if RIIS_SPECIES.NEW_GBIF_KEY not in self.species_header:
+            self.species_header.append(RIIS_SPECIES.NEW_GBIF_KEY)
+        if RIIS_SPECIES.NEW_GBIF_SCINAME_FLD not in self.species_header:
+            self.species_header.append()
+
+    # ...............................................
+    def write_species(self, outfname):
+        """Write out species data with updated taxonKey and scientificName for current GBIF backbone taxonomy"""
+        if not self.species:
+            self.read_species()
+
+        with open(outfname, "w", newline="") as csvfile:
+            writer = csv.DictWriter(
+                csvfile,
+                fieldnames=self.species_header,
+                delimiter=RIIS.DELIMITER,
+            )
+            writer.writeheader(self.species_header)
+            for spname, reclist in self.species.items():
+                for rec in reclist:
+                    writer.writerow(rec.data)
 
 
     # ...............................................
