@@ -122,11 +122,9 @@ class TestRIISTaxonomy(BisonRIIS):
 
     # ...............................................
     def test_gbif_resolution(self):
-        """Test whether any records have a changed GBIF taxonomic resolution, then write
-        updated records.
+        """Record changed GBIF taxonomic resolutions and write updated records.
         """
         err_msgs = []
-        count = 0
 
         # Clear species data, switch to test data, read
         self.bad_species = {}
