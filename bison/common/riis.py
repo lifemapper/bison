@@ -38,6 +38,8 @@ class RIISRec():
             assessment (str): Determination as `Introduced` or `Invasive` species for locality
             locality (str): US locality of `AK`, `HI`, or `L48` (Alaska, Hawaii, or Lower 48)
             line_num (int): line number in input data file for this record
+            new_gbif_key (int): Newly resolved GBIF TaxonKey, unique identifier for the accepted taxon.
+            new_gbif_name (str): Newly resolved GBIF scientific name to match new_gbif_key.
 
         Raises:
             ValueError on non-integer GBIF taxonKey or non-integer ITIS TSN
@@ -207,7 +209,12 @@ class BisonRIIS:
 
     # ...............................................
     def __init__(self, base_path):
-        """Constructor sets the authority and species files and headers expected for BISON-RIIS processing."""
+        """Constructor sets the authority and species files and headers expected for BISON-RIIS processing.
+
+        Args:
+            base_path (str): Path to the base of the input data, used to construct full
+            filenames from base_path and relative path constants.
+        """
         self._base_path = base_path
         self.auth_fname = "{}.{}".format(
             os.path.join(self._base_path, RIIS.DATA_DIR, RIIS_AUTHORITY.FNAME), RIIS.DATA_EXT
@@ -249,12 +256,7 @@ class BisonRIIS:
 
     # ...............................................
     def read_species(self):
-        """Assemble a dictionary of species records and a dictionary of records with invalid ITIS or GBIF keys.
-
-        Returns:
-            species: Dictionary of species records, with keys = scientific name and authorship,
-                and values = list of streamlined records for that species
-            bad_species: Dictionary of species records
+        """Assemble 2 dictionaries of records with valid and invalid data.
 
         Raises:
             ValueError on bad input data
@@ -333,7 +335,7 @@ class BisonRIIS:
 
     # ...............................................
     def resolve_gbif_species(self):
-        """Test whether any full scientific names have more than one GBIF taxonKey"""
+        """Test whether any full scientific names have more than one GBIF taxonKey."""
         msgdict = {}
         # New fields for GBIF resolution in species records
 
