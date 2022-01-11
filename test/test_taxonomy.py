@@ -1,4 +1,5 @@
 """Test the GBIF and ITIS taxonomic resolution provided in the US-RIIS table"""
+import os.path
 
 from bison.common.constants import (ERR_SEPARATOR, LINENO_FLD, RIIS_SPECIES)
 from test.riis import BisonRIIS
@@ -124,25 +125,37 @@ class TestRIISTaxonomy(BisonRIIS):
         """Test whether any full scientific names have more than one GBIF taxonKey"""
         err_msgs = []
         count = 0
+        # Clear species data
+        self.bad_species = {}
+        self.species = {}
+        # Change to test species data
+        production_species_fname = self.species_fname
+        self.species_fname = self.test_species_fname
+        basename, ext = os.path.splitext(self.species_fname)
+        updated_species_fname = "{}_updated_gbif{}".format(basename, ext)
+        self.read_species()
+        # Resolve test species
         self.update_gbif_species()
+        # Find mismatches
         for sciname, reclist in self.species.items():
+            rec1 = reclist[0]
             try:
                 rec1.data[RIIS_SPECIES.NEW_GBIF_KEY]
             except KeyError:
                 pass
             else:
-                count += 1
-                if count > 10:
-                    break
-                rec1 = reclist[0]
                 if not rec1.consistent_gbif_resolution():
-                    msg = "Current GBIF taxonKey {} / {}".format(
+                    msg = "Old GBIF taxonKey {} / {} conflicts with ".format(
+                        rec1.data[RIIS_SPECIES.GBIF_KEY], sciname)
+                    msg += " resolved GBIF taxonKey {} / {}".format(
                         rec1.data[RIIS_SPECIES.NEW_GBIF_KEY],
                         rec1.data[RIIS_SPECIES.NEW_GBIF_SCINAME_FLD])
-                    msg += " conflicts with old taxonKey {} for {}".format(
-                        rec1.data[RIIS_SPECIES.GBIF_KEY], sciname)
                     err_msgs.append(msg)
         self._print_errors("Changed GBIF resolution", err_msgs)
+        self.write_species(updated_species_fname)
+        # Return to production species data
+        self.species_fname = production_species_fname
+        self.read_species()
 
 
 # .............................................................................
