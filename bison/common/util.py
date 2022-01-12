@@ -7,7 +7,7 @@ from bison.common.constants import ENCODING
 
 # .............................................................................
 def get_csv_writer(datafile, delimiter, fmode="w"):
-    """Return a CSV writer that can handle encoding, plus the open file.
+    """Create a CSV writer.
 
     Args:
         datafile: output CSV file for writing
@@ -17,6 +17,9 @@ def get_csv_writer(datafile, delimiter, fmode="w"):
     Returns:
         writer (csv.writer) ready to write
         f (file handle)
+
+    Raises:
+        Exception: on failure to create a csv writer
     """
     if fmode not in ("w", "a"):
         raise Exception("File mode must be 'w' (write) or 'a' (append)")
@@ -35,8 +38,7 @@ def get_csv_writer(datafile, delimiter, fmode="w"):
 
 # .............................................................................
 def get_csv_dict_writer(csvfile, header, delimiter, fmode="w"):
-    """Create a CSV dictionary writer, write the header, then return the writer and
-    open file handle.
+    """Create a CSV dictionary writer and write the header.
 
     Args:
         csvfile: output CSV file for writing
@@ -47,6 +49,10 @@ def get_csv_dict_writer(csvfile, header, delimiter, fmode="w"):
     Returns:
         writer (csv.DictWriter) ready to write
         f (file handle)
+
+    Raises:
+        Exception: on invalid file mode
+        Exception: on failure to create a DictWriter
     """
     if fmode not in ("w", "a"):
         raise Exception("File mode must be 'w' (write) or 'a' (append)")

@@ -55,32 +55,56 @@ class GBIF:
 
     @classmethod
     def DATASET_URL(cls):
-        """GBIF Dataset API base URL."""
+        """GBIF Dataset API base URL.
+
+        Returns:
+            base URL for the GBIF Dataset API
+        """
         return "{}/{}/".format(GBIF.URL, GBIF.DSET_KEYS.apitype)
 
     @classmethod
     def ORGANIZATION_URL(cls):
-        """GBIF Organization API base URL."""
+        """GBIF Organization API base URL.
+
+        Returns:
+            base URL for the GBIF Organization API
+        """
         return "{}/{}/".format(GBIF.URL, GBIF.ORG_KEYS.apitype)
 
     @classmethod
     def BATCH_PARSER_URL(cls):
-        """GBIF batch Parser API base URL."""
+        """GBIF batch Parser API base URL.
+
+        Returns:
+            base URL for the GBIF Batch Name Parser API
+        """
         return GBIF.URL + "/parser/name/"
 
     @classmethod
     def SINGLE_PARSER_URL(cls):
-        """GBIF individual parser API URL prefix."""
+        """GBIF individual parser API URL prefix.
+
+        Returns:
+            base URL for the GBIF Name Parser API
+        """
         return GBIF.URL + "/species/parser/name?name="
 
     @classmethod
     def TAXON_URL(cls):
-        """GBIF Taxon/Species API base URL."""
+        """GBIF Taxon/Species API base URL.
+
+        Returns:
+            base URL for the GBIF Species API
+        """
         return GBIF.URL + "/species/"
 
     @classmethod
     def FUZZY_TAXON_URL(cls):
-        """GBIF Taxon/Species API base URL."""
+        """GBIF Taxon/Species API base URL.
+
+        Returns:
+            base URL for the GBIF Species Match API
+        """
         return GBIF.URL + "/species/match"
 
 
@@ -113,7 +137,7 @@ class RIIS:
 
 
 class RIIS_AUTHORITY:
-    """Authority References Metadata"""
+    """Authority References Metadata."""
     FNAME = "US-RIIS_AuthorityReferences"
     KEY = "Authority"
     DATA_COUNT = 5951
@@ -137,7 +161,7 @@ class RIIS_AUTHORITY:
 
 
 class RIIS_SPECIES:
-    """Introduced or Invasive Species List"""
+    """Introduced or Invasive Species List."""
     FNAME = "US-RIIS_MasterList"
     DEV_FNAME = "US-RIIS_MasterList_10"
     DATA_COUNT = 15264

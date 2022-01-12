@@ -6,6 +6,8 @@ from bison.common.constants import (ERR_SEPARATOR, LINENO_FLD, RIIS, RIIS_AUTHOR
 from bison.common.gbif_api import GbifAPI
 from bison.common.util import get_csv_dict_writer
 
+
+# .............................................................................
 def standardize_name(sci_name, sci_author):
     """Construct a small record to hold relevant data for a RIIS species/locality record.
 
@@ -42,7 +44,7 @@ class RIISRec():
             new_gbif_name (str): Newly resolved GBIF scientific name to match new_gbif_key.
 
         Raises:
-            ValueError on non-integer GBIF taxonKey or non-integer ITIS TSN
+            ValueError: on non-integer GBIF taxonKey or non-integer ITIS TSN
         """
         # Check GBIF taxon key
         if not gbif_key:
@@ -84,6 +86,14 @@ class RIISRec():
 
     # ...............................................
     def update_gbif_resolution(self, gbif_key, gbif_sciname):
+        """Update the new gbif resolution fields in the data dictionary.
+
+        Args:
+            gbif_key (int): current GBIF accepted taxonKey, in the GBIF Backbone
+                Taxonomy, for a scientific name
+            gbif_sciname (str):  current GBIF accepted scientific name, in the GBIF Backbone
+                Taxonomy, for a scientific name
+        """
         self.data[RIIS_SPECIES.NEW_GBIF_KEY] = gbif_key
         self.data[RIIS_SPECIES.NEW_GBIF_SCINAME_FLD] = gbif_sciname
 
@@ -213,7 +223,7 @@ class BisonRIIS:
 
         Args:
             base_path (str): Path to the base of the input data, used to construct full
-            filenames from base_path and relative path constants.
+                filenames from base_path and relative path constants.
         """
         self._base_path = base_path
         self.auth_fname = "{}.{}".format(
@@ -256,11 +266,7 @@ class BisonRIIS:
 
     # ...............................................
     def read_species(self):
-        """Assemble 2 dictionaries of records with valid and invalid data.
-
-        Raises:
-            ValueError on bad input data
-        """
+        """Assemble 2 dictionaries of records with valid and invalid data."""
         self.bad_species = {}
         self.nnsl = {}
         with open(self.riis_fname, "r", newline="") as csvfile:
@@ -361,12 +367,14 @@ class BisonRIIS:
             # Supplement all records for this species with GBIF accepted key and name
             for sprec in reclist:
                 sprec.update_gbif_resolution(new_key, new_name)
-                # sprec.data[RIIS_SPECIES.NEW_GBIF_KEY] = new_key
-                # sprec.data[RIIS_SPECIES.NEW_GBIF_SCINAME_FLD] = new_name
 
     # ...............................................
     def write_species(self, outfname):
-        """Write out species data with updated taxonKey and scientificName for current GBIF backbone taxonomy."""
+        """Write out species data with updated taxonKey and scientificName for current GBIF backbone taxonomy.
+
+        Args:
+            outfname (str): full path and filename for output file.
+        """
         if not self.nnsl:
             self.read_species()
 
@@ -383,11 +391,8 @@ class BisonRIIS:
                         writer.writerow(rec.data)
                     except Exception as e:
                         print("Failed to write {}, {}".format(rec.data, e))
-        except Exception as e:
-            raise(e)
         finally:
             outf.close()
-
 
     # ...............................................
     def _only_ascii(self, name):
@@ -400,12 +405,9 @@ class BisonRIIS:
             cleaned name string
         """
         good = []
-        bad = []
         for ch in name:
             if ch.isascii():
                 good.append(ch)
-            else:
-                bad.append(ch)
         better_name = "".join(good)
         return better_name
 

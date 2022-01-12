@@ -4,12 +4,17 @@ import os.path
 from bison.common.constants import (ERR_SEPARATOR, LINENO_FLD, RIIS_SPECIES)
 from bison.common.riis import BisonRIIS
 
+
 class TestRIISTaxonomy(BisonRIIS):
     """Class for testing input authority and species files."""
 
     # .............................................................................
     def __init__(self, base_path):
-        """Constructor sets the authority and species files and headers expected for BISON-RIIS processing."""
+        """Constructor sets the authority and species files and headers expected for BISON-RIIS processing.
+
+        Args:
+            base_path (str): base file path for project execution
+        """
         BisonRIIS.__init__(self, base_path)
         self.read_species()
 
@@ -33,7 +38,7 @@ class TestRIISTaxonomy(BisonRIIS):
                     rec1 = reclist[i]
                     rec2 = reclist[j]
                     if rec1.is_duplicate_locality(rec2):
-                        msg = ('Sciname has {} on line {} and line {}'.format(
+                        msg = ('Sciname {} has {} on line {} and line {}'.format(
                             sciname, rec1.data[RIIS_SPECIES.LOCALITY_FLD],
                             rec1.data[LINENO_FLD], rec2.data[LINENO_FLD]))
                         err_msgs.append(msg)
@@ -41,7 +46,6 @@ class TestRIISTaxonomy(BisonRIIS):
                     j += 1
                 i += 1
         self._print_errors("Duplicate Name-Locality records", err_msgs)
-
 
     # ...............................................
     def test_gbif_resolution_inconsistency(self):
@@ -78,13 +82,11 @@ class TestRIISTaxonomy(BisonRIIS):
                 if (auth == "GBIF" and rec.data[RIIS_SPECIES.GBIF_KEY] <= 0):
                     err_msgs.append(
                         'Sciname {} has GBIF authority with key {} (line {})'.format(
-                        sciname, rec.data[RIIS_SPECIES.TAXON_AUTHORITY_FLD],
-                        rec.data[RIIS_SPECIES.GBIF_KEY], rec.data[LINENO_FLD]))
+                            sciname, rec.data[RIIS_SPECIES.GBIF_KEY], rec.data[LINENO_FLD]))
                 elif (auth == "ITIS" and rec.data[RIIS_SPECIES.ITIS_KEY] <= 0):
                     err_msgs.append(
                         'Sciname {} has ITIS authority with key {} (line {})'.format(
-                        sciname, rec.data[RIIS_SPECIES.TAXON_AUTHORITY_FLD],
-                        rec.data[RIIS_SPECIES.GBIF_KEY], rec.data[LINENO_FLD]))
+                            sciname, rec.data[RIIS_SPECIES.GBIF_KEY], rec.data[LINENO_FLD]))
         self._print_errors("Missing authority resolution", err_msgs)
 
     # ...............................................
@@ -122,8 +124,7 @@ class TestRIISTaxonomy(BisonRIIS):
 
     # ...............................................
     def test_gbif_resolution(self):
-        """Record changed GBIF taxonomic resolutions and write updated records.
-        """
+        """Record changed GBIF taxonomic resolutions and write updated records."""
         err_msgs = []
 
         # Clear species data, switch to test data, read

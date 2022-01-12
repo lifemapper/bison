@@ -6,12 +6,11 @@ from bison.common.riis import BisonRIIS
 
 
 class TestRIISInput(BisonRIIS):
-    """Class for testing input authority and species files"""
+    """Class for testing input authority and species files."""
 
     # .............................................................................
     def __init__(self):
         """Constructor sets the authority and species files and headers expected for BISON-RIIS processing."""
-        # Construct data filenames
         BisonRIIS.__init__(self)
 
     # .............................................................................
