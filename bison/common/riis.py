@@ -383,6 +383,8 @@ class BisonRIIS:
                         writer.writerow(rec.data)
                     except Exception as e:
                         print("Failed to write {}, {}".format(rec.data, e))
+        except Exception as e:
+            raise(e)
         finally:
             outf.close()
 

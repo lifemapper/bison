@@ -53,13 +53,13 @@ def get_csv_dict_writer(csvfile, header, delimiter, fmode="w"):
 
     csv.field_size_limit(sys.maxsize)
     try:
-        f = open(datafile, fmode, newline="", encoding=ENCODING)
+        f = open(csvfile, fmode, newline="", encoding=ENCODING)
         writer = csv.DictWriter(f, fieldnames=header, delimiter=delimiter)
     except Exception as e:
         raise e
     else:
         writer.writeheader()
-        print("Opened file {} and wrote header".format(datafile))
+        print("Opened file {} and wrote header".format(csvfile))
     return writer, f
 
 

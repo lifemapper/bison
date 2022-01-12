@@ -133,9 +133,6 @@ class TestRIISTaxonomy(BisonRIIS):
         self.riis_fname = self.test_riis_fname
         self.read_species()
 
-        # Create output filename
-        basename, ext = os.path.splitext(self.riis_fname)
-        updated_species_fname = "{}_updated_gbif{}".format(basename, ext)
         # Update species data
         self.resolve_gbif_species()
 
@@ -156,6 +153,9 @@ class TestRIISTaxonomy(BisonRIIS):
                         rec1.data[RIIS_SPECIES.NEW_GBIF_SCINAME_FLD])
                     err_msgs.append(msg)
         self._print_errors("Changed GBIF resolution", err_msgs)
+        # Create output filename and write
+        basename, ext = os.path.splitext(self.riis_fname)
+        updated_species_fname = "{}_updated_gbif{}".format(basename, ext)
         self.write_species(updated_species_fname)
 
         # Switch back to production species data
