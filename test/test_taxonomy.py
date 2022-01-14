@@ -2,10 +2,10 @@
 import os.path
 
 from bison.common.constants import (ERR_SEPARATOR, LINENO_FLD, RIIS_SPECIES)
-from bison.common.riis import BisonRIIS
+from bison.common.riis import ModRIIS
 
 
-class TestRIISTaxonomy(BisonRIIS):
+class TestRIISTaxonomy(ModRIIS):
     """Class for testing input authority and species files."""
 
     # .............................................................................
@@ -15,7 +15,7 @@ class TestRIISTaxonomy(BisonRIIS):
         Args:
             base_path (str): base file path for project execution
         """
-        BisonRIIS.__init__(self, base_path)
+        ModRIIS.__init__(self, base_path)
         self.read_species()
 
     # ...............................................
@@ -179,7 +179,7 @@ if __name__ == "__main__":
 import os.path
 
 from bison.common.constants import (ERR_SEPARATOR, LINENO_FLD, RIIS_SPECIES)
-from test.riis import BisonRIIS
+from test.riis import ModRIIS
 from test.test_taxonomy import *
 
 bison_pth = '/home/astewart/git/bison'

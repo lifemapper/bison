@@ -1,10 +1,10 @@
-"""Common class to setup test environment for US-RIIS data processing."""
+"""Common classes for BISON RIIS data processing."""
 import csv
 import os
 
 from bison.common.constants import (ERR_SEPARATOR, LINENO_FLD, RIIS, RIIS_AUTHORITY, RIIS_SPECIES)
-from bison.common.gbif_api import GbifAPI
-from bison.common.util import get_csv_dict_writer
+from bison.tools.gbif_api import GbifSvc
+from bison.tools.util import get_csv_dict_writer
 
 
 # .............................................................................
@@ -214,7 +214,7 @@ class RIISRec():
 
 
 # .............................................................................
-class BisonRIIS:
+class ModRIIS:
     """Class for reading, writing, comparing RIIS species data records."""
 
     # ...............................................
@@ -265,11 +265,25 @@ class BisonRIIS:
         return authorities
 
     # ...............................................
+    @property
+    def gbif_resolved_riis_fname(self):
+        # Create output filename and write
+        basename, ext = os.path.splitext(self.riis_fname)
+        updated_riis_fname = "{}_updated_gbif{}".format(basename, ext)
+        return updated_riis_fname
+
+    # ...............................................
     def read_species(self):
         """Assemble 2 dictionaries of records with valid and invalid data."""
         self.bad_species = {}
         self.nnsl = {}
-        with open(self.riis_fname, "r", newline="") as csvfile:
+        # Use species data with updated GBIF taxonomic resolution if exists
+        if os.path.exists(self.gbif_resolved_riis_fname):
+            infname = self.gbif_resolved_riis_fname
+        else:
+            infname = self.riis_fname
+
+        with open(infname, "r", newline="") as csvfile:
             rdr = csv.DictReader(
                 csvfile,
                 fieldnames=self.riis_header,
@@ -347,7 +361,7 @@ class BisonRIIS:
 
         if not self.nnsl:
             self.read_species()
-        gbif_svc = GbifAPI()
+        gbif_svc = GbifSvc()
         for spname, reclist in self.nnsl.items():
             # Just get name/kingdom from first record
             rec1 = reclist[0]
@@ -369,7 +383,7 @@ class BisonRIIS:
                 sprec.update_gbif_resolution(new_key, new_name)
 
     # ...............................................
-    def write_species(self, outfname):
+    def write_species(self, outfname=None):
         """Write out species data with updated taxonKey and scientificName for current GBIF backbone taxonomy.
 
         Args:
@@ -377,6 +391,9 @@ class BisonRIIS:
         """
         if not self.nnsl:
             self.read_species()
+
+        if not outfname:
+            outfname = self.gbif_resolved_riis_fname
 
         # First name in keys, first record in value-list, keys from data attribute
         names = list(self.nnsl.keys())
