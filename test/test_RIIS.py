@@ -2,16 +2,16 @@
 import csv
 
 from bison.common.constants import (ERR_SEPARATOR, RIIS, RIIS_AUTHORITY, RIIS_SPECIES)
-from bison.common.riis import BisonRIIS
+from bison.common.riis import ModRIIS
 
 
-class TestRIISInput(BisonRIIS):
+class TestRIISInput(ModRIIS):
     """Class for testing input authority and species files."""
 
     # .............................................................................
     def __init__(self):
         """Constructor sets the authority and species files and headers expected for BISON-RIIS processing."""
-        BisonRIIS.__init__(self)
+        ModRIIS.__init__(self)
 
     # .............................................................................
     def _check_species_authorities(self):

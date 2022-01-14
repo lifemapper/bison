@@ -4,8 +4,16 @@ BISON_DELIMITER = "$"
 ENCODING = "utf-8"
 LINENO_FLD = "LINENO"
 ERR_SEPARATOR = "------------"
+ITIS_SOLR_URL = 'https://services.itis.gov/'
+ITIS_NAME_KEY = 'nameWOInd'
+ITIS_TSN_KEY = 'tsn'
+ITIS_URL_ESCAPES = [ [" ", r"\%20"] ]
+ITIS_VERNACULAR_QUERY = 'https://www.itis.gov/ITISWebService/services/ITISService/getCommonNamesFromTSN?tsn='
+ITIS_NAMESPACE = '{http://itis_service.itis.usgs.gov}'
+ITIS_DATA_NAMESPACE = '{http://data.itis_service.itis.usgs.gov/xsd}'
 
 
+# .............................................................................
 class GBIF:
     """Constants for GBIF APIs, and their request and response objects."""
 
@@ -107,12 +115,11 @@ class GBIF:
         """
         return GBIF.URL + "/species/match"
 
-
 # http://api.gbif.org/v1/parser/name?name=quercus%20berberidifolia
 # http://api.gbif.org/v1/organization?identifier=362
 # http://api.gbif.org/v1/organization/c3ad790a-d426-4ac1-8e32-da61f81f0117
 
-
+# .............................................................................
 class NS:
     """Biodiversity Informatics Community namespaces."""
 
@@ -126,6 +133,7 @@ class NS:
     gbif = "http://rs.gbif.org/terms/1.0/"
 
 
+# .............................................................................
 class RIIS:
     """Constants for the US Register of Introduced and Invasive Species, US-RIIS data."""
     DATA_DIR = "data"
@@ -136,6 +144,7 @@ class RIIS:
     DATA_DICT_FNAME = "US-RIIS_DataDictionary"
 
 
+# .............................................................................
 class RIIS_AUTHORITY:
     """Authority References Metadata."""
     FNAME = "US-RIIS_AuthorityReferences"
@@ -160,6 +169,7 @@ class RIIS_AUTHORITY:
     ]
 
 
+# .............................................................................
 class RIIS_SPECIES:
     """Introduced or Invasive Species List."""
     FNAME = "US-RIIS_MasterList"
