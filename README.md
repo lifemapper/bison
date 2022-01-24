@@ -33,3 +33,9 @@ pip3 install <python dependencies>
 # Testing
 * Include execution of tests in pre-commit hooks, example in
   [Specify7](https://github.com/specify/specify7/blob/production/.pre-commit-config.yaml)
+
+* Create test file with first 100K records + header
+```commandline
+head -n 100001 0090372-210914110416597.csv > gbif_2022-01-07_100k.csv
+
+```

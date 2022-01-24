@@ -69,6 +69,56 @@ def get_csv_dict_writer(csvfile, header, delimiter, fmode="w"):
     return writer, f
 
 
+
+
+# .............................................................................
+def get_csv_dict_reader(csvfile, delimiter, fieldnames=None, encoding=ENCODING, ignore_quotes=False):
+    """Create a CSV dictionary writer and write the header.
+
+    Args:
+        csvfile: output CSV file for reading
+        delimiter: delimiter between fields
+        fieldnames (list): if header is not in the file, use these fieldnames
+        encoding (str): type of encoding
+        ignore_quotes (constant): csv.QUOTE_NONE or csv.QUOTE_MINIMAL
+
+    Returns:
+        writer (csv.DictReader) ready to read
+        f (file handle)
+
+    Raises:
+        Exception: on failure to open file
+        Exception: on failure to create a DictWriter
+    """
+    try:
+        #  If csvfile is a file object, it should be opened with newline=""
+        f = open(csvfile, "r", newline="", encoding=encoding)
+    except Exception as e:
+        raise e
+
+    if fieldnames is None:
+        try:
+            header = next(f)
+            tmpflds = header.split(delimiter)
+            fieldnames = [fld.strip() for fld in tmpflds]
+        except Exception as e:
+            raise e
+
+    # QUOTE_NONE or QUOTE_MINIMAL
+    if ignore_quotes:
+        dreader = csv.DictReader(
+            f, fieldnames=fieldnames, quoting=csv.QUOTE_NONE,
+            escapechar='\\', delimiter=delimiter)
+    else:
+        dreader = csv.DictReader(
+            f, fieldnames=fieldnames,
+            escapechar='\\', delimiter=delimiter)
+
+        print('Opened file {} for dict read'.format(csvfile))
+    return dreader, f
+
+
+
 # .............................................................................
 if __name__ == "__main__":
     print('sys path = ', sys.path)

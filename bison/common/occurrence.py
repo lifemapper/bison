@@ -2,6 +2,9 @@
 
 import os
 
+from bison.common.constants import GBIF, ENCODING
+from bison.tools.util import get_csv_dict_reader
+
 # .............................................................................
 class GBIFReader(object):
     """Class to read a GBIF simple CSV datafile.
@@ -13,74 +16,53 @@ class GBIFReader(object):
         where 1-5000 are lines to delete, and 10000 is the line on which to stop.
     """
     # ...............................................
-    def __init__(self, workpath, logger):
+    def __init__(self, workpath, datafile, logger):
         """Construct an object to read a GBIF datafile.
 
         Args:
             workpath(str): base directory for datafiles
+            datafile(str): basename of file to read
             logger (object): logger for saving relevant processing messages
         """
         self._log = logger
         # Remove any trailing /
         workpath.rstrip(os.sep)
-        self._files = []
-        # Used only for reading from open gbif file to test bison transform
+        # Open file
+        self._inf = None
+        # CVS DictReader, and current line
         self._gbif_reader = None
         self._gbif_recno = 0
-        self._gbif_line = None
+
+    # ...............................................
+    def open(self, csvfile):
+        """Open a GBIF datafile with a csv.DictReader.
+
+        Args:
+            csvfile(str): basename of file to read
+        """
+        try:
+            self._gbif_reader, self._inf = get_csv_dict_reader(csvfile, GBIF.DWCA_DELIMITER, encoding=ENCODING)
+        except Exception as e:
+            raise(e)
+        self._gbif_recno = 0
 
     # ...............................................
     def is_open(self):
         """Return true if any files are open."""
-        for f in self._files:
-            if not f is None and not f.closed:
-                return True
+        if not self._inf is None and not self._inf.closed:
+            return True
         return False
 
     # ...............................................
     def close(self):
         '''Close input datafiles and output file.'''
-        for f in self._files:
-            try:
-                f.close()
-            except Exception:
-                pass
+        try:
+            self._inf.close()
+        except Exception:
+            pass
         # Used only for reading from open gbif file to test bison transform
         self._gbif_reader = None
         self._gbif_recno = 0
-        self._gbif_line = None
-
-    # ...............................................
-    def _test_for_discard(self, brec):
-        """Remove record without name fields or with absence status.
-
-        Args:
-            brec (dict): current record
-        """
-        if brec is not None:
-            gid = brec[OCC_ID_FLD]
-            # Required fields exist
-            if (not brec['provided_scientific_name'] and not brec['taxonKey']):
-                brec = None
-                self._log.info('Discard brec {}: missing both sciname and taxkey'
-                               .format(gid))
-        if brec is not None:
-            # remove records with occurrenceStatus = absence
-            ostat = brec['occurrenceStatus']
-            if ostat and ostat.lower() == 'absent':
-                brec = None
-
-               self._log.info('Discard brec {}: with occurrenceStatus absent'
-                               .format(gid))
-        return brec
-
-    # ...............................................
-    def _remove_internal_delimiters(self, rec):
-        for fld, val in rec.items():
-            if isinstance(val, str):
-                if val.find(BISON_DELIMITER) >= 0:
-                    print ('Delimiter in val {}'.format(val))
-                    rec[fld] = val.replace(BISON_DELIMITER, '')
 
 #     # ...............................................
 #     def find_gbif_record(self, gbifid):
