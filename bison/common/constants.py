@@ -20,6 +20,7 @@ class GBIF:
     URL = "http://api.gbif.org/v1"
     UUID_KEY = "key"
     ORG_FOREIGN_KEY = "publishingOrganizationKey"
+    TEST_DATA = "gbif_2022-01-07_100k.csv"
     DWCA_DATASET_DIR = "dataset"
     DWCA_META_FNAME = "meta.xml"
     DWCA_INTERPRETED = "occurrence"
