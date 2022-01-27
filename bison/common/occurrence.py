@@ -3,7 +3,7 @@
 import os
 
 from bison.common.constants import GBIF, ENCODING
-from bison.tools.util import get_csv_dict_reader
+from bison.tools.util import get_csv_dict_reader, get_logger
 
 # .............................................................................
 class GBIFReader(object):
@@ -16,37 +16,52 @@ class GBIFReader(object):
         where 1-5000 are lines to delete, and 10000 is the line on which to stop.
     """
     # ...............................................
-    def __init__(self, workpath, datafile, logger):
+    def __init__(self, datapath, csvfile, logger=None):
         """Construct an object to read a GBIF datafile.
 
         Args:
-            workpath(str): base directory for datafiles
-            datafile(str): basename of file to read
+            datapath(str): base directory for datafiles
+            csvfile(str): basename of file to read
             logger (object): logger for saving relevant processing messages
         """
-        self._log = logger
         # Remove any trailing /
-        workpath.rstrip(os.sep)
+        datapath.rstrip(os.sep)
+        self.datapath = datapath
+        self.csvfile = os.path.join(datapath, csvfile)
+        if logger is None:
+            logger = get_logger(outpath)
+        self._log = logger
+
         # Open file
         self._inf = None
+
         # CVS DictReader, and current line
         self._gbif_reader = None
-        self._gbif_recno = 0
 
     # ...............................................
-    def open(self, csvfile):
+    def open(self):
         """Open a GBIF datafile with a csv.DictReader.
 
         Args:
             csvfile(str): basename of file to read
         """
         try:
-            self._gbif_reader, self._inf = get_csv_dict_reader(csvfile, GBIF.DWCA_DELIMITER, encoding=ENCODING)
+            self._gbif_reader, self._inf = get_csv_dict_reader(self.csvfile, GBIF.DWCA_DELIMITER, encoding=ENCODING)
         except Exception as e:
             raise(e)
-        self._gbif_recno = 0
 
     # ...............................................
+    def close(self):
+        """Close input datafiles and output file."""
+        try:
+            self._inf.close()
+        except Exception:
+            pass
+        # Used only for reading from open gbif file to test bison transform
+        self._gbif_reader = None
+
+    # ...............................................
+    @property
     def is_open(self):
         """Return true if any files are open."""
         if not self._inf is None and not self._inf.closed:
@@ -54,15 +69,26 @@ class GBIFReader(object):
         return False
 
     # ...............................................
-    def close(self):
-        '''Close input datafiles and output file.'''
+    @property
+    def recno(self):
+        lineno = -1
         try:
-            self._inf.close()
-        except Exception:
+            lineno = self._gbif_reader.line_num
+        except:
             pass
-        # Used only for reading from open gbif file to test bison transform
-        self._gbif_reader = None
-        self._gbif_recno = 0
+        return lineno
+
+    # ...............................................
+    def logit(self, msg):
+        """Log a message to the console or file.
+
+        Args:
+            msg (str): Message to be printed or written to file.
+        """
+        if self._log:
+            self._log.info(msg)
+        else:
+            print(msg)
 
 #     # ...............................................
 #     def find_gbif_record(self, gbifid):
@@ -77,7 +103,7 @@ class GBIFReader(object):
 #         try:
 #             while (not rec and self._gbif_line is not None):
 #                 # Get interpreted record
-#                 self._gbif_line, self._gbif_recno = getLine(self._gbif_reader,
+#                 self._gbif_line, self.recno = getLine(self._gbif_reader,
 #                                                             self._gbif_recno)
 #
 #                 if self._gbif_line is None:
@@ -88,13 +114,13 @@ class GBIFReader(object):
 #                         rec = self._create_rough_bisonrec(self._gbif_line,
 #                                                           self._gbif_column_map)
 #                     # Where are we
-#                     if (self._gbif_self.recno % LOGINTERVAL) == 0:
-#                         self._log.info('*** Record number {} ***'.format(self._gbif_recno))
+#                     if (self.recno % LOGINTERVAL) == 0:
+#                         self._log.info('*** Record number {} ***'.format(self.recno))
 #             if (not rec and self._gbif_line is None):
 #                 self._log.error('Failed to find {} in remaining records'.format(gbifid))
 #                 self.close()
 #         except Exception as e:
-#             self._log.error('Failed on line {}, exception {}'.format(self._gbif_recno, e))
+#             self._log.error('Failed on line {}, exception {}'.format(self.recno, e))
 #         return rec
 #
 #     # ...............................................
@@ -110,7 +136,7 @@ class GBIFReader(object):
 #         self._gbif_reader, inf = get_csv_reader(gbif_interp_fname, GBIF_DELIMITER, ENCODING)
 #         self._files.append(inf)
 #         # Pull the header row
-#         self._gbif_line, self._gbif_recno = getLine(self._gbif_reader, 0)
+#         self._gbif_line, self.recno = getLine(self._gbif_reader, 0)
 
 # ...............................................
 if __name__ == '__main__':
