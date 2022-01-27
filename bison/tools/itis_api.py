@@ -5,15 +5,18 @@ import xml.etree.ElementTree as ET
 from bison.common.constants import (
     ITIS_SOLR_URL, ITIS_NAME_KEY, ITIS_TSN_KEY, ITIS_VERNACULAR_QUERY, ITIS_URL_ESCAPES,
     ITIS_NAMESPACE, ITIS_DATA_NAMESPACE)
+from bison.tools.api import APISvc
+
 
 # .............................................................................
-class ITISSvc(object):
+class ITISSvc(APISvc):
     """Class to pull data from the ITIS Solr service.
 
     Documentation at: https://itis.gov/solr_documentation.html
     """
 # ...............................................
     def __init__(self):
+        """Constructor does nothing."""
         pass
 
 # ...............................................
@@ -72,19 +75,19 @@ class ITISSvc(object):
             tsn: an ITIS code designating a taxonomic name
         """
         accepted_name = kingdom = None
-        url = '{}?q={}:{}&wt=json'.format(ITIS_SOLR_URL, ITIS_TSN_KEY, tsn)
+        url = "{}?q={}:{}&wt=json".format(ITIS_SOLR_URL, ITIS_TSN_KEY, tsn)
         output = self._get_data_from_url(url, resp_type='json')
         try:
-            data = output['response']
-        except:
-            raise Exception('Failed to return response element')
+            data = output["response"]
+        except Exception as e:
+            raise Exception("Failed to return response element {}".format(e))
         try:
             count = data['numFound']
-        except:
+        except KeyError:
             print('No numFound value')
         try:
             docs = data['docs']
-        except:
+        except KeyError:
             raise Exception('Failed to return docs')
         for doc in docs:
             usage = doc['usage']
@@ -110,15 +113,15 @@ class ITISSvc(object):
         output = self._get_data_from_url(url, resp_type='json')
         try:
             data = output['response']
-        except:
+        except KeyError:
             raise Exception('Failed to return response element')
         try:
             count = data['numFound']
-        except:
+        except KeyError:
             print('No numFound value')
         try:
             docs = data['docs']
-        except:
+        except KeyError:
             raise Exception('Failed to return docs')
 #         print('Reported/returned {}/{} docs for name {}'.format(count, len(docs), sciname))
         for doc in docs:

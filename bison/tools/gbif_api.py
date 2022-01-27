@@ -2,6 +2,7 @@
 import requests
 
 from bison.common.constants import GBIF
+from bison.tools.api import APISvc
 
 NEWLINE = "\n"
 CR_RETURN = "\r"
@@ -11,44 +12,10 @@ CR_RETURN = "\r"
 class GbifSvc(APISvc):
     """Pulls UUIDs and metadata for local resolution of GBIF Organizations, Providers, Resources."""
 
-    # # ...............................................
-    # def __init__(self):
-    #     """Construct GBIF API service."""
-    #     pass
-    #
-    # # ...............................................
-    # def _saveNL_delCR(self, strval):
-    #     fval = strval.replace(NEWLINE, "\\n").replace("\r", "")
-    #     return fval
-    #
-    # # ...............................................
-    # def _parse_date(self, datestr):
-    #     datevals = []
-    #     dateonly = datestr.split("T")[0]
-    #     if dateonly != "":
-    #         parts = dateonly.split("-")
-    #         try:
-    #             for i in range(len(parts)):
-    #                 datevals.append(int(parts[i]))
-    #         except ValueError:
-    #             print("Invalid date {}".format(datestr))
-    #             pass
-    #         else:
-    #             if len(datevals) not in (1, 3):
-    #                 print("Non one or three part date {}".format(datevals))
-    #     return datevals
-    #
-    # # ...............................................
-    # def _first_newer(self, datevals1, datevals2):
-    #     for i in (0, 1, 2):
-    #         # only compare matching year/mo/day
-    #         if len(datevals1) > i and len(datevals2) > i:
-    #             if datevals1[i] > datevals2[i]:
-    #                 return True
-    #             elif datevals1[i] < datevals2[i]:
-    #                 return False
-    #     # if equal, return first_newer
-    #     return True
+    # ...............................................
+    def __init__(self):
+        """Construct GBIF API service."""
+        APISvc.__init__(self)
 
     # ...............................................
     def _get_data_from_url(self, url, resp_type="json"):

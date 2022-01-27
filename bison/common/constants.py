@@ -7,10 +7,24 @@ ERR_SEPARATOR = "------------"
 ITIS_SOLR_URL = 'https://services.itis.gov/'
 ITIS_NAME_KEY = 'nameWOInd'
 ITIS_TSN_KEY = 'tsn'
-ITIS_URL_ESCAPES = [ [" ", r"\%20"] ]
+ITIS_URL_ESCAPES = [[ " ", r"\%20" ]]
 ITIS_VERNACULAR_QUERY = 'https://www.itis.gov/ITISWebService/services/ITISService/getCommonNamesFromTSN?tsn='
 ITIS_NAMESPACE = '{http://itis_service.itis.usgs.gov}'
 ITIS_DATA_NAMESPACE = '{http://data.itis_service.itis.usgs.gov/xsd}'
+
+
+class LOG:
+    INTERVAL = 1000000
+    FORMAT = ' '.join([
+        "%(asctime)s",
+        "%(funcName)s",
+        "line",
+        "%(lineno)d",
+        "%(levelname)-8s",
+        "%(message)s"])
+    DATE_FORMAT = '%d %b %Y %H:%M'
+    FILE_MAX_BYTES = 52000000
+    FILE_BACKUP_COUNT = 5
 
 
 # .............................................................................
@@ -19,6 +33,10 @@ class GBIF:
 
     URL = "http://api.gbif.org/v1"
     UUID_KEY = "key"
+    OCCID_FLD = "gbifID"
+    NAME_FLD = "scientificName"
+    TAXON_FLD = "taxonKey"
+    STATUS_FLD = "taxonomicStatus"
     ORG_FOREIGN_KEY = "publishingOrganizationKey"
     TEST_DATA = "gbif_2022-01-07_100k.csv"
     DWCA_DATASET_DIR = "dataset"
@@ -119,6 +137,7 @@ class GBIF:
 # http://api.gbif.org/v1/parser/name?name=quercus%20berberidifolia
 # http://api.gbif.org/v1/organization?identifier=362
 # http://api.gbif.org/v1/organization/c3ad790a-d426-4ac1-8e32-da61f81f0117
+
 
 # .............................................................................
 class NS:
