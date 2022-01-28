@@ -267,7 +267,7 @@ class ModRIIS:
     # ...............................................
     @property
     def gbif_resolved_riis_fname(self):
-        # Create output filename and write
+        """Construct a filename for the resolved RIIS from the original."""
         basename, ext = os.path.splitext(self.riis_fname)
         updated_riis_fname = "{}_updated_gbif{}".format(basename, ext)
         return updated_riis_fname

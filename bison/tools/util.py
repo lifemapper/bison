@@ -1,8 +1,66 @@
 """Common file handling tools used in various BISON modules."""
 import csv
+import logging
+from logging.handlers import RotatingFileHandler
+import os
 import sys
+import time
 
-from bison.common.constants import ENCODING
+from bison.common.constants import ENCODING, LOG
+
+
+# ...............................................
+def delete_file(file_name, delete_dir=False):
+    """Delete file if it exists, optionally delete newly empty directory.
+
+    Args:
+        file_name (str): full path to the file to delete
+        delete_dir (bool): flag - True to delete parent directory if it becomes empty
+    """
+    success = True
+    msg = ''
+    if file_name is None:
+        msg = 'Cannot delete file \'None\''
+    else:
+        pth, _ = os.path.split(file_name)
+        if file_name is not None and os.path.exists(file_name):
+            try:
+                os.remove(file_name)
+            except Exception as e:
+                success = False
+                msg = 'Failed to remove {}, {}'.format(file_name, str(e))
+            if delete_dir and len(os.listdir(pth)) == 0:
+                try:
+                    os.removedirs(pth)
+                except Exception as e:
+                    success = False
+                    msg = 'Failed to remove {}, {}'.format(pth, str(e))
+    return success, msg
+
+
+# ...............................................
+def ready_filename(fullfilename, overwrite=True):
+    if os.path.exists(fullfilename):
+        if overwrite:
+            try:
+                delete_file(fullfilename)
+            except Exception as e:
+                raise Exception('Unable to delete {} ({})'.format(fullfilename, e))
+            else:
+                return True
+        else:
+            return False
+    else:
+        pth, _ = os.path.split(fullfilename)
+        try:
+            os.makedirs(pth)
+        except:
+            pass
+
+        if os.path.isdir(pth):
+            return True
+        else:
+            raise Exception('Failed to create directories {}'.format(pth))
 
 
 # .............................................................................
@@ -69,8 +127,6 @@ def get_csv_dict_writer(csvfile, header, delimiter, fmode="w"):
     return writer, f
 
 
-
-
 # .............................................................................
 def get_csv_dict_reader(csvfile, delimiter, fieldnames=None, encoding=ENCODING, ignore_quotes=False):
     """Create a CSV dictionary writer and write the header.
@@ -117,6 +173,36 @@ def get_csv_dict_reader(csvfile, delimiter, fieldnames=None, encoding=ENCODING, 
         print('Opened file {} for dict read'.format(csvfile))
     return dreader, f
 
+
+# .............................................................................
+def get_logger(outpath, logname=None):
+    level = logging.DEBUG
+    if logname is not None:
+        logfname = os.path.join(outpath, logname + '.log')
+    else:
+        # get log filename
+        logname, _ = os.path.splitext(os.path.basename(__file__))
+        secs = time.time()
+        timestamp = "{}".format(time.strftime("%Y%m%d-%H%M", time.localtime(secs)))
+        logfname = os.path.join(outpath, logname + '.log')
+    ready_filename(logfname, overwrite=True)
+
+    # get logger
+    log = logging.getLogger(logname)
+    log.setLevel(level)
+
+    # create file handlers
+    handlers = []
+    handlers.append(RotatingFileHandler(
+        logfname, maxBytes=LOG.FILE_MAX_BYTES, backupCount=LOG.FILE_BACKUP_COUNT))
+    handlers.append(logging.StreamHandler())
+    # set handlers
+    formatter = logging.Formatter(LOG.FORMAT, LOG.DATE_FORMAT)
+    for fh in handlers:
+        fh.setLevel(level)
+        fh.setFormatter(formatter)
+        log.addHandler(fh)
+    return log
 
 
 # .............................................................................
