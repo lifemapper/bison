@@ -6,27 +6,32 @@ from bison.common.riis import ModRIIS
 
 
 class TestRIISInput(ModRIIS):
-    """Class for testing input authority and species files."""
+    """Class for testing input authority and riis files."""
 
     # .............................................................................
-    def __init__(self):
-        """Constructor sets the authority and species files and headers expected for BISON-RIIS processing."""
-        ModRIIS.__init__(self)
+    def __init__(self, basepath):
+        """Constructor sets the authority and riis files and headers expected for BISON-RIIS processing.
+
+        Args:
+            basepath (str): Path to the base of the input data, used to construct full
+                filenames from basepath and relative path constants.
+        """
+        ModRIIS.__init__(self, basepath)
 
     # .............................................................................
-    def _check_species_authorities(self):
-        """Test each authority in the species file references an authority in the authorities file.
+    def _check_riis_authorities(self):
+        """Test each authority in the riis file references an authority in the authorities file.
 
         Returns:
-            Dictionary of authority identifiers (key) referenced in the species file, with
-            list of values that are the line numbers in the species file where they occur.
+            Dictionary of authority identifiers (key) referenced in the riis file, with
+            list of values that are the line numbers in the riis file where they occur.
         """
         missing_authorities = {}
         authorities = self._read_authorities()
-        with open(self.species_fname, "r", newline="") as csvfile:
+        with open(self.riis_fname, "r", newline="") as csvfile:
             rdr = csv.DictReader(
                 csvfile,
-                fieldnames=self.species_header,
+                fieldnames=self.riis_header,
                 delimiter=RIIS.DELIMITER,
                 quotechar=RIIS.QUOTECHAR,
             )
@@ -110,36 +115,36 @@ class TestRIISInput(ModRIIS):
     def test_authority_structure(self):
         """Test the structure of the authority reference file."""
         row_count, short_lines, long_lines = self._examine_structure(
-            self.auth_fname, self.auth_header, RIIS_AUTHORITY.COUNT
+            self.auth_fname, self.auth_header, RIIS_AUTHORITY.DATA_COUNT
         )
         assert len(short_lines) == 0 and len(long_lines) == 0
 
     # .............................................................................
-    def test_species_structure(self):
-        """Test the structure of the species data file."""
+    def test_riis_structure(self):
+        """Test the structure of the riis data file."""
         row_count, short_lines, long_lines = self._examine_structure(
-            self.species_fname, self.species_header, RIIS_SPECIES.COUNT
+            self.riis_fname, self.riis_header, RIIS_SPECIES.DATA_COUNT
         )
         assert len(short_lines) == 0 and len(long_lines) == 0
 
     # .............................................................................
     def test_authority_keys(self):
-        """Test that all foreign authority keys in the species file exist in the authority reference file."""
-        missing_authorities = self._check_species_authorities()
+        """Test that all foreign authority keys in the riis file exist in the authority reference file."""
+        missing_authorities = self._check_riis_authorities()
         if missing_authorities:
             print(ERR_SEPARATOR)
-            print("[Error] Missing authority:  Line number/s in species file")
+            print("[Error] Missing authority:  Line number/s in riis file")
             for auth, line_nums in missing_authorities.items():
                 print('"{}": {}'.format(auth, line_nums))
         assert len(missing_authorities) == 0
 
     # .............................................................................
-    def test_species_records(self):
-        """Test that all foreign authority keys in the species file exist in the authority reference file."""
-        missing_authorities = self._check_species_authorities()
+    def test_riis_records(self):
+        """Test that all foreign authority keys in the riis file exist in the authority reference file."""
+        missing_authorities = self._check_riis_authorities()
         if missing_authorities:
             print(ERR_SEPARATOR)
-            print("[Error] Missing authority:  Line number/s in species file")
+            print("[Error] Missing authority:  Line number/s in riis file")
             for auth, line_nums in missing_authorities.items():
                 print('"{}": {}'.format(auth, line_nums))
         assert len(missing_authorities) == 0
@@ -147,11 +152,11 @@ class TestRIISInput(ModRIIS):
 
 # .............................................................................
 if __name__ == "__main__":
-    # Test number of rows and columns in authority and species files
+    # Test number of rows and columns in authority and riis files
     bison_pth = '/home/astewart/git/bison'
     Tst = TestRIISInput(bison_pth)
     Tst.test_authority_structure()
-    Tst.test_species_structure()
+    Tst.test_riis_structure()
 
-    # Test that authority foreign keys in species datafile are present in authorities file
+    # Test that authority foreign keys in riis datafile are present in authorities file
     Tst.test_authority_keys()

@@ -37,6 +37,7 @@ class GBIF:
     OCCID_FLD = "gbifID"
     NAME_FLD = "scientificName"
     TAXON_FLD = "taxonKey"
+    MATCH_FLD = "matchType"
     STATUS_FLD = "taxonomicStatus"
     ORG_FOREIGN_KEY = "publishingOrganizationKey"
     TEST_DATA = "gbif_2022-01-07_100k.csv"

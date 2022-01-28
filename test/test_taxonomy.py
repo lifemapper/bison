@@ -60,12 +60,12 @@ class TestRIISTaxonomy(ModRIIS):
                     rec1 = reclist[i]
                     rec2 = reclist[j]
                     if not rec1.is_gbif_match(rec2):
-                        msg = 'Sciname {} has authority {} GBIF key {} (line {})'.format(
-                            sciname, rec1.data[RIIS_SPECIES.TAXON_AUTHORITY_FLD],
-                            rec1.data[RIIS_SPECIES.GBIF_KEY], rec1.data[LINENO_FLD])
-                        msg += ' and authority {} GBIF key {} (line {})'.format(
-                            rec2.data[RIIS_SPECIES.TAXON_AUTHORITY_FLD],
-                            rec2.data[RIIS_SPECIES.GBIF_KEY], rec2.data[LINENO_FLD])
+                        auth1 = rec1.data[RIIS_SPECIES.TAXON_AUTHORITY_FLD]
+                        auth2 = rec2.data[RIIS_SPECIES.TAXON_AUTHORITY_FLD]
+                        msg = 'Sciname {} has record1 taxon authority {}, with GBIF key {} (line {})'.format(
+                            sciname, auth1, rec1.data[RIIS_SPECIES.GBIF_KEY], rec1.data[LINENO_FLD])
+                        msg += ' and record2 taxon authority {}, with GBIF key {} (line {})'.format(
+                            auth2, rec2.data[RIIS_SPECIES.GBIF_KEY], rec2.data[LINENO_FLD])
                         err_msgs.append(msg)
                     # assert reclist[i].is_gbif_match(reclist[j])
                     j += 1
@@ -110,12 +110,12 @@ class TestRIISTaxonomy(ModRIIS):
                     rec1 = reclist[i]
                     rec2 = reclist[j]
                     if not rec1.is_itis_match(rec2):
-                        msg = 'Sciname {} has authority {} ITIS key {} (line {})'.format(
-                            sciname, rec1.data[RIIS_SPECIES.TAXON_AUTHORITY_FLD],
-                            rec1.data[RIIS_SPECIES.ITIS_KEY], rec1.data[LINENO_FLD])
-                        msg += ' and authority {} ITIS key {} (line {})'.format(
-                            rec1.data[RIIS_SPECIES.TAXON_AUTHORITY_FLD],
-                            rec2.data[RIIS_SPECIES.ITIS_KEY], rec2.data[LINENO_FLD])
+                        auth1 = rec1.data[RIIS_SPECIES.TAXON_AUTHORITY_FLD]
+                        auth2 = rec2.data[RIIS_SPECIES.TAXON_AUTHORITY_FLD]
+                        msg = 'Sciname {} has record1 taxon authority {}, with ITIS key {} (line {})'.format(
+                            sciname, auth1, rec1.data[RIIS_SPECIES.ITIS_KEY], rec1.data[LINENO_FLD])
+                        msg += ' and record2 taxon authority {}, with ITIS key {} (line {})'.format(
+                            auth2, rec2.data[RIIS_SPECIES.ITIS_KEY], rec2.data[LINENO_FLD])
                         err_msgs.append(msg)
                     # assert reclist[i].is_itis_match(reclist[j])
                     j += 1
@@ -147,10 +147,8 @@ class TestRIISTaxonomy(ModRIIS):
                     RIIS_SPECIES.NEW_GBIF_KEY, rec1.name))
             else:
                 if not rec1.consistent_gbif_resolution():
-                    msg = "Old GBIF taxonKey {} / {} conflicts with ".format(
-                        rec1.data[RIIS_SPECIES.GBIF_KEY], sciname)
-                    msg += " resolved GBIF taxonKey {} / {}".format(
-                        rec1.data[RIIS_SPECIES.NEW_GBIF_KEY],
+                    msg = "File GBIF taxonKey {} / {} conflicts with API GBIF taxonKey {} / {}".format(
+                        rec1.data[RIIS_SPECIES.GBIF_KEY], sciname, rec1.data[RIIS_SPECIES.NEW_GBIF_KEY],
                         rec1.data[RIIS_SPECIES.NEW_GBIF_SCINAME_FLD])
                     err_msgs.append(msg)
         self._print_errors("Changed GBIF resolution", err_msgs)

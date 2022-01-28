@@ -3,6 +3,7 @@
 .idea/
 
 data/.~lock*
+data/*updated*csv
 
 venv/
 /.pytest_cache/
