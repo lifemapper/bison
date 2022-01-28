@@ -2,7 +2,7 @@
 import csv
 import os
 
-from bison.common.constants import (ERR_SEPARATOR, LINENO_FLD, RIIS, RIIS_AUTHORITY, RIIS_SPECIES)
+from bison.common.constants import (ERR_SEPARATOR, GBIF, LINENO_FLD, RIIS, RIIS_AUTHORITY, RIIS_SPECIES)
 from bison.tools.gbif_api import GbifSvc
 from bison.tools.util import get_csv_dict_writer
 
@@ -24,65 +24,49 @@ def standardize_name(sci_name, sci_author):
 # .............................................................................
 class RIISRec():
     """Class for comparing relevant fields in species data records."""
-    def __init__(
-            self, occ_key, kingdom, sci_name, sci_author, taxon_authority, gbif_key, itis_key, assessment, locality,
-            line_num, new_gbif_key=None, new_gbif_name=None):
+    def __init__(self, record, line_num, new_gbif_key=None, new_gbif_name=None):
         """Construct a small record to hold relevant data for a RIIS species/locality record.
 
         Args:
-            occ_key (str): identifier for this record
-            kingdom (str): kingdom for this scientific name
-            sci_name (str): canonical scientific name
-            sci_author (str): authorship for scientific name
-            taxon_authority (str): status (Accepted) and authority to use for taxonomic resolution (ITIS or GBIF)
-            gbif_key (int): GBIF TaxonKey, unique identifier for the accepted taxon
-            itis_key (int): ITIS TSN, unique identifier for the accepted taxon
-            assessment (str): Determination as `Introduced` or `Invasive` species for locality
-            locality (str): US locality of `AK`, `HI`, or `L48` (Alaska, Hawaii, or Lower 48)
-            line_num (int): line number in input data file for this record
+            record (dict): original US RIIS record
+            line_num (int): line number for this record in the original US RIIS file
             new_gbif_key (int): Newly resolved GBIF TaxonKey, unique identifier for the accepted taxon.
             new_gbif_name (str): Newly resolved GBIF scientific name to match new_gbif_key.
 
         Raises:
             ValueError: on non-integer GBIF taxonKey or non-integer ITIS TSN
         """
-        # Check GBIF taxon key
-        if not gbif_key:
-            gbif_key = -1
-        else:
-            try:
-                gbif_key = int(gbif_key)
-            except ValueError:
-                raise
-        # Check ITIS TSN
-        if not itis_key:
-            itis_key = -1
-        else:
-            try:
-                itis_key = int(itis_key)
-            except ValueError:
-                raise
-        # Trim taxonomy authority
-        prefix = 'Accepted '
-        if not taxon_authority.startswith(prefix):
-            print('taxon_authority {} in line {}'.format(taxon_authority, line_num))
-        else:
-            taxon_authority = taxon_authority[len(prefix):]
+        self.data = record
+        self.data[RIIS_SPECIES.NEW_GBIF_KEY] = new_gbif_key
+        self.data[RIIS_SPECIES.NEW_GBIF_SCINAME_FLD] = new_gbif_name
+        self.data[LINENO_FLD] = line_num
+        self.name = standardize_name(record[RIIS_SPECIES.SCINAME_FLD], record[RIIS_SPECIES.SCIAUTHOR_FLD])
 
-        self.name = standardize_name(sci_name, sci_author)
-        self.data = {
-            RIIS_SPECIES.KEY: occ_key,
-            RIIS_SPECIES.KINGDOM_FLD: kingdom,
-            RIIS_SPECIES.SCINAME_FLD: sci_name,
-            RIIS_SPECIES.SCIAUTHOR_FLD: sci_author,
-            RIIS_SPECIES.TAXON_AUTHORITY_FLD: taxon_authority,
-            RIIS_SPECIES.GBIF_KEY: gbif_key,
-            RIIS_SPECIES.ITIS_KEY: itis_key,
-            RIIS_SPECIES.ASSESSMENT_FLD: assessment,
-            RIIS_SPECIES.LOCALITY_FLD: locality,
-            RIIS_SPECIES.NEW_GBIF_KEY: new_gbif_key,
-            RIIS_SPECIES.NEW_GBIF_SCINAME_FLD: new_gbif_name,
-            LINENO_FLD: line_num}
+    # Set missing GBIF or ITIS key to -1
+        for fld in (RIIS_SPECIES.GBIF_KEY, RIIS_SPECIES.ITIS_KEY):
+            taxon_key = record[RIIS_SPECIES.GBIF_KEY]
+            if not taxon_key:
+                taxon_key = -1
+            else:
+                try:
+                    taxon_key = int(taxon_key)
+                except ValueError:
+                    raise
+            self.data[fld] = taxon_key
+
+        # Edit taxonomy authority to trim "Accepted "
+        prefix = 'Accepted '
+        taxon_authority = record[RIIS_SPECIES.TAXON_AUTHORITY_FLD]
+        try:
+            is_accepted = taxon_authority.startswith(prefix)
+        except AttributeError:
+            is_accepted = False
+        if is_accepted:
+            taxon_authority = taxon_authority[len(prefix):]
+        else:
+            print('taxon_authority value {} in line {}'.format(taxon_authority, line_num))
+        self.data[RIIS_SPECIES.TAXON_AUTHORITY_FLD] = taxon_authority
+
 
     # ...............................................
     def update_gbif_resolution(self, gbif_key, gbif_sciname):
@@ -218,22 +202,22 @@ class ModRIIS:
     """Class for reading, writing, comparing RIIS species data records."""
 
     # ...............................................
-    def __init__(self, base_path):
+    def __init__(self, basepath):
         """Constructor sets the authority and species files and headers expected for BISON-RIIS processing.
 
         Args:
-            base_path (str): Path to the base of the input data, used to construct full
-                filenames from base_path and relative path constants.
+            basepath (str): Path to the base of the input data, used to construct full
+                filenames from basepath and relative path constants.
         """
-        self._base_path = base_path
+        self._basepath = basepath
         self.auth_fname = "{}.{}".format(
-            os.path.join(self._base_path, RIIS.DATA_DIR, RIIS_AUTHORITY.FNAME), RIIS.DATA_EXT
+            os.path.join(self._basepath, RIIS.DATA_DIR, RIIS_AUTHORITY.FNAME), RIIS.DATA_EXT
         )
         self.riis_fname = "{}.{}".format(
-            os.path.join(self._base_path, RIIS.DATA_DIR, RIIS_SPECIES.FNAME), RIIS.DATA_EXT
+            os.path.join(self._basepath, RIIS.DATA_DIR, RIIS_SPECIES.FNAME), RIIS.DATA_EXT
         )
         self.test_riis_fname = "{}.{}".format(
-            os.path.join(self._base_path, RIIS.DATA_DIR, RIIS_SPECIES.DEV_FNAME), RIIS.DATA_EXT
+            os.path.join(self._basepath, RIIS.DATA_DIR, RIIS_SPECIES.DEV_FNAME), RIIS.DATA_EXT
         )
 
         # Test and clean headers of non-ascii characters
@@ -305,12 +289,7 @@ class ModRIIS:
                         new_gbif_key = new_gbif_name = None
                     # Create record of original data and optional new data
                     try:
-                        rec = RIISRec(
-                            row[RIIS_SPECIES.KEY], row[RIIS_SPECIES.KINGDOM_FLD], row[RIIS_SPECIES.SCINAME_FLD],
-                            row[RIIS_SPECIES.SCIAUTHOR_FLD], row[RIIS_SPECIES.TAXON_AUTHORITY_FLD],
-                            row[RIIS_SPECIES.GBIF_KEY], row[RIIS_SPECIES.ITIS_KEY],
-                            row[RIIS_SPECIES.ASSESSMENT_FLD], row[RIIS_SPECIES.LOCALITY_FLD], lineno,
-                            new_gbif_key=new_gbif_key, new_gbif_name=new_gbif_name)
+                        rec = RIISRec(row, lineno, new_gbif_key=new_gbif_key, new_gbif_name=new_gbif_name)
                     except ValueError:
                         row[LINENO_FLD] = lineno
                         self.bad_species[lineno] = row
@@ -325,27 +304,39 @@ class ModRIIS:
         name = None
         key = None
         msg = None
+        status = None
+        match_type = None
         if gbifrec:
-            sci_name_fld = "scientificName"
             try:
-                # Results from species/match?name=<name>
-                status = gbifrec["status"].lower()
-                key_fld = "usageKey"
-                accepted_key_fld = "acceptedUsageKey"
+                match_type = gbifrec[GBIF.MATCH_FLD]
             except KeyError:
-                # Results from species/<key>
-                status = gbifrec["taxonomicStatus"].lower()
-                key_fld = "key"
-                accepted_key_fld = "nubKey"
+                print('No match type in record')
 
-            if status == "accepted":
-                key = gbifrec[key_fld]
-                name = gbifrec[sci_name_fld]
-            else:
+            if match_type is not None and match_type != 'NONE':
                 try:
-                    key = gbifrec[accepted_key_fld]
+                    # Results from species/match?name=<name>
+                    status = gbifrec["status"].lower()
+                    key_fld = "usageKey"
+                    accepted_key_fld = "acceptedUsageKey"
                 except KeyError:
-                    msg = "No accepted key found in results {}".format(gbifrec)
+                    try:
+                        # Results from species/<key>
+                        status = gbifrec[GBIF.STATUS_FLD].lower()
+                        key_fld = "key"
+                        accepted_key_fld = "nubKey"
+                    except KeyError:
+                        print('Failed to get status from {}'.format(gbifrec))
+
+                if status is not None:
+                    if status == "accepted":
+                        key = gbifrec[key_fld]
+                        name = gbifrec[GBIF.NAME_FLD]
+                    else:
+                        # Return accepted key to use for another query
+                        try:
+                            key = gbifrec[accepted_key_fld]
+                        except KeyError:
+                            msg = "No accepted key found in results {}".format(gbifrec)
 
         return key, name, msg
 
@@ -369,11 +360,17 @@ class ModRIIS:
         for spname, reclist in self.nnsl.items():
             # Just get name/kingdom from first record
             rec1 = reclist[0]
+            taxkey = rec1.data[RIIS_SPECIES.GBIF_KEY]
             gbifrec = gbif_svc.query_for_name(
                 sciname=spname, kingdom=rec1.data[RIIS_SPECIES.KINGDOM_FLD])
 
             # Get match results
             new_key, new_name, msg = self._get_accepted_name_key(gbifrec)
+
+            # Match
+            if new_key != taxkey or new_name != spname:
+                msg = "File GBIF taxonKey {} / {} conflicts with API GBIF taxonKey {} / {}".format(
+                    taxkey, spname, new_key, new_name)
 
             # If match results are not 'accepted', query for the returned acceptedUsageKey
             if new_key and new_name is None:
