@@ -21,11 +21,14 @@ class ITISSvc(APISvc):
 
 # ...............................................
     def _get_data_from_url(self, url, resp_type='json'):
-        """Returns a JSON dictionary or ElementTree tree.
+        """Get data from an API query.
 
         Args:
             url (str): URL for the service
             resp_type (str): type of response
+
+        Returns:
+            a JSON dictionary or ElementTree tree.
         """
         data = None
         try:
@@ -45,10 +48,13 @@ class ITISSvc(APISvc):
 
 # ...............................................
     def get_itis_vernacular(self, tsn):
-        """Return vernacular names for an ITIS TSN.
+        """Query the ITIS API and get vernacular names for an ITIS TSN.
 
         Args:
             tsn: an ITIS code designating a taxonomic name
+
+        Returns:
+            vernacular names (list of str) for an ITIS TSN.
         """
         common_names = []
         if tsn is not None:
@@ -66,73 +72,98 @@ class ITISSvc(APISvc):
 
 # ...............................................
     def get_itis_name(self, tsn):
-        """Return an ITIS taxonomic name record for a TSN.
+        """Query the ITIS API and get an ITIS taxonomic name and kingdom for a TSN.
 
         Return the first accepted name used for a TSN (possibly designating an
         unaccepted name).
 
         Args:
             tsn: an ITIS code designating a taxonomic name
+
+        Returns:
+            accepted_name (str): accepted name for this TSN
+            kingdom (str): kingdom for this TSN
+
+        Raises:
+            Exception: on failure to find 'response' element
+            Exception: on failure to find 'docs' element
+
+        Note:
+            retrieved records without a 'usage' element are not eligible for return
         """
         accepted_name = kingdom = None
         url = "{}?q={}:{}&wt=json".format(ITIS_SOLR_URL, ITIS_TSN_KEY, tsn)
         output = self._get_data_from_url(url, resp_type='json')
         try:
             data = output["response"]
-        except Exception as e:
-            raise Exception("Failed to return response element {}".format(e))
-        try:
-            count = data['numFound']
         except KeyError:
-            print('No numFound value')
+            raise Exception("Failed to find 'response' element")
         try:
-            docs = data['docs']
+            docs = data["docs"]
         except KeyError:
-            raise Exception('Failed to return docs')
+            raise Exception("Failed to find 'docs' element")
+        # If > 1 are returned, examine until an accepted one is found, and return it
         for doc in docs:
-            usage = doc['usage']
-            if usage in ('accepted', 'valid'):
-                accepted_name = self._get_val(doc, 'nameWOInd')
-                kingdom = self._get_val(doc, 'kingdom')
+            try:
+                usage = doc["usage"]
+            except KeyError:
+                pass
+            else:
+                if usage in ("accepted", "valid"):
+                    accepted_name = self._get_val(doc, "nameWOInd")
+                    kingdom = self._get_val(doc, "kingdom")
+                    break
         return accepted_name, kingdom
 
 # ...............................................
     def get_itis_tsn(self, sciname):
-        """Return an ITIS TSN and its accepted name and kingdom for a scientific name.
+        """Query the ITIS API and get values for a scientific name.
 
         Args:
             sciname: a scientific name designating a taxon
+
+        Returns:
+            tsn (int): ITIS TSN matching this valid scientific name
+            accepted_name (str): accepted name for the returned TSN matching this valid scientific name
+            kingdom (str): kingdom for the returned TSN matching this valid scientific name
+            accepted_tsn_list (list of int): other accepted TSNs matching this *invalid* scientific name
+
+        Raises:
+            Exception: on failure to find 'response' element
+            Exception: on failure to find 'docs' element
+
+        Note:
+            retrieved records without a 'usage' element are not eligible for return
         """
         tsn = accepted_name = kingdom = None
         accepted_tsn_list = []
         escname = sciname
         for replaceStr, withStr in ITIS_URL_ESCAPES:
             escname = escname.replace(replaceStr, withStr)
-        url = '{}?q={}:{}&wt=json'.format(ITIS_SOLR_URL, ITIS_NAME_KEY,
-                                          escname)
+        url = "{}?q={}:{}&wt=json".format(ITIS_SOLR_URL, ITIS_NAME_KEY, escname)
         output = self._get_data_from_url(url, resp_type='json')
         try:
-            data = output['response']
+            data = output["response"]
         except KeyError:
-            raise Exception('Failed to return response element')
+            raise Exception("Failed to find 'response' element")
         try:
-            count = data['numFound']
+            docs = data["docs"]
         except KeyError:
-            print('No numFound value')
-        try:
-            docs = data['docs']
-        except KeyError:
-            raise Exception('Failed to return docs')
+            raise Exception("Failed to find 'docs' element")
 #         print('Reported/returned {}/{} docs for name {}'.format(count, len(docs), sciname))
         for doc in docs:
-            usage = doc['usage']
-            tsn = self._get_val(doc, 'tsn')
-            if usage in ('accepted', 'valid'):
-                accepted_name = self._get_val(doc, 'nameWOInd')
-                kingdom = self._get_val(doc, 'kingdom')
-                break
+            try:
+                usage = doc["usage"]
+            except KeyError:
+                pass
             else:
-                accepted_tsn_list = self._get_val(doc, 'acceptedTSN')
-#             print('Returned tsn {} acceptedTSN list {}, {} for {} name {}'
-#                   .format(tsn, accepted_tsn_list, kingdom, usage, sciname))
+                tsn = self._get_val(doc, 'tsn')
+                if usage in ("accepted", "valid"):
+                    accepted_name = self._get_val(doc, "nameWOInd")
+                    kingdom = self._get_val(doc, "kingdom")
+                    break
+                else:
+                    accepted_tsn_list = self._get_val(doc, "acceptedTSN")
+    #             print('Returned tsn {} acceptedTSN list {}, {} for {} name {}'
+    #                   .format(tsn, accepted_tsn_list, kingdom, usage, sciname))
         return tsn, accepted_name, kingdom, accepted_tsn_list

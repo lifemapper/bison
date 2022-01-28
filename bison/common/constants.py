@@ -7,13 +7,14 @@ ERR_SEPARATOR = "------------"
 ITIS_SOLR_URL = 'https://services.itis.gov/'
 ITIS_NAME_KEY = 'nameWOInd'
 ITIS_TSN_KEY = 'tsn'
-ITIS_URL_ESCAPES = [[ " ", r"\%20" ]]
+ITIS_URL_ESCAPES = [[" ", r"\%20"]]
 ITIS_VERNACULAR_QUERY = 'https://www.itis.gov/ITISWebService/services/ITISService/getCommonNamesFromTSN?tsn='
 ITIS_NAMESPACE = '{http://itis_service.itis.usgs.gov}'
 ITIS_DATA_NAMESPACE = '{http://data.itis_service.itis.usgs.gov/xsd}'
 
 
 class LOG:
+    """Constants for logging across the project."""
     INTERVAL = 1000000
     FORMAT = ' '.join([
         "%(asctime)s",

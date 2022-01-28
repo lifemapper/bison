@@ -19,6 +19,15 @@ class GbifSvc(APISvc):
 
     # ...............................................
     def _get_data_from_url(self, url, resp_type="json"):
+        """Get data from an API query.
+
+        Args:
+            url (str): URL for the service
+            resp_type (str): type of response
+
+        Returns:
+            a JSON dictionary or ElementTree tree.
+        """
         data = None
         try:
             response = requests.get(url)
@@ -63,6 +72,9 @@ class GbifSvc(APISvc):
 
         Returns:
             UUID for the dataset"s owning organization
+
+        Raises:
+            KeyError on missing publishingOrganizationKey field
         """
         publishingOrgUUID = None
         dataset_rec = self.query_for_dataset(dataset_key)

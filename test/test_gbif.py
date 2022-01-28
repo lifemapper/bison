@@ -10,22 +10,20 @@ class TestGBIFData(GBIFReader):
     """Class for testing downloaded simple GBIF CSV file."""
 
     # .............................................................................
-    def __init__(self, basepath, csvfile, logger):
+    def __init__(self, datapath, csvfile, logger):
         """Constructor sets the authority and species files and headers expected for BISON-RIIS processing.
 
         Args:
-            base_path (str): base file path for project execution
+            datapath (str): base directory for datafiles
+            csvfile (str): basename of file to read
+            logger (object): logger for saving relevant processing messages
         """
-        GBIFReader.__init__(self, basepath, csvfile, logger)
+        GBIFReader.__init__(self, datapath, csvfile, logger)
         self.open()
 
     # ...............................................
     def test_gbif_name_accepted(self):
-        """Open a GBIF datafile with a csv.DictReader.
-
-        Args:
-            csvfile(str): basename of file to read
-        """
+        """Open a GBIF datafile with a csv.DictReader."""
         svc = GbifSvc()
         self.open()
         for rec in self._gbif_reader:
@@ -48,21 +46,18 @@ class TestGBIFData(GBIFReader):
                     rec[GBIF.OCCID_FLD], rec[GBIF.NAME_FLD], taxkey, taxname))
 
 
-
-
-
 # .............................................................................
 if __name__ == "__main__":
-    outpath = "/home/astewart/git/bison/"
+    datapath = "/home/astewart/git/bison/data"
     logname = "test_gbif"
     csvfile = GBIF.TEST_DATA
 
     # Test the taxonkey contents in GBIF simple CSV download file
     # outpath, scriptname = os.path.split(__file__)
     # logname, _ = os.path.splitext(scriptname)
-    logger = get_logger(outpath, logname=logname)
+    logger = get_logger(datapath, logname=logname)
 
-    Tst = TestGBIFData(basepath, csvfile, logger)
+    Tst = TestGBIFData(datapath, csvfile, logger)
     Tst.test_gbif_name_accepted()
 
 """
