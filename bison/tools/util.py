@@ -16,6 +16,10 @@ def delete_file(file_name, delete_dir=False):
     Args:
         file_name (str): full path to the file to delete
         delete_dir (bool): flag - True to delete parent directory if it becomes empty
+
+    Returns:
+        True if file was not found, or file (and optional newly-empty parent directories) was successfully deleted.
+        False if failed to delete file (and parent directories).
     """
     success = True
     msg = ''
@@ -40,27 +44,47 @@ def delete_file(file_name, delete_dir=False):
 
 # ...............................................
 def ready_filename(fullfilename, overwrite=True):
+    """Delete file if it exists, optionally delete newly empty directory.
+
+    Args:
+        fullfilename (str): full path of the file to check
+        overwrite (bool): flag indicating whether to delete the file if it already exists
+
+    Returns:
+        True if file was not found, or file (and optional newly-empty parent directories) was successfully deleted.
+        False if failed to delete file (and parent directories).
+
+    Raises:
+        PermissionError: if unable to delete existing file when overwrite is true
+        Exception: on other delete errors or failure to create directories
+        PermissionError: if unable to create missing directories
+        Exception: on other mkdir errors
+        Exception: on failure to create directories
+    """
+    is_ready = True
     if os.path.exists(fullfilename):
         if overwrite:
             try:
                 delete_file(fullfilename)
+            except PermissionError:
+                raise
             except Exception as e:
                 raise Exception('Unable to delete {} ({})'.format(fullfilename, e))
-            else:
-                return True
         else:
-            return False
+            is_ready = False
     else:
         pth, _ = os.path.split(fullfilename)
         try:
             os.makedirs(pth)
-        except:
-            pass
+        except PermissionError:
+            raise
+        except Exception:
+            raise
 
-        if os.path.isdir(pth):
-            return True
-        else:
+        if not os.path.isdir(pth):
             raise Exception('Failed to create directories {}'.format(pth))
+
+    return is_ready
 
 
 # .............................................................................
@@ -143,22 +167,25 @@ def get_csv_dict_reader(csvfile, delimiter, fieldnames=None, encoding=ENCODING, 
         f (file handle)
 
     Raises:
-        Exception: on failure to open file
-        Exception: on failure to create a DictWriter
+        FileNotFoundError: on missing csvfile
+        PermissionError: on improper permissions on csvfile
+        Exception: on failure to parse first line into fieldnames
     """
     try:
         #  If csvfile is a file object, it should be opened with newline=""
         f = open(csvfile, "r", newline="", encoding=encoding)
-    except Exception as e:
-        raise e
+    except FileNotFoundError:
+        raise
+    except PermissionError:
+        raise
 
     if fieldnames is None:
         try:
             header = next(f)
             tmpflds = header.split(delimiter)
             fieldnames = [fld.strip() for fld in tmpflds]
-        except Exception as e:
-            raise e
+        except Exception:
+            raise
 
     # QUOTE_NONE or QUOTE_MINIMAL
     if ignore_quotes:
@@ -176,6 +203,15 @@ def get_csv_dict_reader(csvfile, delimiter, fieldnames=None, encoding=ENCODING, 
 
 # .............................................................................
 def get_logger(outpath, logname=None):
+    """Get a logger that logs to file and to console in an established format.
+
+    Args:
+        outpath (str): path for the logfile
+        logname: name for the logger and basename for the logfile.
+
+    Returns:
+         a logger
+    """
     level = logging.DEBUG
     if logname is not None:
         logfname = os.path.join(outpath, logname + '.log')
@@ -184,7 +220,7 @@ def get_logger(outpath, logname=None):
         logname, _ = os.path.splitext(os.path.basename(__file__))
         secs = time.time()
         timestamp = "{}".format(time.strftime("%Y%m%d-%H%M", time.localtime(secs)))
-        logfname = os.path.join(outpath, logname + '.log')
+        logfname = os.path.join(outpath, logname + '_{}.log'.format(timestamp))
     ready_filename(logfname, overwrite=True)
 
     # get logger

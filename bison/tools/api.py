@@ -103,7 +103,7 @@ class APISvc(object):
     def _get_val(self, rec, key):
         try:
             val = rec[key]
-        except:
+        except KeyError:
             val = None
         return val
 

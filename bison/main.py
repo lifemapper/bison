@@ -1,8 +1,7 @@
 """Process BISON RIIS and GBIF Species data to annotate GBIF records and aggregate results."""
 import argparse
 
-from bison.common.riis import ModRIIS, RIISRec
-from bison.common.occurrence import *
+from bison.common.riis import ModRIIS
 
 # ...............................................
 if __name__ == "__main__":
@@ -23,5 +22,5 @@ if __name__ == "__main__":
     bison.read_species()
     # Update species data
     bison.resolve_gbif_species()
-    bison.write_species(updated_species_fname)
+    bison.write_species()
     # Step through GBIF data and annotate with RIIS Ids

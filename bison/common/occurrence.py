@@ -5,6 +5,7 @@ import os
 from bison.common.constants import GBIF, ENCODING
 from bison.tools.util import get_csv_dict_reader, get_logger
 
+
 # .............................................................................
 class GBIFReader(object):
     """Class to read a GBIF simple CSV datafile.
@@ -29,7 +30,7 @@ class GBIFReader(object):
         self.datapath = datapath
         self.csvfile = os.path.join(datapath, csvfile)
         if logger is None:
-            logger = get_logger(outpath)
+            logger = get_logger(datapath)
         self._log = logger
 
         # Open file
@@ -42,20 +43,20 @@ class GBIFReader(object):
     def open(self):
         """Open a GBIF datafile with a csv.DictReader.
 
-        Args:
-            csvfile(str): basename of file to read
+        Raises:
+            Exception: on failure to open csvfile and get a csv.DictReader
         """
         try:
             self._gbif_reader, self._inf = get_csv_dict_reader(self.csvfile, GBIF.DWCA_DELIMITER, encoding=ENCODING)
-        except Exception as e:
-            raise(e)
+        except Exception:
+            raise
 
     # ...............................................
     def close(self):
         """Close input datafiles and output file."""
         try:
             self._inf.close()
-        except Exception:
+        except AttributeError:
             pass
         # Used only for reading from open gbif file to test bison transform
         self._gbif_reader = None
@@ -63,18 +64,27 @@ class GBIFReader(object):
     # ...............................................
     @property
     def is_open(self):
-        """Return true if any files are open."""
-        if not self._inf is None and not self._inf.closed:
+        """Return true if any files are open.
+
+        Returns:
+            :type bool, True if CSV file is open, False if CSV file is closed
+        """
+        if self._inf is not None and not self._inf.closed:
             return True
         return False
 
     # ...............................................
     @property
     def recno(self):
+        """Return the line number most recently read by the CSV reader.
+
+        Returns:
+            most recently read line number of the CSV reader.  If the CSV reader does not exist, return None.
+        """
         lineno = -1
         try:
             lineno = self._gbif_reader.line_num
-        except:
+        except AttributeError:
             pass
         return lineno
 
@@ -137,6 +147,7 @@ class GBIFReader(object):
 #         self._files.append(inf)
 #         # Pull the header row
 #         self._gbif_line, self.recno = getLine(self._gbif_reader, 0)
+
 
 # ...............................................
 if __name__ == '__main__':
