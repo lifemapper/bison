@@ -6,7 +6,7 @@
 
 ### GBIF
 * Download GBIF data, query https://www.gbif.org/occurrence/search?country=US&has_coordinate=true&has_geospatial_issue=false&occurrence_status=present 
-* Download format as Darwin Core Archive (The taxonKey and scientific name in "Simple CSV" data is not always accepted).
+* Download option Darwin Core Archive (The taxonKey and scientific name in Simple option is not always accepted).
 * Latest download: GBIF.org (31 January 2022) GBIF Occurrence Download  https://doi.org/10.15468/dl.7hpepm 
 
 ### USGS RIIS
