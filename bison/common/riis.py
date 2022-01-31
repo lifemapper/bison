@@ -2,9 +2,9 @@
 import csv
 import os
 
-from bison.common.constants import (ERR_SEPARATOR, GBIF, LINENO_FLD, RIIS, RIIS_AUTHORITY, RIIS_SPECIES)
+from bison.common.constants import (ERR_SEPARATOR, GBIF, LINENO_FLD, LOG, RIIS, RIIS_AUTHORITY, RIIS_SPECIES)
 from bison.tools.gbif_api import GbifSvc
-from bison.tools.util import get_csv_dict_writer
+from bison.tools.util import get_csv_dict_writer, get_logger
 
 
 # .............................................................................
@@ -42,9 +42,9 @@ class RIISRec():
         self.data[LINENO_FLD] = line_num
         self.name = standardize_name(record[RIIS_SPECIES.SCINAME_FLD], record[RIIS_SPECIES.SCIAUTHOR_FLD])
 
-    # Set missing GBIF or ITIS key to -1
+        # Set missing GBIF or ITIS key to -1
         for fld in (RIIS_SPECIES.GBIF_KEY, RIIS_SPECIES.ITIS_KEY):
-            taxon_key = record[RIIS_SPECIES.GBIF_KEY]
+            taxon_key = record[fld]
             if not taxon_key:
                 taxon_key = -1
             else:
@@ -66,6 +66,18 @@ class RIISRec():
         else:
             print('taxon_authority value {} in line {}'.format(taxon_authority, line_num))
         self.data[RIIS_SPECIES.TAXON_AUTHORITY_FLD] = taxon_authority
+
+    # ...............................................
+    def logit(self, msg):
+        """Log a message to the console or file.
+
+        Args:
+            msg (str): Message to be printed or written to file.
+        """
+        if self._log:
+            self._log.info(msg)
+        else:
+            print(msg)
 
 
     # ...............................................
@@ -198,33 +210,34 @@ class RIISRec():
 
 
 # .............................................................................
-class ModRIIS:
+class NNSL:
     """Class for reading, writing, comparing RIIS species data records."""
 
     # ...............................................
-    def __init__(self, basepath):
+    def __init__(self, datapath, logger=None):
         """Constructor sets the authority and species files and headers expected for BISON-RIIS processing.
 
         Args:
             basepath (str): Path to the base of the input data, used to construct full
                 filenames from basepath and relative path constants.
         """
-        self._basepath = basepath
+        self._datapath = datapath.rstrip(os.sep)
+        if logger is None:
+            logger = get_logger(datapath)
+        self._log = logger
         self.auth_fname = "{}.{}".format(
-            os.path.join(self._basepath, RIIS.DATA_DIR, RIIS_AUTHORITY.FNAME), RIIS.DATA_EXT
+            os.path.join(self._datapath, RIIS_AUTHORITY.FNAME), RIIS.DATA_EXT
         )
         self.riis_fname = "{}.{}".format(
-            os.path.join(self._basepath, RIIS.DATA_DIR, RIIS_SPECIES.FNAME), RIIS.DATA_EXT
+            os.path.join(self._datapath, RIIS_SPECIES.FNAME), RIIS.DATA_EXT
         )
         self.test_riis_fname = "{}.{}".format(
-            os.path.join(self._basepath, RIIS.DATA_DIR, RIIS_SPECIES.DEV_FNAME), RIIS.DATA_EXT
+            os.path.join(self._datapath, RIIS_SPECIES.DEV_FNAME), RIIS.DATA_EXT
         )
 
         # Test and clean headers of non-ascii characters
         self.auth_header = self._clean_header(self.auth_fname, RIIS_AUTHORITY.HEADER)
-        self.riis_header = self._clean_header(
-            self.riis_fname, RIIS_SPECIES.HEADER
-        )
+        self.riis_header = self._clean_header(self.riis_fname, RIIS_SPECIES.HEADER)
         # Trimmed and updated Non-native Species List, built from RIIS
         self.nnsl = None
         self.nnsl_header = None
@@ -305,14 +318,15 @@ class ModRIIS:
         key = None
         msg = None
         status = None
-        match_type = None
+
         if gbifrec:
             try:
                 match_type = gbifrec[GBIF.MATCH_FLD]
             except KeyError:
-                print('No match type in record')
+                match_type = 'unknown'
+                # print('No match type in record')
 
-            if match_type is not None and match_type != 'NONE':
+            if match_type != 'NONE':
                 try:
                     # Results from species/match?name=<name>
                     status = gbifrec["status"].lower()
@@ -350,7 +364,7 @@ class ModRIIS:
 
     # ...............................................
     def resolve_gbif_species(self):
-        """Test whether any full scientific names have more than one GBIF taxonKey."""
+        """Find the current accepted name and key from the GBIF taxonomic backbone for each scientific name."""
         msgdict = {}
         # New fields for GBIF resolution in species records
 
@@ -361,44 +375,100 @@ class ModRIIS:
             # Just get name/kingdom from first record
             rec1 = reclist[0]
             taxkey = rec1.data[RIIS_SPECIES.GBIF_KEY]
-            gbifrec = gbif_svc.query_for_name(
-                sciname=spname, kingdom=rec1.data[RIIS_SPECIES.KINGDOM_FLD])
+            kingdom = reclist[0].data[RIIS_SPECIES.KINGDOM_FLD]
 
-            # Get match results
-            new_key, new_name, msg = self._get_accepted_name_key(gbifrec)
-
-            # Match
-            if new_key != taxkey or new_name != spname:
-                msg = "File GBIF taxonKey {} / {} conflicts with API GBIF taxonKey {} / {}".format(
-                    taxkey, spname, new_key, new_name)
-
-            # If match results are not 'accepted', query for the returned acceptedUsageKey
-            if new_key and new_name is None:
-                self._add_msg(msgdict, spname, msg)
-                gbifrec2 = gbif_svc.query_for_name(taxkey=new_key)
-                # Replace new key and name with results of 2nd query
-                new_key, new_name, msg = self._get_accepted_name_key(gbifrec2)
+            # Try to match, if match is not 'accepted', repeat with returned accepted keys
+            new_key, new_name, msg = self._find_current_accepted_taxon(gbif_svc, spname, kingdom, taxkey)
+            self._add_msg(msgdict, spname, msg)
 
             # Supplement all records for this species with GBIF accepted key and name
             for sprec in reclist:
                 sprec.update_gbif_resolution(new_key, new_name)
 
     # ...............................................
-    def write_species(self, outfname=None):
-        """Write out species data with updated taxonKey and scientificName for current GBIF backbone taxonomy.
+    def _find_current_accepted_taxon(self, gbif_svc, sciname, kingdom, taxkey):
+        gbifrec = gbif_svc.query_for_name(sciname=sciname, kingdom=kingdom)
+
+        # Get match results
+        new_key, new_name, msg = self._get_accepted_name_key(gbifrec)
+
+        # Match
+        if new_key != taxkey or new_name != sciname:
+            msg = "File GBIF taxonKey {} / {} conflicts with API GBIF taxonKey {} / {}".format(
+                taxkey, sciname, new_key, new_name)
+
+        # If match results are not 'accepted', query for the returned acceptedUsageKey
+        if new_key and new_name is None:
+            # self._add_msg(msgdict, spname, msg)
+            gbifrec2 = gbif_svc.query_for_name(taxkey=new_key)
+            # Replace new key and name with results of 2nd query
+            new_key, new_name, msg = self._get_accepted_name_key(gbifrec2)
+
+        return new_key, new_name, msg
+
+    # ...............................................
+    def resolve_write_gbif_taxa(self, outfname=None):
+        """Find current accepted name and key from the GBIF taxonomic backbone for each name, write updated records."""
+        msgdict = {}
+        if not outfname:
+            outfname = self.gbif_resolved_riis_fname
+        # Read and get a record for its keys
+        rec1 = self._get_random_rec()
+        newheader = rec1.data.keys()
+        writer, outf = get_csv_dict_writer(outfname, newheader, RIIS.DELIMITER, fmode="w")
+
+        name_count = 0
+        gbif_svc = GbifSvc()
+        try:
+            for spname, reclist in self.nnsl.items():
+                name_count += 1
+                # Resolve each name, update each record (1-3) for that name
+                try:
+                    # Get name/kingdom from first record
+                    taxkey = reclist[0].data[RIIS_SPECIES.GBIF_KEY]
+                    kingdom = reclist[0].data[RIIS_SPECIES.KINGDOM_FLD]
+
+                    # Try to match, if match is not 'accepted', repeat with returned accepted keys
+                    new_key, new_name, msg = self._find_current_accepted_taxon(gbif_svc, spname, kingdom, taxkey)
+                    self._add_msg(msgdict, spname, msg)
+
+                    # Supplement all records for this name with GBIF accepted key and sciname, then write
+                    for rec in reclist:
+                        rec.update_gbif_resolution(new_key, new_name)
+                        # then write records
+                        try:
+                            writer.writerow(rec.data)
+                        except Exception as e:
+                            print("Failed to write {}, {}".format(rec.data, e))
+                            self._add_msg(msgdict, spname, 'Failed to write record {} ({})'.format(rec.data, e))
+
+                    if (name_count % LOG.INTERVAL) == 0:
+                        self.logit('*** NNSL Name {} ***'.format(name_count))
+
+                except Exception:
+                    self._add_msg(msgdict, spname, 'Failed to read records in dict')
+        except Exception as e:
+            self._add_msg(msgdict, 'unknown_error', '{}'.format(e))
+        finally:
+            outf.close()
+
+    # ...............................................
+    def _get_random_rec(self):
+        if not self.nnsl:
+            self.read_species()
+        # First name in keys, first record in value-list, keys from data attribute
+        name = list(self.nnsl.keys())[0]
+        rec1 = self.nnsl[name][0]
+        return rec1
+
+    # ...............................................
+    def write_species(self, outfname):
+        """Write species data to a CSV file.
 
         Args:
             outfname (str): full path and filename for output file.
         """
-        if not self.nnsl:
-            self.read_species()
-
-        if not outfname:
-            outfname = self.gbif_resolved_riis_fname
-
-        # First name in keys, first record in value-list, keys from data attribute
-        names = list(self.nnsl.keys())
-        rec1 = self.nnsl[names[0]][0]
+        rec1 = self._get_random_rec()
         header = rec1.data.keys()
 
         writer, outf = get_csv_dict_writer(outfname, header, RIIS.DELIMITER, fmode="w")
@@ -406,6 +476,7 @@ class ModRIIS:
             for reclist in self.nnsl.values():
                 for rec in reclist:
                     try:
+
                         writer.writerow(rec.data)
                     except Exception as e:
                         print("Failed to write {}, {}".format(rec.data, e))

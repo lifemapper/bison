@@ -1,11 +1,11 @@
 """Test the GBIF and ITIS taxonomic resolution provided in the US-RIIS table."""
 import os.path
 
-from bison.common.constants import (ERR_SEPARATOR, LINENO_FLD, RIIS_SPECIES)
-from bison.common.riis import ModRIIS
+from bison.common.constants import (DATA_PATH, ERR_SEPARATOR, LINENO_FLD, RIIS_SPECIES)
+from bison.common.riis import NNSL
 
 
-class TestRIISTaxonomy(ModRIIS):
+class TestRIISTaxonomy(NNSL):
     """Class for testing input authority and species files."""
 
     # .............................................................................
@@ -15,7 +15,7 @@ class TestRIISTaxonomy(ModRIIS):
         Args:
             base_path (str): base file path for project execution
         """
-        ModRIIS.__init__(self, base_path)
+        NNSL.__init__(self, base_path)
         self.read_species()
 
     # ...............................................
@@ -128,14 +128,13 @@ class TestRIISTaxonomy(ModRIIS):
         err_msgs = []
 
         # Clear species data, switch to test data, read
-        self.bad_species = {}
-        self.nnsl = {}
-        production_species_fname = self.riis_fname
-        self.riis_fname = self.test_riis_fname
-        self.read_species()
+        # self.nnsl = {}
+        # production_species_fname = self.riis_fname
+        # self.riis_fname = self.test_riis_fname
+        # self.read_species()
 
         # Update species data
-        self.resolve_gbif_species()
+        self.resolve_write_gbif_taxa()
 
         # Find mismatches
         for sciname, reclist in self.nnsl.items():
@@ -152,20 +151,15 @@ class TestRIISTaxonomy(ModRIIS):
                         rec1.data[RIIS_SPECIES.NEW_GBIF_SCINAME_FLD])
                     err_msgs.append(msg)
         self._print_errors("Changed GBIF resolution", err_msgs)
-        # Create output filename and write
-        basename, ext = os.path.splitext(self.riis_fname)
-        updated_species_fname = "{}_updated_gbif{}".format(basename, ext)
-        self.write_species(updated_species_fname)
 
         # Switch back to production species data
-        self.riis_fname = production_species_fname
-        self.read_species()
+        # self.riis_fname = production_species_fname
+        # self.read_species()
 
 
 # .............................................................................
 if __name__ == "__main__":
-    bison_pth = '/home/astewart/git/bison'
-    tt = TestRIISTaxonomy(bison_pth)
+    tt = TestRIISTaxonomy(DATA_PATH)
     tt.test_missing_taxon_authority_resolution()
     tt.test_taxonomy_keys()
     tt.test_duplicate_name_localities()
@@ -174,14 +168,9 @@ if __name__ == "__main__":
     tt.test_gbif_resolution()
 
 """
-import os.path
-
-from bison.common.constants import (ERR_SEPARATOR, LINENO_FLD, RIIS_SPECIES)
-from test.riis import ModRIIS
 from test.test_taxonomy import *
 
-bison_pth = '/home/astewart/git/bison'
-tt = TestRIISTaxonomy(bison_pth)
+tt = TestRIISTaxonomy(DATA_PATH)
 tt.test_missing_taxon_authority_resolution()
 tt.test_taxonomy_keys()
 tt.test_duplicate_name_localities()

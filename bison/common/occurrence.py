@@ -2,7 +2,7 @@
 
 import os
 
-from bison.common.constants import GBIF, ENCODING
+from bison.common.constants import GBIF, ENCODING, RIIS
 from bison.tools.util import get_csv_dict_reader, get_logger
 
 
@@ -26,8 +26,7 @@ class GBIFReader(object):
             logger (object): logger for saving relevant processing messages
         """
         # Remove any trailing /
-        datapath.rstrip(os.sep)
-        self.datapath = datapath
+        self._datapath = datapath.rstrip(os.sep)
         self.csvfile = os.path.join(datapath, csvfile)
         if logger is None:
             logger = get_logger(datapath)

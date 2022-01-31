@@ -76,6 +76,8 @@ def ready_filename(fullfilename, overwrite=True):
         pth, _ = os.path.split(fullfilename)
         try:
             os.makedirs(pth)
+        except FileExistsError:
+            pass
         except PermissionError:
             raise
         except Exception:
