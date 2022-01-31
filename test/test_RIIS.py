@@ -1,11 +1,11 @@
 """Test the structure, size, and content of input US-RIIS data files."""
 import csv
 
-from bison.common.constants import (ERR_SEPARATOR, RIIS, RIIS_AUTHORITY, RIIS_SPECIES)
-from bison.common.riis import ModRIIS
+from bison.common.constants import (DATA_PATH, ERR_SEPARATOR, RIIS, RIIS_AUTHORITY, RIIS_SPECIES)
+from bison.common.riis import NNSL
 
 
-class TestRIISInput(ModRIIS):
+class TestRIISInput(NNSL):
     """Class for testing input authority and riis files."""
 
     # .............................................................................
@@ -16,7 +16,7 @@ class TestRIISInput(ModRIIS):
             basepath (str): Path to the base of the input data, used to construct full
                 filenames from basepath and relative path constants.
         """
-        ModRIIS.__init__(self, basepath)
+        NNSL.__init__(self, basepath)
 
     # .............................................................................
     def _check_riis_authorities(self):
@@ -153,8 +153,7 @@ class TestRIISInput(ModRIIS):
 # .............................................................................
 if __name__ == "__main__":
     # Test number of rows and columns in authority and riis files
-    bison_pth = '/home/astewart/git/bison'
-    Tst = TestRIISInput(bison_pth)
+    Tst = TestRIISInput(DATA_PATH)
     Tst.test_authority_structure()
     Tst.test_riis_structure()
 

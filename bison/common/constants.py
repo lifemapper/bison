@@ -1,5 +1,6 @@
 """Constants for GBIF, BISON, RIIS, and processed outputs, used across modules."""
 
+DATA_PATH = '/home/astewart/git/bison/data'
 BISON_DELIMITER = "$"
 ENCODING = "utf-8"
 LINENO_FLD = "LINENO"
@@ -15,7 +16,7 @@ ITIS_DATA_NAMESPACE = '{http://data.itis_service.itis.usgs.gov/xsd}'
 
 class LOG:
     """Constants for logging across the project."""
-    INTERVAL = 1000000
+    INTERVAL = 1000
     FORMAT = ' '.join([
         "%(asctime)s",
         "%(funcName)s",
