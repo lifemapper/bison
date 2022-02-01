@@ -38,6 +38,8 @@ class GBIF:
     OCCID_FLD = "gbifID"
     NAME_FLD = "scientificName"
     TAXON_FLD = "taxonKey"
+    ACC_NAME_FLD = "acceptedScientificName"
+    ACC_TAXON_FLD = "acceptedTaxonKey"
     MATCH_FLD = "matchType"
     STATUS_FLD = "taxonomicStatus"
     ORG_FOREIGN_KEY = "publishingOrganizationKey"

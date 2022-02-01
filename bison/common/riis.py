@@ -79,7 +79,6 @@ class RIISRec():
         else:
             print(msg)
 
-
     # ...............................................
     def update_gbif_resolution(self, gbif_key, gbif_sciname):
         """Update the new gbif resolution fields in the data dictionary.
@@ -218,8 +217,9 @@ class NNSL:
         """Constructor sets the authority and species files and headers expected for BISON-RIIS processing.
 
         Args:
-            basepath (str): Path to the base of the input data, used to construct full
+            datapath (str): Path to the base of the input data, used to construct full
                 filenames from basepath and relative path constants.
+            logger (object): logger for writing messages to file and console
         """
         self._datapath = datapath.rstrip(os.sep)
         if logger is None:
@@ -364,7 +364,7 @@ class NNSL:
 
     # ...............................................
     def resolve_gbif_species(self):
-        """Find the current accepted name and key from the GBIF taxonomic backbone for each scientific name."""
+        """Resolve accepted name and key from the GBIF taxonomic backbone, add to self.nnsl."""
         msgdict = {}
         # New fields for GBIF resolution in species records
 
@@ -408,7 +408,11 @@ class NNSL:
 
     # ...............................................
     def resolve_write_gbif_taxa(self, outfname=None):
-        """Find current accepted name and key from the GBIF taxonomic backbone for each name, write updated records."""
+        """Resolve accepted name and key from the GBIF taxonomic backbone, write to file.
+
+        Args:
+            outfname (str): Full path and filename for updated RIIS records.
+        """
         msgdict = {}
         if not outfname:
             outfname = self.gbif_resolved_riis_fname

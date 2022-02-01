@@ -1,6 +1,4 @@
 """Test the GBIF and ITIS taxonomic resolution provided in the US-RIIS table."""
-import os.path
-
 from bison.common.constants import (DATA_PATH, ERR_SEPARATOR, LINENO_FLD, RIIS_SPECIES)
 from bison.common.riis import NNSL
 
