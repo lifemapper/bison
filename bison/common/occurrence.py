@@ -2,7 +2,7 @@
 
 import os
 
-from bison.common.constants import GBIF, ENCODING, RIIS
+from bison.common.constants import GBIF, ENCODING
 from bison.tools.util import get_csv_dict_reader, get_logger
 
 

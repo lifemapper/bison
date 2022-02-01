@@ -79,7 +79,6 @@ class RIISRec():
         else:
             print(msg)
 
-
     # ...............................................
     def update_gbif_resolution(self, gbif_key, gbif_sciname):
         """Update the new gbif resolution fields in the data dictionary.
@@ -294,6 +293,8 @@ class NNSL:
             for row in rdr:
                 lineno = rdr.line_num
                 if lineno > 1:
+                    # Use GBIF taxon key for dictionary key
+                    gbif_key = row[RIIS_SPECIES.GBIF_KEY]
                     # Read new gbif resolutions if they exist
                     try:
                         new_gbif_key = row[RIIS_SPECIES.NEW_GBIF_KEY]
@@ -306,11 +307,21 @@ class NNSL:
                     except ValueError:
                         row[LINENO_FLD] = lineno
                         self.bad_species[lineno] = row
+
+                    # Organize the records by species using the most up-to-date link to GBIF accepted name.
+                    # If no GBIF accepted name, use scientificName for later query into GBIF
+                    if new_gbif_key is not None:
+                        index = new_gbif_key
+                    elif gbif_key > 0:
+                        index = gbif_key
+                    else:
+                        index = rec.name
+
                     # Save to list of records for this species
                     try:
-                        self.nnsl[rec.name].append(rec)
+                        self.nnsl[index].append(rec)
                     except KeyError:
-                        self.nnsl[rec.name] = [rec]
+                        self.nnsl[index] = [rec]
 
     # ...............................................
     def _get_accepted_name_key(self, gbifrec):
@@ -371,35 +382,35 @@ class NNSL:
         if not self.nnsl:
             self.read_species()
         gbif_svc = GbifSvc()
-        for spname, reclist in self.nnsl.items():
+        for key_or_name, reclist in self.nnsl.items():
             # Just get name/kingdom from first record
             rec1 = reclist[0]
-            taxkey = rec1.data[RIIS_SPECIES.GBIF_KEY]
             kingdom = reclist[0].data[RIIS_SPECIES.KINGDOM_FLD]
 
-            # Try to match, if match is not 'accepted', repeat with returned accepted keys
-            new_key, new_name, msg = self._find_current_accepted_taxon(gbif_svc, spname, kingdom, taxkey)
-            self._add_msg(msgdict, spname, msg)
+            try:
+                int(key_or_name)
+            except:
+                # Try to match, if match is not 'accepted', repeat with returned accepted keys
+                new_key, new_name, msg = self._find_current_accepted_taxon(gbif_svc, key_or_name, kingdom)
+                self._add_msg(msgdict, key_or_name, msg)
 
-            # Supplement all records for this species with GBIF accepted key and name
-            for sprec in reclist:
-                sprec.update_gbif_resolution(new_key, new_name)
+                # Supplement all records for this species with GBIF accepted key and name
+                for sprec in reclist:
+                    sprec.update_gbif_resolution(new_key, new_name)
 
     # ...............................................
-    def _find_current_accepted_taxon(self, gbif_svc, sciname, kingdom, taxkey):
+    def _find_current_accepted_taxon(self, gbif_svc, sciname, kingdom):
         gbifrec = gbif_svc.query_for_name(sciname=sciname, kingdom=kingdom)
 
         # Get match results
         new_key, new_name, msg = self._get_accepted_name_key(gbifrec)
 
         # Match
-        if new_key != taxkey or new_name != sciname:
-            msg = "File GBIF taxonKey {} / {} conflicts with API GBIF taxonKey {} / {}".format(
-                taxkey, sciname, new_key, new_name)
+        if new_name != sciname:
+            msg = "File sciname {} resolved to GBIF taxonKey {} / {}".format(sciname, new_key, new_name)
 
-        # If match results are not 'accepted', query for the returned acceptedUsageKey
-        if new_key and new_name is None:
-            # self._add_msg(msgdict, spname, msg)
+        # If new_key results are not 'accepted', query for the returned acceptedUsageKey
+        if new_key is not None and new_name is None:
             gbifrec2 = gbif_svc.query_for_name(taxkey=new_key)
             # Replace new key and name with results of 2nd query
             new_key, new_name, msg = self._get_accepted_name_key(gbifrec2)
