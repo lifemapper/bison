@@ -45,18 +45,8 @@ class Annotator():
             elif (self._gbif_rdr.recno % LOG.INTERVAL) == 0:
                 self.logit('*** Record number {} ***'.format(self._gbif_rdr.recno))
 
-            taxkey = rec[GBIF.TAXON_FLD]
+            taxkey = rec[GBIF.ACC_TAXON_FLD]
+            sciname = rec[GBIF.ACC_NAME_FLD]
 
-            if taxkey
-            # API data
-            taxdata = svc.query_for_name(taxkey=taxkey)
-            taxstatus = taxdata[GBIF.STATUS_FLD]
-            taxname = taxdata[GBIF.NAME_FLD]
-            # Make sure simple CSV data taxonkey is accepted
-            if taxstatus.lower() != "accepted":
-                self.logit("Record {} taxon key {} is not an accepted name {}".format(
-                    rec[GBIF.OCCID_FLD], taxkey, taxstatus))
-            # Make sure simple CSV data sciname matches name for taxonkey
-            if rec[GBIF.NAME_FLD] != taxname:
-                self.logit("Record {} name {} does not match taxon key {} name {}".format(
-                    rec[GBIF.OCCID_FLD], rec[GBIF.NAME_FLD], taxkey, taxname))
+            if self.nnsl
+
