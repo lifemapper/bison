@@ -5,9 +5,9 @@
 ## Data Inputs
 
 ### GBIF
-* Download GBIF data, query https://www.gbif.org/occurrence/search?country=US&has_coordinate=true&has_geospatial_issue=false&occurrence_status=present 
+* Download GBIF data, query https://www.gbif.org/occurrence/search?country=US&has_coordinate=true&has_geospatial_issue=false&occurrence_status=present
 * Download option Darwin Core Archive (The taxonKey and scientific name in Simple option is not always accepted).
-* Latest download: GBIF.org (31 January 2022) GBIF Occurrence Download  https://doi.org/10.15468/dl.7hpepm 
+* Latest download: GBIF.org (31 January 2022) GBIF Occurrence Download  https://doi.org/10.15468/dl.7hpepm
 
 ### USGS RIIS
 United States Register of Introduced and Invasive Species (US-RIIS)
