@@ -4,6 +4,8 @@
 
 data/.~lock*
 data/*updated*csv
+data/*log
+data/gbif*csv
 
 venv/
 /.pytest_cache/
