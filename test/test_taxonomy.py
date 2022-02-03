@@ -1,6 +1,9 @@
 """Test the GBIF and ITIS taxonomic resolution provided in the US-RIIS table."""
-from bison.common.constants import (DATA_PATH, ERR_SEPARATOR, LINENO_FLD, RIIS_SPECIES)
+import os
+
+from bison.common.constants import (DATA_PATH, ERR_SEPARATOR, LINENO_FLD, RIIS, RIIS_SPECIES)
 from bison.common.riis import NNSL
+from bison.tools.util import ready_filename
 
 
 class TestRIISTaxonomy(NNSL):
@@ -121,21 +124,32 @@ class TestRIISTaxonomy(NNSL):
         self._print_errors("ITIS tsn conflicts", err_msgs)
 
     # ...............................................
-    def test_gbif_resolution(self):
-        """Record changed GBIF taxonomic resolutions and write updated records."""
+    def test_gbif_resolution(self, test_fname=None):
+        """Record changed GBIF taxonomic resolutions and write updated records.
+
+        Args:
+            test_fname (str): full filename for testing input RIIS file.
+        """
         err_msgs = []
 
-        # Clear species data, switch to test data, read
-        # self.nnsl = {}
-        # production_species_fname = self.riis_fname
-        # self.riis_fname = self.test_riis_fname
-        # self.read_species()
+        if test_fname is not None:
+            # Clear species data, switch to test data, read
+            self.nnsl = {}
+            production_species_fname = self.riis_fname
+            self.riis_fname = "{}.{}".format(
+                os.path.join(self._datapath, test_fname), RIIS.DATA_EXT
+            )
+            overwrite = True
+            if ready_filename(self.gbif_resolved_riis_fname, overwrite=overwrite):
+                self.read_species()
+        else:
+            overwrite = False
 
         # Update species data
-        self.resolve_write_gbif_taxa()
+        self.resolve_write_gbif_taxa(overwrite=overwrite)
 
         # Find mismatches
-        for sciname, reclist in self.nnsl.items():
+        for key, reclist in self.nnsl.items():
             rec1 = reclist[0]
             try:
                 rec1.data[RIIS_SPECIES.NEW_GBIF_KEY]
@@ -144,15 +158,20 @@ class TestRIISTaxonomy(NNSL):
                     RIIS_SPECIES.NEW_GBIF_KEY, rec1.name))
             else:
                 if not rec1.consistent_gbif_resolution():
-                    msg = "File GBIF taxonKey {} / {} conflicts with API GBIF taxonKey {} / {}".format(
-                        rec1.data[RIIS_SPECIES.GBIF_KEY], sciname, rec1.data[RIIS_SPECIES.NEW_GBIF_KEY],
+                    msg = "File key {} GBIF taxonKey {} / {} conflicts with API GBIF taxonKey {} / {}".format(
+                        key,
+                        rec1.data[RIIS_SPECIES.GBIF_KEY],
+                        rec1.data[RIIS_SPECIES.SCINAME_FLD],
+
+                        rec1.data[RIIS_SPECIES.NEW_GBIF_KEY],
                         rec1.data[RIIS_SPECIES.NEW_GBIF_SCINAME_FLD])
                     err_msgs.append(msg)
         self._print_errors("Changed GBIF resolution", err_msgs)
 
-        # Switch back to production species data
-        # self.riis_fname = production_species_fname
-        # self.read_species()
+        if test_fname is not None:
+            # Switch back to production species data
+            self.riis_fname = production_species_fname
+            self.read_species()
 
 
 # .............................................................................
@@ -163,7 +182,7 @@ if __name__ == "__main__":
     tt.test_duplicate_name_localities()
     tt.test_gbif_resolution_inconsistency()
     tt.test_itis_resolution_inconsistency()
-    tt.test_gbif_resolution()
+    tt.test_gbif_resolution(test_fname=RIIS_SPECIES.TEST_FNAME)
 
 """
 from test.test_taxonomy import *
