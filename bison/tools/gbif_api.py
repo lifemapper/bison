@@ -85,36 +85,40 @@ class GbifSvc(APISvc):
         return publishingOrgUUID
 
     # ...............................................
-    def query_for_name(self, taxkey=None, sciname=None, kingdom=None):
+    def query_by_namekey(self, taxkey):
         """Query the GBIF species service for taxonomic name elements.
 
         Args:
             taxkey (str): GBIF unique identifier for a taxonomic record
+
+        Returns:
+            a dictionary of name elements
+        """
+        url = "{}{}".format(GBIF.TAXON_URL(), taxkey)
+        data = self._get_data_from_url(url)
+
+        return data
+
+    # ...............................................
+    def query_by_name(self, sciname, kingdom=None):
+        """Query the GBIF species service for taxonomic name elements.
+
+        Args:
             sciname (str): Scientific name for a scientific record
             kingdom (str): Kingdom for scientific name to search
 
         Returns:
-            a dictionary of name elements
-
-        Raises:
-            Exception: on failure to provide either taxkey or sciname.
+            a dictionary of name elements, with possible alternate matches
         """
-        if taxkey is not None:
-            url = "{}{}".format(GBIF.TAXON_URL(), taxkey)
-            data = self._get_data_from_url(url)
-
-        elif sciname is not None:
-            # for replaceStr, withStr in GBIF.URL_ESCAPES:
-            #     sciname = sciname.replace(replaceStr, withStr)
-            url = "{}?name={}".format(GBIF.FUZZY_TAXON_URL(), sciname)
-            if kingdom:
-                url = "{}&kingdom={}".format(url, kingdom)
-            data = self._get_data_from_url(url)
-            if data is not None:
-                if type(data) is list and len(data) > 0:
-                    data = data[0]
-        else:
-            raise Exception("Must provide taxkey or sciname")
+        # for replaceStr, withStr in GBIF.URL_ESCAPES:
+        #     sciname = sciname.replace(replaceStr, withStr)
+        url = "{}?name={}".format(GBIF.FUZZY_TAXON_URL(), sciname)
+        if kingdom:
+            url = "{}&kingdom={}".format(url, kingdom)
+        data = self._get_data_from_url(url)
+        if data is not None:
+            if type(data) is list and len(data) > 0:
+                data = data[0]
 
         return data
 
