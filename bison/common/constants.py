@@ -12,6 +12,24 @@ ITIS_URL_ESCAPES = [[" ", r"\%20"]]
 ITIS_VERNACULAR_QUERY = 'https://www.itis.gov/ITISWebService/services/ITISService/getCommonNamesFromTSN?tsn='
 ITIS_NAMESPACE = '{http://itis_service.itis.usgs.gov}'
 ITIS_DATA_NAMESPACE = '{http://data.itis_service.itis.usgs.gov/xsd}'
+RANKS = [
+    "ABERRATION", "CLASS", "COHORT", "CONVARIETY", "CULTIVAR", "CULTIVAR_GROUP",
+    "FAMILY", "FORM", "FORMA_SPECIALIS", "GENUS", "GRANDORDER", "GREX", "INFRACLASS",
+    "INFRACOHORT", "INFRAFAMILY", "INFRAGENERIC_NAME", "INFRAGENUS", "INFRAKINGDOM",
+    "INFRALEGION", "INFRAORDER", "INFRAPHYLUM", "INFRASPECIFIC_NAME",
+    "INFRASUBSPECIFIC_NAME", "INFRATRIBE", "KINGDOM", "LEGION", "MORPH", "NATIO",
+    "ORDER", "OTHER", "PARVCLASS", "PARVORDER", "PATHOVAR", "PHAGOVAR", "PHYLUM",
+    "PROLES", "RACE", "SECTION", "SERIES", "SEROVAR", "SPECIES", "SPECIES_AGGREGATE",
+    "STRAIN", "SUBCLASS", "SUBCOHORT", "SUBFAMILY", "SUBFORM", "SUBGENUS", "SUBKINGDOM",
+    "SUBLEGION", "SUBORDER", "SUBPHYLUM", "SUBSECTION", "SUBSERIES", "SUBSPECIES",
+    "SUBTRIBE", "SUBVARIETY", "SUPERCLASS", "SUPERCOHORT", "SUPERFAMILY", "SUPERKINGDOM",
+    "SUPERLEGION", "SUPERORDER", "SUPERPHYLUM", "SUPERTRIBE", "SUPRAGENERIC_NAME",
+    "TRIBE", "UNRANKED", "VARIETY"]
+RANKS_BELOW_SPECIES = [
+    "FORM", "SUBFORM",
+    "FORMA_SPECIALIS",
+    "SUBSPECIES",
+    "SUBVARIETY", "VARIETY"]
 
 
 class LOG:
@@ -43,7 +61,7 @@ class GBIF:
     MATCH_FLD = "matchType"
     STATUS_FLD = "taxonomicStatus"
     ORG_FOREIGN_KEY = "publishingOrganizationKey"
-    TEST_DATA = "gbif_2022-01-07_100k.csv"
+    TEST_DATA = "gbif_2022-01-31_100k.csv"
     DWCA_DATASET_DIR = "dataset"
     DWCA_META_FNAME = "meta.xml"
     DWCA_INTERPRETED = "occurrence"
@@ -198,7 +216,7 @@ class RIIS_AUTHORITY:
 class RIIS_SPECIES:
     """Introduced or Invasive Species List."""
     FNAME = "US-RIIS_MasterList"
-    DEV_FNAME = "US-RIIS_MasterList_10"
+    TEST_FNAME = "US-RIIS_MasterList_10"
     DATA_COUNT = 15264
     KEY = "occurrenceID"
     GBIF_KEY = "GBIF taxonKey"
@@ -209,6 +227,7 @@ class RIIS_SPECIES:
     KINGDOM_FLD = "kingdom"
     SCINAME_FLD = "scientificName"
     SCIAUTHOR_FLD = "scientificNameAuthorship"
+    RANK_FLD = "taxonRank"
     ASSESSMENT_FLD = "Introduced or Invasive"
     TAXON_AUTHORITY_FLD = "taxonomicStatus"
     HEADER = [

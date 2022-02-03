@@ -2,9 +2,10 @@
 import csv
 import os
 
-from bison.common.constants import (ERR_SEPARATOR, GBIF, LINENO_FLD, LOG, RIIS, RIIS_AUTHORITY, RIIS_SPECIES)
+from bison.common.constants import (
+    ERR_SEPARATOR, GBIF, LINENO_FLD, LOG, RIIS, RIIS_AUTHORITY, RIIS_SPECIES)
 from bison.tools.gbif_api import GbifSvc
-from bison.tools.util import get_csv_dict_writer, get_logger
+from bison.tools.util import get_csv_dict_writer, get_logger, logit
 
 
 # .............................................................................
@@ -68,19 +69,7 @@ class RIISRec():
         self.data[RIIS_SPECIES.TAXON_AUTHORITY_FLD] = taxon_authority
 
     # ...............................................
-    def logit(self, msg):
-        """Log a message to the console or file.
-
-        Args:
-            msg (str): Message to be printed or written to file.
-        """
-        if self._log:
-            self._log.info(msg)
-        else:
-            print(msg)
-
-    # ...............................................
-    def update_gbif_resolution(self, gbif_key, gbif_sciname):
+    def update_data(self, gbif_key, gbif_sciname):
         """Update the new gbif resolution fields in the data dictionary.
 
         Args:
@@ -231,9 +220,6 @@ class NNSL:
         self.riis_fname = "{}.{}".format(
             os.path.join(self._datapath, RIIS_SPECIES.FNAME), RIIS.DATA_EXT
         )
-        self.test_riis_fname = "{}.{}".format(
-            os.path.join(self._datapath, RIIS_SPECIES.DEV_FNAME), RIIS.DATA_EXT
-        )
 
         # Test and clean headers of non-ascii characters
         self.auth_header = self._clean_header(self.auth_fname, RIIS_AUTHORITY.HEADER)
@@ -313,7 +299,7 @@ class NNSL:
                     # If no GBIF accepted name, use scientificName for later query into GBIF
                     if new_gbif_key is not None:
                         index = new_gbif_key
-                    elif gbif_key > 0:
+                    elif gbif_key not in (None, "", "-1"):
                         index = gbif_key
                     else:
                         index = rec.name
@@ -324,46 +310,120 @@ class NNSL:
                     except KeyError:
                         self.nnsl[index] = [rec]
 
+    # # ...............................................
+    # def _get_accepted_name_key_from_match(self, gbifrec):
+    #     name = None
+    #     key = None
+    #     msg = None
+    #     status = None
+    #
+    #     if gbifrec:
+    #         try:
+    #             match_type = gbifrec[GBIF.MATCH_FLD]
+    #         except KeyError:
+    #             match_type = 'unknown'
+    #             # print('No match type in record')
+    #
+    #         if match_type != 'NONE':
+    #             try:
+    #                 # Results from species/match?name=<name>
+    #                 status = gbifrec["status"].lower()
+    #                 key_fld = "usageKey"
+    #                 accepted_key_fld = "acceptedUsageKey"
+    #             except KeyError:
+    #                 try:
+    #                     # Results from species/<key>
+    #                     status = gbifrec[GBIF.STATUS_FLD].lower()
+    #                     key_fld = "key"
+    #                     accepted_key_fld = "acceptedKey"
+    #                     accepted_name_fld = "accepted"
+    #                 except KeyError:
+    #                     print('Failed to get status from {}'.format(gbifrec))
+    #
+    #             if status is not None:
+    #                 if status == "accepted":
+    #                     key = gbifrec[key_fld]
+    #                     name = gbifrec[GBIF.NAME_FLD]
+    #                 else:
+    #                     # Return accepted key to use for another query
+    #                     try:
+    #                         key = gbifrec[accepted_key_fld]
+    #                     except KeyError:
+    #                         msg = "No accepted key found in results {}".format(gbifrec)
+    #
+    #     return key, name, msg
+
     # ...............................................
-    def _get_accepted_name_key(self, gbifrec):
+    def _get_alternatives(self, gbifrec):
+        name = None
+        key = None
+        try:
+            alternatives = gbifrec["alternatives"]
+        except KeyError:
+            pass
+        else:
+            # Take the first accepted alternative, assuming ranked high-low confidence
+            for alt in alternatives:
+                try:
+                    status = alt["status"].lower()
+                except KeyError:
+                    print("Failed to get status from alternative {}".format(alt))
+                else:
+                    if status == "accepted":
+                        key = alt["usageKey"]
+                        name = alt["scientificName"]
+                    else:
+                        try:
+                            key = alt["acceptedUsageKey"]
+                        except KeyError:
+                            pass
+        return key, name
+
+    # ...............................................
+    def _get_accepted_name_key_from_match(self, gbifrec):
         name = None
         key = None
         msg = None
-        status = None
-
-        if gbifrec:
-            try:
-                match_type = gbifrec[GBIF.MATCH_FLD]
-            except KeyError:
-                match_type = 'unknown'
-                # print('No match type in record')
-
+        try:
+            # Results from fuzzy match search (species/match?name=<name>)
+            match_type = gbifrec[GBIF.MATCH_FLD]
+        except KeyError:
+            print('Failed to get matchType from {}'.format(gbifrec))
+        else:
             if match_type != 'NONE':
                 try:
                     # Results from species/match?name=<name>
                     status = gbifrec["status"].lower()
-                    key_fld = "usageKey"
-                    accepted_key_fld = "acceptedUsageKey"
                 except KeyError:
-                    try:
-                        # Results from species/<key>
-                        status = gbifrec[GBIF.STATUS_FLD].lower()
-                        key_fld = "key"
-                        accepted_key_fld = "nubKey"
-                    except KeyError:
-                        print('Failed to get status from {}'.format(gbifrec))
-
-                if status is not None:
+                    print('Failed to get status from {}'.format(gbifrec))
+                else:
                     if status == "accepted":
-                        key = gbifrec[key_fld]
-                        name = gbifrec[GBIF.NAME_FLD]
+                        key = gbifrec["usageKey"]
+                        name = gbifrec["scientificName"]
                     else:
-                        # Return accepted key to use for another query
                         try:
-                            key = gbifrec[accepted_key_fld]
+                            key = gbifrec["acceptedUsageKey"]
                         except KeyError:
-                            msg = "No accepted key found in results {}".format(gbifrec)
+                            key, name = self._get_alternatives(gbifrec)
+        return key, name, msg
 
+    # ...............................................
+    def _get_accepted_name_key_from_get(self, gbifrec):
+        name = None
+        key = None
+        msg = None
+        try:
+            # Results from species/<key>
+            status = gbifrec[GBIF.STATUS_FLD].lower()
+        except KeyError:
+            msg = 'Failed to get status from {}'.format(gbifrec)
+        else:
+            if status == "accepted":
+                key = gbifrec["key"]
+                name = gbifrec["scientificName"]
+            else:
+                key = gbifrec["acceptedKey"]
+                name = gbifrec["accepted"]
         return key, name, msg
 
     # ...............................................
@@ -378,51 +438,54 @@ class NNSL:
     def resolve_gbif_species(self):
         """Resolve accepted name and key from the GBIF taxonomic backbone, add to self.nnsl."""
         msgdict = {}
-        # New fields for GBIF resolution in species records
-
         if not self.nnsl:
             self.read_species()
         gbif_svc = GbifSvc()
         for key_or_name, reclist in self.nnsl.items():
-            # Just get name/kingdom from first record
-            kingdom = reclist[0].data[RIIS_SPECIES.KINGDOM_FLD]
+            # Use name, key values from first record
+            data = reclist[0].data
+            # Try to match, if match is not 'accepted', repeat with returned accepted keys
+            new_key, new_name, msg = self._find_current_accepted_taxon(
+                gbif_svc, data[RIIS_SPECIES.SCINAME_FLD],
+                data[RIIS_SPECIES.KINGDOM_FLD],
+                data[RIIS_SPECIES.GBIF_KEY])
+            self._add_msg(msgdict, key_or_name, msg)
 
-            try:
-                int(key_or_name)
-            except ValueError:
-                # Try to match, if match is not 'accepted', repeat with returned accepted keys
-                new_key, new_name, msg = self._find_current_accepted_taxon(gbif_svc, key_or_name, kingdom)
-                self._add_msg(msgdict, key_or_name, msg)
-
-                # Supplement all records for this species with GBIF accepted key and name
-                for sprec in reclist:
-                    sprec.update_gbif_resolution(new_key, new_name)
+            # Supplement all records for this species with GBIF accepted key and name
+            for sprec in reclist:
+                sprec.update_gbif_resolution(new_key, new_name)
 
     # ...............................................
-    def _find_current_accepted_taxon(self, gbif_svc, sciname, kingdom):
-        gbifrec = gbif_svc.query_for_name(sciname=sciname, kingdom=kingdom)
+    def _find_current_accepted_taxon(self, gbif_svc, sciname, kingdom, taxkey):
+        # Query GBIF with the name/kingdom
+        gbifrec = gbif_svc.query_by_name(sciname, kingdom=kingdom)
 
-        # Get match results
-        new_key, new_name, msg = self._get_accepted_name_key(gbifrec)
+        # Interpret match results
+        new_key, new_name, msg = self._get_accepted_name_key_from_match(gbifrec)
 
-        # Match
-        if new_name != sciname:
-            msg = "File sciname {} resolved to GBIF taxonKey {} / {}".format(sciname, new_key, new_name)
+        if new_name is None:
+            # Try again, query GBIF with the returned acceptedUsageKey (new_key)
+            if new_key is not None and new_name is None:
+                gbifrec2 = gbif_svc.query_by_namekey(taxkey=new_key)
+                # Replace new key and name with results of 2nd query
+                new_key, new_name, msg = self._get_accepted_name_key_from_get(gbifrec2)
 
-        # If new_key results are not 'accepted', query for the returned acceptedUsageKey
-        if new_key is not None and new_name is None:
-            gbifrec2 = gbif_svc.query_for_name(taxkey=new_key)
-            # Replace new key and name with results of 2nd query
-            new_key, new_name, msg = self._get_accepted_name_key(gbifrec2)
+        if new_key != taxkey:
+            print("File taxonKey/sciname {}/{} resolved to GBIF taxonKey {}/{}".format(
+                taxkey, sciname, new_key, new_name))
 
         return new_key, new_name, msg
 
     # ...............................................
-    def resolve_write_gbif_taxa(self, outfname=None):
+    def resolve_write_gbif_taxa(self, outfname=None, overwrite=True):
         """Resolve accepted name and key from the GBIF taxonomic backbone, write to file.
 
         Args:
             outfname (str): Full path and filename for updated RIIS records.
+            overwrite (bool): True to delete an existing updated RIIS file.
+
+        Raises:
+            Exception: on failure to get csv writer.
         """
         msgdict = {}
         if not outfname:
@@ -430,38 +493,43 @@ class NNSL:
         # Read and get a record for its keys
         rec1 = self._get_random_rec()
         newheader = rec1.data.keys()
-        writer, outf = get_csv_dict_writer(outfname, newheader, RIIS.DELIMITER, fmode="w")
+        try:
+            writer, outf = get_csv_dict_writer(
+                outfname, newheader, RIIS.DELIMITER, fmode="w", overwrite=overwrite)
+        except Exception:
+            raise
 
         name_count = 0
         gbif_svc = GbifSvc()
         try:
-            for spname, reclist in self.nnsl.items():
+            for key_or_name, reclist in self.nnsl.items():
                 name_count += 1
                 # Resolve each name, update each record (1-3) for that name
                 try:
-                    # Get name/kingdom from first record
-                    taxkey = reclist[0].data[RIIS_SPECIES.GBIF_KEY]
-                    kingdom = reclist[0].data[RIIS_SPECIES.KINGDOM_FLD]
-
                     # Try to match, if match is not 'accepted', repeat with returned accepted keys
-                    new_key, new_name, msg = self._find_current_accepted_taxon(gbif_svc, spname, kingdom, taxkey)
-                    self._add_msg(msgdict, spname, msg)
+                    data = reclist[0].data
+                    new_key, new_name, msg = self._find_current_accepted_taxon(
+                        gbif_svc, data[RIIS_SPECIES.SCINAME_FLD],
+                        data[RIIS_SPECIES.KINGDOM_FLD],
+                        data[RIIS_SPECIES.GBIF_KEY])
+                    self._add_msg(msgdict, key_or_name, msg)
 
                     # Supplement all records for this name with GBIF accepted key and sciname, then write
                     for rec in reclist:
-                        rec.update_gbif_resolution(new_key, new_name)
+                        rec.update_data(new_key, new_name)
                         # then write records
                         try:
                             writer.writerow(rec.data)
                         except Exception as e:
                             print("Failed to write {}, {}".format(rec.data, e))
-                            self._add_msg(msgdict, spname, 'Failed to write record {} ({})'.format(rec.data, e))
+                            self._add_msg(msgdict, key_or_name, 'Failed to write record {} ({})'.format(rec.data, e))
 
                     if (name_count % LOG.INTERVAL) == 0:
-                        self.logit('*** NNSL Name {} ***'.format(name_count))
+                        logit(self._log, '*** NNSL Name {} ***'.format(name_count))
 
-                except Exception:
-                    self._add_msg(msgdict, spname, 'Failed to read records in dict')
+                except Exception as e:
+                    self._add_msg(
+                        msgdict, key_or_name, 'Failed to read records in dict, {}'.format(e))
         except Exception as e:
             self._add_msg(msgdict, 'unknown_error', '{}'.format(e))
         finally:
@@ -494,7 +562,7 @@ class NNSL:
 
                         writer.writerow(rec.data)
                     except Exception as e:
-                        print("Failed to write {}, {}".format(rec.data, e))
+                        logit(self._log, "Failed to write {}, {}".format(rec.data, e))
         finally:
             outf.close()
 
@@ -539,23 +607,23 @@ class NNSL:
         # Test header length
         fld_count = len(header)
         if fld_count != len(expected_header):
-            print(ERR_SEPARATOR)
-            print("[Error] Header has {} fields, != {} expected count".format(
+            logit(self._log, ERR_SEPARATOR)
+            logit(self._log, "[Error] Header has {} fields, != {} expected count".format(
                 fld_count, len(expected_header))
             )
         # Test header fieldnames
         for i in range(len(header)):
             good_fieldname = self._only_ascii(header[i])
             if header[i] != good_fieldname:
-                print(ERR_SEPARATOR)
-                print('[Warning] File {}, header field {} "{}" has non-ascii characters'.format(
+                logit(self._log, ERR_SEPARATOR)
+                logit(self._log, '[Warning] File {}, header field {} "{}" has non-ascii characters'.format(
                     fname, i, header[i])
                 )
 
             clean_header.append(good_fieldname)
             if good_fieldname != expected_header[i]:
-                print(ERR_SEPARATOR)
-                print("[Error] Header fieldname {} != {} expected fieldname".format(
+                logit(self._log, ERR_SEPARATOR)
+                logit(self._log, "[Error] Header fieldname {} != {} expected fieldname".format(
                     header[i], expected_header[i])
                 )
         return clean_header

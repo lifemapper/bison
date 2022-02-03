@@ -3,7 +3,7 @@ from bison.common.constants import (GBIF, LOG)
 from bison.common.occurrence import GBIFReader
 from bison.common.riis import NNSL
 
-from bison.tools.util import get_logger
+from bison.tools.util import get_logger, logit
 
 
 # .............................................................................
@@ -40,10 +40,10 @@ class Annotator():
             if rec is None:
                 break
             elif (self._gbif_rdr.recno % LOG.INTERVAL) == 0:
-                self.logit('*** Record number {} ***'.format(self._gbif_rdr.recno))
+                logit(self._log, '*** Record number {} ***'.format(self._gbif_rdr.recno))
 
             taxkey = rec[GBIF.ACC_TAXON_FLD]
             sciname = rec[GBIF.ACC_NAME_FLD]
 
             if taxkey is not None and sciname is not None:
-                self.logit("They're here")
+                logit(self._log, "They're here")
