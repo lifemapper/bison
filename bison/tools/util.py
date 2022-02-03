@@ -121,14 +121,15 @@ def get_csv_writer(datafile, delimiter, fmode="w"):
 
 
 # .............................................................................
-def get_csv_dict_writer(csvfile, header, delimiter, fmode="w"):
+def get_csv_dict_writer(csvfile, header, delimiter, fmode="w", overwrite=True):
     """Create a CSV dictionary writer and write the header.
 
     Args:
-        csvfile: output CSV file for writing
-        header: header for output file
-        delimiter: field separator
-        fmode: Write ('w') or append ('a')
+        csvfile (str): output CSV filename for writing
+        header (list): header for output file
+        delimiter (str): field separator
+        fmode (str): Write ('w') or append ('a')
+        overwrite (bool): True to delete an existing file before write
 
     Returns:
         writer (csv.DictWriter) ready to write
@@ -137,20 +138,23 @@ def get_csv_dict_writer(csvfile, header, delimiter, fmode="w"):
     Raises:
         Exception: on invalid file mode
         Exception: on failure to create a DictWriter
+        FileExistsError: on existing file if overwrite is False
     """
     if fmode not in ("w", "a"):
         raise Exception("File mode must be 'w' (write) or 'a' (append)")
-
-    csv.field_size_limit(sys.maxsize)
-    try:
-        f = open(csvfile, fmode, newline="", encoding=ENCODING)
-        writer = csv.DictWriter(f, fieldnames=header, delimiter=delimiter)
-    except Exception as e:
-        raise e
+    if ready_filename(csvfile, overwrite=overwrite):
+        csv.field_size_limit(sys.maxsize)
+        try:
+            f = open(csvfile, fmode, newline="", encoding=ENCODING)
+            writer = csv.DictWriter(f, fieldnames=header, delimiter=delimiter)
+        except Exception as e:
+            raise e
+        else:
+            writer.writeheader()
+            print("Opened file {} and wrote header".format(csvfile))
+        return writer, f
     else:
-        writer.writeheader()
-        print("Opened file {} and wrote header".format(csvfile))
-    return writer, f
+        raise FileExistsError
 
 
 # .............................................................................
@@ -243,6 +247,20 @@ def get_logger(outpath, logname=None):
     return log
 
 
+# ...............................................
+def logit(logger, msg):
+    """Log a message to the console or file.
+
+    Args:
+        logger (object): Logger for writing messages to file and console.
+        msg (str): Message to be written.
+    """
+    if logger is not None:
+        logger.info(msg)
+    else:
+        print(msg)
+
+
 # .............................................................................
 if __name__ == "__main__":
-    print('sys path = ', sys.path)
+    print('Testing, sys path = ', sys.path)

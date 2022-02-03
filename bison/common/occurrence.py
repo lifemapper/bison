@@ -87,18 +87,6 @@ class GBIFReader(object):
             pass
         return lineno
 
-    # ...............................................
-    def logit(self, msg):
-        """Log a message to the console or file.
-
-        Args:
-            msg (str): Message to be printed or written to file.
-        """
-        if self._log:
-            self._log.info(msg)
-        else:
-            print(msg)
-
 #     # ...............................................
 #     def find_gbif_record(self, gbifid):
 #         """
