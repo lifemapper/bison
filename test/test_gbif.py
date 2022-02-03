@@ -24,6 +24,7 @@ class TestGBIFData(GBIFReader):
     def test_gbif_name_accepted(self):
         """Open a GBIF datafile with a csv.DictReader."""
         svc = GbifSvc()
+
         self.open()
         for rec in self._gbif_reader:
             if rec is None:
