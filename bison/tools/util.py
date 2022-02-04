@@ -121,7 +121,7 @@ def get_csv_writer(datafile, delimiter, fmode="w"):
 
 
 # .............................................................................
-def get_csv_dict_writer(csvfile, header, delimiter, fmode="w", overwrite=True):
+def get_csv_dict_writer(csvfile, header, delimiter, fmode="w", encoding=ENCODING, overwrite=True):
     """Create a CSV dictionary writer and write the header.
 
     Args:
@@ -129,6 +129,7 @@ def get_csv_dict_writer(csvfile, header, delimiter, fmode="w", overwrite=True):
         header (list): header for output file
         delimiter (str): field separator
         fmode (str): Write ('w') or append ('a')
+        encoding (str): Encoding for output file
         overwrite (bool): True to delete an existing file before write
 
     Returns:
@@ -145,7 +146,7 @@ def get_csv_dict_writer(csvfile, header, delimiter, fmode="w", overwrite=True):
     if ready_filename(csvfile, overwrite=overwrite):
         csv.field_size_limit(sys.maxsize)
         try:
-            f = open(csvfile, fmode, newline="", encoding=ENCODING)
+            f = open(csvfile, fmode, newline="", encoding=encoding)
             writer = csv.DictWriter(f, fieldnames=header, delimiter=delimiter)
         except Exception as e:
             raise e
@@ -158,7 +159,8 @@ def get_csv_dict_writer(csvfile, header, delimiter, fmode="w", overwrite=True):
 
 
 # .............................................................................
-def get_csv_dict_reader(csvfile, delimiter, fieldnames=None, encoding=ENCODING, ignore_quotes=False):
+def get_csv_dict_reader(
+        csvfile, delimiter, fieldnames=None, encoding=ENCODING, ignore_quotes=False):
     """Create a CSV dictionary writer and write the header.
 
     Args:

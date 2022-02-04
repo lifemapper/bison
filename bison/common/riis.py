@@ -57,16 +57,15 @@ class RIISRec():
 
         # Edit taxonomy authority to trim "Accepted "
         prefix = 'Accepted '
+        start_idx = len(prefix)
         taxon_authority = record[RIIS_SPECIES.TAXON_AUTHORITY_FLD]
         try:
             is_accepted = taxon_authority.startswith(prefix)
         except AttributeError:
-            is_accepted = False
-        if is_accepted:
-            taxon_authority = taxon_authority[len(prefix):]
+            pass
         else:
-            print('taxon_authority value {} in line {}'.format(taxon_authority, line_num))
-        self.data[RIIS_SPECIES.TAXON_AUTHORITY_FLD] = taxon_authority
+            if is_accepted:
+                self.data[RIIS_SPECIES.TAXON_AUTHORITY_FLD] = taxon_authority[start_idx:]
 
     # ...............................................
     def update_data(self, gbif_key, gbif_sciname):

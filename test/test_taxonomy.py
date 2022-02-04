@@ -173,6 +173,39 @@ class TestRIISTaxonomy(NNSL):
             self.riis_fname = production_species_fname
             self.read_species()
 
+    # ...............................................
+    def test_resolution_output(self, test_fname=None):
+        """Record changed GBIF taxonomic resolutions and write updated records.
+
+        Args:
+            test_fname (str): full filename for testing input RIIS file.
+        """
+        nnsl2 = NNSL(DATA_PATH)
+        nnsl2.read_species()
+
+        # Count originals
+        orig_rec_count = 0
+        orig_key_count = 0
+        for _key, reclist in self.nnsl.items():
+            orig_key_count += 1
+            for _rec in reclist:
+                orig_rec_count += 1
+
+            # Count updated
+            upd_rec_count = 0
+            upd_key_count = 0
+            for _key, reclist in nnsl2.nnsl.items():
+                upd_key_count += 1
+                for _rec in reclist:
+                    upd_rec_count += 1
+
+        if orig_rec_count != upd_rec_count:
+            print("Original records {}, updated records {}".format(
+                orig_rec_count, upd_rec_count))
+        if orig_key_count != upd_key_count:
+            print("Original taxa {}, updated taxa {}".format(
+                orig_key_count, upd_key_count))
+
 
 # .............................................................................
 if __name__ == "__main__":
@@ -182,7 +215,9 @@ if __name__ == "__main__":
     tt.test_duplicate_name_localities()
     tt.test_gbif_resolution_inconsistency()
     tt.test_itis_resolution_inconsistency()
-    tt.test_gbif_resolution(test_fname=RIIS_SPECIES.TEST_FNAME)
+    # tt.test_resolve_gbif(test_fname=RIIS_SPECIES.TEST_FNAME)
+    # tt.test_resolve_gbif()
+    tt.test_resolution_output()
 
 """
 from test.test_taxonomy import *

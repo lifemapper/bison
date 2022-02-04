@@ -1,11 +1,11 @@
 """Module to test the contents of the input GBIF csv occurrence data file."""
 from bison.common.constants import DATA_PATH, GBIF
-from bison.common.occurrence import GBIFReader
+from bison.common.occurrence import DwcOccurrence
 from bison.tools.gbif_api import GbifSvc
 from bison.tools.util import get_logger
 
 
-class TestGBIFData(GBIFReader):
+class TestGBIFData(DwcOccurrence):
     """Class for testing downloaded simple GBIF CSV file."""
 
     # .............................................................................
@@ -17,7 +17,7 @@ class TestGBIFData(GBIFReader):
             csvfile (str): basename of file to read
             logger (object): logger for saving relevant processing messages
         """
-        GBIFReader.__init__(self, datapath, csvfile, logger)
+        DwcOccurrence.__init__(self, datapath, csvfile, logger)
         self.open()
 
     # ...............................................

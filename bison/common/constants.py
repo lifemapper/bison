@@ -5,13 +5,9 @@ BISON_DELIMITER = "$"
 ENCODING = "utf-8"
 LINENO_FLD = "LINENO"
 ERR_SEPARATOR = "------------"
-ITIS_SOLR_URL = 'https://services.itis.gov/'
-ITIS_NAME_KEY = 'nameWOInd'
-ITIS_TSN_KEY = 'tsn'
-ITIS_URL_ESCAPES = [[" ", r"\%20"]]
-ITIS_VERNACULAR_QUERY = 'https://www.itis.gov/ITISWebService/services/ITISService/getCommonNamesFromTSN?tsn='
-ITIS_NAMESPACE = '{http://itis_service.itis.usgs.gov}'
-ITIS_DATA_NAMESPACE = '{http://data.itis_service.itis.usgs.gov/xsd}'
+NEW_RIIS_KEY_FLD = "riis_occurrence_id"
+NEW_RIIS_ASSESSMENT_FLD = "riis_assessment"
+
 RANKS = [
     "ABERRATION", "CLASS", "COHORT", "CONVARIETY", "CULTIVAR", "CULTIVAR_GROUP",
     "FAMILY", "FORM", "FORMA_SPECIALIS", "GENUS", "GRANDORDER", "GREX", "INFRACLASS",
@@ -32,25 +28,21 @@ RANKS_BELOW_SPECIES = [
     "SUBVARIETY", "VARIETY"]
 
 
-class LOG:
-    """Constants for logging across the project."""
-    INTERVAL = 1000
-    FORMAT = ' '.join([
-        "%(asctime)s",
-        "%(funcName)s",
-        "line",
-        "%(lineno)d",
-        "%(levelname)-8s",
-        "%(message)s"])
-    DATE_FORMAT = '%d %b %Y %H:%M'
-    FILE_MAX_BYTES = 52000000
-    FILE_BACKUP_COUNT = 5
+# .............................................................................
+class ITIS:
+    """Constants for ITIS APIs, and their request and response objects."""
+    SOLR_URL = 'https://services.itis.gov/'
+    NAME_KEY = 'nameWOInd'
+    TSN_KEY = 'tsn'
+    URL_ESCAPES = [[" ", r"\%20"]]
+    VERNACULAR_QUERY = 'https://www.itis.gov/ITISWebService/services/ITISService/getCommonNamesFromTSN?tsn='
+    NAMESPACE = '{http://itis_service.itis.usgs.gov}'
+    DATA_NAMESPACE = '{http://data.itis_service.itis.usgs.gov/xsd}'
 
 
 # .............................................................................
 class GBIF:
-    """Constants for GBIF APIs, and their request and response objects."""
-
+    """Constants for GBIF DWCA fields, APIs, and their request and response objects."""
     URL = "http://api.gbif.org/v1"
     UUID_KEY = "key"
     OCCID_FLD = "gbifID"
@@ -58,6 +50,8 @@ class GBIF:
     TAXON_FLD = "taxonKey"
     ACC_NAME_FLD = "acceptedScientificName"
     ACC_TAXON_FLD = "acceptedTaxonKey"
+    STATE_FLD = "stateProvince"
+    COUNTY_FLD = "county"
     MATCH_FLD = "matchType"
     STATUS_FLD = "taxonomicStatus"
     ORG_FOREIGN_KEY = "publishingOrganizationKey"
@@ -157,9 +151,20 @@ class GBIF:
         """
         return GBIF.URL + "/species/match"
 
-# http://api.gbif.org/v1/parser/name?name=quercus%20berberidifolia
-# http://api.gbif.org/v1/organization?identifier=362
-# http://api.gbif.org/v1/organization/c3ad790a-d426-4ac1-8e32-da61f81f0117
+
+class LOG:
+    """Constants for logging across the project."""
+    INTERVAL = 1000
+    FORMAT = ' '.join([
+        "%(asctime)s",
+        "%(funcName)s",
+        "line",
+        "%(lineno)d",
+        "%(levelname)-8s",
+        "%(message)s"])
+    DATE_FORMAT = '%d %b %Y %H:%M'
+    FILE_MAX_BYTES = 52000000
+    FILE_BACKUP_COUNT = 5
 
 
 # .............................................................................
