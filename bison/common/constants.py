@@ -27,6 +27,12 @@ RANKS_BELOW_SPECIES = [
     "SUBSPECIES",
     "SUBVARIETY", "VARIETY"]
 
+LOWER_48_STATES = [
+    "AL", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA", "ID", "IL", "IN", "IA", "KS",
+    "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ",
+    "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC", "SD", "TN", "TX", "UT",
+    "VT", "VA", "WA", "WV", "WI", "WY", "DC"]
+
 
 # .............................................................................
 class ITIS:
@@ -183,19 +189,19 @@ class NS:
 
 # .............................................................................
 class RIIS:
-    """Constants for the US Register of Introduced and Invasive Species, US-RIIS data."""
+    """Constants for the US Register of Introduced and Invasive Species, "RIIS data."""
     DATA_DIR = "data"
     DATA_EXT = "csv"
     DELIMITER = ","
     QUOTECHAR = '"'
     # Metadata about fields
-    DATA_DICT_FNAME = "US-RIIS_DataDictionary"
+    DATA_DICT_FNAME = ""RIIS_DataDictionary"
 
 
 # .............................................................................
 class RIIS_AUTHORITY:
     """Authority References Metadata."""
-    FNAME = "US-RIIS_AuthorityReferences"
+    FNAME = ""RIIS_AuthorityReferences"
     KEY = "Authority"
     DATA_COUNT = 5951
     HEADER = [
@@ -220,8 +226,8 @@ class RIIS_AUTHORITY:
 # .............................................................................
 class RIIS_SPECIES:
     """Introduced or Invasive Species List."""
-    FNAME = "US-RIIS_MasterList"
-    TEST_FNAME = "US-RIIS_MasterList_10"
+    FNAME = ""RIIS_MasterList"
+    TEST_FNAME = ""RIIS_MasterList_10"
     DATA_COUNT = 15264
     KEY = "occurrenceID"
     GBIF_KEY = "GBIF taxonKey"
