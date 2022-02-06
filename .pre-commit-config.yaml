@@ -37,7 +37,7 @@ repos:
 #      - id: tests
 #        name: Input data tester
 #        description: Run tests to check input data and basic read/write functions
-#        entry: /bin/bash -c "(cd bison; . venv/bin/activate; python3 test/test_taxonomy.py)"
+#        entry: /bin/bash -c "(cd bison; . venv/bin/activate; python3 test/test_riis_resolve.py)"
 #        language: script
 #        pass_filenames: false
 
