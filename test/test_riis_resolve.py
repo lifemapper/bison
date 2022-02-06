@@ -3,7 +3,7 @@ import os
 
 from bison.common.constants import (DATA_PATH, ERR_SEPARATOR, LINENO_FLD, RIIS, RIIS_SPECIES)
 from bison.common.riis import NNSL
-from bison.tools.util import ready_filename
+from bison.tools.util import get_csv_dict_reader, ready_filename
 
 
 class TestRIISTaxonomy(NNSL):
@@ -80,11 +80,11 @@ class TestRIISTaxonomy(NNSL):
         for sciname, reclist in self.nnsl.items():
             for rec in reclist:
                 auth = rec.data[RIIS_SPECIES.TAXON_AUTHORITY_FLD]
-                if (auth == "GBIF" and rec.data[RIIS_SPECIES.GBIF_KEY] <= 0):
+                if (auth == "Accepted GBIF" and rec.data[RIIS_SPECIES.GBIF_KEY] <= 0):
                     err_msgs.append(
                         'Sciname {} has GBIF authority with key {} (line {})'.format(
                             sciname, rec.data[RIIS_SPECIES.GBIF_KEY], rec.data[LINENO_FLD]))
-                elif (auth == "ITIS" and rec.data[RIIS_SPECIES.ITIS_KEY] <= 0):
+                elif (auth == "Accepted ITIS" and rec.data[RIIS_SPECIES.ITIS_KEY] <= 0):
                     err_msgs.append(
                         'Sciname {} has ITIS authority with key {} (line {})'.format(
                             sciname, rec.data[RIIS_SPECIES.GBIF_KEY], rec.data[LINENO_FLD]))
@@ -124,7 +124,7 @@ class TestRIISTaxonomy(NNSL):
         self._print_errors("ITIS tsn conflicts", err_msgs)
 
     # ...............................................
-    def test_gbif_resolution(self, test_fname=None):
+    def test_resolve_gbif(self, test_fname=None):
         """Record changed GBIF taxonomic resolutions and write updated records.
 
         Args:
@@ -139,6 +139,8 @@ class TestRIISTaxonomy(NNSL):
             self.riis_fname = "{}.{}".format(
                 os.path.join(self._datapath, test_fname), RIIS.DATA_EXT
             )
+
+            # Delete existing resolved test data
             overwrite = True
             if ready_filename(self.gbif_resolved_riis_fname, overwrite=overwrite):
                 self.read_species()
@@ -146,6 +148,7 @@ class TestRIISTaxonomy(NNSL):
             overwrite = False
 
         # Update species data
+        self._print_errors("Re-resolve to accepted GBIF taxon", err_msgs)
         self.resolve_write_gbif_taxa(overwrite=overwrite)
 
         # Find mismatches
@@ -166,7 +169,6 @@ class TestRIISTaxonomy(NNSL):
                         rec1.data[RIIS_SPECIES.NEW_GBIF_KEY],
                         rec1.data[RIIS_SPECIES.NEW_GBIF_SCINAME_FLD])
                     err_msgs.append(msg)
-        self._print_errors("Changed GBIF resolution", err_msgs)
 
         if test_fname is not None:
             # Switch back to production species data
@@ -206,6 +208,43 @@ class TestRIISTaxonomy(NNSL):
             print("Original taxa {}, updated taxa {}".format(
                 orig_key_count, upd_key_count))
 
+    # ...............................................
+    def test_missing_resolved_records(self):
+        """Read the original and updated RIIS records and find missing records in the updated file."""
+        orig_fname = self.riis_fname
+        upd_fname = self.gbif_resolved_riis_fname
+
+        orig_rdr, origf = get_csv_dict_reader(orig_fname, RIIS.DELIMITER, fieldnames=self.riis_header)
+        upd_rdr, updf = get_csv_dict_reader(upd_fname, RIIS.DELIMITER, fieldnames=self.riis_header)
+        finished = False
+        orec = orig_rdr.next()
+        urec = upd_rdr.next()
+        try:
+            while not finished:
+                if orec is not None and urec is not None:
+                    do_match = orec[RIIS_SPECIES.KEY] == urec[RIIS_SPECIES.KEY]
+                    if do_match:
+                        pass
+                    else:
+                        while not do_match:
+                            print("Failed to match original to updated on line {}".format(orig_rdr.line_num))
+                            # move to next orec
+                            orec = orig_rdr.next()
+                            if orec is not None:
+                                do_match = orec[RIIS_SPECIES.KEY] == urec[RIIS_SPECIES.KEY]
+                            else:
+                                finished = True
+                                do_match = True
+                orec = orig_rdr.next()
+                urec = upd_rdr.next()
+        except Exception:
+            raise
+        finally:
+            origf.close()
+            updf.close()
+
+
+
 
 # .............................................................................
 if __name__ == "__main__":
@@ -218,9 +257,10 @@ if __name__ == "__main__":
     # tt.test_resolve_gbif(test_fname=RIIS_SPECIES.TEST_FNAME)
     # tt.test_resolve_gbif()
     tt.test_resolution_output()
+    tt.test_missing_resolved_records()
 
 """
-from test.test_taxonomy import *
+from test.test_riis_resolve import *
 
 tt = TestRIISTaxonomy(DATA_PATH)
 tt.test_missing_taxon_authority_resolution()
@@ -228,5 +268,7 @@ tt.test_taxonomy_keys()
 tt.test_duplicate_name_localities()
 tt.test_gbif_resolution_inconsistency()
 tt.test_itis_resolution_inconsistency()
-tt.test_gbif_resolution()
+# tt.test_resolve_gbif()
+tt.test_resolution_output()
+tt.test_missing_resolved_records()
 """

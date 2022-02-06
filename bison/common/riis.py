@@ -5,7 +5,7 @@ import os
 from bison.common.constants import (
     ERR_SEPARATOR, GBIF, LINENO_FLD, LOG, RIIS, RIIS_AUTHORITY, RIIS_SPECIES)
 from bison.tools.gbif_api import GbifSvc
-from bison.tools.util import get_csv_dict_writer, get_logger, logit
+from bison.tools.util import get_csv_dict_reader, get_csv_dict_writer, get_logger, logit
 
 
 # .............................................................................
@@ -55,17 +55,17 @@ class RIISRec():
                     raise
             self.data[fld] = taxon_key
 
-        # Edit taxonomy authority to trim "Accepted "
-        prefix = 'Accepted '
-        start_idx = len(prefix)
-        taxon_authority = record[RIIS_SPECIES.TAXON_AUTHORITY_FLD]
-        try:
-            is_accepted = taxon_authority.startswith(prefix)
-        except AttributeError:
-            pass
-        else:
-            if is_accepted:
-                self.data[RIIS_SPECIES.TAXON_AUTHORITY_FLD] = taxon_authority[start_idx:]
+        # # Edit taxonomy authority to trim "Accepted "
+        # prefix = 'Accepted '
+        # start_idx = len(prefix)
+        # taxon_authority = record[RIIS_SPECIES.TAXON_AUTHORITY_FLD]
+        # try:
+        #     is_accepted = taxon_authority.startswith(prefix)
+        # except AttributeError:
+        #     pass
+        # else:
+        #     if is_accepted:
+        #         self.data[RIIS_SPECIES.TAXON_AUTHORITY_FLD] = taxon_authority[start_idx:]
 
     # ...............................................
     def update_data(self, gbif_key, gbif_sciname):
@@ -182,16 +182,16 @@ class RIISRec():
         """
         # Test GBIF match
         if (
-                self.data[RIIS_SPECIES.TAXON_AUTHORITY_FLD] == "GBIF"
-                and rrec.data[RIIS_SPECIES.TAXON_AUTHORITY_FLD] == "GBIF"
+                self.data[RIIS_SPECIES.TAXON_AUTHORITY_FLD] == "Accepted GBIF"
+                and rrec.data[RIIS_SPECIES.TAXON_AUTHORITY_FLD] == "Accepted GBIF"
                 and self.data[RIIS_SPECIES.GBIF_KEY] == rrec.data[RIIS_SPECIES.GBIF_KEY]
         ):
             return True
         # Test ITIS match
         else:
             return (
-                self.data[RIIS_SPECIES.TAXON_AUTHORITY_FLD] == "ITIS"
-                and rrec.data[RIIS_SPECIES.TAXON_AUTHORITY_FLD] == "ITIS"
+                self.data[RIIS_SPECIES.TAXON_AUTHORITY_FLD] == "Accepted ITIS"
+                and rrec.data[RIIS_SPECIES.TAXON_AUTHORITY_FLD] == "Accepted ITIS"
                 and self.data[RIIS_SPECIES.ITIS_KEY] == rrec.data[RIIS_SPECIES.ITIS_KEY]
             )
 
@@ -221,8 +221,11 @@ class NNSL:
         )
 
         # Test and clean headers of non-ascii characters
-        self.auth_header = self._clean_header(self.auth_fname, RIIS_AUTHORITY.HEADER)
-        self.riis_header = self._clean_header(self.riis_fname, RIIS_SPECIES.HEADER)
+        self._test_header(self.auth_fname, RIIS_AUTHORITY.HEADER)
+        good_header = self._test_header(self.riis_fname, RIIS_SPECIES.HEADER)
+        if good_header is False:
+            raise Exception("Unexpected file header found in {}".format(self.riis_fname))
+
         # Trimmed and updated Non-native Species List, built from RIIS
         self.nnsl = None
         self.nnsl_header = None
@@ -238,7 +241,7 @@ class NNSL:
         with open(self.auth_fname, "r", newline="") as csvfile:
             rdr = csv.DictReader(
                 csvfile,
-                fieldnames=self.auth_header,
+                fieldnames=RIIS_AUTHORITY.HEADER,
                 delimiter=RIIS.DELIMITER,
                 quotechar=RIIS.QUOTECHAR,
             )
@@ -259,33 +262,46 @@ class NNSL:
         return updated_riis_fname
 
     # ...............................................
-    def read_species(self):
+    @property
+    def gbif_resolved_riis_header(self):
+        """Construct the expected header for the resolved RIIS.
+
+        Returns:
+            updated_riis_header: fieldnames for the updated file
+        """
+        header = RIIS_SPECIES.HEADER.copy()
+        header.append(RIIS_SPECIES.NEW_GBIF_KEY)
+        header.append(RIIS_SPECIES.NEW_GBIF_SCINAME_FLD)
+        return header
+
+    # ...............................................
+    def read_species(self, read_resolved=False):
         """Assemble 2 dictionaries of records with valid and invalid data."""
         self.bad_species = {}
         self.nnsl = {}
-        # Use species data with updated GBIF taxonomic resolution if exists
-        if os.path.exists(self.gbif_resolved_riis_fname):
-            infname = self.gbif_resolved_riis_fname
+        if read_resolved is True:
+            # Use species data with updated GBIF taxonomic resolution if exists
+            if not os.path.exists(self.gbif_resolved_riis_fname):
+                raise FileNotFoundError("File {} does not exist".format(self.gbif_resolved_riis_fname))
+            else:
+                infname = self.gbif_resolved_riis_fname
+                header = self.gbif_resolved_riis_header
         else:
             infname = self.riis_fname
+            header = RIIS_SPECIES.HEADER
 
-        with open(infname, "r", newline="") as csvfile:
-            rdr = csv.DictReader(
-                csvfile,
-                fieldnames=self.riis_header,
-                delimiter=RIIS.DELIMITER,
-                quotechar=RIIS.QUOTECHAR,
-            )
+        rdr, inf = get_csv_dict_reader(infname, RIIS.DELIMITER, fieldnames=header)
+        try:
             for row in rdr:
                 lineno = rdr.line_num
                 if lineno > 1:
                     # Use GBIF taxon key for dictionary key
                     gbif_key = row[RIIS_SPECIES.GBIF_KEY]
                     # Read new gbif resolutions if they exist
-                    try:
+                    if read_resolved is True:
                         new_gbif_key = row[RIIS_SPECIES.NEW_GBIF_KEY]
                         new_gbif_name = row[RIIS_SPECIES.NEW_GBIF_SCINAME_FLD]
-                    except KeyError:
+                    else:
                         new_gbif_key = new_gbif_name = None
                     # Create record of original data and optional new data
                     try:
@@ -308,49 +324,11 @@ class NNSL:
                         self.nnsl[index].append(rec)
                     except KeyError:
                         self.nnsl[index] = [rec]
+        except Exception as e:
+            raise(e)
+        finally:
+            inf.close()
 
-    # # ...............................................
-    # def _get_accepted_name_key_from_match(self, gbifrec):
-    #     name = None
-    #     key = None
-    #     msg = None
-    #     status = None
-    #
-    #     if gbifrec:
-    #         try:
-    #             match_type = gbifrec[GBIF.MATCH_FLD]
-    #         except KeyError:
-    #             match_type = 'unknown'
-    #             # print('No match type in record')
-    #
-    #         if match_type != 'NONE':
-    #             try:
-    #                 # Results from species/match?name=<name>
-    #                 status = gbifrec["status"].lower()
-    #                 key_fld = "usageKey"
-    #                 accepted_key_fld = "acceptedUsageKey"
-    #             except KeyError:
-    #                 try:
-    #                     # Results from species/<key>
-    #                     status = gbifrec[GBIF.STATUS_FLD].lower()
-    #                     key_fld = "key"
-    #                     accepted_key_fld = "acceptedKey"
-    #                     accepted_name_fld = "accepted"
-    #                 except KeyError:
-    #                     print('Failed to get status from {}'.format(gbifrec))
-    #
-    #             if status is not None:
-    #                 if status == "accepted":
-    #                     key = gbifrec[key_fld]
-    #                     name = gbifrec[GBIF.NAME_FLD]
-    #                 else:
-    #                     # Return accepted key to use for another query
-    #                     try:
-    #                         key = gbifrec[accepted_key_fld]
-    #                     except KeyError:
-    #                         msg = "No accepted key found in results {}".format(gbifrec)
-    #
-    #     return key, name, msg
 
     # ...............................................
     def _get_alternatives(self, gbifrec):
@@ -434,11 +412,11 @@ class NNSL:
                 msgdict[key] = [msg]
 
     # ...............................................
-    def resolve_gbif_species(self):
+    def resolve_gbif_species(self, overwrite=False):
         """Resolve accepted name and key from the GBIF taxonomic backbone, add to self.nnsl."""
         msgdict = {}
         if not self.nnsl:
-            self.read_species()
+            self.read_species(read_resolved=False)
         gbif_svc = GbifSvc()
         for key_or_name, reclist in self.nnsl.items():
             # Use name, key values from first record
@@ -469,9 +447,9 @@ class NNSL:
                 # Replace new key and name with results of 2nd query
                 new_key, new_name, msg = self._get_accepted_name_key_from_get(gbifrec2)
 
-        if new_key != taxkey:
-            print("File taxonKey/sciname {}/{} resolved to GBIF taxonKey {}/{}".format(
-                taxkey, sciname, new_key, new_name))
+        # if new_key != taxkey:
+        #     print("File taxonKey/sciname {}/{} resolved to GBIF taxonKey {}/{}".format(
+        #         taxkey, sciname, new_key, new_name))
 
         return new_key, new_name, msg
 
@@ -489,12 +467,9 @@ class NNSL:
         msgdict = {}
         if not outfname:
             outfname = self.gbif_resolved_riis_fname
-        # Read and get a record for its keys
-        rec1 = self._get_random_rec()
-        newheader = rec1.data.keys()
         try:
             writer, outf = get_csv_dict_writer(
-                outfname, newheader, RIIS.DELIMITER, fmode="w", overwrite=overwrite)
+                outfname, self.gbif_resolved_riis_header, RIIS.DELIMITER, fmode="w", overwrite=overwrite)
         except Exception:
             raise
 
@@ -583,7 +558,7 @@ class NNSL:
         return better_name
 
     # ...............................................
-    def _clean_header(self, fname, expected_header):
+    def _test_header(self, fname, expected_header):
         """Compare the actual header in fname with an expected_header.
 
         Print warnings if actual fieldnames contain non-ascii characters.  Print errors
@@ -597,11 +572,9 @@ class NNSL:
         Returns:
              list of fieldnames from the actual header, stripped of non-ascii characters
         """
-        clean_header = []
+        success = True
         with open(fname, "r", newline="") as csvfile:
-            rdr = csv.reader(
-                csvfile, delimiter=RIIS.DELIMITER, quotechar=RIIS.QUOTECHAR
-            )
+            rdr = csv.reader(csvfile, delimiter=RIIS.DELIMITER)
             header = next(rdr)
         # Test header length
         fld_count = len(header)
@@ -610,22 +583,16 @@ class NNSL:
             logit(self._log, "[Error] Header has {} fields, != {} expected count".format(
                 fld_count, len(expected_header))
             )
-        # Test header fieldnames
         for i in range(len(header)):
+            # Test header fieldnames
             good_fieldname = self._only_ascii(header[i])
-            if header[i] != good_fieldname:
-                logit(self._log, ERR_SEPARATOR)
-                logit(self._log, '[Warning] File {}, header field {} "{}" has non-ascii characters'.format(
-                    fname, i, header[i])
-                )
-
-            clean_header.append(good_fieldname)
             if good_fieldname != expected_header[i]:
+                success = False
                 logit(self._log, ERR_SEPARATOR)
                 logit(self._log, "[Error] Header fieldname {} != {} expected fieldname".format(
                     header[i], expected_header[i])
                 )
-        return clean_header
+        return success
 
 
 # .............................................................................
