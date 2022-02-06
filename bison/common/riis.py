@@ -208,6 +208,9 @@ class NNSL:
             datapath (str): Path to the base of the input data, used to construct full
                 filenames from basepath and relative path constants.
             logger (object): logger for writing messages to file and console
+
+        Raises:
+            Exception on unexpected file header
         """
         self._datapath = datapath.rstrip(os.sep)
         if logger is None:
@@ -276,7 +279,17 @@ class NNSL:
 
     # ...............................................
     def read_species(self, read_resolved=False):
-        """Assemble 2 dictionaries of records with valid and invalid data."""
+        """Assemble 2 dictionaries of records with valid and invalid data.
+
+        Args:
+            read_resolved (bool): True if reading ammended RIIS data, with scientific
+                names resolved to the currently accepted taxon.
+
+        Raises:
+            FileNotFoundError if read_resolved is True but resolved data file does not
+                exist
+            Exception on read error
+        """
         self.bad_species = {}
         self.nnsl = {}
         if read_resolved is True:
@@ -328,7 +341,6 @@ class NNSL:
             raise(e)
         finally:
             inf.close()
-
 
     # ...............................................
     def _get_alternatives(self, gbifrec):
@@ -413,7 +425,11 @@ class NNSL:
 
     # ...............................................
     def resolve_gbif_species(self, overwrite=False):
-        """Resolve accepted name and key from the GBIF taxonomic backbone, add to self.nnsl."""
+        """Resolve accepted name and key from the GBIF taxonomic backbone, add to self.nnsl.
+
+        Args:
+            overwrite (bool): True if overwrite existing resolved RIIS file.
+        """
         msgdict = {}
         if not self.nnsl:
             self.read_species(read_resolved=False)

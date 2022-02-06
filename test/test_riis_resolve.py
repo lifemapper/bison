@@ -244,8 +244,6 @@ class TestRIISTaxonomy(NNSL):
             updf.close()
 
 
-
-
 # .............................................................................
 if __name__ == "__main__":
     tt = TestRIISTaxonomy(DATA_PATH)
