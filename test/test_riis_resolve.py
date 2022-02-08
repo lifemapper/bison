@@ -3,7 +3,7 @@ import os
 
 from bison.common.constants import (DATA_PATH, ERR_SEPARATOR, LINENO_FLD, RIIS, RIIS_SPECIES)
 from bison.common.riis import NNSL
-from bison.tools.util import get_csv_dict_reader, ready_filename
+from bison.tools.util import get_csv_dict_reader, ready_filename, logit
 
 
 class TestRIISTaxonomy(NNSL):
@@ -123,6 +123,8 @@ class TestRIISTaxonomy(NNSL):
                 i += 1
         self._print_errors("ITIS tsn conflicts", err_msgs)
 
+
+
     # ...............................................
     def test_resolve_gbif(self, test_fname=None):
         """Record changed GBIF taxonomic resolutions and write updated records.
@@ -214,41 +216,17 @@ class TestRIISTaxonomy(NNSL):
     # ...............................................
     def test_missing_resolved_records(self):
         """Read the original and updated RIIS records and find missing records in the updated file."""
-
-
+        self.read_riis_recs(read_resolved=False)
         nnsl2 = NNSL(DATA_PATH)
-        nnsl2.read_species()
+        nnsl2.read_riis_recs(read_resolved=True)
 
         # Count originals
         orig_rec_count = 0
-        orig_key_count = 0
-        for _key, reclist in self.nnsl.items():
-            orig_key_count += 1
-            for _rec in reclist:
-                orig_rec_count += 1
-
-            while not finished:
-                if orec is not None and urec is not None:
-                    do_match = orec[RIIS_SPECIES.KEY] == urec[RIIS_SPECIES.KEY]
-                    if do_match:
-                        pass
-                    else:
-                        while not do_match:
-                            print("Failed to match original to updated on line {}".format(orig_rdr.line_num))
-                            # move to next orec
-                            orec = next(orig_rdr)
-                            if orec is not None:
-                                do_match = orec[RIIS_SPECIES.KEY] == urec[RIIS_SPECIES.KEY]
-                            else:
-                                finished = True
-                                do_match = True
-                orec = next(orig_rdr)
-                urec = next(upd_rdr)
-        except Exception:
-            raise
-        finally:
-            origf.close()
-            updf.close()
+        for occid, rec in self.nnsl.items():
+            try:
+                uprec = nnsl2[occid]
+            except KeyError:
+                logit(self._log, "Missing record {}".format(occid))
 
 
 # .............................................................................
