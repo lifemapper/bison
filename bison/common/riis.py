@@ -201,16 +201,17 @@ class NNSL:
     """Class for reading, writing, comparing RIIS species data records."""
 
     # ...............................................
-    def __init__(self, datapath, logger=None):
+    def __init__(self, datapath, test_fname=None, logger=None):
         """Constructor sets the authority and species files and headers expected for BISON-RIIS processing.
 
         Args:
             datapath (str): Path to the base of the input data, used to construct full
                 filenames from basepath and relative path constants.
+            test_fname (str): RIIS file with fewer records for testing
             logger (object): logger for writing messages to file and console
 
         Raises:
-            Exception on unexpected file header
+            Exception: on unexpected file header
         """
         self._datapath = datapath.rstrip(os.sep)
         if logger is None:
@@ -219,9 +220,16 @@ class NNSL:
         self.auth_fname = "{}.{}".format(
             os.path.join(self._datapath, RIIS_AUTHORITY.FNAME), RIIS.DATA_EXT
         )
-        self.riis_fname = "{}.{}".format(
-            os.path.join(self._datapath, RIIS_SPECIES.FNAME), RIIS.DATA_EXT
-        )
+        # If testing data
+        if test_fname is not None:
+            # Clear species data, switch to test data, read
+            self.riis_fname = "{}.{}".format(
+                os.path.join(self._datapath, test_fname), RIIS.DATA_EXT
+            )
+        else:
+            self.riis_fname = "{}.{}".format(
+                os.path.join(self._datapath, RIIS_SPECIES.FNAME), RIIS.DATA_EXT
+            )
 
         # Test and clean headers of non-ascii characters
         self._test_header(self.auth_fname, RIIS_AUTHORITY.HEADER)
@@ -230,7 +238,8 @@ class NNSL:
             raise Exception("Unexpected file header found in {}".format(self.riis_fname))
 
         # Trimmed and updated Non-native Species List, built from RIIS
-        self.nnsl = None
+        self.nnsl_by_species = None
+        self.nnsl_by_id = None
         self.nnsl_header = None
 
     # ...............................................
@@ -275,23 +284,24 @@ class NNSL:
         header = RIIS_SPECIES.HEADER.copy()
         header.append(RIIS_SPECIES.NEW_GBIF_KEY)
         header.append(RIIS_SPECIES.NEW_GBIF_SCINAME_FLD)
+        header.append(LINENO_FLD)
         return header
 
     # ...............................................
-    def read_riis_by_species(self, read_resolved=False):
+    def read_riis(self, read_resolved=False):
         """Assemble 2 dictionaries of records with valid and invalid data.
 
         Args:
-            read_resolved (bool): True if reading ammended RIIS data, with scientific
+            read_resolved (bool): True if reading amended RIIS data, with scientific
                 names resolved to the currently accepted taxon.
 
         Raises:
-            FileNotFoundError if read_resolved is True but resolved data file does not
-                exist
-            Exception on read error
+            FileNotFoundError: if read_resolved is True but resolved data file does not exist
+            Exception: on read error
         """
         self.bad_species = {}
-        self.nnsl = {}
+        self.nnsl_by_species = {}
+        self.nnsl_by_id = {}
         if read_resolved is True:
             # Use species data with updated GBIF taxonomic resolution if exists
             if not os.path.exists(self.gbif_resolved_riis_fname):
@@ -304,12 +314,11 @@ class NNSL:
             header = RIIS_SPECIES.HEADER
 
         rdr, inf = get_csv_dict_reader(infname, RIIS.DELIMITER, fieldnames=header)
+        logit(self._log, "Reading RIIS from {}".format(infname))
         try:
             for row in rdr:
                 lineno = rdr.line_num
                 if lineno > 1:
-                    # Use GBIF taxon key for dictionary key
-                    gbif_key = row[RIIS_SPECIES.GBIF_KEY]
                     # Read new gbif resolutions if they exist
                     if read_resolved is True:
                         new_gbif_key = row[RIIS_SPECIES.NEW_GBIF_KEY]
@@ -325,9 +334,12 @@ class NNSL:
 
                     # Organize the records by scientificName for later query into GBIF
                     try:
-                        self.nnsl[rec.name].append(rec)
+                        self.nnsl_by_species[rec.name].append(rec)
                     except KeyError:
-                        self.nnsl[rec.name] = [rec]
+                        self.nnsl_by_species[rec.name] = [rec]
+                    # Use RIIS occurrenceID for dictionary key
+                    self.nnsl_by_id[row[RIIS_SPECIES.KEY]] = rec
+
         except Exception as e:
             raise(e)
         finally:
@@ -415,30 +427,6 @@ class NNSL:
                 msgdict[key] = [msg]
 
     # ...............................................
-    def resolve_gbif_species(self, overwrite=False):
-        """Resolve accepted name and key from the GBIF taxonomic backbone, add to self.nnsl.
-
-        Args:
-            overwrite (bool): True if overwrite existing file.
-        """
-        msgdict = {}
-        self.read_riis_by_id(read_resolved=False)
-        gbif_svc = GbifSvc()
-        for name, reclist in self.nnsl.items():
-            # Use name, key values from first record
-            data = reclist[0].data
-            # Try to match, if match is not 'accepted', repeat with returned accepted keys
-            new_key, new_name, msg = self._find_current_accepted_taxon(
-                gbif_svc, data[RIIS_SPECIES.SCINAME_FLD],
-                data[RIIS_SPECIES.KINGDOM_FLD],
-                data[RIIS_SPECIES.GBIF_KEY])
-            self._add_msg(msgdict, name, msg)
-
-            # Supplement all records for this species with GBIF accepted key and name
-            for sprec in reclist:
-                sprec.update_gbif_resolution(new_key, new_name)
-
-    # ...............................................
     def _find_current_accepted_taxon(self, gbif_svc, sciname, kingdom, taxkey):
         # Query GBIF with the name/kingdom
         gbifrec = gbif_svc.query_by_name(sciname, kingdom=kingdom)
@@ -460,58 +448,6 @@ class NNSL:
         return new_key, new_name, msg
 
     # ...............................................
-    def read_riis_by_id(self, read_resolved=False):
-        """Assemble 2 dictionaries of records with valid and invalid data.
-
-        Args:
-            read_resolved (bool): True if reading ammended RIIS data, with scientific
-                names resolved to the currently accepted taxon.
-
-        Raises:
-            FileNotFoundError if read_resolved is True but resolved data file does not
-                exist
-            Exception on read error
-        """
-        self.bad_species = {}
-        self.nnsl_by_species = {}
-        self.nnsl_by_id = {}
-        if read_resolved is True:
-            # Use species data with updated GBIF taxonomic resolution if exists
-            if not os.path.exists(self.gbif_resolved_riis_fname):
-                raise FileNotFoundError("File {} does not exist".format(self.gbif_resolved_riis_fname))
-            else:
-                infname = self.gbif_resolved_riis_fname
-                header = self.gbif_resolved_riis_header
-        else:
-            infname = self.riis_fname
-            header = RIIS_SPECIES.HEADER
-
-        rdr, inf = get_csv_dict_reader(infname, RIIS.DELIMITER, fieldnames=header)
-        try:
-            for row in rdr:
-                lineno = rdr.line_num
-                if lineno > 1:
-                    # Read new gbif resolutions if they exist
-                    if read_resolved is True:
-                        new_gbif_key = row[RIIS_SPECIES.NEW_GBIF_KEY]
-                        new_gbif_name = row[RIIS_SPECIES.NEW_GBIF_SCINAME_FLD]
-                    else:
-                        new_gbif_key = new_gbif_name = None
-                    # Create record of original data and optional new data
-                    try:
-                        rec = RIISRec(row, lineno, new_gbif_key=new_gbif_key, new_gbif_name=new_gbif_name)
-                    except ValueError:
-                        row[LINENO_FLD] = lineno
-                        self.bad_species[lineno] = row
-
-                    # Use RIIS occurrenceID for dictionary key
-                    self.nnsl_by_species[row[RIIS_SPECIES.KEY]] = rec
-        except Exception as e:
-            raise(e)
-        finally:
-            inf.close()
-
-    # ...............................................
     def resolve_write_gbif_taxa(self, outfname=None, overwrite=True):
         """Resolve accepted name and key from the GBIF taxonomic backbone, write to file.
 
@@ -525,16 +461,17 @@ class NNSL:
         msgdict = {}
         if not outfname:
             outfname = self.gbif_resolved_riis_fname
+        new_header = self.gbif_resolved_riis_header
         try:
             writer, outf = get_csv_dict_writer(
-                outfname, self.gbif_resolved_riis_header, RIIS.DELIMITER, fmode="w", overwrite=overwrite)
+                outfname, new_header, RIIS.DELIMITER, fmode="w", overwrite=overwrite)
         except Exception:
             raise
-
+        logit(self._log, "Writing resolved RIIS to {}".format(outfname))
         name_count = 0
         gbif_svc = GbifSvc()
         try:
-            for key_or_name, reclist in self.nnsl.items():
+            for name, reclist in self.nnsl_by_species.items():
                 name_count += 1
                 # Resolve each name, update each record (1-3) for that name
                 try:
@@ -544,50 +481,29 @@ class NNSL:
                         gbif_svc, data[RIIS_SPECIES.SCINAME_FLD],
                         data[RIIS_SPECIES.KINGDOM_FLD],
                         data[RIIS_SPECIES.GBIF_KEY])
-                    self._add_msg(msgdict, key_or_name, msg)
+                    self._add_msg(msgdict, name, msg)
 
                     # Supplement all records for this name with GBIF accepted key and sciname, then write
                     for rec in reclist:
+                        # Update record in dictionary nnsl_by_species with name keys
                         rec.update_data(new_key, new_name)
+                        # Update dictionary nnsl_by_id with Occid keys
+                        self.nnsl_by_id[rec.data[RIIS_SPECIES.KEY]] = rec
                         # then write records
                         try:
                             writer.writerow(rec.data)
                         except Exception as e:
                             print("Failed to write {}, {}".format(rec.data, e))
-                            self._add_msg(msgdict, key_or_name, 'Failed to write record {} ({})'.format(rec.data, e))
+                            self._add_msg(msgdict, name, 'Failed to write record {} ({})'.format(rec.data, e))
 
                     if (name_count % LOG.INTERVAL) == 0:
                         logit(self._log, '*** NNSL Name {} ***'.format(name_count))
 
                 except Exception as e:
                     self._add_msg(
-                        msgdict, key_or_name, 'Failed to read records in dict, {}'.format(e))
+                        msgdict, name, 'Failed to read records in dict, {}'.format(e))
         except Exception as e:
             self._add_msg(msgdict, 'unknown_error', '{}'.format(e))
-        finally:
-            outf.close()
-
-    # ...............................................
-    def write_species(self, outfname):
-        """Write species data to a CSV file.
-
-        Args:
-            outfname (str): full path and filename for output file.
-        """
-        # First name in keys, first record in value-list, keys from data attribute
-        name = list(self.nnsl.keys())[0]
-        rec1 = self.nnsl[name][0]
-        header = rec1.data.keys()
-
-        writer, outf = get_csv_dict_writer(outfname, header, RIIS.DELIMITER, fmode="w")
-        try:
-            for reclist in self.nnsl.values():
-                for rec in reclist:
-                    try:
-
-                        writer.writerow(rec.data)
-                    except Exception as e:
-                        logit(self._log, "Failed to write {}, {}".format(rec.data, e))
         finally:
             outf.close()
 

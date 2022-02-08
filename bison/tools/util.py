@@ -115,8 +115,6 @@ def get_csv_writer(datafile, delimiter, fmode="w"):
             f, escapechar="\\", delimiter=delimiter, quoting=csv.QUOTE_NONE)
     except Exception as e:
         raise e
-    else:
-        print("Opened file {} for write".format(datafile))
     return writer, f
 
 
@@ -152,7 +150,6 @@ def get_csv_dict_writer(csvfile, header, delimiter, fmode="w", encoding=ENCODING
             raise e
         else:
             writer.writeheader()
-            print("Opened file {} and wrote header".format(csvfile))
         return writer, f
     else:
         raise FileExistsError
@@ -205,7 +202,6 @@ def get_csv_dict_reader(
             f, fieldnames=fieldnames,
             escapechar='\\', delimiter=delimiter)
 
-        print('Opened file {} for dict read'.format(csvfile))
     return dreader, f
 
 
