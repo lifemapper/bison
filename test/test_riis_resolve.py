@@ -16,7 +16,6 @@ class TestRIISTaxonomy(NNSL):
             test_fname (str): RIIS file with fewer records for testing
         """
         NNSL.__init__(self, base_path, test_fname=test_fname)
-        self.read_riis()
 
     # ...............................................
     def test_taxonomy_keys(self):
@@ -219,7 +218,7 @@ if __name__ == "__main__":
     tt.test_itis_resolution_inconsistency()
     tt = None
 
-    # These overwrite resolved RIIS species.  Full version takes ~ 3 hours
+    # These overwrite resolved test data RIIS species w/ 100 records
     tt = TestRIISTaxonomy(DATA_PATH, test_fname=RIIS_SPECIES.TEST_FNAME)
     tt.test_resolve_gbif()
     tt.test_resolution_output(is_test=True)
@@ -241,7 +240,18 @@ tt.test_taxonomy_keys()
 tt.test_duplicate_name_localities()
 tt.test_gbif_resolution_inconsistency()
 tt.test_itis_resolution_inconsistency()
-# tt.test_resolve_gbif()
-tt.test_resolution_output()
-tt.test_missing_resolved_records()
+tt = None
+
+# These overwrite resolved test data RIIS species w/ 100 records
+tt = TestRIISTaxonomy(DATA_PATH, test_fname=RIIS_SPECIES.TEST_FNAME)
+tt.test_resolve_gbif()
+tt.test_resolution_output(is_test=True)
+tt.test_missing_resolved_records(is_test=True)
+tt = None
+
+# Resolve all the data (12K records) takes ~ 3 hours
+tt = TestRIISTaxonomy(DATA_PATH)
+tt.test_resolve_gbif()
+tt.test_resolution_output(is_test=False)
+tt.test_missing_resolved_records(is_test=False)
 """
