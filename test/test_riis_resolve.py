@@ -182,8 +182,11 @@ class TestRIISTaxonomy(NNSL):
         Args:
             test_fname (str): full filename for testing input RIIS file.
         """
+        # original data
+        self.read_species(read_resolved=False)
+        # resolved data
         nnsl2 = NNSL(DATA_PATH)
-        nnsl2.read_species()
+        nnsl2.read_species(read_resolved=True)
 
         # Count originals
         orig_rec_count = 0
@@ -211,15 +214,19 @@ class TestRIISTaxonomy(NNSL):
     # ...............................................
     def test_missing_resolved_records(self):
         """Read the original and updated RIIS records and find missing records in the updated file."""
-        orig_fname = self.riis_fname
-        upd_fname = self.gbif_resolved_riis_fname
 
-        orig_rdr, origf = get_csv_dict_reader(orig_fname, RIIS.DELIMITER, fieldnames=self.riis_header)
-        upd_rdr, updf = get_csv_dict_reader(upd_fname, RIIS.DELIMITER, fieldnames=self.riis_header)
-        finished = False
-        orec = orig_rdr.next()
-        urec = upd_rdr.next()
-        try:
+
+        nnsl2 = NNSL(DATA_PATH)
+        nnsl2.read_species()
+
+        # Count originals
+        orig_rec_count = 0
+        orig_key_count = 0
+        for _key, reclist in self.nnsl.items():
+            orig_key_count += 1
+            for _rec in reclist:
+                orig_rec_count += 1
+
             while not finished:
                 if orec is not None and urec is not None:
                     do_match = orec[RIIS_SPECIES.KEY] == urec[RIIS_SPECIES.KEY]
@@ -229,14 +236,14 @@ class TestRIISTaxonomy(NNSL):
                         while not do_match:
                             print("Failed to match original to updated on line {}".format(orig_rdr.line_num))
                             # move to next orec
-                            orec = orig_rdr.next()
+                            orec = next(orig_rdr)
                             if orec is not None:
                                 do_match = orec[RIIS_SPECIES.KEY] == urec[RIIS_SPECIES.KEY]
                             else:
                                 finished = True
                                 do_match = True
-                orec = orig_rdr.next()
-                urec = upd_rdr.next()
+                orec = next(orig_rdr)
+                urec = next(upd_rdr)
         except Exception:
             raise
         finally:
@@ -252,7 +259,9 @@ if __name__ == "__main__":
     tt.test_duplicate_name_localities()
     tt.test_gbif_resolution_inconsistency()
     tt.test_itis_resolution_inconsistency()
+    # These overwrite resolved RIIS species.  Full version takes ~ 3 hours
     # tt.test_resolve_gbif(test_fname=RIIS_SPECIES.TEST_FNAME)
+    # Resolving all the data (12K records) takes ~ 3 hours
     # tt.test_resolve_gbif()
     tt.test_resolution_output()
     tt.test_missing_resolved_records()
