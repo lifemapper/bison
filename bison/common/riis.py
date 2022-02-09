@@ -448,26 +448,10 @@ class NNSL:
         return new_key, new_name, msg
 
     # ...............................................
-    def resolve_write_gbif_taxa(self, outfname=None, overwrite=True):
-        """Resolve accepted name and key from the GBIF taxonomic backbone, write to file.
-
-        Args:
-            outfname (str): Full path and filename for updated RIIS records.
-            overwrite (bool): True to delete an existing updated RIIS file.
-
-        Raises:
-            Exception: on failure to get csv writer.
-        """
+    def resolve_riis_to_gbif_taxa(self):
+        """Resolve accepted name and key from the GBIF taxonomic backbone, write to file."""
         msgdict = {}
-        if not outfname:
-            outfname = self.gbif_resolved_riis_fname
-        new_header = self.gbif_resolved_riis_header
-        try:
-            writer, outf = get_csv_dict_writer(
-                outfname, new_header, RIIS.DELIMITER, fmode="w", overwrite=overwrite)
-        except Exception:
-            raise
-        logit(self._log, "Writing resolved RIIS to {}".format(outfname))
+
         name_count = 0
         gbif_svc = GbifSvc()
         try:
@@ -489,12 +473,6 @@ class NNSL:
                         rec.update_data(new_key, new_name)
                         # Update dictionary nnsl_by_id with Occid keys
                         self.nnsl_by_id[rec.data[RIIS_SPECIES.KEY]] = rec
-                        # then write records
-                        try:
-                            writer.writerow(rec.data)
-                        except Exception as e:
-                            print("Failed to write {}, {}".format(rec.data, e))
-                            self._add_msg(msgdict, name, 'Failed to write record {} ({})'.format(rec.data, e))
 
                     if (name_count % LOG.INTERVAL) == 0:
                         logit(self._log, '*** NNSL Name {} ***'.format(name_count))
@@ -502,6 +480,40 @@ class NNSL:
                 except Exception as e:
                     self._add_msg(
                         msgdict, name, 'Failed to read records in dict, {}'.format(e))
+        except Exception as e:
+            self._add_msg(msgdict, 'unknown_error', '{}'.format(e))
+
+    # ...............................................
+    def write_resolved_riis(self, outfname=None, overwrite=True):
+        """Write RIIS records to file.
+
+        Args:
+            outfname (str): Full path and filename for updated RIIS records.
+            overwrite (bool): True to delete an existing updated RIIS file.
+
+        Raises:
+            Exception: on failure to get csv writer.
+        """
+        msgdict = {}
+        self.read_riis(read_resolved=True)
+        if not outfname:
+            outfname = self.gbif_resolved_riis_fname
+        new_header = self.gbif_resolved_riis_header
+        try:
+            writer, outf = get_csv_dict_writer(
+                outfname, new_header, RIIS.DELIMITER, fmode="w", overwrite=overwrite)
+        except Exception:
+            raise
+        logit(self._log, "Writing resolved RIIS to {}".format(outfname))
+        try:
+            for name, rec in self.nnsl_by_id.items():
+                # write each record
+                try:
+                    writer.writerow(rec.data)
+                except Exception as e:
+                    print("Failed to write {}, {}".format(rec.data, e))
+                    self._add_msg(msgdict, name, 'Failed to write record {} ({})'.format(rec.data, e))
+
         except Exception as e:
             self._add_msg(msgdict, 'unknown_error', '{}'.format(e))
         finally:
