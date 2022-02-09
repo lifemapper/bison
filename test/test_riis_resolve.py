@@ -225,7 +225,7 @@ if __name__ == "__main__":
     tt.test_missing_resolved_records(is_test=True)
     tt = None
 
-    # # Resolving all the data (12K records) takes ~ 3 hours
+    # # Resolving all the data (> 12K species) takes ~ 1-3 hours
     # tt = TestRIISTaxonomy(DATA_PATH)
     # tt.test_resolve_gbif()
     # tt.test_resolution_output(is_test=False)
