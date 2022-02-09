@@ -129,7 +129,7 @@ class TestRIISTaxonomy(NNSL):
 
         # Update species data
         self._print_errors("Re-resolve to accepted GBIF taxon", err_msgs)
-        self.resolve_write_gbif_taxa(overwrite=True)
+        self.resolve_riis_to_gbif_taxa(overwrite=True)
 
         # Find mismatches
         for key, reclist in self.nnsl_by_species.items():
