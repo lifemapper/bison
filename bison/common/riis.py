@@ -449,14 +449,18 @@ class NNSL:
 
     # ...............................................
     def resolve_riis_to_gbif_taxa(self):
-        """Resolve accepted name and key from the GBIF taxonomic backbone, write to file."""
+        """Resolve accepted name and key from the GBIF taxonomic backbone, write to file.
+        Returns:
+            name_count: count of updated records
+            rec_count: count of resolved species
+        """
         msgdict = {}
 
         name_count = 0
+        rec_count = 0
         gbif_svc = GbifSvc()
         try:
             for name, reclist in self.nnsl_by_species.items():
-                name_count += 1
                 # Resolve each name, update each record (1-3) for that name
                 try:
                     # Try to match, if match is not 'accepted', repeat with returned accepted keys
@@ -466,6 +470,7 @@ class NNSL:
                         data[RIIS_SPECIES.KINGDOM_FLD],
                         data[RIIS_SPECIES.GBIF_KEY])
                     self._add_msg(msgdict, name, msg)
+                    name_count += 1
 
                     # Supplement all records for this name with GBIF accepted key and sciname, then write
                     for rec in reclist:
@@ -473,6 +478,7 @@ class NNSL:
                         rec.update_data(new_key, new_name)
                         # Update dictionary nnsl_by_id with Occid keys
                         self.nnsl_by_id[rec.data[RIIS_SPECIES.KEY]] = rec
+                        rec_count += 1
 
                     if (name_count % LOG.INTERVAL) == 0:
                         logit(self._log, '*** NNSL Name {} ***'.format(name_count))
@@ -482,6 +488,8 @@ class NNSL:
                         msgdict, name, 'Failed to read records in dict, {}'.format(e))
         except Exception as e:
             self._add_msg(msgdict, 'unknown_error', '{}'.format(e))
+
+        return name_count, rec_count
 
     # ...............................................
     def write_resolved_riis(self, outfname=None, overwrite=True):
@@ -493,6 +501,9 @@ class NNSL:
 
         Raises:
             Exception: on failure to get csv writer.
+
+        Returns:
+            count of successfully written records
         """
         msgdict = {}
         self.read_riis(read_resolved=True)
@@ -505,11 +516,13 @@ class NNSL:
         except Exception:
             raise
         logit(self._log, "Writing resolved RIIS to {}".format(outfname))
+        rec_count = 0
         try:
             for name, rec in self.nnsl_by_id.items():
                 # write each record
                 try:
                     writer.writerow(rec.data)
+                    rec_count += 1
                 except Exception as e:
                     print("Failed to write {}, {}".format(rec.data, e))
                     self._add_msg(msgdict, name, 'Failed to write record {} ({})'.format(rec.data, e))
@@ -518,6 +531,8 @@ class NNSL:
             self._add_msg(msgdict, 'unknown_error', '{}'.format(e))
         finally:
             outf.close()
+
+        return rec_count
 
     # ...............................................
     def _only_ascii(self, name):

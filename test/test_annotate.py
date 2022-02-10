@@ -1,6 +1,7 @@
 """Module to test appending RIIS determinations to GBIF occurrences."""
+from bison.common.annotate import Annotator
 from bison.common.constants import GBIF, DATA_PATH
-from bison.tools.annotate import Annotator
+from bison.common.riis import NNSL
 from bison.tools.util import get_logger
 
 
@@ -22,15 +23,17 @@ class TestAnnotator(Annotator):
         self.open()
 
 
+    # .............................................................................
+    def test_gbif_name_accepted(self, nnsl_data):
+
 # .............................................................................
 if __name__ == "__main__":
-    logname = "test_gbif"
-
     # Test the taxonkey contents in GBIF simple CSV download file
-    logger = get_logger(DATA_PATH, logname=logname)
+    logger = get_logger(DATA_PATH, logname="test_annotate")
+    nnsl_data = NNSL(DATA_PATH, logger=logger)
 
-    Tst = TestAnnotator(DATA_PATH, GBIF.TEST_DATA, do_resolve=False, logger=logger)
-    Tst.test_gbif_name_accepted()
+    tst = TestAnnotator(DATA_PATH, GBIF.TEST_DATA, do_resolve=False, logger=logger)
+    tst.test_gbif_name_accepted()
 
 """
 from test.test_annotate import *
