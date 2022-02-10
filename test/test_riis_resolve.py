@@ -147,7 +147,8 @@ class TestRIISTaxonomy(NNSL):
 
         # Update species data
         self._print_errors("Re-resolve to accepted GBIF taxon", err_msgs)
-        self.resolve_riis_to_gbif_taxa(overwrite=True)
+        name_count, rec_count = self.resolve_riis_to_gbif_taxa(overwrite=True)
+        logit(self._log, "Resolved {} of expected {} records".format(rec_count, RIIS_SPECIES.DATA_COUNT))
 
         # Find mismatches
         for key, reclist in self.nnsl_by_species.items():
@@ -233,7 +234,7 @@ class TestRIISTaxonomy(NNSL):
 
 # .............................................................................
 if __name__ == "__main__":
-    logger = get_logger(DATA_PATH)
+    logger = get_logger(DATA_PATH, "test_riis_resolve")
 
     tt = TestRIISTaxonomy(DATA_PATH, logger=logger)
     tt.test_missing_taxon_authority_resolution()
