@@ -2,8 +2,8 @@
 
 import os
 
-from bison.common.constants import GBIF, ENCODING
-from bison.tools.util import get_csv_dict_reader, get_logger
+from bison.common.constants import ENCODING, GBIF, LOG
+from bison.tools.util import get_csv_dict_reader, get_logger, logit
 
 
 # .............................................................................
@@ -91,22 +91,28 @@ class DwcOccurrence(object):
 
     # ...............................................
     def get_record(self):
-        """Return next record from the reader.
-
-        Returns:
-            dictionary containing a GBIF DwC record
-        """
+        """Return next record from the reader."""
         self.dwcrec = next(self._csv_reader)
 
     # ...............................................
     def annotate_record(self, riis_assessment, riis_id):
-        pass
+        """Add RIIS data to a GBIF record.
 
+        Args:
+            riis_assessment: Determination of "introduced" or "invasive" for this species in this locaation.
+            riis_id: locally unique RIIS occurrenceID identifying this determination for this species in this location.
+        """
+        pass
 
     # ...............................................
     def find_gbif_record(self, gbifid):
-        """
-        @summary: Find a GBIF occurrence record identified by provided gbifID.
+        """Find a GBIF occurrence record identified by provided gbifID.
+
+        Args:
+            gbifid: local GBIF identifier for finding a record in a large file.
+
+        Returns:
+            self.dwcrec: a dictionary containing GBIF record
         """
         if self._csv_reader is None:
             self.open()
@@ -119,7 +125,7 @@ class DwcOccurrence(object):
                     found = True
 
                 # Where are we
-                if (self.recno % LOGINTERVAL) == 0:
+                if (self.recno % LOG.INTERVAL) == 0:
                     logit(self._log, '*** Record number {} ***'.format(self.recno))
             if (self.dwcrec is None and found is False):
                 logit(self._log, 'Failed to find {}'.format(gbifid))
