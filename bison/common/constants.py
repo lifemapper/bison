@@ -51,7 +51,7 @@ class GBIF:
     """Constants for GBIF DWCA fields, APIs, and their request and response objects."""
     URL = "http://api.gbif.org/v1"
     UUID_KEY = "key"
-    OCCID_FLD = "gbifID"
+    ID_FLD = "gbifID"
     NAME_FLD = "scientificName"
     TAXON_FLD = "taxonKey"
     ACC_NAME_FLD = "acceptedScientificName"

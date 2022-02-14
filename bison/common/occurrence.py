@@ -35,8 +35,9 @@ class DwcOccurrence(object):
         # Open file
         self._inf = None
 
-        # CVS DictReader, and current line
+        # CVS DictReader and current record
         self._csv_reader = None
+        self.dwcrec = None
 
     # ...............................................
     def open(self):
@@ -89,47 +90,43 @@ class DwcOccurrence(object):
         return lineno
 
     # ...............................................
-    def get_dwc_record(self):
+    def get_record(self):
         """Return next record from the reader.
 
         Returns:
             dictionary containing a GBIF DwC record
         """
-        dwcrec = self._csv_reader.next()
-        return dwcrec
+        self.dwcrec = next(self._csv_reader)
 
-#     # ...............................................
-#     def find_gbif_record(self, gbifid):
-#         """
-#         @summary: Find a GBIF occurrence record identified by provided gbifID.
-#         """
-#         if (not self._csv_reader or
-#             not self._gbif_line):
-#             raise Exception('Use open_gbif_for_search before searching')
-#
-#         rec = None
-#         try:
-#             while (not rec and self._gbif_line is not None):
-#                 # Get interpreted record
-#                 self._gbif_line, self.recno = getLine(self._csv_reader,
-#                                                             self._gbif_recno)
-#
-#                 if self._gbif_line is None:
-#                     break
-#                 else:
-#                     if self._gbif_line[0] == gbifid:
-#                         # Create new record or empty list
-#                         rec = self._create_rough_bisonrec(self._gbif_line,
-#                                                           self._gbif_column_map)
-#                     # Where are we
-#                     if (self.recno % LOGINTERVAL) == 0:
-#                         self._log.info('*** Record number {} ***'.format(self.recno))
-#             if (not rec and self._gbif_line is None):
-#                 self._log.error('Failed to find {} in remaining records'.format(gbifid))
-#                 self.close()
-#         except Exception as e:
-#             self._log.error('Failed on line {}, exception {}'.format(self.recno, e))
-#         return rec
+    # ...............................................
+    def annotate_record(self, riis_assessment, riis_id):
+        pass
+
+
+    # ...............................................
+    def find_gbif_record(self, gbifid):
+        """
+        @summary: Find a GBIF occurrence record identified by provided gbifID.
+        """
+        if self._csv_reader is None:
+            self.open()
+        found = False
+        try:
+            while (self.dwcrec is not None and found is False):
+                # Get interpreted record
+                self.get_record()
+                if self.dwcrec[GBIF.ID_FLD] == gbifid:
+                    found = True
+
+                # Where are we
+                if (self.recno % LOGINTERVAL) == 0:
+                    logit(self._log, '*** Record number {} ***'.format(self.recno))
+            if (self.dwcrec is None and found is False):
+                logit(self._log, 'Failed to find {}'.format(gbifid))
+                self.close()
+        except Exception as e:
+            logit(self._log, 'Failed on line {}, exception {}'.format(self.recno, e))
+        return self.dwcrec
 
 
 # ...............................................

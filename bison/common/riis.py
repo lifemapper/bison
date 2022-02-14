@@ -450,6 +450,7 @@ class NNSL:
     # ...............................................
     def resolve_riis_to_gbif_taxa(self):
         """Resolve accepted name and key from the GBIF taxonomic backbone, write to file.
+
         Returns:
             name_count: count of updated records
             rec_count: count of resolved species
