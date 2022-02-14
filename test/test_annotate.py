@@ -22,9 +22,10 @@ class TestAnnotator(Annotator):
             self, datapath, gbif_occ_fname, do_resolve=do_resolve, logger=logger)
         self.open()
 
-
     # .............................................................................
     def test_gbif_name_accepted(self, nnsl_data):
+        """"""
+        pass
 
 # .............................................................................
 if __name__ == "__main__":

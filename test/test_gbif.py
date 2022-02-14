@@ -38,11 +38,11 @@ class TestGBIFData(DwcOccurrence):
             # Make sure simple CSV data taxonkey is accepted
             if taxstatus.lower() != "accepted":
                 self.logit("Record {} taxon key {} is not an accepted name {}".format(
-                    rec[GBIF.OCCID_FLD], taxkey, taxstatus))
+                    rec[GBIF.ID_FLD], taxkey, taxstatus))
             # Make sure simple CSV data sciname matches name for taxonkey
             if rec[GBIF.NAME_FLD] != taxname:
                 self.logit("Record {} name {} does not match taxon key {} name {}".format(
-                    rec[GBIF.OCCID_FLD], rec[GBIF.NAME_FLD], taxkey, taxname))
+                    rec[GBIF.ID_FLD], rec[GBIF.NAME_FLD], taxkey, taxname))
 
 
 # .............................................................................
