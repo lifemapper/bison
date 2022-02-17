@@ -22,10 +22,12 @@ class TestAnnotator(Annotator):
             self, datapath, gbif_occ_fname, do_resolve=do_resolve, logger=logger)
         self.open()
 
-    # # .............................................................................
-    # def test_gbif_name_accepted(self, nnsl_data):
-    #     """"""
-    #     pass
+    # .............................................................................
+    def test_annotate_records(self, nnsl_data):
+        """Test 
+        
+        """
+        self.append_dwca_records()
 
 
 # .............................................................................
