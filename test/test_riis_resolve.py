@@ -147,17 +147,17 @@ class TestRIISTaxonomy(NNSL):
 
         # Update species data
         self._print_errors("Re-resolve to accepted GBIF taxon", err_msgs)
-        name_count, rec_count = self.resolve_riis_to_gbif_taxa(overwrite=True)
+        name_count, rec_count = self.resolve_riis_to_gbif_taxa()
         logit(self._log, "Resolved {} of expected {} records".format(rec_count, RIIS_SPECIES.DATA_COUNT))
 
         # Find mismatches
         for key, reclist in self.nnsl_by_species.items():
             rec1 = reclist[0]
             try:
-                rec1.data[RIIS_SPECIES.NEW_GBIF_KEY]
+                rec1.data[RIIS_SPECIES.NEW_GBIF_KEY_FLD]
             except KeyError:
                 logit(self._log, 'Failed to add field {} to {} records'.format(
-                    RIIS_SPECIES.NEW_GBIF_KEY, rec1.name))
+                    RIIS_SPECIES.NEW_GBIF_KEY_FLD, rec1.name))
             else:
                 if not rec1.consistent_gbif_resolution():
                     msg = "Record {} old GBIF taxonKey {} / {} conflicts with new GBIF taxonKey {} / {}".format(
@@ -165,7 +165,7 @@ class TestRIISTaxonomy(NNSL):
                         rec1.data[RIIS_SPECIES.GBIF_KEY],
                         rec1.data[RIIS_SPECIES.SCINAME_FLD],
 
-                        rec1.data[RIIS_SPECIES.NEW_GBIF_KEY],
+                        rec1.data[RIIS_SPECIES.NEW_GBIF_KEY_FLD],
                         rec1.data[RIIS_SPECIES.NEW_GBIF_SCINAME_FLD])
                     err_msgs.append(msg)
 

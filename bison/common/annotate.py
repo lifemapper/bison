@@ -3,6 +3,7 @@ import os
 
 from bison.common.constants import (
     ENCODING, GBIF, LOG, NEW_RIIS_ASSESSMENT_FLD, NEW_RIIS_KEY_FLD, RIIS_SPECIES)
+from bison.common.occurrence import DwcData
 from bison.common.riis import NNSL
 
 from bison.tools.util import (
@@ -18,7 +19,8 @@ class Annotator():
         Args:
             datapath (str): base directory for datafiles
             gbif_occ_fname (str): base filename for GBIF occurrence CSV file
-            do_resolve (bool): flag indicating whether to query GBIF for updated accepted name/key
+            do_resolve (bool): flag indicating whether to (re-)query GBIF for updated
+                accepted name/key
             logger (object): logger for saving relevant processing messages
         """
         self._datapath = datapath
@@ -30,13 +32,12 @@ class Annotator():
 
         self.nnsl = NNSL(datapath, logger=logger)
         if do_resolve is True:
-            self.resolve_write_gbif_taxa()
+            self.nnsl.read_riis(read_resolved=False)
+            self.nnsl.resolve_riis_to_gbif_taxa()
         else:
-            self.nnsl.read_species()
+            self.nnsl.read_riis(read_resolved=True)
         # Input reader
-        # self._dwc_occ = DwcOccurrence(datapath, occ_infname, logger=logger)
-        self._csv_reader, self._inf = get_csv_dict_reader(
-            self._csvfile, GBIF.DWCA_DELIMITER, encoding=ENCODING)
+        self._dwcdata = DwcData(datapath, occ_infname, logger=logger)
         # Output writer
         self._csv_writer = None
 
@@ -53,7 +54,18 @@ class Annotator():
         return outfname
 
     # ...............................................
-    def _open_for_write(self, outfname):
+    def open(self, outfname):
+        """Open the DwcData for reading and the csv_writer for writing.
+
+        Also reads the first record and writes the header.
+
+        Args:
+            outfname: full filename for output file.
+
+        Raises:
+            Exception: on failure to open the csv_writer.
+        """
+        self._dwcdata.open()
         header = self._csv_reader.fieldnames
         header.append(NEW_RIIS_KEY_FLD)
         header.append(NEW_RIIS_ASSESSMENT_FLD)
@@ -92,40 +104,75 @@ class Annotator():
         return False
 
     # ...............................................
-    def _assess_occurrence(self, taxkey, dwcrec, iis_reclist):
+    def assess_occurrence(self, dwcrec, iis_reclist):
+        """Find RIIS assessment matching the acceptedTaxonKey and state in this record.
+
+        Args:
+            dwcrec: dictionary of original DwC specimen occurrence record
+            iis_reclist: list of RIIS records with acceptedTaxonKey matching the
+                acceptedTaxonKey for this occurrence
+
+        Returns:
+            riis_assessment: Determination of "introduced" or "invasive" for this
+                record with species in this locaation.
+            riis_id: locally unique RIIS occurrenceID identifying this determination
+                for this species in this location.
+        """
+        riis_assessment = None
+        riis_key = None
         occ_state = dwcrec[GBIF.STATE_FLD]
-        occ_acc_taxa = dwcrec[GBIF.ACC_TAXON_FLD]
         for iisrec in iis_reclist:
+
             # Double check NNSL dict key == RIIS resolved key == occurrence accepted key
-            if taxkey != occ_acc_taxa or taxkey != iisrec[RIIS_SPECIES.NEW_GBIF_KEY]:
+            if dwcrec[GBIF.ACC_TAXON_FLD] != iisrec[RIIS_SPECIES.NEW_GBIF_KEY]:
                 logit(self._log, "WTF is happening?!?")
+
             # Look for AK or HI
             if occ_state in ("AK", "HI"):
                 if occ_state == iisrec[RIIS_SPECIES.LOCALITY_FLD]:
-                    dwcrec[NEW_RIIS_ASSESSMENT_FLD] = iisrec[RIIS_SPECIES.ASSESSMENT_FLD]
-                    dwcrec[NEW_RIIS_KEY_FLD] = iisrec[RIIS_SPECIES.KEY]
+                    riis_assessment = iisrec[RIIS_SPECIES.ASSESSMENT_FLD]
+                    riis_key = iisrec[RIIS_SPECIES.KEY]
+
             # Not AK or HI, must be L48
             elif iisrec[RIIS_SPECIES.LOCALITY_FLD] == "L48":
-                dwcrec[NEW_RIIS_ASSESSMENT_FLD] = iisrec[RIIS_SPECIES.ASSESSMENT_FLD]
-                dwcrec[NEW_RIIS_KEY_FLD] = iisrec[RIIS_SPECIES.KEY]
-        return dwcrec
+                riis_assessment = iisrec[RIIS_SPECIES.ASSESSMENT_FLD]
+                riis_key = iisrec[RIIS_SPECIES.KEY]
+
+        return riis_assessment, riis_key
+
+    # ...............................................
+    def annotate_record(self, dwcrec, iis_reclist):
+        """Add RIIS data to a GBIF record.
+
+        Args:
+            riis_assessment: Determination of "introduced" or "invasive" for this species in this locaation.
+            riis_id: locally unique RIIS occurrenceID identifying this determination for this species in this location.
+            dwcrec: dictionary of original DwC specimen occurrence record
+            iis_reclist: list of RIIS records with acceptedTaxonKey matching the
+                acceptedTaxonKey for this occurrence
+        """
+        pass
 
     # ...............................................
     def append_dwca_records(self):
         """Append 'introduced' or 'invasive' status to GBIF DWC occurrence records."""
-        self._open_for_write(self.annotated_dwc_fname)
-        for dwcrec in self._csv_reader:
-            if dwcrec is None:
-                break
-            elif (self._csv_reader.recno % LOG.INTERVAL) == 0:
+        self.open(self.annotated_dwc_fname)
+        # iterate over DwC records
+        dwcrec = self._dwcdata.dwcrec
+        while dwcrec is not None:
+            if (self._dwcdata.recno % LOG.INTERVAL) == 0:
                 logit(self._log, '*** Record number {} ***'.format(self._csv_reader.recno))
-
+            # Find acceptedTaxonKey in DwC record
             taxkey = dwcrec[GBIF.ACC_TAXON_FLD]
+            # Find RIIS records for this acceptedTaxonKey
             try:
                 iis_reclist = self.nnsl.data[taxkey]
             except Exception:
-                pass
+                iis_reclist = None
             else:
-                dwcrec = self._assess_occurrence(taxkey, dwcrec, iis_reclist)
+                if iis_reclist is not None:
+                    riis_assessment, riis_key = self.assess_occurrence(dwcrec, iis_reclist)
+                    dwcrec[NEW_RIIS_ASSESSMENT_FLD] = riis_assessment
+                    dwcrec[NEW_RIIS_KEY_FLD] = riis_key
 
             self._csv_writer.writerow(dwcrec)

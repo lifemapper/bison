@@ -61,7 +61,7 @@ class GBIF:
     MATCH_FLD = "matchType"
     STATUS_FLD = "taxonomicStatus"
     ORG_FOREIGN_KEY = "publishingOrganizationKey"
-    TEST_DATA = "gbif_2022-01-31_100k.csv"
+    TEST_DATA = "gbif_2022-02-15_1k.csv"
     DWCA_DATASET_DIR = "dataset"
     DWCA_META_FNAME = "meta.xml"
     DWCA_INTERPRETED = "occurrence"
@@ -231,8 +231,6 @@ class RIIS_SPECIES:
     DATA_COUNT = 15264
     KEY = "occurrenceID"
     GBIF_KEY = "GBIF taxonKey"
-    NEW_GBIF_KEY = "gbif_res_taxonkey"
-    NEW_GBIF_SCINAME_FLD = "gbif_res_scientificName"
     ITIS_KEY = "ITIS TSN"
     LOCALITY_FLD = "locality"
     KINGDOM_FLD = "kingdom"
@@ -241,6 +239,8 @@ class RIIS_SPECIES:
     RANK_FLD = "taxonRank"
     ASSESSMENT_FLD = "Introduced or Invasive"
     TAXON_AUTHORITY_FLD = "taxonomicStatus"
+    NEW_GBIF_KEY_FLD = "gbif_res_taxonkey"
+    NEW_GBIF_SCINAME_FLD = "gbif_res_scientificName"
     HEADER = [
         "locality",
         "scientificName",

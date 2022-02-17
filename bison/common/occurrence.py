@@ -2,12 +2,13 @@
 
 import os
 
-from bison.common.constants import ENCODING, GBIF, LOG
+from bison.common.constants import (
+    ENCODING, GBIF, LOG, NEW_RIIS_ASSESSMENT_FLD, NEW_RIIS_KEY_FLD)
 from bison.tools.util import get_csv_dict_reader, get_logger, logit
 
 
 # .............................................................................
-class DwcOccurrence(object):
+class DwcData(object):
     """Class to read or write a GBIF DWC format CSV datafile.
 
     Note:
@@ -51,6 +52,9 @@ class DwcOccurrence(object):
                 self.csvfile, GBIF.DWCA_DELIMITER, encoding=ENCODING)
         except Exception:
             raise
+        else:
+            # Fill self.dwcrec
+            self._dwcdata.get_record()
 
     # ...............................................
     def close(self):
@@ -93,16 +97,6 @@ class DwcOccurrence(object):
     def get_record(self):
         """Return next record from the reader."""
         self.dwcrec = next(self._csv_reader)
-
-    # ...............................................
-    def annotate_record(self, riis_assessment, riis_id):
-        """Add RIIS data to a GBIF record.
-
-        Args:
-            riis_assessment: Determination of "introduced" or "invasive" for this species in this locaation.
-            riis_id: locally unique RIIS occurrenceID identifying this determination for this species in this location.
-        """
-        pass
 
     # ...............................................
     def find_gbif_record(self, gbifid):

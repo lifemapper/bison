@@ -38,7 +38,7 @@ class RIISRec():
             ValueError: on non-integer GBIF taxonKey or non-integer ITIS TSN
         """
         self.data = record
-        self.data[RIIS_SPECIES.NEW_GBIF_KEY] = new_gbif_key
+        self.data[RIIS_SPECIES.NEW_GBIF_KEY_FLD] = new_gbif_key
         self.data[RIIS_SPECIES.NEW_GBIF_SCINAME_FLD] = new_gbif_name
         self.data[LINENO_FLD] = line_num
         self.name = standardize_name(record[RIIS_SPECIES.SCINAME_FLD], record[RIIS_SPECIES.SCIAUTHOR_FLD])
@@ -77,7 +77,7 @@ class RIISRec():
             gbif_sciname (str):  current GBIF accepted scientific name, in the GBIF Backbone
                 Taxonomy, for a scientific name
         """
-        self.data[RIIS_SPECIES.NEW_GBIF_KEY] = gbif_key
+        self.data[RIIS_SPECIES.NEW_GBIF_KEY_FLD] = gbif_key
         self.data[RIIS_SPECIES.NEW_GBIF_SCINAME_FLD] = gbif_sciname
 
     # ...............................................
@@ -167,7 +167,7 @@ class RIISRec():
         Returns:
             True if self and rrec GBIF key match.
         """
-        return (self.data[RIIS_SPECIES.GBIF_KEY] == self.data[RIIS_SPECIES.NEW_GBIF_KEY])
+        return (self.data[RIIS_SPECIES.GBIF_KEY] == self.data[RIIS_SPECIES.NEW_GBIF_KEY_FLD])
 
     # ...............................................
     def is_taxauthority_match(self, rrec):
@@ -282,7 +282,7 @@ class NNSL:
             updated_riis_header: fieldnames for the updated file
         """
         header = RIIS_SPECIES.HEADER.copy()
-        header.append(RIIS_SPECIES.NEW_GBIF_KEY)
+        header.append(RIIS_SPECIES.NEW_GBIF_KEY_FLD)
         header.append(RIIS_SPECIES.NEW_GBIF_SCINAME_FLD)
         header.append(LINENO_FLD)
         return header
@@ -321,7 +321,7 @@ class NNSL:
                 if lineno > 1:
                     # Read new gbif resolutions if they exist
                     if read_resolved is True:
-                        new_gbif_key = row[RIIS_SPECIES.NEW_GBIF_KEY]
+                        new_gbif_key = row[RIIS_SPECIES.NEW_GBIF_KEY_FLD]
                         new_gbif_name = row[RIIS_SPECIES.NEW_GBIF_SCINAME_FLD]
                     else:
                         new_gbif_key = new_gbif_name = None
@@ -332,11 +332,17 @@ class NNSL:
                         row[LINENO_FLD] = lineno
                         self.bad_species[lineno] = row
 
-                    # Organize the records by scientificName for later query into GBIF
+                    # Organize the records by scientificName before query into GBIF, or failed query
+                    #                   or by GBIF taxonKey after successful query
+                    index = rec.name
+                    if read_resolved is True and new_gbif_key is not None:
+                        index = new_gbif_key
+                    # Group records by matching name/taxon
                     try:
-                        self.nnsl_by_species[rec.name].append(rec)
+                        self.nnsl_by_species[index].append(rec)
                     except KeyError:
-                        self.nnsl_by_species[rec.name] = [rec]
+                        self.nnsl_by_species[index] = [rec]
+
                     # Use RIIS occurrenceID for dictionary key
                     self.nnsl_by_id[row[RIIS_SPECIES.KEY]] = rec
 
@@ -489,6 +495,8 @@ class NNSL:
                         msgdict, name, 'Failed to read records in dict, {}'.format(e))
         except Exception as e:
             self._add_msg(msgdict, 'unknown_error', '{}'.format(e))
+
+        self.write_resolved_riis(overwrite=True)
 
         return name_count, rec_count
 
