@@ -2,7 +2,7 @@
 import os
 
 from bison.common.constants import (
-    ENCODING, GBIF, LOG, NEW_RIIS_ASSESSMENT_FLD, NEW_RIIS_KEY_FLD, RIIS_SPECIES)
+    ENCODING, GBIF, LOG, NEW_RIIS_ASSESSMENT_FLD, NEW_RIIS_KEY_FLD, RIIS_SPECIES, STATES)
 from bison.common.occurrence import DwcData
 from bison.common.riis import NNSL
 
@@ -37,9 +37,16 @@ class Annotator():
         else:
             self.nnsl.read_riis(read_resolved=True)
         # Input reader
-        self._dwcdata = DwcData(datapath, occ_infname, logger=logger)
+        self._dwcdata = DwcData(datapath, gbif_occ_fname, logger=logger)
         # Output writer
         self._csv_writer = None
+
+        self._valid_states = [k.lower() for k in STATES.keys()]
+        self._valid_states.extend([v.lower() for v in STATES.values()])
+
+        self.good_locations = {}
+        self.bad_locations = {}
+
 
     # ...............................................
     @property
@@ -54,7 +61,7 @@ class Annotator():
         return outfname
 
     # ...............................................
-    def open(self, outfname):
+    def open(self, outfname=None):
         """Open the DwcData for reading and the csv_writer for writing.
 
         Also reads the first record and writes the header.
@@ -65,8 +72,10 @@ class Annotator():
         Raises:
             Exception: on failure to open the csv_writer.
         """
+        if outfname is None:
+            outfname = self.annotated_dwc_fname
         self._dwcdata.open()
-        header = self._csv_reader.fieldnames
+        header = self._dwcdata.fieldnames
         header.append(NEW_RIIS_KEY_FLD)
         header.append(NEW_RIIS_ASSESSMENT_FLD)
         try:
@@ -120,7 +129,7 @@ class Annotator():
         """
         riis_assessment = None
         riis_key = None
-        occ_state = dwcrec[GBIF.STATE_FLD]
+        occ_state = dwcrec[GBIF.STATE_FLD].lower()
         for iisrec in iis_reclist:
 
             # Double check NNSL dict key == RIIS resolved key == occurrence accepted key
@@ -128,10 +137,11 @@ class Annotator():
                 logit(self._log, "WTF is happening?!?")
 
             # Look for AK or HI
-            if occ_state in ("AK", "HI"):
-                if occ_state == iisrec[RIIS_SPECIES.LOCALITY_FLD]:
-                    riis_assessment = iisrec[RIIS_SPECIES.ASSESSMENT_FLD]
-                    riis_key = iisrec[RIIS_SPECIES.KEY]
+            if ((occ_state in ("ak", "alaska") and iisrec[RIIS_SPECIES.LOCALITY_FLD] == "AK")
+                or
+                (occ_state in ("hi", "hawaii") and iisrec[RIIS_SPECIES.LOCALITY_FLD] == "HI")):
+                riis_assessment = iisrec[RIIS_SPECIES.ASSESSMENT_FLD]
+                riis_key = iisrec[RIIS_SPECIES.KEY]
 
             # Not AK or HI, must be L48
             elif iisrec[RIIS_SPECIES.LOCALITY_FLD] == "L48":
@@ -154,14 +164,31 @@ class Annotator():
         pass
 
     # ...............................................
+    def _aggregate_locations(self, dwcrec):
+        # Save state/county from DwC record
+        state = dwcrec[GBIF.STATE_FLD].lower()
+        county = dwcrec[GBIF.COUNTY_FLD].lower()
+        if state in self._valid_states and county not in ("", None):
+            try:
+                self.good_locations[state].add(county)
+            except:
+                self.good_locations[dwcrec[GBIF.STATE_FLD]] = set(dwcrec[GBIF.COUNTY_FLD])
+        else:
+            try:
+                self.bad_locations[state].add(county)
+            except:
+                self.bad_locations[dwcrec[GBIF.STATE_FLD]] = set(dwcrec[GBIF.COUNTY_FLD])
+
+    # ...............................................
     def append_dwca_records(self):
         """Append 'introduced' or 'invasive' status to GBIF DWC occurrence records."""
         self.open(self.annotated_dwc_fname)
         # iterate over DwC records
-        dwcrec = self._dwcdata.dwcrec
+        dwcrec = self._dwcdata.get_record()
         while dwcrec is not None:
             if (self._dwcdata.recno % LOG.INTERVAL) == 0:
-                logit(self._log, '*** Record number {} ***'.format(self._csv_reader.recno))
+                logit(self._log, '*** Record number {} ***'.format(self._dwcdata.recno))
+            self._aggregate_locations(dwcrec)
             # Find acceptedTaxonKey in DwC record
             taxkey = dwcrec[GBIF.ACC_TAXON_FLD]
             # Find RIIS records for this acceptedTaxonKey
@@ -175,4 +202,10 @@ class Annotator():
                     dwcrec[NEW_RIIS_ASSESSMENT_FLD] = riis_assessment
                     dwcrec[NEW_RIIS_KEY_FLD] = riis_key
 
-            self._csv_writer.writerow(dwcrec)
+            try:
+                self._csv_writer.writerow(dwcrec)
+            except ValueError as e:
+                print("Error {} on line {}".format(e, self._dwcdata.recno))
+
+            dwcrec = self._dwcdata.get_record()
+
