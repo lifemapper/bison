@@ -23,11 +23,15 @@ class TestAnnotator(Annotator):
         self.open()
 
     # .............................................................................
-    def test_annotate_records(self, nnsl_data):
+    def test_annotate_records(self):
         """Test 
         
         """
         self.append_dwca_records()
+        print("States: ")
+        for st in self.good_locations.keys():
+            print("  {}".format(st))
+        print("There are {} bad state values".format(len(self.bad_locations)))
 
 
 # .............................................................................
@@ -37,7 +41,7 @@ if __name__ == "__main__":
     nnsl_data = NNSL(DATA_PATH, logger=logger)
 
     tst = TestAnnotator(DATA_PATH, GBIF.TEST_DATA, do_resolve=False, logger=logger)
-    tst.test_gbif_name_accepted()
+    tst.test_annotate_records()
 
 """
 from test.test_annotate import *

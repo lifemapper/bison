@@ -157,7 +157,7 @@ def get_csv_dict_writer(csvfile, header, delimiter, fmode="w", encoding=ENCODING
 
 # .............................................................................
 def get_csv_dict_reader(
-        csvfile, delimiter, fieldnames=None, encoding=ENCODING, ignore_quotes=False):
+        csvfile, delimiter, fieldnames=None, encoding=ENCODING, ignore_quotes=True):
     """Create a CSV dictionary writer and write the header.
 
     Args:

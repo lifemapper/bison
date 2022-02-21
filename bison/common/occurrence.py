@@ -3,7 +3,7 @@
 import os
 
 from bison.common.constants import (
-    ENCODING, GBIF, LOG, NEW_RIIS_ASSESSMENT_FLD, NEW_RIIS_KEY_FLD)
+    DATA_PATH, ENCODING, GBIF, LOG, NEW_RIIS_ASSESSMENT_FLD, NEW_RIIS_KEY_FLD)
 from bison.tools.util import get_csv_dict_reader, get_logger, logit
 
 
@@ -49,12 +49,9 @@ class DwcData(object):
         """
         try:
             self._csv_reader, self._inf = get_csv_dict_reader(
-                self.csvfile, GBIF.DWCA_DELIMITER, encoding=ENCODING)
+                self.csvfile, GBIF.DWCA_DELIMITER, encoding=ENCODING, ignore_quotes=True)
         except Exception:
             raise
-        else:
-            # Fill self.dwcrec
-            self._dwcdata.get_record()
 
     # ...............................................
     def close(self):
@@ -94,9 +91,27 @@ class DwcData(object):
         return lineno
 
     # ...............................................
+    @property
+    def fieldnames(self):
+        """Return the fieldnames read by the CSV reader.
+
+        Returns:
+            fieldnames of the CSV reader.  If the CSV reader does not exist, return None.
+        """
+        try:
+            fieldnames = self._csv_reader.fieldnames
+        except AttributeError:
+            fieldnames = None
+        return fieldnames
+
+    # ...............................................
     def get_record(self):
         """Return next record from the reader."""
-        self.dwcrec = next(self._csv_reader)
+        try:
+            self.dwcrec = next(self._csv_reader)
+        except StopIteration:
+            self.dwcrec = None
+        return self.dwcrec
 
     # ...............................................
     def find_gbif_record(self, gbifid):
@@ -129,6 +144,82 @@ class DwcData(object):
         return self.dwcrec
 
 
+def compare_rec(good_rec, bad_rec):
+    good_fns = set(good_rec.keys())
+    bad_fns = set(bad_rec.keys())
+    extra_fns = bad_fns.difference(good_fns)
+
+    for k, v in good_rec.items():
+        print("$$$$ {}:  {}".format(k, v))
+        print("       vs {}".format(bad_rec[k]))
+    for extra in extra_fns:
+        print("!!!! {}:  {}".format(extra, bad_rec[extra]))
+
+
+
 # ...............................................
 if __name__ == '__main__':
-    pass
+    # Bad record plus before and after
+    before = "1698052989"
+    bad = "1698055779"
+    after = "1698058398"
+
+    logname = "test_gbif"
+    # csvfile = GBIF.TEST_DATA
+    csvfile = "gbif_2022-02-15_testbad_10.csv"
+    logger = get_logger(DATA_PATH, logname=logname)
+
+    dwcdata = DwcData(DATA_PATH, csvfile, logger)
+    dwcdata.open()
+
+    finished = False
+    rec = dwcdata.get_record()
+    while rec is not None and not finished:
+        gbif_id = rec["gbifID"]
+        if gbif_id == before:
+            before_rec = rec
+        elif gbif_id == bad:
+            bad_rec = rec
+        elif gbif_id == after:
+            after_rec = rec
+            finished = True
+        rec = dwcdata.get_record()
+
+    compare_rec(before_rec, bad_rec)
+    print("fini")
+"""
+
+from bison.common.constants import DATA_PATH
+from bison.common.occurrence import *
+
+# Bad record plus before and after
+before = "1698052989"
+bad = "1698055779"
+after = "1698058398"
+
+logname = "test_gbif"
+# csvfile = GBIF.TEST_DATA
+csvfile = "gbif_2022-02-15_testbad_10.csv"
+logger = get_logger(DATA_PATH, logname=logname)
+
+dwcdata = DwcData(DATA_PATH, csvfile, logger)
+dwcdata.open()
+
+finished = False
+rec = dwcdata.get_record()
+
+while rec is not None and not finished:
+    gbif_id = rec["gbifID"]
+    if gbif_id == before:
+        before_rec = rec
+    elif gbif_id == bad:
+        bad_rec = rec
+    elif gbif_id == after:
+        after_rec = rec
+        finished = True
+    rec = dwcdata.get_record()
+        
+
+
+Tst.test_gbif_name_accepted()
+"""

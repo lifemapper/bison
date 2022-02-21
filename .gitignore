@@ -6,6 +6,10 @@ data/.~lock*
 data/*updated*csv
 data/*log
 data/gbif*100k.csv
+data/gbif_2022-02-15.csv
+data/*zip
+data/*annotated*
+data/*xml
 
 venv/
 /.pytest_cache/
