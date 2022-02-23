@@ -81,16 +81,9 @@ STATES = {
 }
 
 #
-US_COUNTY =  {
-    'file':  'cb_2020_us_county_500k',
-    'fields': {"county": "NAME",
-               "state": "STATE_NAME"
-               }
-}
-    # 'file': 'us_can_boundaries_centroids.shp',
-    # 'fields': (('B_FIPS', 'calculated_fips'),
-    #            ('B_COUNTY', 'calculated_county_name'),
-    #            ('B_STATE', 'calculated_state_name'))},
+class US_COUNTY:
+    FILE =  'cb_2020_us_county_500k',
+    CENSUS_BISON_MAP = {"NAME": "census_cty", "STATE_NAME": "census_st"}
 
 # .............................................................................
 class ITIS:

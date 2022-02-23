@@ -2,8 +2,10 @@
 import os
 
 from bison.common.constants import (
-    ENCODING, GBIF, LOG, NEW_RIIS_ASSESSMENT_FLD, NEW_RIIS_KEY_FLD, RIIS_SPECIES, STATES)
+    ENCODING, GBIF, LOG, NEW_RIIS_ASSESSMENT_FLD, NEW_RIIS_KEY_FLD, RIIS_SPECIES, STATES,
+    US_COUNTY)
 from bison.common.occurrence import DwcData
+from bison.common.geoindex import GeoResolver
 from bison.common.riis import NNSL
 
 from bison.tools.util import (
@@ -36,6 +38,10 @@ class Annotator():
             self.nnsl.resolve_riis_to_gbif_taxa()
         else:
             self.nnsl.read_riis(read_resolved=True)
+            
+        # Must georeference points to add new, consistent state and county fields
+        self._geores = GeoResolver(US_COUNTY.FILE, US_COUNTY.CENSUS_BISON_MAP)
+        
         # Input reader
         self._dwcdata = DwcData(datapath, gbif_occ_fname, logger=logger)
         # Output writer
@@ -183,6 +189,9 @@ class Annotator():
     def append_dwca_records(self):
         """Append 'introduced' or 'invasive' status to GBIF DWC occurrence records."""
         self.open(self.annotated_dwc_fname)
+        # Create geospatial index to identify county/state of points
+        self._geores.initialize_geospatial_data()
+
         # iterate over DwC records
         dwcrec = self._dwcdata.get_record()
         while dwcrec is not None:

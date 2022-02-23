@@ -1,7 +1,7 @@
 import os
 from osgeo import ogr
 
-from bison.common.constants import US_COUNTY
+from bison.common.constants import DATA_PATH, US_COUNTY
 
 # .............................................................................
 class GeoResolver(object):
@@ -12,58 +12,58 @@ class GeoResolver(object):
     """
 
     # ...............................................
-    def __init__(self, state_county_shpfile, log):
+    def __init__(self, spatial_fname, spatial_fields, log):
         """
         @summary: Constructor
         """
+        full_spatial_fname = os.path.join(DATA_PATH, spatial_fname)
+        if not os.path.exists(full_spatial_fname):
+            raise FileNotFoundError
         self._log = log
-        if os.path.exists(state_county_shpfile):
-            self._us_filename = state_county_shpfile
-        self.us_index = None
-        self.us_feats = None
-        self.us_fldnames = None
+        self._spatial_filename = full_spatial_fname
+        self._spatial_fields = spatial_fields
+        self.spatial_index = None
+        self.spatial_feats = None
+        self.bison_spatial_fields = None
 
     # ...............................................
     def initialize_geospatial_data(self):
         driver = ogr.GetDriverByName("ESRI Shapefile")
 
-        if None in (self.us_index, self.us_feats, self.us_fldnames):
-            terrestrial_shpname = os.path.join(ancillary_path, terr_data['file'])
-            terr_data_src = driver.Open(terrestrial_shpname, 0)
-            terrlyr = terr_data_src.GetLayer()
-            (self.terrindex,
-             self.terrfeats,
-             self.terr_bison_fldnames) = self._create_spatial_index(
-                 terr_data['fields'], terrlyr)
-
-        if None in (self.marindex, self.marfeats, self.mar_bison_fldnames):
-            marine_shpname = os.path.join(ancillary_path, marine_data['file'])
-            eez_data_src = driver.Open(marine_shpname, 0)
-            eezlyr = eez_data_src.GetLayer()
-            (self.marindex,
-             self.marfeats,
-             self.mar_bison_fldnames) = self._create_spatial_index(
-                 marine_data['fields'], eezlyr)
-
+        bnd_src = driver.Open(self._spatial_filename, 0)
+        bnd_lyr = bnd_src.GetLayer()
+        (self.spatial_index, self.spatial_feats, self.bison_spatial_fields) = self._create_spatial_index(
+             self._spatial_fields, bnd_lyr)
 
 
     # ...............................................
+    def _create_spatial_index(self, flddata, lyr):
+        lyr_def = lyr.GetLayerDefn()
+
+        fld_indexes = []
+        bison_fldnames = []
+        for bnd_fld, bison_fld in flddata.items():
+            bnd_idx = lyr_def.GetFieldIndex(bnd_fld)
+            fld_indexes.append((bison_fld, bnd_idx))
+            bison_fldnames.append(bison_fld)
+
+        sp_index = rtree.index.Index(interleaved=False)
+        sp_feats = {}
+        for fid in range(0, lyr.GetFeatureCount()):
+            feat = lyr.GetFeature(fid)
+            geom = feat.geometry()
+            # OGR returns xmin, xmax, ymin, ymax
+            xmin, xmax, ymin, ymax = geom.GetEnvelope()
+            # Rtree takes xmin, xmax, ymin, ymax IFF interleaved = False
+            sp_index.insert(fid, (xmin, xmax, ymin, ymax))
+            sp_feats[fid] = {'feature': feat, 'geom': geom}
+            for name, idx in fld_indexes:
+                sp_feats[fid][name] = feat.GetFieldAsString(idx)
+        return sp_index, sp_feats, bison_fldnames
+
+    # ...............................................
     def update_point_in_polygons(self, geo_data):
-        """
-        @summary: Process a CSV file with 47 ordered BISON fields (and optional
-                  gbifID field for GBIF provided data) to
-                  1) fill itis_tsn, valid_accepted_scientific_name,
-                     valid_accepted_tsn, itis_common_name, kingdom (if blank)
-                     with ITIS values based on clean_provided_scientific_name,
-                  2) georeference records without coordinates or re-georeference
-                     records previously georeferenced to county centroid,
-                  3) fill terrestrial (state/county/fips) or marine (EEZ) fields
-                     for reported/computed coordinates
-                  4) fill 'establishment_means' field for species non-native
-                     to Alaska, Hawaii, or Lower 48 based on itis_tsn or
-                     clean_provided_scientific_name
-        @return: A CSV file of BISON-modified records
-        """
+        """Process a CSV file to intersect coordinates with state and county boundaries"""
         if os.path.exists(outfname):
             delete_shapefile(outfname)
         if self.is_open():
