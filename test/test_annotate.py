@@ -20,18 +20,20 @@ class TestAnnotator(Annotator):
         """
         Annotator.__init__(
             self, datapath, gbif_occ_fname, do_resolve=do_resolve, logger=logger)
-        self.open()
 
     # .............................................................................
     def test_annotate_records(self):
-        """Test 
-        
-        """
+        """Test annotating records and returning summarized errors in state field."""
         self.append_dwca_records()
-        print("States: ")
-        for st in self.good_locations.keys():
-            print("  {}".format(st))
-        print("There are {} bad state values".format(len(self.bad_locations)))
+        print(f"Matched states: {self.matched_states}")
+        print(f"Mis-matched states: {self.mismatched_states}")
+        print(f"Missing states: {self.missing_states}")
+        print("Good states: ")
+        for st, counties in self.good_locations.items():
+            print(f"  {st}: {counties}")
+        print("Bad states: ")
+        for st, counties in self.bad_locations.items():
+            print(f"  {st}: {counties}")
 
 
 # .............................................................................

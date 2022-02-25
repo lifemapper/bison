@@ -7,6 +7,9 @@ LINENO_FLD = "LINENO"
 ERR_SEPARATOR = "------------"
 NEW_RIIS_KEY_FLD = "riis_occurrence_id"
 NEW_RIIS_ASSESSMENT_FLD = "riis_assessment"
+# Geospatial data for intersecting with points to identify state and county for points
+NEW_RESOLVED_COUNTY = "georef_cty"
+NEW_RESOLVED_STATE = "georef_st"
 
 RANKS = [
     "ABERRATION", "CLASS", "COHORT", "CONVARIETY", "CULTIVAR", "CULTIVAR_GROUP",
@@ -27,9 +30,9 @@ RANKS_BELOW_SPECIES = [
     "SUBSPECIES",
     "SUBVARIETY", "VARIETY"]
 
-CONUS_STATES = {
+US_STATES = {
     "Alabama": "AL",
-    # "Alaska": "AK",
+    "Alaska": "AK",
     "Arizona": "AZ",
     "Arkansas": "AR",
     "California": "CA",
@@ -38,7 +41,7 @@ CONUS_STATES = {
     "Delaware": "DE",
     "Florida": "FL",
     "Georgia": "GA",
-    # "Hawaii": "HI",
+    "Hawaii": "HI",
     "Idaho": "ID",
     "Illinois": "IL",
     "Indiana": "IN",
@@ -80,12 +83,13 @@ CONUS_STATES = {
     "Wyoming": "WY",
 }
 
-# Geospatial data for intersecting with points to identify state and county for points
-RESOLVED_COUNTY = "georef_cty"
-RESOLVED_STATE = "georef_cty"
+
+# .............................................................................
 class US_COUNTY:
-    FILE =  'cb_2020_us_county_500k',
-    CENSUS_BISON_MAP = {"NAME": RESOLVED_COUNTY, "STUSPS": RESOLVED_STATE}
+    """File and fieldnames for census county boundary data, mapping to bison fieldnames."""
+    FILE = "cb_2020_us_county_500k.shp"
+    CENSUS_BISON_MAP = {"NAME": NEW_RESOLVED_COUNTY, "STUSPS": NEW_RESOLVED_STATE}
+
 
 # .............................................................................
 class ITIS:
@@ -116,7 +120,7 @@ class GBIF:
     MATCH_FLD = "matchType"
     STATUS_FLD = "taxonomicStatus"
     ORG_FOREIGN_KEY = "publishingOrganizationKey"
-    TEST_DATA = "gbif_2022-02-15.csv"
+    TEST_DATA = "gbif_2022-02-15_1k.csv"
     DWCA_DATASET_DIR = "dataset"
     DWCA_META_FNAME = "meta.xml"
     DWCA_INTERPRETED = "occurrence"

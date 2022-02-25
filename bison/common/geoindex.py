@@ -1,13 +1,16 @@
+"""Class for a spatial index and tools for intersecting with a point and extracting attributes."""
 import os
-from osgeo import ogr
+import ogr
+import rtree
+import time
 
-from bison.common.constants import DATA_PATH, US_COUNTY
+from bison.common.constants import DATA_PATH
+
 
 # .............................................................................
 class GeoResolver(object):
-    """Object for intersecting coordinates with a polygon shapefile"""
-    # ...............................................
-    def __init__(self, spatial_fname, spatial_fields, log):
+    """Object for intersecting coordinates with a polygon shapefile."""
+    def __init__(self, spatial_fname, spatial_fields, logger):
         """Construct a geospatial index to intersect with a set of coordinates.
 
         Args:
@@ -15,11 +18,15 @@ class GeoResolver(object):
             spatial_fields (dict): dictionary containing keys that are fieldnames for
                 polygon attributes of interest and values that are new fields for
                 the intersected points.
+            logger (object): logger for saving relevant processing messages
+
+        Raises:
+            FileNotFoundError: if spatial_fname does not exist on the file system
         """
         full_spatial_fname = os.path.join(DATA_PATH, spatial_fname)
         if not os.path.exists(full_spatial_fname):
             raise FileNotFoundError
-        self._log = log
+        self._log = logger
         self._spatial_filename = full_spatial_fname
         self._spatial_fields = spatial_fields
         self.spatial_index = None
@@ -28,6 +35,7 @@ class GeoResolver(object):
 
     # ...............................................
     def initialize_geospatial_data(self):
+        """Create a spatial index for the features in self._spatial_filename."""
         driver = ogr.GetDriverByName("ESRI Shapefile")
 
         bnd_src = driver.Open(self._spatial_filename, 0)
@@ -36,7 +44,6 @@ class GeoResolver(object):
          self.spatial_feats,
          self.bison_spatial_fields
          ) = self._create_spatial_index(bnd_lyr)
-
 
     # ...............................................
     def _create_spatial_index(self, lyr):
@@ -64,14 +71,25 @@ class GeoResolver(object):
 
     # ...............................................
     def _find_enclosing_polygon(self, lon, lat):
-        # Start time
         start = time.time()
-        msgs = None
+        try:
+            lon = float(lon)
+            lat = float(lat)
+        except TypeError:
+            raise TypeError(f"Longitude {lon} or latitude {lat} is not a number")
+
+        # Initialize fields to pull values from intersection
         fldvals = {}
+        for fn in self.bison_spatial_fields:
+            fldvals[fn] = None
+
+        # Construct point
         pt = ogr.Geometry(ogr.wkbPoint)
         pt.AddPoint(lon, lat)
-
+        # Intersect with spatial index to get ID (fid) of intersecting features
         intersect_fids = list(self.spatial_index.intersection((lon, lat)))
+
+        # Pull attributes of interest from intersecting feature
         for fid in intersect_fids:
             geom = self.spatial_feats[fid]['geom']
             if pt.Within(geom):
@@ -80,14 +98,9 @@ class GeoResolver(object):
                     fldvals[fn] = self.spatial_feats[fid][fn]
                 # Stop looking after finding intersection
                 break
-                
+
         # Elapsed time
         ogr_seconds = time.time()-start
-
         return fldvals, ogr_seconds
 
-
     # ...............................................
-    def find_enclosing_polygon(self, geo_data):
-        """Process a CSV file to intersect coordinates with state and county boundaries"""
-        pass
