@@ -27,9 +27,9 @@ RANKS_BELOW_SPECIES = [
     "SUBSPECIES",
     "SUBVARIETY", "VARIETY"]
 
-STATES = {
+CONUS_STATES = {
     "Alabama": "AL",
-    "Alaska": "AK",
+    # "Alaska": "AK",
     "Arizona": "AZ",
     "Arkansas": "AR",
     "California": "CA",
@@ -38,7 +38,7 @@ STATES = {
     "Delaware": "DE",
     "Florida": "FL",
     "Georgia": "GA",
-    "Hawaii": "HI",
+    # "Hawaii": "HI",
     "Idaho": "ID",
     "Illinois": "IL",
     "Indiana": "IN",
@@ -80,10 +80,12 @@ STATES = {
     "Wyoming": "WY",
 }
 
-#
+# Geospatial data for intersecting with points to identify state and county for points
+RESOLVED_COUNTY = "georef_cty"
+RESOLVED_STATE = "georef_cty"
 class US_COUNTY:
     FILE =  'cb_2020_us_county_500k',
-    CENSUS_BISON_MAP = {"NAME": "census_cty", "STATE_NAME": "census_st"}
+    CENSUS_BISON_MAP = {"NAME": RESOLVED_COUNTY, "STUSPS": RESOLVED_STATE}
 
 # .............................................................................
 class ITIS:
@@ -109,6 +111,8 @@ class GBIF:
     ACC_TAXON_FLD = "acceptedTaxonKey"
     STATE_FLD = "stateProvince"
     COUNTY_FLD = "county"
+    LAT_FLD = "decimalLatitude"
+    LON_FLD = "decimalLongitude"
     MATCH_FLD = "matchType"
     STATUS_FLD = "taxonomicStatus"
     ORG_FOREIGN_KEY = "publishingOrganizationKey"

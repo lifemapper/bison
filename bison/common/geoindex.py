@@ -5,16 +5,16 @@ from bison.common.constants import DATA_PATH, US_COUNTY
 
 # .............................................................................
 class GeoResolver(object):
-    """
-    Object for processing a CSV file with 47 ordered BISON fields (and optional
-    gbifID field for GBIF provided data) filling ITIS, coordinates, terrestrial
-    or marine boundaries, and establishment_means.
-    """
-
+    """Object for intersecting coordinates with a polygon shapefile"""
     # ...............................................
     def __init__(self, spatial_fname, spatial_fields, log):
-        """
-        @summary: Constructor
+        """Construct a geospatial index to intersect with a set of coordinates.
+
+        Args:
+            spatial_fname (str): filename for a shapefile to construct index from
+            spatial_fields (dict): dictionary containing keys that are fieldnames for
+                polygon attributes of interest and values that are new fields for
+                the intersected points.
         """
         full_spatial_fname = os.path.join(DATA_PATH, spatial_fname)
         if not os.path.exists(full_spatial_fname):
@@ -32,17 +32,18 @@ class GeoResolver(object):
 
         bnd_src = driver.Open(self._spatial_filename, 0)
         bnd_lyr = bnd_src.GetLayer()
-        (self.spatial_index, self.spatial_feats, self.bison_spatial_fields) = self._create_spatial_index(
-             self._spatial_fields, bnd_lyr)
+        (self.spatial_index,
+         self.spatial_feats,
+         self.bison_spatial_fields
+         ) = self._create_spatial_index(bnd_lyr)
 
 
     # ...............................................
-    def _create_spatial_index(self, flddata, lyr):
+    def _create_spatial_index(self, lyr):
         lyr_def = lyr.GetLayerDefn()
-
         fld_indexes = []
         bison_fldnames = []
-        for bnd_fld, bison_fld in flddata.items():
+        for bnd_fld, bison_fld in self._spatial_fields.items():
             bnd_idx = lyr_def.GetFieldIndex(bnd_fld)
             fld_indexes.append((bison_fld, bnd_idx))
             bison_fldnames.append(bison_fld)
@@ -62,67 +63,31 @@ class GeoResolver(object):
         return sp_index, sp_feats, bison_fldnames
 
     # ...............................................
-    def update_point_in_polygons(self, geo_data):
+    def _find_enclosing_polygon(self, lon, lat):
+        # Start time
+        start = time.time()
+        msgs = None
+        fldvals = {}
+        pt = ogr.Geometry(ogr.wkbPoint)
+        pt.AddPoint(lon, lat)
+
+        intersect_fids = list(self.spatial_index.intersection((lon, lat)))
+        for fid in intersect_fids:
+            geom = self.spatial_feats[fid]['geom']
+            if pt.Within(geom):
+                # Retrieve values from intersecting polygon
+                for fn in self.bison_spatial_fields:
+                    fldvals[fn] = self.spatial_feats[fid][fn]
+                # Stop looking after finding intersection
+                break
+                
+        # Elapsed time
+        ogr_seconds = time.time()-start
+
+        return fldvals, ogr_seconds
+
+
+    # ...............................................
+    def find_enclosing_polygon(self, geo_data):
         """Process a CSV file to intersect coordinates with state and county boundaries"""
-        if os.path.exists(outfname):
-            delete_shapefile(outfname)
-        if self.is_open():
-            self.close()
-
-        self.initialize_geospatial_data(terr_data, marine_data, ancillary_path)
-
-        matches = {0: 0, 1: 0, 2: 0}
-        recno = 0
-        painful_count = 0
-        try:
-            start_time = time.time()
-            loop_time = start_time
-            dict_reader, inf, writer, outf = open_csv_files(
-                infname, BISON_DELIMITER, ENCODING, outfname=outfname,
-                outfields=self._outfields)
-            for rec in dict_reader:
-                recno += 1
-                if from_gbif:
-                    squid = rec['id']
-                else:
-                    squid = rec[BISON_SQUID_FLD]
-                lon, lat = self._get_coords(rec)
-                # Use coordinates to calc
-                if lon is not None:
-                    # Compute geo: coordinates and polygons
-                    match_count, msgs = self._fill_geofields(rec, lon, lat)
-
-                    if match_count == 0:
-                        matches[0] += 1
-                    elif match_count == 1:
-                        matches[1] += 1
-                    else:
-                        matches[2] += 1
-
-                    if msgs:
-                        painful_count += 1
-                        for msg in msgs:
-                            self._log.info('Rec {}; {}'.format(recno, msg))
-
-                # Write updated record
-                row = self._makerow(rec)
-                writer.writerow(row)
-                # Log progress occasionally, this process is very time-consuming
-                # so show progress at shorter intervals to ensure it is moving
-                if (recno % LOGINTERVAL/10) == 0:
-                    now = time.time()
-                    self._log.info('*** Record number {}, painful {}, time {} ***'.format(
-                        recno, painful_count, now - loop_time))
-                    loop_time = now
-
-        except Exception as e:
-            self._log.error('Failed filling data from id {}, line {}: {}'
-                            .format(squid, recno, e))
-        finally:
-            inf.close()
-            outf.close()
-            self._log.info('*** Elapsed time {} for {} records ***'.format(
-                time.time() - start_time, recno))
-            self._log.info('*** Matched 0: {}, 1: {}, >1: {} records ***'.format(
-                matches[0], matches[1], matches[2]))
-
+        pass

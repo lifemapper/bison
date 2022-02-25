@@ -2,8 +2,8 @@
 import os
 
 from bison.common.constants import (
-    ENCODING, GBIF, LOG, NEW_RIIS_ASSESSMENT_FLD, NEW_RIIS_KEY_FLD, RIIS_SPECIES, STATES,
-    US_COUNTY)
+    ENCODING, GBIF, LOG, NEW_RIIS_ASSESSMENT_FLD, NEW_RIIS_KEY_FLD, RIIS_SPECIES,
+    CONUS_STATES, RESOLVED_COUNTY, RESOLVED_STATE, US_COUNTY)
 from bison.common.occurrence import DwcData
 from bison.common.geoindex import GeoResolver
 from bison.common.riis import NNSL
@@ -47,8 +47,10 @@ class Annotator():
         # Output writer
         self._csv_writer = None
 
-        self._valid_states = [k.lower() for k in STATES.keys()]
-        self._valid_states.extend([v.lower() for v in STATES.values()])
+        # capitalized state names
+        self._conus_states = [k for k in CONUS_STATES.keys()]
+        # upper case 2-character state abbreviations
+        self._conus_states.extend([v for v in CONUS_STATES.values()])
 
         self.good_locations = {}
         self.bad_locations = {}
@@ -119,7 +121,7 @@ class Annotator():
         return False
 
     # ...............................................
-    def assess_occurrence(self, dwcrec, iis_reclist):
+    def assess_occurrence(self, dwcrec, county, state, iis_reclist):
         """Find RIIS assessment matching the acceptedTaxonKey and state in this record.
 
         Args:
@@ -135,7 +137,7 @@ class Annotator():
         """
         riis_assessment = None
         riis_key = None
-        occ_state = dwcrec[GBIF.STATE_FLD].lower()
+        # state = dwcrec[GBIF.STATE_FLD].lower()
         for iisrec in iis_reclist:
 
             # Double check NNSL dict key == RIIS resolved key == occurrence accepted key
@@ -143,14 +145,14 @@ class Annotator():
                 logit(self._log, "WTF is happening?!?")
 
             # Look for AK or HI
-            if ((occ_state in ("ak", "alaska") and iisrec[RIIS_SPECIES.LOCALITY_FLD] == "AK")
+            if ((state  == "AK" and iisrec[RIIS_SPECIES.LOCALITY_FLD] == "AK")
                 or
-                (occ_state in ("hi", "hawaii") and iisrec[RIIS_SPECIES.LOCALITY_FLD] == "HI")):
+                (state == "HI" and iisrec[RIIS_SPECIES.LOCALITY_FLD] == "HI")):
                 riis_assessment = iisrec[RIIS_SPECIES.ASSESSMENT_FLD]
                 riis_key = iisrec[RIIS_SPECIES.KEY]
 
-            # Not AK or HI, must be L48
-            elif iisrec[RIIS_SPECIES.LOCALITY_FLD] == "L48":
+            # Not AK or HI, is it L48?
+            elif state in self._conus_states and iisrec[RIIS_SPECIES.LOCALITY_FLD] == "L48":
                 riis_assessment = iisrec[RIIS_SPECIES.ASSESSMENT_FLD]
                 riis_key = iisrec[RIIS_SPECIES.KEY]
 
@@ -171,7 +173,7 @@ class Annotator():
 
     # ...............................................
     def _aggregate_locations(self, dwcrec):
-        # Save state/county from DwC record
+        """Examine unique states/counties"""
         state = dwcrec[GBIF.STATE_FLD].lower()
         county = dwcrec[GBIF.COUNTY_FLD].lower()
         if state in self._valid_states and county not in ("", None):
@@ -197,19 +199,30 @@ class Annotator():
         while dwcrec is not None:
             if (self._dwcdata.recno % LOG.INTERVAL) == 0:
                 logit(self._log, '*** Record number {} ***'.format(self._dwcdata.recno))
+
+            # Save when examining input data
             self._aggregate_locations(dwcrec)
             # Find acceptedTaxonKey in DwC record
             taxkey = dwcrec[GBIF.ACC_TAXON_FLD]
+
+            # Find county and state for these coords
+            county, state = self._find_county_state(
+                dwcrec[GBIF.LON_FLD], dwcrec[GBIF.LAT_FLD])
+
             # Find RIIS records for this acceptedTaxonKey
             try:
                 iis_reclist = self.nnsl.data[taxkey]
             except Exception:
-                iis_reclist = None
-            else:
-                if iis_reclist is not None:
-                    riis_assessment, riis_key = self.assess_occurrence(dwcrec, iis_reclist)
-                    dwcrec[NEW_RIIS_ASSESSMENT_FLD] = riis_assessment
-                    dwcrec[NEW_RIIS_KEY_FLD] = riis_key
+                iis_reclist = []
+
+            riis_assessment, riis_key = self.assess_occurrence(
+                dwcrec, county, state, iis_reclist)
+
+            dwcrec[NEW_RIIS_ASSESSMENT_FLD] = riis_assessment
+            dwcrec[NEW_RIIS_KEY_FLD] = riis_key
+            # Add county and state to record
+            dwcrec[RESOLVED_COUNTY] = county
+            dwcrec[RESOLVED_STATE] = state
 
             try:
                 self._csv_writer.writerow(dwcrec)
@@ -218,3 +231,16 @@ class Annotator():
 
             dwcrec = self._dwcdata.get_record()
 
+
+    # ...............................................
+    def _find_county_state(self, lon, lat):
+        county = state = None
+        if None not in (lon, lat):
+            # Intersect coordinates with state and county boundaries
+            fldvals, ogr_seconds = self._find_enclosing_polygon(lon, lat)
+            if ogr_seconds > 0.75:
+                logit(self._log, 'Rec {}; intersect point {}, {}; OGR time {} '.format(
+                    recno, lon, lat, ogr_seconds))
+            county = fldvals[RESOLVED_COUNTY]
+            state = fldvals[RESOLVED_STATE]
+        return county, state
