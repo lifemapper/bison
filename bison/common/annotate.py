@@ -50,6 +50,8 @@ class Annotator():
         for k, v in US_STATES.items():
             if k not in ("Alaska", "Hawaii"):
                 self._conus_states.extend([k, v])
+        self._all_states = self._conus_states.copy()
+        self._all_states.extend(["Alaska", "Hawaii", "AK", "HI"])
 
         # Test DwC record contents
         self.good_locations = {}
@@ -178,7 +180,13 @@ class Annotator():
             elif len(state) > 2:
                 state.capitalize()
 
-            if state in self._conus_states:
+            # Does record state == georeferenced state?
+            if US_STATES[state] == state_code or state == state_code:
+                self.matched_states += 1
+            else:
+                self.mismatched_states += 1
+
+            if state in self._all_states:
                 # Good state/county combos
                 try:
                     self.good_locations[state].add(county)

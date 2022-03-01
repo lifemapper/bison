@@ -120,7 +120,7 @@ class GBIF:
     MATCH_FLD = "matchType"
     STATUS_FLD = "taxonomicStatus"
     ORG_FOREIGN_KEY = "publishingOrganizationKey"
-    TEST_DATA = "gbif_2022-02-15_1k.csv"
+    TEST_DATA = "gbif_2022-02-15.csv"
     DWCA_DATASET_DIR = "dataset"
     DWCA_META_FNAME = "meta.xml"
     DWCA_INTERPRETED = "occurrence"
