@@ -5,7 +5,7 @@ import os
 from bison.common.constants import (
     ERR_SEPARATOR, GBIF, LINENO_FLD, LOG, RIIS, RIIS_AUTHORITY, RIIS_SPECIES)
 from bison.tools.gbif_api import GbifSvc
-from bison.tools.util import get_csv_dict_reader, get_csv_dict_writer, get_logger, logit
+from bison.tools.util import get_csv_dict_reader, get_csv_dict_writer, get_logger
 
 
 # .............................................................................
@@ -19,7 +19,7 @@ def standardize_name(sci_name, sci_author):
     Returns:
         String that is a concatenation of the 2 inputs, with a space between.
     """
-    return "{} {}".format(sci_name, sci_author)
+    return f"{sci_name} {sci_author}"
 
 
 # .............................................................................
@@ -214,28 +214,25 @@ class NNSL:
             Exception: on unexpected file header
         """
         self._datapath = datapath.rstrip(os.sep)
+
         if logger is None:
             logger = get_logger(datapath)
         self._log = logger
-        self.auth_fname = "{}.{}".format(
-            os.path.join(self._datapath, RIIS_AUTHORITY.FNAME), RIIS.DATA_EXT
-        )
-        # If testing data
+
+        self.auth_fname = f"{os.path.join(self._datapath, RIIS_AUTHORITY.FNAME)}.{RIIS.DATA_EXT}"
+
+        # Test or full RIIS file
         if test_fname is not None:
-            # Clear species data, switch to test data, read
-            self.riis_fname = "{}.{}".format(
-                os.path.join(self._datapath, test_fname), RIIS.DATA_EXT
-            )
+            basename = test_fname
         else:
-            self.riis_fname = "{}.{}".format(
-                os.path.join(self._datapath, RIIS_SPECIES.FNAME), RIIS.DATA_EXT
-            )
+            basename = RIIS_SPECIES.FNAME
+        self.riis_fname = f"{os.path.join(self._datapath, basename)}.{RIIS.DATA_EXT}"
 
         # Test and clean headers of non-ascii characters
         self._test_header(self.auth_fname, RIIS_AUTHORITY.HEADER)
         good_header = self._test_header(self.riis_fname, RIIS_SPECIES.HEADER)
         if good_header is False:
-            raise Exception("Unexpected file header found in {}".format(self.riis_fname))
+            raise Exception(f"Unexpected file header found in {self.riis_fname}")
 
         # Trimmed and updated Non-native Species List, built from RIIS
         self.nnsl_by_species = None
@@ -270,7 +267,7 @@ class NNSL:
             updated_riis_fname: output filename derived from the input RIIS filename
         """
         basename, ext = os.path.splitext(self.riis_fname)
-        updated_riis_fname = "{}_updated_gbif{}".format(basename, ext)
+        updated_riis_fname = f"{basename}_updated_gbif{ext}"
         return updated_riis_fname
 
     # ...............................................
@@ -305,7 +302,7 @@ class NNSL:
         if read_resolved is True:
             # Use species data with updated GBIF taxonomic resolution if exists
             if not os.path.exists(self.gbif_resolved_riis_fname):
-                raise FileNotFoundError("File {} does not exist".format(self.gbif_resolved_riis_fname))
+                raise FileNotFoundError(f"File {self.gbif_resolved_riis_fname} does not exist")
             else:
                 infname = self.gbif_resolved_riis_fname
                 header = self.gbif_resolved_riis_header
@@ -314,7 +311,7 @@ class NNSL:
             header = RIIS_SPECIES.HEADER
 
         rdr, inf = get_csv_dict_reader(infname, RIIS.DELIMITER, fieldnames=header)
-        logit(self._log, "Reading RIIS from {}".format(infname))
+        self._log.debug(f"Reading RIIS from {infname}")
         try:
             for row in rdr:
                 lineno = rdr.line_num
@@ -365,7 +362,7 @@ class NNSL:
                 try:
                     status = alt["status"].lower()
                 except KeyError:
-                    print("Failed to get status from alternative {}".format(alt))
+                    print(f"Failed to get status from alternative {alt}")
                 else:
                     if status == "accepted":
                         key = alt["usageKey"]
@@ -386,14 +383,14 @@ class NNSL:
             # Results from fuzzy match search (species/match?name=<name>)
             match_type = gbifrec[GBIF.MATCH_FLD]
         except KeyError:
-            print('Failed to get matchType from {}'.format(gbifrec))
+            print(f"Failed to get matchType from {gbifrec}")
         else:
             if match_type != 'NONE':
                 try:
                     # Results from species/match?name=<name>
                     status = gbifrec["status"].lower()
                 except KeyError:
-                    print('Failed to get status from {}'.format(gbifrec))
+                    print(f"Failed to get status from {gbifrec}")
                 else:
                     if status == "accepted":
                         key = gbifrec["usageKey"]
@@ -414,7 +411,7 @@ class NNSL:
             # Results from species/<key>
             status = gbifrec[GBIF.STATUS_FLD].lower()
         except KeyError:
-            msg = 'Failed to get status from {}'.format(gbifrec)
+            msg = f"Failed to get status from {gbifrec}"
         else:
             if status == "accepted":
                 key = gbifrec["key"]
@@ -446,10 +443,6 @@ class NNSL:
                 gbifrec2 = gbif_svc.query_by_namekey(taxkey=new_key)
                 # Replace new key and name with results of 2nd query
                 new_key, new_name, msg = self._get_accepted_name_key_from_get(gbifrec2)
-
-        # if new_key != taxkey:
-        #     print("File taxonKey/sciname {}/{} resolved to GBIF taxonKey {}/{}".format(
-        #         taxkey, sciname, new_key, new_name))
 
         return new_key, new_name, msg
 
@@ -488,13 +481,12 @@ class NNSL:
                         rec_count += 1
 
                     if (name_count % LOG.INTERVAL) == 0:
-                        logit(self._log, '*** NNSL Name {} ***'.format(name_count))
+                        self._log.debug(f'*** NNSL Name {name_count} ***')
 
                 except Exception as e:
-                    self._add_msg(
-                        msgdict, name, 'Failed to read records in dict, {}'.format(e))
+                    self._add_msg(msgdict, name, f"Failed to read records in dict, {e}")
         except Exception as e:
-            self._add_msg(msgdict, 'unknown_error', '{}'.format(e))
+            self._add_msg(msgdict, "unknown_error", f"{e}")
 
         self.write_resolved_riis(overwrite=True)
 
@@ -524,7 +516,7 @@ class NNSL:
                 outfname, new_header, RIIS.DELIMITER, fmode="w", overwrite=overwrite)
         except Exception:
             raise
-        logit(self._log, "Writing resolved RIIS to {}".format(outfname))
+        self._log.debug(f"Writing resolved RIIS to {outfname}")
         rec_count = 0
         try:
             for name, rec in self.nnsl_by_id.items():
@@ -533,11 +525,11 @@ class NNSL:
                     writer.writerow(rec.data)
                     rec_count += 1
                 except Exception as e:
-                    print("Failed to write {}, {}".format(rec.data, e))
-                    self._add_msg(msgdict, name, 'Failed to write record {} ({})'.format(rec.data, e))
+                    print(f"Failed to write {rec.data}, {e}")
+                    self._add_msg(msgdict, name, f"Failed to write {rec.data} ({e})")
 
         except Exception as e:
-            self._add_msg(msgdict, 'unknown_error', '{}'.format(e))
+            self._add_msg(msgdict, "unknown_error", f"{e}")
         finally:
             outf.close()
 
@@ -582,19 +574,18 @@ class NNSL:
         # Test header length
         fld_count = len(header)
         if fld_count != len(expected_header):
-            logit(self._log, ERR_SEPARATOR)
-            logit(self._log, "[Error] Header has {} fields, != {} expected count".format(
-                fld_count, len(expected_header))
-            )
+            self._log.error(ERR_SEPARATOR)
+            self._log.error(
+                f"[Error] Header has {fld_count} fields, != {len(expected_header)} expected")
+
         for i in range(len(header)):
             # Test header fieldnames
             good_fieldname = self._only_ascii(header[i])
             if good_fieldname != expected_header[i]:
                 success = False
-                logit(self._log, ERR_SEPARATOR)
-                logit(self._log, "[Error] Header fieldname {} != {} expected fieldname".format(
-                    header[i], expected_header[i])
-                )
+                self._log.error(ERR_SEPARATOR)
+                self._log.error(
+                    f"[Error] Header {header[i]} != {expected_header[i]} expected")
         return success
 
 

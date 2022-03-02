@@ -71,36 +71,36 @@ class GeoResolver(object):
 
     # ...............................................
     def _find_enclosing_polygon(self, lon, lat):
-        start = time.time()
-        try:
-            lon = float(lon)
-            lat = float(lat)
-        except TypeError:
-            raise TypeError(f"Longitude {lon} or latitude {lat} is not a number")
-
+        ogr_seconds = 0
         # Initialize fields to pull values from intersection
         fldvals = {}
         for fn in self.bison_spatial_fields:
             fldvals[fn] = None
+        try:
+            lon = float(lon)
+            lat = float(lat)
+        except ValueError:
+            self._log.error(f"Longitude {lon} or latitude {lat} is not a number")
+        else:
+            start = time.time()
+            # Construct point
+            pt = ogr.Geometry(ogr.wkbPoint)
+            pt.AddPoint(lon, lat)
+            # Intersect with spatial index to get ID (fid) of intersecting features
+            intersect_fids = list(self.spatial_index.intersection((lon, lat)))
 
-        # Construct point
-        pt = ogr.Geometry(ogr.wkbPoint)
-        pt.AddPoint(lon, lat)
-        # Intersect with spatial index to get ID (fid) of intersecting features
-        intersect_fids = list(self.spatial_index.intersection((lon, lat)))
+            # Pull attributes of interest from intersecting feature
+            for fid in intersect_fids:
+                geom = self.spatial_feats[fid]['geom']
+                if pt.Within(geom):
+                    # Retrieve values from intersecting polygon
+                    for fn in self.bison_spatial_fields:
+                        fldvals[fn] = self.spatial_feats[fid][fn]
+                    # Stop looking after finding intersection
+                    break
+            # Elapsed time
+            ogr_seconds = time.time()-start
 
-        # Pull attributes of interest from intersecting feature
-        for fid in intersect_fids:
-            geom = self.spatial_feats[fid]['geom']
-            if pt.Within(geom):
-                # Retrieve values from intersecting polygon
-                for fn in self.bison_spatial_fields:
-                    fldvals[fn] = self.spatial_feats[fid][fn]
-                # Stop looking after finding intersection
-                break
-
-        # Elapsed time
-        ogr_seconds = time.time()-start
         return fldvals, ogr_seconds
 
     # ...............................................

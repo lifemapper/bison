@@ -120,7 +120,8 @@ class GBIF:
     MATCH_FLD = "matchType"
     STATUS_FLD = "taxonomicStatus"
     ORG_FOREIGN_KEY = "publishingOrganizationKey"
-    TEST_DATA = "gbif_2022-02-15.csv"
+    INPUT_DATA = "gbif_2022-02-15.csv"
+    TEST_DATA = "gbif_2022-02-15_1k.csv"
     DWCA_DATASET_DIR = "dataset"
     DWCA_META_FNAME = "meta.xml"
     DWCA_INTERPRETED = "occurrence"
@@ -219,7 +220,7 @@ class GBIF:
 
 class LOG:
     """Constants for logging across the project."""
-    INTERVAL = 1000
+    INTERVAL = 10000
     FORMAT = ' '.join([
         "%(asctime)s",
         "%(funcName)s",
