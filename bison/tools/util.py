@@ -2,11 +2,13 @@
 import csv
 import logging
 from logging.handlers import RotatingFileHandler
+from multiprocessing import cpu_count
 import os
+import subprocess
 import sys
 import time
 
-from bison.common.constants import ENCODING, LOG
+from bison.common.constants import DATA_PATH, ENCODING, GBIF, LOG
 
 
 # ...............................................
@@ -258,7 +260,211 @@ def logit(logger, msg):
     else:
         print(msg)
 
+# .............................................................................
+def get_header(filename):
+    """Find fieldnames from the first line of a CSV file.
+
+    Args:
+         filename (str): Full filename for a CSV file with a header.
+
+    Returns:
+         header (list): list of fieldnames in the first line of the file
+    """
+    header = None
+    try:
+        f = open(filename, 'r', encoding='utf-8')
+        header = f.readline()
+    except Exception as e:
+        print('Failed to read first line of {}: {}'.format(filename, e))
+    finally:
+        f.close()
+    return header
+
+# .............................................................................
+def find_chunk_files(big_csv_filename, out_base_filename):
+    """Find multiple smaller input csv files from a large input csv file
+
+    Args:
+        big_csv_filename (str): Full path to the original large CSV file of records
+        out_base_filename (str): Full path and basename (no extension) for output files.
+
+    Returns:
+        csv_filename_pairs: a list of filename pairs, containing the input base filename,
+            and the output base filename
+        chunk_size: the number of records in files, computed from the total records and
+            the number of local CPUs for processing
+    """
+    cpus2use = get_process_count()
+    in_base_filename, ext = os.path.splitext(big_csv_filename)
+
+    total_lines = get_line_count(big_csv_filename) - 1
+    chunk_size = int(total_lines / cpus2use)
+
+    csv_filename_pairs = []
+    start = 1
+    stop = chunk_size
+    return csv_filename_pairs, chunk_size
+    while start <= total_lines:
+        in_filename = f"{in_base_filename}_chunk-{start}-{stop}{ext}"
+        out_filename =  f"{out_base_filename}_chunk-{start}-{stop}{ext}"
+        if os.path.exists(in_filename):
+            csv_filename_pairs.append((in_filename, out_filename))
+        else:
+            # Return basenames if files are not present
+            csv_filename_pairs = [(in_base_filename, out_base_filename)]
+            print('Missing file {}'.format(in_filename))
+            break
+        start = stop + 1
+        stop = start + chunk_size - 1
+
+# .............................................................................
+def get_chunk_files(big_csv_filename, out_base_filename):
+    """Split a large input csv file into multiple smaller input csv files.
+
+    Args:
+        big_csv_filename (str): Full path to the original large CSV file of records
+        out_base_filename (str): Full path and basename (no extension) for output files.
+
+    Returns:
+        csv_filename_pairs: a list of filename pairs, containing the input base filename,
+            and the output base filename
+        header: the header for all input and output files.
+    """
+    csv_filename_pairs, chunk_size = find_chunk_files(big_csv_filename, out_base_filename)
+
+    # First pair is existing files OR basenames
+    if os.path.exists(csv_filename_pairs[0][0]):
+        header = get_header(big_csv_filename)
+    else:
+        in_base_filename = csv_filename_pairs[0][0]
+        out_base_filename = csv_filename_pairs[0][1]
+
+        csv_filename_pairs = []
+        try:
+            bigf = open(big_csv_filename, 'r', encoding='utf-8')
+            header = bigf.readline()
+            line = bigf.readline()
+            curr_recno = 1
+            while line != '':
+                # Reset vars for next chunk
+                start = curr_recno
+                stop = start + chunk_size - 1
+                in_filename = '{}_chunk-{}-{}.csv'.format(in_base_filename, start, stop)
+                out_filename =  '{}_chunk-{}-{}.csv'.format(out_base_filename, start, stop)
+                csv_filename_pairs.append((in_filename, out_filename))
+                try:
+                    # Start writing the smaller file
+                    inf = open(in_filename, 'w', encoding='utf-8')
+                    inf.write('{}'.format(header))
+                    while curr_recno <= stop:
+                        if line != '':
+                            inf.write('{}'.format(line))
+                            line = bigf.readline()
+                            curr_recno += 1
+                        else:
+                            curr_recno = stop + 1
+                except Exception as inner_err:
+                    print('Failed in inner loop {}'.format(inner_err))
+                    raise
+                finally:
+                    inf.close()
+        except Exception as outer_err:
+            print('Failed to do something {}'.format(outer_err))
+            raise
+        finally:
+            bigf.close()
+
+    return csv_filename_pairs, header
+
+# .............................................................................
+def get_line_count(filename):
+    """ find total number lines in a file """
+    cmd = "wc -l {}".format(repr(filename))
+    info, _ = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()
+    temp = info.split(b'\n')[0]
+    line_count = int(temp.split()[0])
+    return line_count
+
+# .............................................................................
+def chunk_files(big_csv_filename):
+    """Split a large input csv file into multiple smaller input csv files.
+
+    Args:
+        big_csv_filename (str): Full path to the original large CSV file of records
+
+    Returns:
+        csv_filename_pairs: a list of filename pairs, containing the input base filename,
+            and the output base filename
+        header: the header for all input and output files.
+    """
+    cpus2use = cpu_count() - 2
+    chunks = []
+
+    in_base_filename, ext = os.path.splitext(big_csv_filename)
+    total_lines = get_line_count(big_csv_filename) - 1
+    chunk_size = int(total_lines / cpus2use)
+
+    start = 1
+    stop = chunk_size
+
+    try:
+        bigf = open(big_csv_filename, 'r', encoding='utf-8')
+        header = bigf.readline()
+        line = bigf.readline()
+        curr_recno = 1
+
+        while start <= total_lines and line != '':
+            chunk_filename = f"{in_base_filename}_chunk-{start}-{stop}{ext}"
+            if os.path.exists(chunk_filename):
+                delete_file(chunk_filename)
+
+            try:
+                # Start writing the smaller file
+                chunkf = open(chunk_filename, 'w', encoding='utf-8')
+                chunkf.write('{}'.format(header))
+                while curr_recno <= stop:
+                    if line != '':
+                        chunkf.write(f"{line}")
+                        line = bigf.readline()
+                        curr_recno += 1
+                    else:
+                        curr_recno = stop + 1
+                chunks.append(chunk_filename)
+
+                # Advance for next chunk
+                start = stop + 1
+                stop = start + chunk_size - 1
+
+            except Exception as inner_err:
+                print(f"Failed in inner loop {inner_err}")
+                raise
+            finally:
+                chunkf.close()
+
+    except Exception as outer_err:
+        print(f"Failed to do something {outer_err}")
+        raise
+    finally:
+        bigf.close()
+
+    return chunks
 
 # .............................................................................
 if __name__ == "__main__":
+    import argparse
+
+    default_infile = os.path.join(DATA_PATH, GBIF.INPUT_DATA)
+    default_output_basename = os.path.join(DATA_PATH)
+
+    parser = argparse.ArgumentParser(description="Split")
+    parser.add_argument("cmd", type=str, default="split")
+    parser.add_argument(
+        "big_csv_filename", type=str, default=GBIF.INPUT_DATA,
+        help='The full path to GBIF input species occurrence data.')
+    args = parser.parse_args()
+
+    if args.cmd != "split":
+        print("Only `split` is currently supported")
+    else:
+        chunk_files(args.big_csv_filename)
     print('Testing, sys path = ', sys.path)

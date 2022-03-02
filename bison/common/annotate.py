@@ -8,7 +8,7 @@ from bison.common.occurrence import DwcData
 from bison.common.geoindex import GeoResolver
 from bison.common.riis import NNSL
 
-from bison.tools.util import (get_csv_dict_writer, get_logger, logit)
+from bison.tools.util import (get_csv_dict_writer, get_logger)
 
 
 # .............................................................................
@@ -152,7 +152,7 @@ class Annotator():
         for iisrec in iis_reclist:
             # Double check NNSL dict key == RIIS resolved key == occurrence accepted key
             if dwcrec[GBIF.ACC_TAXON_FLD] != iisrec[RIIS_SPECIES.NEW_GBIF_KEY]:
-                logit(self._log, "WTF is happening?!?")
+                self._log.debug("WTF is happening?!?")
 
             # Look for AK or HI
             if ((state == "AK" and iisrec[RIIS_SPECIES.LOCALITY_FLD] == "AK")
@@ -180,12 +180,6 @@ class Annotator():
             elif len(state) > 2:
                 state.capitalize()
 
-            # Does record state == georeferenced state?
-            if US_STATES[state] == state_code or state == state_code:
-                self.matched_states += 1
-            else:
-                self.mismatched_states += 1
-
             if state in self._all_states:
                 # Good state/county combos
                 try:
@@ -194,7 +188,11 @@ class Annotator():
                     self.good_locations[dwcrec[GBIF.STATE_FLD]] = set(dwcrec[GBIF.COUNTY_FLD])
 
                 # Does record state == georeferenced state?
-                if US_STATES[state] == state_code:
+                try:
+                    scode = US_STATES[state]
+                except KeyError:
+                    scode = None
+                if state == state_code or scode == state_code:
                     self.matched_states += 1
                 else:
                     self.mismatched_states += 1
@@ -217,7 +215,7 @@ class Annotator():
         dwcrec = self._dwcdata.get_record()
         while dwcrec is not None:
             if (self._dwcdata.recno % LOG.INTERVAL) == 0:
-                logit(self._log, f"*** Record number {self._dwcdata.recno} ***")
+                self._log.debug(f"*** Record number {self._dwcdata.recno} ***")
 
             # # Save when examining input data
             # self._aggregate_locations(dwcrec)
@@ -257,7 +255,7 @@ class Annotator():
             # Intersect coordinates with state and county boundaries
             fldvals, ogr_seconds = self._geores._find_enclosing_polygon(lon, lat)
             if ogr_seconds > 0.75:
-                logit(self._log, "Rec {self._dwcdata.recno}; intersect point {lon}, {lat}; OGR time {ogr_seconds}")
+                self._log.debug("Rec {self._dwcdata.recno}; intersect point {lon}, {lat}; OGR time {ogr_seconds}")
             county = fldvals[NEW_RESOLVED_COUNTY]
             state = fldvals[NEW_RESOLVED_STATE]
         return county, state
