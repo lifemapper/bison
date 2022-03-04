@@ -10,6 +10,7 @@ data/gbif_2022-02-15.csv
 data/*zip
 data/*annotated*
 data/*xml
+data/*chunk*csv
 
 venv/
 /.pytest_cache/
