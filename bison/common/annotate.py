@@ -165,6 +165,9 @@ class Annotator():
                 riis_assessment = iisrec[RIIS_SPECIES.ASSESSMENT_FLD]
                 riis_key = iisrec[RIIS_SPECIES.KEY]
 
+        if riis_assessment and riis_key:
+            self._log.info(f"Adding assessment {riis_assessment} to record {dwcrec[GBIF.ID_FLD]}")
+
         return riis_assessment, riis_key
 
     # ...............................................
