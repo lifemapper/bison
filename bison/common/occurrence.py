@@ -2,8 +2,7 @@
 
 import os
 
-from bison.common.constants import (
-    DATA_PATH, ENCODING, GBIF, LOG, NEW_RIIS_ASSESSMENT_FLD, NEW_RIIS_KEY_FLD)
+from bison.common.constants import (DATA_PATH, ENCODING, GBIF, LOG)
 from bison.tools.util import get_csv_dict_reader, get_logger, logit
 
 
@@ -106,7 +105,11 @@ class DwcData(object):
 
     # ...............................................
     def get_record(self):
-        """Return next record from the reader."""
+        """Get next record from the reader.
+
+        Returns:
+            self.dwcrec: next record from the CSV reader
+        """
         try:
             self.dwcrec = next(self._csv_reader)
         except StopIteration:
@@ -144,17 +147,24 @@ class DwcData(object):
         return self.dwcrec
 
 
-def compare_rec(good_rec, bad_rec):
-    good_fns = set(good_rec.keys())
-    bad_fns = set(bad_rec.keys())
-    extra_fns = bad_fns.difference(good_fns)
-
-    for k, v in good_rec.items():
-        print("$$$$ {}:  {}".format(k, v))
-        print("       vs {}".format(bad_rec[k]))
-    for extra in extra_fns:
-        print("!!!! {}:  {}".format(extra, bad_rec[extra]))
-
+# # ...............................................
+# def compare_rec(good_rec, bad_rec):
+#     """Compare 2 records for differences.
+#
+#     Args:
+#         good_rec (dict): a record containing expected keys
+#         bad_rec (dict): a bad record
+#
+#     """
+#     good_fns = set(good_rec.keys())
+#     bad_fns = set(bad_rec.keys())
+#     extra_fns = bad_fns.difference(good_fns)
+#
+#     for k, v in good_rec.items():
+#         print("$$$$ {}:  {}".format(k, v))
+#         print("       vs {}".format(bad_rec[k]))
+#     for extra in extra_fns:
+#         print("!!!! {}:  {}".format(extra, bad_rec[extra]))
 
 
 # ...............................................
@@ -185,7 +195,6 @@ if __name__ == '__main__':
             finished = True
         rec = dwcdata.get_record()
 
-    compare_rec(before_rec, bad_rec)
     print("fini")
 """
 
@@ -218,7 +227,7 @@ while rec is not None and not finished:
         after_rec = rec
         finished = True
     rec = dwcdata.get_record()
-        
+
 
 
 Tst.test_gbif_name_accepted()

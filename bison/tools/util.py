@@ -2,6 +2,7 @@
 import csv
 import logging
 from logging.handlers import RotatingFileHandler
+import math
 from multiprocessing import cpu_count
 import os
 import subprocess
@@ -260,6 +261,7 @@ def logit(logger, msg):
     else:
         print(msg)
 
+
 # .............................................................................
 def get_header(filename):
     """Find fieldnames from the first line of a CSV file.
@@ -280,110 +282,98 @@ def get_header(filename):
         f.close()
     return header
 
-# .............................................................................
-def find_chunk_files(big_csv_filename, out_base_filename):
-    """Find multiple smaller input csv files from a large input csv file
-
-    Args:
-        big_csv_filename (str): Full path to the original large CSV file of records
-        out_base_filename (str): Full path and basename (no extension) for output files.
-
-    Returns:
-        csv_filename_pairs: a list of filename pairs, containing the input base filename,
-            and the output base filename
-        chunk_size: the number of records in files, computed from the total records and
-            the number of local CPUs for processing
-    """
-    cpus2use = get_process_count()
-    in_base_filename, ext = os.path.splitext(big_csv_filename)
-
-    total_lines = get_line_count(big_csv_filename) - 1
-    chunk_size = int(total_lines / cpus2use)
-
-    csv_filename_pairs = []
-    start = 1
-    stop = chunk_size
-    return csv_filename_pairs, chunk_size
-    while start <= total_lines:
-        in_filename = f"{in_base_filename}_chunk-{start}-{stop}{ext}"
-        out_filename =  f"{out_base_filename}_chunk-{start}-{stop}{ext}"
-        if os.path.exists(in_filename):
-            csv_filename_pairs.append((in_filename, out_filename))
-        else:
-            # Return basenames if files are not present
-            csv_filename_pairs = [(in_base_filename, out_base_filename)]
-            print('Missing file {}'.format(in_filename))
-            break
-        start = stop + 1
-        stop = start + chunk_size - 1
-
-# .............................................................................
-def get_chunk_files(big_csv_filename, out_base_filename):
-    """Split a large input csv file into multiple smaller input csv files.
-
-    Args:
-        big_csv_filename (str): Full path to the original large CSV file of records
-        out_base_filename (str): Full path and basename (no extension) for output files.
-
-    Returns:
-        csv_filename_pairs: a list of filename pairs, containing the input base filename,
-            and the output base filename
-        header: the header for all input and output files.
-    """
-    csv_filename_pairs, chunk_size = find_chunk_files(big_csv_filename, out_base_filename)
-
-    # First pair is existing files OR basenames
-    if os.path.exists(csv_filename_pairs[0][0]):
-        header = get_header(big_csv_filename)
-    else:
-        in_base_filename = csv_filename_pairs[0][0]
-        out_base_filename = csv_filename_pairs[0][1]
-
-        csv_filename_pairs = []
-        try:
-            bigf = open(big_csv_filename, 'r', encoding='utf-8')
-            header = bigf.readline()
-            line = bigf.readline()
-            curr_recno = 1
-            while line != '':
-                # Reset vars for next chunk
-                start = curr_recno
-                stop = start + chunk_size - 1
-                in_filename = '{}_chunk-{}-{}.csv'.format(in_base_filename, start, stop)
-                out_filename =  '{}_chunk-{}-{}.csv'.format(out_base_filename, start, stop)
-                csv_filename_pairs.append((in_filename, out_filename))
-                try:
-                    # Start writing the smaller file
-                    inf = open(in_filename, 'w', encoding='utf-8')
-                    inf.write('{}'.format(header))
-                    while curr_recno <= stop:
-                        if line != '':
-                            inf.write('{}'.format(line))
-                            line = bigf.readline()
-                            curr_recno += 1
-                        else:
-                            curr_recno = stop + 1
-                except Exception as inner_err:
-                    print('Failed in inner loop {}'.format(inner_err))
-                    raise
-                finally:
-                    inf.close()
-        except Exception as outer_err:
-            print('Failed to do something {}'.format(outer_err))
-            raise
-        finally:
-            bigf.close()
-
-    return csv_filename_pairs, header
 
 # .............................................................................
 def get_line_count(filename):
-    """ find total number lines in a file """
-    cmd = "wc -l {}".format(repr(filename))
-    info, _ = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()
-    temp = info.split(b'\n')[0]
-    line_count = int(temp.split()[0])
+    """Find total number of lines in a file.
+
+    Args:
+        filename (str): file to count lines
+
+    Returns:
+        line_count (int): number of lines in the file
+
+    Raises:
+        Exception: on unknown error in line count subprocess
+        FileNotFoundError: on missing input file
+    """
+    line_count = None
+    if os.path.exists(filename):
+        cmd = f"wc -l {filename}"
+        sp = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        sp_outs = sp.communicate()
+        # Return has list of byte strings, which has line count and filename?
+        for info in sp_outs:
+            try:
+                results = info.split(b' ')
+                tmp = results[0]
+                line_count = int(tmp)
+                break
+            except Exception as e:
+                print(e)
+                pass
+        if line_count is None:
+            raise Exception(f"Failed to get line count from {sp_outs}")
+    else:
+        raise FileNotFoundError(filename)
     return line_count
+
+
+# .............................................................................
+def identify_chunks(big_csv_filename):
+    """Determine the start and stop lines in a large file that will make up the contents of smaller subsets of the file.
+
+    The purpose of chunking the files is to split the large file into more manageable chunks that can be processed
+     concurrently by the CPUs on the local machine.
+
+    Args:
+        big_csv_filename (str): Full path to the original large CSV file of records
+
+    Returns:
+        start_stop_pairs: a list of tuples, containing pairs of line numbers in the original file that will be the first
+            and last record of a subset chunk of the file.
+    """
+    cpus2use = cpu_count() - 2
+    start_stop_pairs = []
+
+    # in_base_filename, ext = os.path.splitext(big_csv_filename)
+    rec_count = get_line_count(big_csv_filename) - 1
+    chunk_size = math.ceil(rec_count / cpus2use)
+
+    start = 1
+    stop = chunk_size
+    start_stop_pairs.append((start, stop))
+
+    while stop < rec_count:
+        # chunk_filename = f"{in_base_filename}_chunk-{start}-{stop}{ext}"
+
+        # Advance for next chunk
+        start = stop + 1
+        stop = min((start + chunk_size - 1), rec_count)
+        start_stop_pairs.append((start, stop))
+
+    return start_stop_pairs
+
+
+# .............................................................................
+def get_chunk_filename(in_base_filename, start, stop, ext, overwrite=True):
+    """Create a consistent filename for chunks of a larger file.
+
+    Args:
+        in_base_filename (str): common base filename for all chunks
+        start (int): line number in the large file that serves as the first record of the chunk file
+        stop (int): line number in the large file that serves as the last record of the chunk file
+        ext (str): file extension for the chunk file
+        overwrite (bool): flag indicating whether to delete an existing file with the chunk filename.
+
+    Returns:
+        chunk_filename: standardized filename for the chunk of data
+    """
+    chunk_filename = f"{in_base_filename}_chunk-{start}-{stop}{ext}"
+    if overwrite is True and os.path.exists(chunk_filename):
+        delete_file(chunk_filename)
+    return chunk_filename
+
 
 # .............................................................................
 def chunk_files(big_csv_filename):
@@ -393,61 +383,61 @@ def chunk_files(big_csv_filename):
         big_csv_filename (str): Full path to the original large CSV file of records
 
     Returns:
-        csv_filename_pairs: a list of filename pairs, containing the input base filename,
-            and the output base filename
-        header: the header for all input and output files.
+        chunk_filenames: a list of chunk filenames
+
+    Raises:
+        Exception: on failure to open or write to a chunk file
+        Exception: on failure to open or read the big_csv_filename
     """
-    cpus2use = cpu_count() - 2
-    chunks = []
-
     in_base_filename, ext = os.path.splitext(big_csv_filename)
-    total_lines = get_line_count(big_csv_filename) - 1
-    chunk_size = int(total_lines / cpus2use)
-
-    start = 1
-    stop = chunk_size
+    chunk_filenames = []
+    boundary_pairs = identify_chunks(big_csv_filename)
 
     try:
         bigf = open(big_csv_filename, 'r', encoding='utf-8')
         header = bigf.readline()
         line = bigf.readline()
-        curr_recno = 1
+        big_recno = 1
 
-        while start <= total_lines and line != '':
-            chunk_filename = f"{in_base_filename}_chunk-{start}-{stop}{ext}"
-            if os.path.exists(chunk_filename):
-                delete_file(chunk_filename)
+        for (start, stop) in boundary_pairs:
+            chunk_fname = get_chunk_filename(in_base_filename, start, stop, ext, overwrite=True)
 
             try:
                 # Start writing the smaller file
-                chunkf = open(chunk_filename, 'w', encoding='utf-8')
+                chunkf = open(chunk_fname, 'w', encoding='utf-8')
                 chunkf.write('{}'.format(header))
-                while curr_recno <= stop:
-                    if line != '':
+
+                while big_recno <= stop and line:
+                    try:
+                        # Write last line to chunk file
                         chunkf.write(f"{line}")
+                    except Exception as e:
+                        # Log error and move on
+                        print(
+                            f"Failed on bigfile {big_csv_filename} line number {big_recno} writing to {chunk_fname}: {e}")
+                    # If bigfile still has lines, get next one
+                    if line:
                         line = bigf.readline()
-                        curr_recno += 1
+                        big_recno += 1
                     else:
-                        curr_recno = stop + 1
-                chunks.append(chunk_filename)
+                        big_recno = stop + 1
 
-                # Advance for next chunk
-                start = stop + 1
-                stop = start + chunk_size - 1
-
-            except Exception as inner_err:
-                print(f"Failed in inner loop {inner_err}")
+            except Exception as e:
+                print(f"Failed opening or writing to {chunk_fname}: {e}")
                 raise
             finally:
+                # After got to stop, close and add filename to list
                 chunkf.close()
+                chunk_filenames.append(chunk_fname)
 
-    except Exception as outer_err:
-        print(f"Failed to do something {outer_err}")
+    except Exception as e:
+        print(f"Failed to read bigfile {big_csv_filename}: {e}")
         raise
     finally:
         bigf.close()
 
-    return chunks
+    return chunk_filenames
+
 
 # .............................................................................
 if __name__ == "__main__":
@@ -466,5 +456,6 @@ if __name__ == "__main__":
     if args.cmd != "split":
         print("Only `split` is currently supported")
     else:
+        boundary_pairs = identify_chunks(args.big_csv_filename)
         chunk_files(args.big_csv_filename)
-    print('Testing, sys path = ', sys.path)
+        print(f"boundary_pairs = {boundary_pairs}")

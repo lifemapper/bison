@@ -46,20 +46,20 @@ head -n 100001 0090372-210914110416597.csv > gbif_2022-01-07_100k.csv
 ```
 
 # Split GBIF data
-To chunk the file into more easily managed small files, first prefix each smaller file 
+To chunk the file into more easily managed small files, first prefix each smaller file
 with the header from the original file, where the header is on line 1.
 For example:
 ```commandline
 head -n1 gbif_2022-02-15.csv > gbif_2022-02-15_lines_50000-100000.csv
 ```
 
-Then split using sed command output, where 1-50000 are lines to delete (ignore) and 
+Then split using sed command output, where 1-50000 are lines to delete (ignore) and
 and 100000 is the line on which to stop.
 ```commandline
-sed -e '1,50000d;100000q' occurrence.txt >> occurrence_lines_50000-100000.csv 
+sed -e '1,50000d;100000q' occurrence.txt >> occurrence_lines_50000-100000.csv
 ```
 
 Optionally, use the get_chunk_files function in the bison.tools.util module
 ```commandline
-python get_chunk_files 
+python get_chunk_files
 ```
