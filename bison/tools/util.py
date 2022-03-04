@@ -457,5 +457,5 @@ if __name__ == "__main__":
         print("Only `split` is currently supported")
     else:
         boundary_pairs = identify_chunks(args.big_csv_filename)
-        chunk_files(args.big_csv_filename)
+        chunk_filenames = chunk_files(args.big_csv_filename)
         print(f"boundary_pairs = {boundary_pairs}")
