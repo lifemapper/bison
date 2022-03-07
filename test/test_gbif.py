@@ -1,6 +1,6 @@
 """Module to test the contents of the input GBIF csv occurrence data file."""
 from bison.common.constants import DATA_PATH, GBIF
-from bison.common.occurrence import DwcData
+from bison.common.gbif import DwcData
 from bison.tools.gbif_api import GbifSvc
 from bison.tools.util import get_logger
 

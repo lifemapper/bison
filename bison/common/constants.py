@@ -10,6 +10,7 @@ NEW_RIIS_ASSESSMENT_FLD = "riis_assessment"
 # Geospatial data for intersecting with points to identify state and county for points
 NEW_RESOLVED_COUNTY = "georef_cty"
 NEW_RESOLVED_STATE = "georef_st"
+AGGREGATOR_DELIMITER = "__"
 
 RANKS = [
     "ABERRATION", "CLASS", "COHORT", "CONVARIETY", "CULTIVAR", "CULTIVAR_GROUP",
