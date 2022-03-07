@@ -4,7 +4,7 @@ import os
 from bison.common.constants import (
     ENCODING, GBIF, LOG, NEW_RESOLVED_COUNTY, NEW_RESOLVED_STATE, NEW_RIIS_ASSESSMENT_FLD,
     NEW_RIIS_KEY_FLD, RIIS_SPECIES, US_COUNTY, US_STATES)
-from bison.common.occurrence import DwcData
+from bison.common.gbif import DwcData
 from bison.common.geoindex import GeoResolver
 from bison.common.riis import NNSL
 
