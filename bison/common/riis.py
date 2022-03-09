@@ -201,11 +201,11 @@ class NNSL:
     """Class for reading, writing, comparing RIIS species data records."""
 
     # ...............................................
-    def __init__(self, datapath, test_fname=None, logger=None):
+    def __init__(self, riis_filename, logger=None):
         """Constructor sets the authority and species files and headers expected for BISON-RIIS processing.
 
         Args:
-            datapath (str): Path to the base of the input data, used to construct full
+            riis_filename (str): Path to the base of the input data, used to construct full
                 filenames from basepath and relative path constants.
             test_fname (str): RIIS file with fewer records for testing
             logger (object): logger for writing messages to file and console
@@ -213,7 +213,11 @@ class NNSL:
         Raises:
             Exception: on unexpected file header
         """
-        self._datapath = datapath.rstrip(os.sep)
+        datapath, fname_w_ext = os.path.split(riis_filename)
+        basename, ext = os.path.splitext(fname_w_ext)
+
+        self._datapath = datapath
+        self._csvfile = riis_filename
 
         if logger is None:
             logger = get_logger(datapath)
@@ -221,18 +225,11 @@ class NNSL:
 
         self.auth_fname = f"{os.path.join(self._datapath, RIIS_AUTHORITY.FNAME)}.{RIIS.DATA_EXT}"
 
-        # Test or full RIIS file
-        if test_fname is not None:
-            basename = test_fname
-        else:
-            basename = RIIS_SPECIES.FNAME
-        self.riis_fname = f"{os.path.join(self._datapath, basename)}.{RIIS.DATA_EXT}"
-
         # Test and clean headers of non-ascii characters
         self._test_header(self.auth_fname, RIIS_AUTHORITY.HEADER)
-        good_header = self._test_header(self.riis_fname, RIIS_SPECIES.HEADER)
+        good_header = self._test_header(self._csvfile, RIIS_SPECIES.HEADER)
         if good_header is False:
-            raise Exception(f"Unexpected file header found in {self.riis_fname}")
+            raise Exception(f"Unexpected file header found in {self._csvfile}")
 
         # Trimmed and updated Non-native Species List, built from RIIS
         self.nnsl_by_species = None
@@ -266,7 +263,7 @@ class NNSL:
         Returns:
             updated_riis_fname: output filename derived from the input RIIS filename
         """
-        basename, ext = os.path.splitext(self.riis_fname)
+        basename, ext = os.path.splitext(self._csvfile)
         updated_riis_fname = f"{basename}_updated_gbif{ext}"
         return updated_riis_fname
 
@@ -307,7 +304,7 @@ class NNSL:
                 infname = self.gbif_resolved_riis_fname
                 header = self.gbif_resolved_riis_header
         else:
-            infname = self.riis_fname
+            infname = self._csvfile
             header = RIIS_SPECIES.HEADER
 
         rdr, inf = get_csv_dict_reader(infname, RIIS.DELIMITER, fieldnames=header)
@@ -455,6 +452,9 @@ class NNSL:
             rec_count: count of resolved species
         """
         msgdict = {}
+
+        if len(self.nnsl_by_species) == 0:
+            self.read_riis(read_resolved=False)
 
         name_count = 0
         rec_count = 0

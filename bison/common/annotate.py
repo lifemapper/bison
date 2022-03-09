@@ -18,10 +18,8 @@ class Annotator():
         """Constructor.
 
         Args:
-            datapath (str): base directory for datafiles
-            gbif_occ_fname (str): base filename for GBIF occurrence CSV file
-            do_resolve (bool): flag indicating whether to (re-)query GBIF for updated
-                accepted name/key
+            gbif_occ_filename (str): full path of CSV occurrence file to annotate
+            do_resolve (bool): flag indicating whether to update accepted name/key in RIIS records by querying GBIF API
             logger (object): logger for saving relevant processing messages
         """
         datapath, _ = os.path.split(gbif_occ_filename)
@@ -211,7 +209,7 @@ class Annotator():
     # ...............................................
     def append_dwca_records(self):
         """Append 'introduced' or 'invasive' status to GBIF DWC occurrence records."""
-        self.open(self.annotated_dwc_fname)
+        self.open(outfname=self.annotated_dwc_fname)
         # Create geospatial index to identify county/state of points
         self._geores.initialize_geospatial_data()
 
@@ -251,6 +249,8 @@ class Annotator():
                 print(f"Error {e} on line {self._dwcdata.recno}")
 
             dwcrec = self._dwcdata.get_record()
+
+        return self.annotated_dwc_fname
 
     # ...............................................
     def _find_county_state(self, lon, lat):
