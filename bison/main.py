@@ -1,7 +1,7 @@
 """Process BISON RIIS and GBIF Species data to annotate GBIF records and aggregate results."""
 import argparse
 
-from bison.common.riis import ModRIIS
+from bison.common.riis import NNSL
 
 # ...............................................
 if __name__ == "__main__":
@@ -18,7 +18,7 @@ if __name__ == "__main__":
         help='The full path to GBIF input species occurrence data.')
     args = parser.parse_args()
 
-    bison = ModRIIS(args.bison_path)
+    bison = NNSL(args.bison_path)
     bison.read_species()
     # Update species data
     bison.resolve_gbif_species()
