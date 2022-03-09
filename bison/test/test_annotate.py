@@ -48,8 +48,7 @@ if __name__ == "__main__":
 
     chunk_fnames = chunk_files(big_gbif_fname)
     for fname in chunk_fnames:
-        pth, basename = os.path.split(fname)
-        tst = TestAnnotator(pth, basename, do_resolve=False, logger=logger)
+        tst = TestAnnotator(fname, do_resolve=False, logger=logger)
         tst.test_annotate_records()
 
 """

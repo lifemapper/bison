@@ -17,7 +17,7 @@ class DwcData(object):
         where 1-5000 are lines to delete, and 10000 is the line on which to stop.
     """
     # ...............................................
-    def __init__(self, datapath, csvfile, logger=None):
+    def __init__(self, occ_filename, logger=None):
         """Construct an object to read a GBIF datafile.
 
         Args:
@@ -25,9 +25,9 @@ class DwcData(object):
             csvfile(str): basename of file to read
             logger (object): logger for saving relevant processing messages
         """
-        # Remove any trailing /
-        self._datapath = datapath.rstrip(os.sep)
-        self.csvfile = os.path.join(datapath, csvfile)
+        datapath, _ = os.path.split(occ_filename)
+        self._datapath = datapath
+        self.csvfile = occ_filename
         if logger is None:
             logger = get_logger(datapath)
         self._log = logger
@@ -176,10 +176,10 @@ if __name__ == '__main__':
 
     logname = "test_gbif"
     # csvfile = GBIF.TEST_DATA
-    csvfile = "gbif_2022-02-15_testbad_10.csv"
+    csvfile = os.path.join(DATA_PATH, "gbif_2022-02-15_testbad_10.csv")
     logger = get_logger(DATA_PATH, logname=logname)
 
-    dwcdata = DwcData(DATA_PATH, csvfile, logger)
+    dwcdata = DwcData(csvfile, logger)
     dwcdata.open()
 
     finished = False
@@ -208,10 +208,10 @@ after = "1698058398"
 
 logname = "test_gbif"
 # csvfile = GBIF.TEST_DATA
-csvfile = "gbif_2022-02-15_testbad_10.csv"
+csvfile = os.path.join(DATA_PATH, "gbif_2022-02-15_testbad_10.csv")
 logger = get_logger(DATA_PATH, logname=logname)
 
-dwcdata = DwcData(DATA_PATH, csvfile, logger)
+dwcdata = DwcData(csvfile, logger)
 dwcdata.open()
 
 finished = False

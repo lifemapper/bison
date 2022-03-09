@@ -14,7 +14,7 @@ from bison.tools.util import (get_csv_dict_writer, get_logger)
 # .............................................................................
 class Annotator():
     """Class for adding USGS RIIS info to GBIF occurrences."""
-    def __init__(self, datapath, gbif_occ_fname, do_resolve=False, logger=None):
+    def __init__(self, gbif_occ_filename, do_resolve=False, logger=None):
         """Constructor.
 
         Args:
@@ -24,8 +24,9 @@ class Annotator():
                 accepted name/key
             logger (object): logger for saving relevant processing messages
         """
+        datapath, _ = os.path.split(gbif_occ_filename)
         self._datapath = datapath
-        self._csvfile = os.path.join(datapath, gbif_occ_fname)
+        self._csvfile = gbif_occ_filename
 
         if logger is None:
             logger = get_logger(datapath)
@@ -42,7 +43,7 @@ class Annotator():
         self._geores = GeoResolver(US_COUNTY.FILE, US_COUNTY.CENSUS_BISON_MAP, self._log)
 
         # Input reader
-        self._dwcdata = DwcData(datapath, gbif_occ_fname, logger=logger)
+        self._dwcdata = DwcData(self._csvfile, logger=logger)
         # Output writer
         self._csv_writer = None
 

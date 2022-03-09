@@ -376,6 +376,15 @@ def get_chunk_filename(in_base_filename, start, stop, ext, overwrite=True):
 
 
 # .............................................................................
+def identify_chunk_files(big_csv_filename):
+    chunk_filenames = []
+    boundary_pairs = identify_chunks(big_csv_filename)
+    for (start, stop) in boundary_pairs:
+        chunk_fname = get_chunk_filename(in_base_filename, start, stop, ext, overwrite=True)
+        chunk_filenames.append(chunk_fname)
+
+
+# .............................................................................
 def chunk_files(big_csv_filename):
     """Split a large input csv file into multiple smaller input csv files.
 
