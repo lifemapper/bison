@@ -27,7 +27,7 @@ def delete_file(file_name, delete_dir=False):
     success = True
     msg = ''
     if file_name is None:
-        msg = 'Cannot delete file \'None\''
+        msg = "Cannot delete file 'None'"
     else:
         pth, _ = os.path.split(file_name)
         if file_name is not None and os.path.exists(file_name):

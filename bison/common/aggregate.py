@@ -5,35 +5,41 @@ from bison.common.constants import (
     AGGREGATOR_DELIMITER, ENCODING, GBIF, NEW_RESOLVED_COUNTY, NEW_RESOLVED_STATE, NEW_RIIS_ASSESSMENT_FLD)
 from bison.tools.util import (get_csv_writer, get_csv_dict_reader, get_logger)
 
+GBIF_TAXON_KEY = "gbif_taxon_key"
 SPECIES_KEY = "species_key"
 ASSESS_KEY = "assessment"
 LOCATION_KEY = "location_key"
 COUNT_KEY = "count"
-SUMMARY_HEADER = [SPECIES_KEY, ASSESS_KEY, LOCATION_KEY, COUNT_KEY]
+SUMMARY_HEADER = [SPECIES_KEY, GBIF_TAXON_KEY, ASSESS_KEY, LOCATION_KEY, COUNT_KEY]
 
 
 # .............................................................................
 class Aggregator():
     """Class for summarizing GBIF data annotated with USGS Introduced and Invasive species assessments."""
-    def __init__(self, datapath, base_filename_list, logger=None):
+    def __init__(self, annotated_filename, logger=None):
         """Constructor.
 
         Args:
-            datapath (str): base directory for datafiles
-            base_filename_list (list): base filenames for annotated GBIF occurrence CSV file
+            occ_filename_list (list): full filenames for annotated occurrence CSV files
             logger (object): logger for saving relevant processing messages
-        """
-        self._datapath = datapath
-        self._csvfiles = [os.path.join(datapath, fname) for fname in base_filename_list]
 
+        Raises:
+            Exception: on no files to process
+            FileNotFoundError: on any missing file in occ_filename_list
+        """
+        if not os.path.exists(annotated_filename):
+            raise FileNotFoundError(f"File {annotated_filename} does not exist")
+
+        datapath, _ = os.path.split(annotated_filename)
+        self._datapath = datapath
+        self._csvfile = annotated_filename
         if logger is None:
             logger = get_logger(datapath)
         self._log = logger
         #  {gbif_sciname: {introduced: {state-county: count, ...},
         #                  invasive: {state-county: count, ...},
         #                  presumed-native: {state-county: count, ...},
-        #                  gbif_taxon_key: taxonKey,
-        #                  itis_scientific_name: tsn,
+        #                  gbif_taxon_key: taxonKey
         #                  }
         #   }
         self.species = {}
@@ -47,7 +53,7 @@ class Aggregator():
         pass
 
     # ...............................................
-    def _add_record_to_summary(self, species_key, assess, location_key):
+    def _add_record_to_summary(self, species_key, assess, location_key, gbif_taxon_key=None):
         # Is species present?
         try:
             self.species[species_key]
@@ -71,12 +77,15 @@ class Aggregator():
 
         # Add new species, assessment and location
         except KeyError:
-            self.species[species_key] = {assess: {location_key: 1}}
+            self.species[species_key] = {assess: {location_key: 1},
+                                         GBIF_TAXON_KEY: gbif_taxon_key}
 
     # ...............................................
-    def _summarize_annotations(self, annotated_occurrence_filename):
+    def summarize_annotations(self):
+        # Reset summary
+        self.species = {}
         csv_rdr, inf = get_csv_dict_reader(
-            annotated_occurrence_filename, GBIF.DWCA_DELIMITER, fieldnames=None, encoding=ENCODING, ignore_quotes=True)
+            self._csvfile, GBIF.DWCA_DELIMITER, encoding=ENCODING, ignore_quotes=True)
         try:
             for rec in csv_rdr:
                 species_key = f"{rec[GBIF.ACC_TAXON_FLD]}{AGGREGATOR_DELIMITER}{rec[GBIF.ACC_NAME_FLD]}"
@@ -86,10 +95,10 @@ class Aggregator():
                 if assess not in ("introduced", "invasive"):
                     assess = "presumed_native"
 
-                self._add_record_to_summary(species_key, assess, location_key)
+                self._add_record_to_summary(species_key, assess, location_key, gbif_taxon_key=rec[GBIF.ACC_TAXON_FLD])
 
         except Exception as e:
-            raise Exception(f"Failed to read annotated occurrences from {annotated_occurrence_filename}: {e}")
+            raise Exception(f"Failed to read annotated occurrences from {self._csvfile}: {e}")
 
         finally:
             csv_rdr = None
@@ -97,22 +106,65 @@ class Aggregator():
 
     # ...............................................
     def _write_summary(self, summary_filename):
-        csv_wtr, outf = get_csv_writer(summary_filename, GBIF.DWCA_DELIMITER, fmode="w")
-        csv_wtr.writerow(SUMMARY_HEADER)
+        try:
+            csv_wtr, outf = get_csv_writer(summary_filename, GBIF.DWCA_DELIMITER, fmode="w")
+            csv_wtr.writerow(SUMMARY_HEADER)
 
-        for species_key, sp_info in self.species.items():
-            for assessment, location_info in sp_info.items():
-                for location_key, count in location_info.items():
-                    row = [species_key, assessment, location_key, count]
-                    csv_wtr.writerow(row)
+            for species_key, sp_info in self.species.items():
+                gbif_taxon_key = sp_info[GBIF_TAXON_KEY]
+                for assessment, location_info in sp_info.items():
+                    # Taxon key included with assessments
+                    if assessment != GBIF_TAXON_KEY:
+                        for location_key, count in location_info.items():
+                            row = [species_key, gbif_taxon_key, assessment, location_key, count]
+                            csv_wtr.writerow(row)
+        except Exception as e:
+            raise Exception(f"Failed to write summary file {summary_filename}: {e}")
+        finally:
+            outf.close()
 
     # ...............................................
-    def _read_write_summary(self, annotated_occurrence_filename, summary_filename):
-        self._summarize_annotations(annotated_occurrence_filename)
+    def summarize_to_file(self):
+        """Read an annotated file, summarize by species and location, write to a csvfile.
+
+        Returns:
+            summary_filename: full output filename for CSV summary of annotated occurrence file. CSV fields are
+                 [SPECIES_KEY, GBIF_TAXON_KEY, ASSESS_KEY, LOCATION_KEY, COUNT_KEY].
+        """
+        basename, ext = os.path.splitext(self._csvfile)
+        summary_filename = f"{basename}_summary{ext}"
+        # Summarize and write
+        self.summarize_annotations(self._csvfile)
         self._write_summary(summary_filename)
+        return summary_filename
 
     # ...............................................
-    def aggregate_summarize(self, location_summary_filename, species_summary_filename):
+    def read_summaries(self, summary_filename_list):
+        """Read annotated data from a summary file and populate the self.species dictionary.
+
+        Args:
+            summary_filename_list (list): list of full summary input filenames to be read.
+
+        Raises:
+            Exception: on unexpected read error
+        """
+        self.species = {}
+
+        # Read summaries of occurrences and aggregate
+        for summary_filename in summary_filename_list:
+            try:
+                csv_rdr, inf = get_csv_dict_reader(
+                    summary_filename, GBIF.DWCA_DELIMITER, fieldnames=SUMMARY_HEADER, encoding=ENCODING, ignore_quotes=True)
+                for rec in csv_rdr:
+                    self._add_record_to_summary(
+                        rec[SPECIES_KEY], rec[ASSESS_KEY], rec[LOCATION_KEY], gbif_taxon_key=rec[GBIF_TAXON_KEY])
+            except Exception as e:
+                raise Exception(f"Failed to read summary file {summary_filename}: {e}")
+            finally:
+                inf.close()
+
+    # ...............................................
+    def structure_summary(self):
         """Read annotated data from one or more files, summarize by species, and by location.
 
         Args:
@@ -122,31 +174,21 @@ class Aggregator():
         Raises:
             Exception: on unexpected read error
         """
-        # Clear existing summary
-        self.species = {}
+        if not self.species:
+            raise Exception("No summarized data to structure, first summarize_annotations or summarize_to_file")
 
-        # Read annotated occurrences and summarize each file
-        summary_files = []
-        for annotated_occurrence_filename in self._csvfiles:
-            basename, ext = os.path.splitext(annotated_occurrence_filename)
-            summary_filename = f"{basename}_summary{ext}"
-            self._read_write_summary(annotated_occurrence_filename, summary_filename)
-            summary_files.append(summary_filename)
 
-        # Read summaries of occurrences and aggregate
-        for sum_fname in summary_files:
-            csv_rdr, inf = get_csv_dict_reader(
-                sum_fname, GBIF.DWCA_DELIMITER, fieldnames=SUMMARY_HEADER, encoding=ENCODING, ignore_quotes=True)
-            try:
-                for rec in csv_rdr:
-                    self._add_record_to_summary(rec[SPECIES_KEY], rec[ASSESS_KEY], rec[LOCATION_KEY])
+    # ...............................................
+    def summarize_stats(self, location_summary_filename, species_summary_filename):
+        """Read annotated data from one or more files, summarize by species, and by location.
 
-            except Exception as e:
-                raise Exception(f"Failed to read summarized occurrences from {sum_fname}: {e}")
+        Args:
+            location_summary_filename (str): full output filename for the summary by county and state
+            species_summary_filename (str): full output filename for the summary by species
 
-            finally:
-                csv_rdr = None
-                inf.close()
+        Raises:
+            Exception: on unexpected read error
+        """
 
         # Write summary of all files
         self._write_location_summary(location_summary_filename)

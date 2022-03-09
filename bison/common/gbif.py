@@ -21,13 +21,12 @@ class DwcData(object):
         """Construct an object to read a GBIF datafile.
 
         Args:
-            datapath(str): base directory for datafiles
-            csvfile(str): basename of file to read
+            occ_filename(str): full path of CSV occurrence file to read
             logger (object): logger for saving relevant processing messages
         """
         datapath, _ = os.path.split(occ_filename)
         self._datapath = datapath
-        self.csvfile = occ_filename
+        self._csvfile = occ_filename
         if logger is None:
             logger = get_logger(datapath)
         self._log = logger
@@ -48,7 +47,7 @@ class DwcData(object):
         """
         try:
             self._csv_reader, self._inf = get_csv_dict_reader(
-                self.csvfile, GBIF.DWCA_DELIMITER, encoding=ENCODING, ignore_quotes=True)
+                self._csvfile, GBIF.DWCA_DELIMITER, encoding=ENCODING, ignore_quotes=True)
         except Exception:
             raise
 
