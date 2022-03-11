@@ -39,6 +39,16 @@ class DwcData(object):
         self.dwcrec = None
 
     # ...............................................
+    @property
+    def input_file(self):
+        """Public property for input file.
+
+        Returns:
+            self._csvfile: input file containing DwC records.
+        """
+        return self._csvfile
+
+    # ...............................................
     def open(self):
         """Open a GBIF datafile with a csv.DictReader.
 
@@ -47,7 +57,7 @@ class DwcData(object):
         """
         try:
             self._csv_reader, self._inf = get_csv_dict_reader(
-                self._csvfile, GBIF.DWCA_DELIMITER, encoding=ENCODING, ignore_quotes=True)
+                self._csvfile, GBIF.DWCA_DELIMITER, encoding=ENCODING, quote_none=False)
         except Exception:
             raise
 

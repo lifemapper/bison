@@ -69,20 +69,21 @@ class Annotator():
         return outfname
 
     # ...............................................
-    def open(self, outfname=None):
+    def _open_input_output(self):
         """Open the DwcData for reading and the csv_writer for writing.
 
         Also reads the first record and writes the header.
 
-        Args:
-            outfname: full filename for output file.
-
         Raises:
+            Exception: on failure to open the DwcData csvreader.
             Exception: on failure to open the csv_writer.
         """
-        if outfname is None:
-            outfname = self.annotated_dwc_fname
-        self._dwcdata.open()
+        outfname = self.annotated_dwc_fname
+        try:
+            self._dwcdata.open()
+        except Exception:
+            raise
+
         header = self._dwcdata.fieldnames
         header.extend(
             [NEW_RIIS_KEY_FLD, NEW_RIIS_ASSESSMENT_FLD,
@@ -93,16 +94,12 @@ class Annotator():
                 outfname, header, GBIF.DWCA_DELIMITER, fmode="w", encoding=ENCODING,
                 overwrite=True)
         except Exception:
-            raise
+            raise Exception(f"Failed to open file or csv_writer for {outfname}")
 
     # ...............................................
     def close(self):
         """Close input datafiles and output file."""
-        try:
-            self._inf.close()
-            self._csv_reader = None
-        except AttributeError:
-            pass
+        self._dwcdata.close()
         try:
             self._outf.close()
             self._csv_writer = None
@@ -141,10 +138,6 @@ class Annotator():
         """
         riis_assessment = None
         riis_key = None
-
-        # Test record contents: get state value from record
-        self._test_state(dwcrec, state)
-
         for iisrec in iis_reclist:
             # Double check NNSL dict key == RIIS resolved key == occurrence accepted key
             if dwcrec[GBIF.ACC_TAXON_FLD] != iisrec[RIIS_SPECIES.NEW_GBIF_KEY]:
@@ -166,86 +159,103 @@ class Annotator():
 
         return riis_assessment, riis_key
 
-    # ...............................................
-    def _test_state(self, dwcrec, state_code):
-        state = dwcrec[GBIF.STATE_FLD]
-        county = dwcrec[GBIF.COUNTY_FLD]
-        if len(state) == 0:
-            self.missing_states += 1
-        else:
-            # Capitalized state names, uppercase codes
-            if len(state) == 2:
-                state = state.upper()
-            elif len(state) > 2:
-                state.capitalize()
-
-            if state in self._all_states:
-                # Good state/county combos
-                try:
-                    self.good_locations[state].add(county)
-                except KeyError:
-                    self.good_locations[dwcrec[GBIF.STATE_FLD]] = set(dwcrec[GBIF.COUNTY_FLD])
-
-                # Does record state == georeferenced state?
-                try:
-                    scode = US_STATES[state]
-                except KeyError:
-                    scode = None
-                if state == state_code or scode == state_code:
-                    self.matched_states += 1
-                else:
-                    self.mismatched_states += 1
-
-            else:
-                # Bad state/county combos
-                try:
-                    self.bad_locations[state].add(county)
-                except KeyError:
-                    self.bad_locations[dwcrec[GBIF.STATE_FLD]] = set(dwcrec[GBIF.COUNTY_FLD])
+    # # ...............................................
+    # def _test_state(self, dwcrec, state_code):
+    #     state = dwcrec[GBIF.STATE_FLD]
+    #     county = dwcrec[GBIF.COUNTY_FLD]
+    #     if len(state) == 0:
+    #         self.missing_states += 1
+    #     else:
+    #         # Capitalized state names, uppercase codes
+    #         if len(state) == 2:
+    #             state = state.upper()
+    #         elif len(state) > 2:
+    #             state.capitalize()
+    #
+    #         if state in self._all_states:
+    #             # Good state/county combos
+    #             try:
+    #                 self.good_locations[state].add(county)
+    #             except KeyError:
+    #                 self.good_locations[dwcrec[GBIF.STATE_FLD]] = set(dwcrec[GBIF.COUNTY_FLD])
+    #
+    #             # Does record state == georeferenced state?
+    #             try:
+    #                 scode = US_STATES[state]
+    #             except KeyError:
+    #                 scode = None
+    #             if state == state_code or scode == state_code:
+    #                 self.matched_states += 1
+    #             else:
+    #                 self.mismatched_states += 1
+    #
+    #         else:
+    #             # Bad state/county combos
+    #             try:
+    #                 self.bad_locations[state].add(county)
+    #             except KeyError:
+    #                 self.bad_locations[dwcrec[GBIF.STATE_FLD]] = set(dwcrec[GBIF.COUNTY_FLD])
 
     # ...............................................
     def append_dwca_records(self):
-        """Append 'introduced' or 'invasive' status to GBIF DWC occurrence records."""
-        self.open(outfname=self.annotated_dwc_fname)
-        # Create geospatial index to identify county/state of points
-        self._geores.initialize_geospatial_data()
+        """Resolve and append state, county, RIIS assessment, and RIIS key to GBIF DWC occurrence records.
 
-        # iterate over DwC records
-        dwcrec = self._dwcdata.get_record()
-        while dwcrec is not None:
-            if (self._dwcdata.recno % LOG.INTERVAL) == 0:
-                self._log.debug(f"*** Record number {self._dwcdata.recno} ***")
+        Returns:
+            self.annotated_dwc_fname: full filename of the GBIF DWC records with appended fields.
 
-            # # Save when examining input data
-            # self._aggregate_locations(dwcrec)
-            # Find acceptedTaxonKey in DwC record
-            taxkey = dwcrec[GBIF.ACC_TAXON_FLD]
+        Raises:
+            Exception: on failure to open input or output data.
+            Exception: on unexpected failure to read or write data.
+        """
+        try:
+            # Open the original DwC data file for read, and the annotated file for write.
+            self._open_input_output()
+        except Exception:
+            raise
+        else:
+            # Create geospatial index to identify county/state of points
+            self._geores.initialize_geospatial_data()
 
-            # Find county and state for these coords
-            county, state = self._find_county_state(
-                dwcrec[GBIF.LON_FLD], dwcrec[GBIF.LAT_FLD])
-
-            # Find RIIS records for this acceptedTaxonKey
             try:
-                iis_reclist = self.nnsl.data[taxkey]
+                # iterate over DwC records
+                dwcrec = self._dwcdata.get_record()
+                while dwcrec is not None:
+                    if (self._dwcdata.recno % LOG.INTERVAL) == 0:
+                        self._log.debug(f"*** Record number {self._dwcdata.recno} ***")
+
+                    # Find county and state for these coords
+                    try:
+                        county, state = self._find_county_state(
+                            dwcrec[GBIF.LON_FLD], dwcrec[GBIF.LAT_FLD])
+                    except ValueError:
+                        self._log.error("Record {self._dwcdata.recno}: {e}")
+                        county = state = None
+
+                    # Find RIIS records for this acceptedTaxonKey
+                    taxkey = dwcrec[GBIF.ACC_TAXON_FLD]
+                    try:
+                        iis_reclist = self.nnsl.data[taxkey]
+                    except Exception:
+                        iis_reclist = []
+
+                    if county and state and iis_reclist:
+                        riis_assessment, riis_key = self.assess_occurrence(
+                            dwcrec, county, state, iis_reclist)
+
+                    # Add county, state and RIIS assessment to record
+                    dwcrec[NEW_RESOLVED_COUNTY] = county
+                    dwcrec[NEW_RESOLVED_STATE] = state
+                    dwcrec[NEW_RIIS_ASSESSMENT_FLD] = riis_assessment
+                    dwcrec[NEW_RIIS_KEY_FLD] = riis_key
+
+                    try:
+                        self._csv_writer.writerow(dwcrec)
+                    except ValueError as e:
+                        print(f"Error {e} on line {self._dwcdata.recno}")
+
+                    dwcrec = self._dwcdata.get_record()
             except Exception:
-                iis_reclist = []
-
-            riis_assessment, riis_key = self.assess_occurrence(
-                dwcrec, county, state, iis_reclist)
-
-            dwcrec[NEW_RIIS_ASSESSMENT_FLD] = riis_assessment
-            dwcrec[NEW_RIIS_KEY_FLD] = riis_key
-            # Add county and state to record
-            dwcrec[NEW_RESOLVED_COUNTY] = county
-            dwcrec[NEW_RESOLVED_STATE] = state
-
-            try:
-                self._csv_writer.writerow(dwcrec)
-            except ValueError as e:
-                print(f"Error {e} on line {self._dwcdata.recno}")
-
-            dwcrec = self._dwcdata.get_record()
+                raise Exception(f"Unexpected error reading {self._dwcdata.input_file} or writing {self.annotated_dwc_fname}")
 
         return self.annotated_dwc_fname
 
@@ -254,7 +264,10 @@ class Annotator():
         county = state = None
         if None not in (lon, lat):
             # Intersect coordinates with state and county boundaries
-            fldvals, ogr_seconds = self._geores._find_enclosing_polygon(lon, lat)
+            try:
+                fldvals, ogr_seconds = self._geores.find_enclosing_polygon(lon, lat)
+            except ValueError:
+                raise
             if ogr_seconds > 0.75:
                 self._log.debug("Rec {self._dwcdata.recno}; intersect point {lon}, {lat}; OGR time {ogr_seconds}")
             county = fldvals[NEW_RESOLVED_COUNTY]

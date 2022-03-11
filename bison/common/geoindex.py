@@ -70,7 +70,20 @@ class GeoResolver(object):
         return sp_index, sp_feats, bison_fldnames
 
     # ...............................................
-    def _find_enclosing_polygon(self, lon, lat):
+    def find_enclosing_polygon(self, lon, lat):
+        """Return attributes of polygon enclosing these coordinates.
+
+        Args:
+            lon (str or double): longitude value
+            lat (str or double): latitude value
+
+        Returns:
+            fldvals (dict): of fieldnames and values
+            ogr_seconds (double): time elapsed for intersect
+
+        Raises:
+            ValueError: on non-numeric coordinate
+        """
         ogr_seconds = 0
         # Initialize fields to pull values from intersection
         fldvals = {}
@@ -80,7 +93,7 @@ class GeoResolver(object):
             lon = float(lon)
             lat = float(lat)
         except ValueError:
-            self._log.error(f"Longitude {lon} or latitude {lat} is not a number")
+            raise ValueError(f"Longitude {lon} or latitude {lat} is not a number")
         else:
             start = time.time()
             # Construct point

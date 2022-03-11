@@ -207,7 +207,6 @@ class NNSL:
         Args:
             riis_filename (str): Path to the base of the input data, used to construct full
                 filenames from basepath and relative path constants.
-            test_fname (str): RIIS file with fewer records for testing
             logger (object): logger for writing messages to file and console
 
         Raises:
@@ -285,6 +284,9 @@ class NNSL:
     def get_riis_by_gbif_taxonkey(self, gbif_taxon_key):
         """Get all RIIS records for this GBIF taxonKey.
 
+        Args:
+            gbif_taxon_key (str): unique identifier for GBIF taxon record
+
         Returns:
             list of RIISRecs for the species with this GBIF taxonKey
         """
@@ -299,6 +301,9 @@ class NNSL:
     # ...............................................
     def get_assessments_for_gbif_taxonkey(self, gbif_taxon_key):
         """Get all RIIS assessments for this GBIF taxonKey.
+
+        Args:
+            gbif_taxon_key (str): unique identifier for GBIF taxon record
 
         Returns:
             dict of 0 or more, like {"AK": "introduced", "HI": "invasive", "L48": "introduced"}
