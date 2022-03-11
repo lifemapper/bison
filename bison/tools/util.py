@@ -115,7 +115,7 @@ def get_csv_writer(datafile, delimiter, fmode="w"):
     try:
         f = open(datafile, fmode, newline="", encoding=ENCODING)
         writer = csv.writer(
-            f, escapechar="\\", delimiter=delimiter, quoting=csv.QUOTE_NONE)
+            f, escapechar="\\", delimiter=delimiter, quoting=csv.QUOTE_MINIMAL)
     except Exception as e:
         raise e
     return writer, f
@@ -160,7 +160,7 @@ def get_csv_dict_writer(csvfile, header, delimiter, fmode="w", encoding=ENCODING
 
 # .............................................................................
 def get_csv_dict_reader(
-        csvfile, delimiter, fieldnames=None, encoding=ENCODING, ignore_quotes=True):
+        csvfile, delimiter, fieldnames=None, encoding=ENCODING, quote_none=False):
     """Create a CSV dictionary writer and write the header.
 
     Args:
@@ -196,7 +196,7 @@ def get_csv_dict_reader(
             raise
 
     # QUOTE_NONE or QUOTE_MINIMAL
-    if ignore_quotes:
+    if quote_none:
         dreader = csv.DictReader(
             f, fieldnames=fieldnames, quoting=csv.QUOTE_NONE,
             escapechar='\\', delimiter=delimiter)
@@ -378,10 +378,12 @@ def get_chunk_filename(in_base_filename, start, stop, ext, overwrite=True):
 # .............................................................................
 def identify_chunk_files(big_csv_filename):
     chunk_filenames = []
+    in_base_filename, ext = os.path.splitext(big_csv_filename)
     boundary_pairs = identify_chunks(big_csv_filename)
     for (start, stop) in boundary_pairs:
         chunk_fname = get_chunk_filename(in_base_filename, start, stop, ext, overwrite=True)
         chunk_filenames.append(chunk_fname)
+    return chunk_filenames
 
 
 # .............................................................................

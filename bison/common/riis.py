@@ -282,6 +282,35 @@ class NNSL:
         return header
 
     # ...............................................
+    def get_riis_by_gbif_taxonkey(self, gbif_taxon_key):
+        """Get all RIIS records for this GBIF taxonKey.
+
+        Returns:
+            list of RIISRecs for the species with this GBIF taxonKey
+        """
+        riis_recs = []
+        try:
+            riis_recs = self.nnsl_by_id[gbif_taxon_key]
+        except KeyError:
+            # Taxon is not present
+            pass
+        return riis_recs
+
+    # ...............................................
+    def get_assessments_for_gbif_taxonkey(self, gbif_taxon_key):
+        """Get all RIIS assessments for this GBIF taxonKey.
+
+        Returns:
+            dict of 0 or more, like {"AK": "introduced", "HI": "invasive", "L48": "introduced"}
+                for the species with this GBIF taxonKey
+        """
+        assessments = {}
+        riis_recs = self.get_riis_by_gbif_taxonkey(gbif_taxon_key)
+        for riis in riis_recs:
+            assessments[riis.data[RIIS_SPECIES.LOCALITY_FLD]] = riis.data[RIIS_SPECIES.ASSESSMENT_FLD]
+        return assessments
+
+    # ...............................................
     def read_riis(self, read_resolved=False):
         """Assemble 2 dictionaries of records with valid and invalid data.
 
@@ -307,7 +336,7 @@ class NNSL:
             infname = self._csvfile
             header = RIIS_SPECIES.HEADER
 
-        rdr, inf = get_csv_dict_reader(infname, RIIS.DELIMITER, fieldnames=header)
+        rdr, inf = get_csv_dict_reader(infname, RIIS.DELIMITER, fieldnames=header, quote_none=False)
         self._log.debug(f"Reading RIIS from {infname}")
         try:
             for row in rdr:
@@ -453,7 +482,7 @@ class NNSL:
         """
         msgdict = {}
 
-        if len(self.nnsl_by_species) == 0:
+        if not self.nnsl_by_species:
             self.read_riis(read_resolved=False)
 
         name_count = 0
@@ -507,15 +536,27 @@ class NNSL:
             count of successfully written records
         """
         msgdict = {}
-        self.read_riis(read_resolved=True)
+        # Make sure data is present
+        if not self.nnsl_by_id:
+            raise Exception("RIIS dictionary is not present")
+        else:
+            keys = list(self.nnsl_by_id.keys())
+            tstrec = self.nnsl_by_id[keys[0]]
+            try:
+                tstrec.data[RIIS_SPECIES.NEW_GBIF_KEY_FLD]
+            except KeyError:
+                raise Exception("RIIS records have not been resolved to GBIF accepted taxa")
+
         if not outfname:
             outfname = self.gbif_resolved_riis_fname
         new_header = self.gbif_resolved_riis_header
+
         try:
             writer, outf = get_csv_dict_writer(
                 outfname, new_header, RIIS.DELIMITER, fmode="w", overwrite=overwrite)
         except Exception:
             raise
+
         self._log.debug(f"Writing resolved RIIS to {outfname}")
         rec_count = 0
         try:
