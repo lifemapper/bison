@@ -122,7 +122,6 @@ class GBIF:
     STATUS_FLD = "taxonomicStatus"
     ORG_FOREIGN_KEY = "publishingOrganizationKey"
     INPUT_DATA = "gbif_2022-02-15.csv"
-    TEST_DATA = "gbif_2022-02-15_1k.csv"
     DWCA_DATASET_DIR = "dataset"
     DWCA_META_FNAME = "meta.xml"
     DWCA_INTERPRETED = "occurrence"
@@ -287,8 +286,8 @@ class RIIS_AUTHORITY:
 # .............................................................................
 class RIIS_SPECIES:
     """Introduced or Invasive Species List."""
-    FNAME = "US-RIIS_MasterList"
-    TEST_FNAME = "US-RIIS_MasterList_100"
+    FNAME = "US-RIIS_MasterList.csv"
+    TEST_FNAME = "US-RIIS_MasterList_100.csv"
     DATA_COUNT = 15264
     KEY = "occurrenceID"
     GBIF_KEY = "GBIF taxonKey"

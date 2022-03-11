@@ -168,7 +168,7 @@ def get_csv_dict_reader(
         delimiter: delimiter between fields
         fieldnames (list): if header is not in the file, use these fieldnames
         encoding (str): type of encoding
-        ignore_quotes (constant): csv.QUOTE_NONE or csv.QUOTE_MINIMAL
+        quote_none (bool): True for csv.QUOTE_NONE or False for csv.QUOTE_MINIMAL
 
     Returns:
         writer (csv.DictReader) ready to read
@@ -356,7 +356,7 @@ def identify_chunks(big_csv_filename):
 
 
 # .............................................................................
-def get_chunk_filename(in_base_filename, start, stop, ext, overwrite=True):
+def get_chunk_filename(in_base_filename, start, stop, ext):
     """Create a consistent filename for chunks of a larger file.
 
     Args:
@@ -364,24 +364,31 @@ def get_chunk_filename(in_base_filename, start, stop, ext, overwrite=True):
         start (int): line number in the large file that serves as the first record of the chunk file
         stop (int): line number in the large file that serves as the last record of the chunk file
         ext (str): file extension for the chunk file
-        overwrite (bool): flag indicating whether to delete an existing file with the chunk filename.
 
     Returns:
         chunk_filename: standardized filename for the chunk of data
     """
     chunk_filename = f"{in_base_filename}_chunk-{start}-{stop}{ext}"
-    if overwrite is True and os.path.exists(chunk_filename):
-        delete_file(chunk_filename)
     return chunk_filename
 
 
 # .............................................................................
 def identify_chunk_files(big_csv_filename):
+    """Construct filenames for smaller files subset from a large file.
+
+    Args:
+        big_csv_filename (str): Full path to the original large CSV file of records
+
+    Returns:
+        chunk_filenames: a list of chunk filenames
+    """
     chunk_filenames = []
     in_base_filename, ext = os.path.splitext(big_csv_filename)
     boundary_pairs = identify_chunks(big_csv_filename)
     for (start, stop) in boundary_pairs:
-        chunk_fname = get_chunk_filename(in_base_filename, start, stop, ext, overwrite=True)
+        chunk_fname = get_chunk_filename(in_base_filename, start, stop, ext)
+        # if os.path.exists(chunk_fname):
+        #     print(f"File {chunk_fname} exists")
         chunk_filenames.append(chunk_fname)
     return chunk_filenames
 
@@ -411,7 +418,7 @@ def chunk_files(big_csv_filename):
         big_recno = 1
 
         for (start, stop) in boundary_pairs:
-            chunk_fname = get_chunk_filename(in_base_filename, start, stop, ext, overwrite=True)
+            chunk_fname = get_chunk_filename(in_base_filename, start, stop, ext)
 
             try:
                 # Start writing the smaller file
