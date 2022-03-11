@@ -16,13 +16,15 @@ def split_files(big_csv_filename, logger):
     """
     chunk_filenames = chunk_files(big_csv_filename)
     logger.info(f"Chunk files created: {chunk_filenames}")
+    return chunk_filenames
 
 # .............................................................................
 def resolve_riis_taxa(riis_filename, logger):
-    """Split files into smaller subsets for faster processing.
+    """Resolve and write GBIF accepted names and taxonKeys in RIIS records.
 
     Args:
-        big_csv_filename (str): full filename for splitting into smaller files.
+        riis_filename (str): full filename for splitting into smaller files.
+        logger (object): logger for saving relevant processing messages
     """
     nnsl = NNSL(riis_filename, logger=logger)
     # Update species data
@@ -32,7 +34,13 @@ def resolve_riis_taxa(riis_filename, logger):
     return resolved_riis_filename
 
 # .............................................................................
-def annotate_occurrence_files(csv_filenames, do_resolve, logger):
+def annotate_occurrence_files(csv_filenames, logger):
+    """Annotate GBIF records with census state and county, and RIIS key and assessment.
+
+    Args:
+        csv_filenames (list): list of full filenames containing GBIF data for annotation.
+        logger (object): logger for saving relevant processing messages
+    """
     annotated_filenames = []
     for csv_filename in csv_filenames:
         ant = Annotator(csv_filename, do_resolve=False, logger=logger)
@@ -42,7 +50,13 @@ def annotate_occurrence_files(csv_filenames, do_resolve, logger):
 
 
 # .............................................................................
-def summarize_occurrence_contents(csv_filenames, location_summary_filename, species_summary_filename, logger):
+def summarize_occurrence_contents(csv_filenames, logger):
+    """Annotate GBIF records with census state and county, and RIIS key and assessment.
+
+    Args:
+        csv_filenames (list): list of full filenames containing GBIF data for annotation.
+        logger (object): logger for saving relevant processing messages
+    """
     summary_filenames = []
     for csv_filename in csv_filenames:
         agg = Aggregator(csv_filename, logger=logger)
@@ -51,11 +65,8 @@ def summarize_occurrence_contents(csv_filenames, location_summary_filename, spec
 
     # Create a new Aggregator, ignore annotated occurrence file used for construction,
     agg = Aggregator(csv_filenames[0], logger=logger)
-    # do not re-summarize, read summaries from files
-    agg.read_summaries(summary_filenames, do_clear=False)
-
-    agg.structure_summary()
-    agg.summarize_stats(location_summary_filename, species_summary_filename)
+    # read summaries from all files
+    agg.aggregate_summaries(summary_filenames)
 
 
 # .............................................................................
@@ -73,7 +84,7 @@ def identify_subset_files(csv_filenames, logger):
         for csv_filename in csv_filenames:
             delete_file(csv_filename)
         # Resplit into subset files
-        csv_filenames = split_files(big_csv_filename)
+        csv_filenames = split_files(big_csv_filename, logger)
 
     return csv_filenames
 
@@ -82,7 +93,8 @@ def identify_subset_files(csv_filenames, logger):
 if __name__ == '__main__':
     import argparse
 
-    riis_filename = os.path.join(DATA_PATH, RIIS_SPECIES.FNAME)
+    riis_filename = os.path.join(DATA_PATH, RIIS_SPECIES.FNAME + ".csv")
+    # riis_filename = os.path.join(DATA_PATH, "US-RIIS_MasterList_100.csv")
     gbif_infile = os.path.join(DATA_PATH, GBIF.INPUT_DATA)
     default_output_basename = os.path.join(DATA_PATH)
 
@@ -93,30 +105,31 @@ if __name__ == '__main__':
         "big_csv_filename", type=str, default=gbif_infile,
         help="The full path to GBIF input species occurrence data.")
     parser.add_argument(
-        "do_split", type=str, default=True,
+        "do_split", type=str, choices=("True","False"),
         help="True to process subsetted/chunked files; False to process big_csv_filename directly.  Command 'split' assumes do_subset is True")
 
     args = parser.parse_args()
     cmd = args.cmd
     big_csv_filename = args.big_csv_filename
-    do_split = args.do_split
+    do_split = True if args.do_split.lower() in ("yes", "y", "true", "1") else False
     logger = get_logger(DATA_PATH, logname=f"main_{cmd}")
 
-    if do_split is True:
-        csv_filenames = identify_subset_files(big_csv_filename, logger)
-    else:
-        csv_filenames = [big_csv_filename]
-
-    # Make sure files to be processed exist
-    for csv_filename in csv_filenames:
-        if not os.path.exists(csv_filename):
-            raise FileNotFoundError(f"Expected file {csv_filename} does not exist")
-
     if cmd == "resolve":
-        resolved_riis_filename = resolve_riis_taxa(riis_filename)
+        resolved_riis_filename = resolve_riis_taxa(riis_filename, logger)
+        print(resolved_riis_filename)
+    else:
+        if do_split is True:
+            csv_filenames = identify_subset_files(big_csv_filename, logger)
+        else:
+            csv_filenames = [big_csv_filename]
 
-    elif args.cmd == "annotate":
-        annotated_filenames = annotate_occurrence_files(csv_filenames, logger)
+        # Make sure files to be processed exist
+        for csv_filename in csv_filenames:
+            if not os.path.exists(csv_filename):
+                raise FileNotFoundError(f"Expected file {csv_filename} does not exist")
 
-    elif cmd == "summarize":
-        summarize_occurrence_contents(csv_filenames, logger)
+        if cmd == "annotate":
+            annotated_filenames = annotate_occurrence_files(csv_filenames, logger)
+
+        # elif cmd == "summarize":
+        #     summarize_occurrence_contents(csv_filenames, logger)

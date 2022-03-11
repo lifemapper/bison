@@ -30,12 +30,9 @@ class Annotator():
             logger = get_logger(datapath)
         self._log = logger
 
-        self.nnsl = NNSL(datapath, logger=logger)
-        if do_resolve is True:
-            self.nnsl.read_riis(read_resolved=False)
-            self.nnsl.resolve_riis_to_gbif_taxa()
-        else:
-            self.nnsl.read_riis(read_resolved=True)
+        riis_filename = os.path.join(datapath, RIIS_SPECIES.FNAME)
+        self.nnsl = NNSL(riis_filename, logger=logger)
+        self.nnsl.read_riis(read_resolved=True)
 
         # Must georeference points to add new, consistent state and county fields
         self._geores = GeoResolver(US_COUNTY.FILE, US_COUNTY.CENSUS_BISON_MAP, self._log)

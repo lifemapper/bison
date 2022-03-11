@@ -14,3 +14,8 @@ data/*chunk*csv
 
 venv/
 /.pytest_cache/
+data/US-RIIS_MasterList_100.csv
+data/US-RIIS_MasterList_100_updated_gbif.csv
+data/US-RIIS_MasterList.csv
+data/US-RIIS_MasterList_updated_gbif.csv
+data/US-RIIS_MasterList_updated_gbif.csv.saveme
