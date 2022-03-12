@@ -67,13 +67,18 @@ class Aggregator():
             logger = get_logger(datapath)
         # Hold all counties found in each state
         self.states = {}
-        for st in US_STATES.values():
-            self.states[st] = set()
+        self._init_states()
 
         self._log = logger
         # {county_or_state: {species: count, ... }
         #  ...  }
         self.locations = {}
+
+    # ...............................................
+    def _init_states(self):
+        self.states = {}
+        for st in US_STATES.values():
+            self.states[st] = set()
 
     # ...............................................
     def _get_compound_key(self, part1, part2):
@@ -107,7 +112,6 @@ class Aggregator():
     def _summarize_annotations_by_location(self):
         # Reset summary
         self.locations = {}
-        self.states = {}
         csv_rdr, inf = get_csv_dict_reader(
             self._csvfile, GBIF.DWCA_DELIMITER, encoding=ENCODING, quote_none=False)
         try:

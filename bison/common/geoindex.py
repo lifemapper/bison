@@ -70,6 +70,25 @@ class GeoResolver(object):
         return sp_index, sp_feats, bison_fldnames
 
     # ...............................................
+    def _get_values_from_polygons(self, pt, intersect_fids):
+        # Initialize dictionary
+        fldvals = {}
+        for fn in self.bison_spatial_fields:
+            fldvals[fn] = None
+        intersects = False
+        # Check any intersecting envelopes for actual intersecting geometry
+        for fid in intersect_fids:
+            geom = self.spatial_feats[fid]['geom']
+            if pt.Intersects(geom):
+                intersects = True
+                # Retrieve values from intersecting polygon
+                for fn in self.bison_spatial_fields:
+                    fldvals[fn] = self.spatial_feats[fid][fn]
+                # Stop looking after finding intersection
+                break
+        return intersects, fldvals
+
+    # ...............................................
     def find_enclosing_polygon(self, lon, lat):
         """Return attributes of polygon enclosing these coordinates.
 
@@ -83,12 +102,12 @@ class GeoResolver(object):
 
         Raises:
             ValueError: on non-numeric coordinate
+            GeoException: on failure to intersect point with spatial index
+            GeoException: on no intersecting geometry returned by spatial index contains point
         """
         ogr_seconds = 0
         # Initialize fields to pull values from intersection
         fldvals = {}
-        for fn in self.bison_spatial_fields:
-            fldvals[fn] = None
         try:
             lon = float(lon)
             lat = float(lat)
@@ -103,17 +122,32 @@ class GeoResolver(object):
             intersect_fids = list(self.spatial_index.intersection((lon, lat)))
 
             # Pull attributes of interest from intersecting feature
-            for fid in intersect_fids:
-                geom = self.spatial_feats[fid]['geom']
-                if pt.Within(geom):
-                    # Retrieve values from intersecting polygon
-                    for fn in self.bison_spatial_fields:
-                        fldvals[fn] = self.spatial_feats[fid][fn]
-                    # Stop looking after finding intersection
-                    break
+            intersects, fldvals = self._get_values_from_polygons(pt, intersect_fids)
+
+            if intersects is False:
+                # If point does not intersect spatial index (envelopes of features)
+                if not intersect_fids:
+                    raise GeoException(f"Failed to intersect point {lon} {lat} with spatial index")
+                else:
+                    # If point does not intersect geometries, try buffer (0.1 dd ~= 11.1 km) to get close enough
+                    ptbuf = pt.Buffer(0.1)
+                    intersects, fldvals = self._get_values_from_polygons(ptbuf, intersect_fids)
+                    if intersects is False:
+                        raise GeoException(f"Failed to intersect buffered point {lon} {lat} with spatial index")
+
             # Elapsed time
             ogr_seconds = time.time()-start
 
         return fldvals, ogr_seconds
 
-    # ...............................................
+
+# .............................................................................
+class GeoException(Exception):
+    """Object for returning geospatial index errors."""
+    def __init__(self, message=""):
+        """Constructor.
+
+        Args:
+            message: optional message to be displayed when raised.
+        """
+        Exception(message)
