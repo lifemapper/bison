@@ -63,3 +63,18 @@ Optionally, use the get_chunk_files function in the bison.tools.util module
 ```commandline
 python get_chunk_files
 ```
+
+# Census data for determining point county/state
+Used the US Census 2020 cartographic boundaries from
+https://www.census.gov/geographies/mapping-files/time-series/geo/cartographic-boundary.html
+
+Census data are in EPSG:4269 (WGS84), a geographic SRS very close to EPSG:4326 (NAD83).
+For 2 reasons, I did not project the census data:
+* The difference is on the order of meters.
+* The GBIF data usually does not specify a datum
+
+See https://gis.stackexchange.com/questions/170839/is-re-projection-needed-from-srid-4326-wgs-84-to-srid-4269-nad-83
+
+Occasionally a point would intersect with a county envelope (created for a spatial index)
+but not be contained within the returned geometry.  In that case, I returned the
+values from the geometry returned by the spatial index (intersected with the envelope).

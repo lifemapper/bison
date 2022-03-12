@@ -58,7 +58,7 @@ def annotate_occurrence_files(csv_filenames, logger):
     """
     annotated_filenames = []
     for csv_filename in csv_filenames:
-        ant = Annotator(csv_filename, do_resolve=False, logger=logger)
+        ant = Annotator(csv_filename, logger=logger)
         annotated_dwc_fname = ant.append_dwca_records()
         annotated_filenames.append(annotated_dwc_fname)
     return annotated_filenames
@@ -126,7 +126,6 @@ if __name__ == '__main__':
     riis_filename = os.path.join(DATA_PATH, RIIS_SPECIES.FNAME)
     gbif_infile = os.path.join(DATA_PATH, GBIF.INPUT_DATA)
     gbif_infile = os.path.join(DATA_PATH, "gbif_2022-02-15_100k.csv")
-    default_output_basename = os.path.join(DATA_PATH)
 
     parser = argparse.ArgumentParser(
         description="Execute one or more steps of annotating GBIF data with RIIS assessments, and summarizing by species, county, and state")
@@ -143,6 +142,11 @@ if __name__ == '__main__':
     big_csv_filename = args.big_csv_filename
     do_split = True if args.do_split.lower() in ("yes", "y", "true", "1") else False
     logger = get_logger(DATA_PATH, logname=f"main_{cmd}")
+
+    # Test data
+    big_csv_filename = os.path.join(DATA_PATH, "gbif_2022-02-15_100k_chunk-1-5556.csv")
+    do_split = False
+    cmd = "full"
 
     if cmd == "resolve":
         resolved_riis_filename = resolve_riis_taxa(riis_filename, logger)
@@ -162,4 +166,13 @@ if __name__ == '__main__':
             annotated_filenames = annotate_occurrence_files(csv_filenames, logger)
 
         elif cmd == "summarize":
-            state_aggregation_filenames, cty_aggregation_filenames = summarize_occurrence_contents(csv_filenames, logger)
+            annotated_filenames = [Annotator.construct_annotated_name(csvfile) for csvfile in csv_filenames]
+            state_aggregation_filenames, cty_aggregation_filenames = summarize_occurrence_contents(
+                annotated_filenames, logger)
+
+        elif cmd == "full":
+            annotated_filenames = annotate_occurrence_files(csv_filenames, logger)
+            state_aggregation_filenames, cty_aggregation_filenames = summarize_occurrence_contents(
+                annotated_filenames, logger)
+            for fn in state_aggregation_filenames:
+                print(fn)
