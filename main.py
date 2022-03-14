@@ -46,18 +46,18 @@ def resolve_riis_taxa(riis_filename, logger):
 
 
 # .............................................................................
-def annotate_occurrence_files(csv_filenames, logger):
+def annotate_occurrence_files(input_filenames, logger):
     """Annotate GBIF records with census state and county, and RIIS key and assessment.
 
     Args:
-        csv_filenames (list): list of full filenames containing GBIF data for annotation.
+        input_filenames (list): list of full filenames containing GBIF data for annotation.
         logger (object): logger for saving relevant processing messages
 
     Returns:
         annotated_filenames: fill filenames for GBIF data annotated with state, county, RIIS assessment, and RIIS key.
     """
     annotated_filenames = []
-    for csv_filename in csv_filenames:
+    for csv_filename in input_filenames:
         ant = Annotator(csv_filename, logger=logger)
         annotated_dwc_fname = ant.append_dwca_records()
         annotated_filenames.append(annotated_dwc_fname)
@@ -65,11 +65,11 @@ def annotate_occurrence_files(csv_filenames, logger):
 
 
 # .............................................................................
-def summarize_occurrence_contents(csv_filenames, logger):
+def summarize_occurrence_contents(input_filenames, logger):
     """Annotate GBIF records with census state and county, and RIIS key and assessment.
 
     Args:
-        csv_filenames (list): list of full filenames containing GBIF data for annotation.
+        input_filenames (list): list of full filenames containing GBIF data for annotation.
         logger (object): logger for saving relevant processing messages
 
     Returns:
@@ -77,15 +77,15 @@ def summarize_occurrence_contents(csv_filenames, logger):
         cty_aggregation_filename (list): full filenames of species counts and percentages for each county-state.
     """
     summary_filenames = []
-    for csv_filename in csv_filenames:
+    for csv_filename in input_filenames:
         agg = Aggregator(csv_filename, logger=logger)
-        summary_filename = agg.summarize_to_file()
+        summary_filename = agg.summarize_write_locations()
         summary_filenames.append(summary_filename)
 
     # Create a new Aggregator, ignore annotated occurrence file used for construction,
-    agg = Aggregator(csv_filenames[0], logger=logger)
+    agg = Aggregator(input_filenames[0], logger=logger)
     # read summaries from all files
-    state_aggregation_filenames, cty_aggregation_filenames = agg.write_location_aggregates(summary_filenames)
+    state_aggregation_filenames, cty_aggregation_filenames = agg.aggregate_write_for_locations(summary_filenames)
     return state_aggregation_filenames, cty_aggregation_filenames
 
 
@@ -98,25 +98,29 @@ def identify_subset_files(big_csv_filename, logger):
         logger (object): logger for saving relevant processing messages
 
     Returns:
-        csv_filenames (list): full filenames for subset files created from large input file.
+        input_filenames (list): full filenames for subset files created from large input file.
     """
-    csv_filenames = identify_chunk_files(big_csv_filename)
+    chunk_filenames = identify_chunk_files(big_csv_filename)
     # If any are missing, delete them all and split
     re_split = False
-    for csv_filename in csv_filenames:
-        if not os.path.exists(csv_filename):
+    for chunk_fname in chunk_filenames:
+        if not os.path.exists(chunk_fname):
             re_split = True
             break
-    # raise FileNotFoundError(f"Expected chunk file {csv_filename} does not exist")
     if re_split is True:
         # Delete any existing files
-        for csv_filename in csv_filenames:
-            delete_file(csv_filename)
+        for chunk_fname in chunk_filenames:
+            delete_file(chunk_fname)
         # Resplit into subset files
-        csv_filenames = split_files(big_csv_filename, logger)
+        chunk_filenames = split_files(big_csv_filename, logger)
 
-    return csv_filenames
+    return chunk_filenames
 
+def log_output(logger, msg, outlist=[]):
+    msg = f"{msg}\n"
+    for elt in outlist:
+        msg += f"  {elt}\n"
+    logger.info(msg)
 
 # .............................................................................
 # Press the green button in the gutter to run the script.
@@ -144,35 +148,46 @@ if __name__ == '__main__':
     logger = get_logger(DATA_PATH, logname=f"main_{cmd}")
 
     # Test data
-    big_csv_filename = os.path.join(DATA_PATH, "gbif_2022-02-15_100k_chunk-1-5556.csv")
+    big_csv_filename = os.path.join(DATA_PATH, "/home/astewart/git/bison/data/gbif_2022-02-15_100k_chunk-27781-33336.csv")
     do_split = False
-    cmd = "full"
+    cmd = "annotate"
 
     if cmd == "resolve":
         resolved_riis_filename = resolve_riis_taxa(riis_filename, logger)
         print(resolved_riis_filename)
+        log_output(logger, f"Resolved RIIS filename: {resolved_riis_filename}")
     else:
         if do_split is True:
-            csv_filenames = identify_subset_files(big_csv_filename, logger)
+            input_filenames = identify_subset_files(big_csv_filename, logger)
         else:
-            csv_filenames = [big_csv_filename]
+            input_filenames = [big_csv_filename]
+
+        log_output(logger, "Input filenames:", outlist=input_filenames)
 
         # Make sure files to be processed exist
-        for csv_filename in csv_filenames:
-            if not os.path.exists(csv_filename):
-                raise FileNotFoundError(f"Expected file {csv_filename} does not exist")
+        for csv_fname in input_filenames:
+            if not os.path.exists(csv_fname):
+                raise FileNotFoundError(f"Expected file {csv_fname} does not exist")
 
         if cmd == "annotate":
-            annotated_filenames = annotate_occurrence_files(csv_filenames, logger)
+            annotated_filenames = annotate_occurrence_files(input_filenames, logger)
+            log_output(logger, "Annotated filenames:", outlist=annotated_filenames)
 
         elif cmd == "summarize":
-            annotated_filenames = [Annotator.construct_annotated_name(csvfile) for csvfile in csv_filenames]
+            annotated_filenames = [Annotator.construct_annotated_name(csvfile) for csvfile in input_filenames]
             state_aggregation_filenames, cty_aggregation_filenames = summarize_occurrence_contents(
                 annotated_filenames, logger)
+            state_aggregation_filenames.extend(cty_aggregation_filenames)
+            log_output(
+                logger, "Aggregated county/state filenames:", outlist=state_aggregation_filenames)
 
         elif cmd == "full":
-            annotated_filenames = annotate_occurrence_files(csv_filenames, logger)
+            annotated_filenames = annotate_occurrence_files(input_filenames, logger)
             state_aggregation_filenames, cty_aggregation_filenames = summarize_occurrence_contents(
                 annotated_filenames, logger)
-            for fn in state_aggregation_filenames:
-                print(fn)
+            log_output(
+                logger, "Aggregated county/state filenames:",
+                outlist=state_aggregation_filenames.extend(cty_aggregation_filenames))
+
+        else:
+            logger.error(f"Unsupported command '{cmd}'")

@@ -27,3 +27,5 @@ data/cb_2020_us_state_500k.shp.ea.iso.xml
 data/cb_2020_us_state_500k.shp.iso.xml
 data/cb_2020_us_state_500k.shx
 data/cb_2020_us_state_500k.zip
+data/state*csv
+data/county*csv

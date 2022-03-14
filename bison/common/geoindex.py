@@ -89,6 +89,43 @@ class GeoResolver(object):
         return intersects, fldvals
 
     # ...............................................
+    def _buffer_for_enclosing_polygon(self, pt, intersect_fids):
+        fldvals = {}
+        fuzzy_pt = pt
+        buffer_vals = [(i / 10.0) for i in range(1,11)]
+        # If point does not intersect spatial index (envelopes of features), buffer point
+        if not intersect_fids:
+            for buffer in buffer_vals:
+                fuzzy_pt = fuzzy_pt.Buffer(buffer)
+                # Intersect with spatial index to get ID (fid) of intersecting features
+                # intersect_fids = list(self.spatial_index.intersection((fuzzy_pt)))
+                intersect_fids = list(fuzzy_pt.intersection(self.spatial_index.intersection))
+                if intersect_fids:
+                    break
+            self._log.info(
+                f"Intersected point buffered {buffer} dd returned {len(intersect_fids)} counties")
+        if not intersect_fids:
+            raise GeoException(f"Failed to intersect point buffered to {buffer} dd with spatial index")
+
+        # Pull attributes of interest from intersecting feature
+        intersects, fldvals = self._get_values_from_polygons(fuzzy_pt, intersect_fids)
+        if intersects is False:
+            # Try increasingly large buffer, (0.1 dd ~= 11.1 km, 1 dd ~= 111 km)
+            for buffer in buffer_vals:
+                fuzzy_pt = fuzzy_pt.Buffer(buffer)
+                intersects, fldvals = self._get_values_from_polygons(fuzzy_pt, intersect_fids)
+                if intersects is True:
+                    break
+            if intersects is False:
+                raise GeoException(
+                    f"Failed to intersect point buffered {buffer} dd with any of {len(intersect_fids)} counties")
+            else:
+                self._log.info(
+                    f"Intersected point buffered {buffer} dd with one of {len(intersect_fids)} counties")
+
+        return fldvals
+
+    # ...............................................
     def find_enclosing_polygon(self, lon, lat):
         """Return attributes of polygon enclosing these coordinates.
 
@@ -120,20 +157,26 @@ class GeoResolver(object):
             pt.AddPoint(lon, lat)
             # Intersect with spatial index to get ID (fid) of intersecting features
             intersect_fids = list(self.spatial_index.intersection((lon, lat)))
+            # If point does not intersect spatial index (envelopes of features)
+            if not intersect_fids:
+                raise GeoException(f"Failed to intersect point {lon} {lat} with spatial index")
 
             # Pull attributes of interest from intersecting feature
             intersects, fldvals = self._get_values_from_polygons(pt, intersect_fids)
-
             if intersects is False:
-                # If point does not intersect spatial index (envelopes of features)
-                if not intersect_fids:
-                    raise GeoException(f"Failed to intersect point {lon} {lat} with spatial index")
-                else:
-                    # If point does not intersect geometries, try buffer (0.1 dd ~= 11.1 km) to get close enough
-                    ptbuf = pt.Buffer(0.1)
+                # Try increasingly large buffer, (0.1 dd ~= 11.1 km, 1 dd ~= 111 km)
+                for i in range(1,11):
+                    buffer = (i / 10.0)
+                    ptbuf = pt.Buffer(buffer)
                     intersects, fldvals = self._get_values_from_polygons(ptbuf, intersect_fids)
-                    if intersects is False:
-                        raise GeoException(f"Failed to intersect buffered point {lon} {lat} with spatial index")
+                    if intersects is True:
+                        break
+                if intersects is False:
+                    raise GeoException(
+                        f"Failed to intersect point buffered {buffer} dd with any of {len(intersect_fids)} counties")
+                else:
+                    self._log.info(
+                        f"Intersected point buffered {buffer} dd with one of {len(intersect_fids)} counties")
 
             # Elapsed time
             ogr_seconds = time.time()-start

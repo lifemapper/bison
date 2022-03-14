@@ -238,8 +238,6 @@ class Annotator():
                 while dwcrec is not None:
                     if (self._dwcdata.recno % LOG.INTERVAL) == 0:
                         self._log.debug(f"*** Record number {self._dwcdata.recno} ***")
-                    if dwcrec[GBIF.ID_FLD] == "3327828493":
-                        print("Here lies a problem")
 
                     # Initialize new fields
                     county = state = riis_assessment = riis_key = None
