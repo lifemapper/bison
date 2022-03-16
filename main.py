@@ -138,19 +138,19 @@ if __name__ == '__main__':
         "big_csv_filename", type=str, default=gbif_infile,
         help="The full path to GBIF input species occurrence data.")
     parser.add_argument(
-        "--do_split", type=str, choices=("True", "False"), default="True",
+        "--do-split", type=str, choices=("True", "False"), default="True",
         help="True to process subsetted/chunked files; False to process big_csv_filename directly.  Command 'split' assumes do_subset is True")
 
     args = parser.parse_args()
     cmd = args.cmd
-    big_csv_filename = args.big_csv_filename
+    big_csv_filename = os.path.join(DATA_PATH, args.big_csv_filename)
     do_split = True if args.do_split.lower() in ("yes", "y", "true", "1") else False
     logger = get_logger(DATA_PATH, logname=f"main_{cmd}")
 
-    # Test data
-    big_csv_filename = os.path.join(DATA_PATH, "/home/astewart/git/bison/data/gbif_2022-02-15_100k_chunk-27781-33336.csv")
-    do_split = False
-    cmd = "annotate"
+    # # Test data
+    # big_csv_filename = os.path.join(DATA_PATH, "/home/astewart/git/bison/data/gbif_2022-02-15_100k_chunk-27781-33336.csv")
+    # do_split = False
+    # cmd = "annotate"
 
     if cmd == "resolve":
         resolved_riis_filename = resolve_riis_taxa(riis_filename, logger)
