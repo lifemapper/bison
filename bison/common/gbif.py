@@ -56,8 +56,7 @@ class DwcData(object):
             Exception: on failure to open csvfile and get a csv.DictReader
         """
         try:
-            self._csv_reader, self._inf = get_csv_dict_reader(
-                self._csvfile, GBIF.DWCA_DELIMITER, encoding=ENCODING, quote_none=False)
+            self._csv_reader, self._inf = get_csv_dict_reader(self._csvfile, GBIF.DWCA_DELIMITER, encoding=ENCODING)
         except Exception:
             raise
 

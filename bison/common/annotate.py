@@ -2,7 +2,7 @@
 import os
 
 from bison.common.constants import (
-    ENCODING, GBIF, LOG, NEW_RESOLVED_COUNTY, NEW_RESOLVED_STATE, NEW_RIIS_ASSESSMENT_FLD,
+    ENCODING, EXTRA_CSV_FIELD, GBIF, LOG, NEW_RESOLVED_COUNTY, NEW_RESOLVED_STATE, NEW_RIIS_ASSESSMENT_FLD,
     NEW_RIIS_KEY_FLD, RIIS_SPECIES, US_CENSUS_COUNTY, US_CENSUS_STATE, US_STATES)
 from bison.common.gbif import DwcData
 from bison.common.geoindex import GeoResolver, GeoException
@@ -14,7 +14,7 @@ from bison.tools.util import (get_csv_dict_writer, get_logger)
 # .............................................................................
 class Annotator():
     """Class for adding USGS RIIS info to GBIF occurrences."""
-    def __init__(self, gbif_occ_filename, logger=None):
+    def __init__(self, gbif_occ_filename, nnsl=None, logger=None):
         """Constructor.
 
         Args:
@@ -29,9 +29,12 @@ class Annotator():
             logger = get_logger(datapath)
         self._log = logger
 
-        riis_filename = os.path.join(datapath, RIIS_SPECIES.FNAME)
-        self.nnsl = NNSL(riis_filename, logger=logger)
-        self.nnsl.read_riis(read_resolved=True)
+        if nnsl is not None:
+            self.nnsl = nnsl
+        else:
+            riis_filename = os.path.join(datapath, RIIS_SPECIES.FNAME)
+            self.nnsl = NNSL(riis_filename, logger=logger)
+            self.nnsl.read_riis(read_resolved=True)
 
         # Must georeference points to add new, consistent state and county fields
         self._geo_county = GeoResolver(US_CENSUS_COUNTY.FILE, US_CENSUS_COUNTY.CENSUS_BISON_MAP, self._log)
@@ -105,10 +108,11 @@ class Annotator():
 
         try:
             self._csv_writer, self._outf = get_csv_dict_writer(
-                outfname, header, GBIF.DWCA_DELIMITER, fmode="w", encoding=ENCODING,
-                overwrite=True)
+                outfname, header, GBIF.DWCA_DELIMITER, fmode="w", encoding=ENCODING, overwrite=True)
         except Exception:
             raise Exception(f"Failed to open file or csv_writer for {outfname}")
+
+        return header
 
     # ...............................................
     def close(self):
@@ -173,43 +177,6 @@ class Annotator():
 
         return riis_assessment, riis_key
 
-    # # ...............................................
-    # def _test_state(self, dwcrec, state_code):
-    #     state = dwcrec[GBIF.STATE_FLD]
-    #     county = dwcrec[GBIF.COUNTY_FLD]
-    #     if len(state) == 0:
-    #         self.missing_states += 1
-    #     else:
-    #         # Capitalized state names, uppercase codes
-    #         if len(state) == 2:
-    #             state = state.upper()
-    #         elif len(state) > 2:
-    #             state.capitalize()
-    #
-    #         if state in self._all_states:
-    #             # Good state/county combos
-    #             try:
-    #                 self.good_locations[state].add(county)
-    #             except KeyError:
-    #                 self.good_locations[dwcrec[GBIF.STATE_FLD]] = set(dwcrec[GBIF.COUNTY_FLD])
-    #
-    #             # Does record state == georeferenced state?
-    #             try:
-    #                 scode = US_STATES[state]
-    #             except KeyError:
-    #                 scode = None
-    #             if state == state_code or scode == state_code:
-    #                 self.matched_states += 1
-    #             else:
-    #                 self.mismatched_states += 1
-    #
-    #         else:
-    #             # Bad state/county combos
-    #             try:
-    #                 self.bad_locations[state].add(county)
-    #             except KeyError:
-    #                 self.bad_locations[dwcrec[GBIF.STATE_FLD]] = set(dwcrec[GBIF.COUNTY_FLD])
-
     # ...............................................
     def append_dwca_records(self):
         """Resolve and append state, county, RIIS assessment, and RIIS key to GBIF DWC occurrence records.
@@ -223,13 +190,14 @@ class Annotator():
         """
         try:
             # Open the original DwC data file for read, and the annotated file for write.
-            self._open_input_output()
+            _ = self._open_input_output()
         except Exception:
             raise
         else:
             # Create geospatial index to identify county/state of points
             self._geo_county.initialize_geospatial_data()
             buffer_vals = [(i / 10.0) for i in range(1, 11)]
+            fieldnames = self._dwcdata.fieldnames
 
             try:
                 # iterate over DwC records
@@ -240,8 +208,16 @@ class Annotator():
                         self._log.debug(f"*** Record number {self._dwcdata.recno}, gbifID: {gbif_id} ***")
 
                     # Debug: examine data
-                    if gbif_id == "1698055779":
-                        self._log.debug(f"Found gbifID 1698055779")
+                    trouble = "1698055779"
+                    trouble_next = "1698058398"
+                    if gbif_id == trouble:
+                        self._log.debug(f"Found gbifID {trouble}")
+                    if gbif_id == trouble_next:
+                        self._log.debug(f"Not so troubling")
+
+                    rec_keys = set(dwcrec.keys())
+                    if EXTRA_CSV_FIELD in dwcrec.keys():
+                        self._log.debug(f"Extra fields detected: possible bad read for record {gbif_id}:")
 
                     # Initialize new fields
                     county = state = riis_assessment = riis_key = None

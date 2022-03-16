@@ -1,11 +1,12 @@
 """Main script to execute all elements of the summarize-GBIF BISON workflow."""
+import csv
 import os
 
 from bison.common.aggregate import Aggregator
 from bison.common.annotate import Annotator
-from bison.common.constants import GBIF, DATA_PATH, RIIS_SPECIES
+from bison.common.constants import GBIF, DATA_PATH, EXTRA_CSV_FIELD, RIIS_SPECIES
 from bison.common.riis import NNSL
-from bison.tools.util import chunk_files, delete_file, get_logger, identify_chunk_files
+from bison.tools.util import chunk_files, delete_file, get_csv_dict_reader, get_logger, identify_chunk_files
 
 
 # .............................................................................
@@ -57,8 +58,10 @@ def annotate_occurrence_files(input_filenames, logger):
         annotated_filenames: fill filenames for GBIF data annotated with state, county, RIIS assessment, and RIIS key.
     """
     annotated_filenames = []
+    nnsl = NNSL(riis_filename, logger=logger)
+    nnsl.read_riis(read_resolved=True)
     for csv_filename in input_filenames:
-        ant = Annotator(csv_filename, logger=logger)
+        ant = Annotator(csv_filename, nnsl=nnsl, logger=logger)
         annotated_dwc_fname = ant.append_dwca_records()
         annotated_filenames.append(annotated_dwc_fname)
     return annotated_filenames
@@ -116,11 +119,20 @@ def identify_subset_files(big_csv_filename, logger):
 
     return chunk_filenames
 
+# .............................................................................
 def log_output(logger, msg, outlist=[]):
     msg = f"{msg}\n"
     for elt in outlist:
         msg += f"  {elt}\n"
     logger.info(msg)
+
+
+# .............................................................................
+def test_bad_line(input_filenames, logger):
+    for csvfile in input_filenames:
+        f = open(csvfile, "r", newline="", encoding="utf-8")
+        dreader = csv.DictReader(f, quoting=csv.QUOTE_MINIMAL, delimiter="\t", restkey=EXTRA_CSV_FIELD)
+
 
 # .............................................................................
 # Press the green button in the gutter to run the script.
