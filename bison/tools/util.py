@@ -115,7 +115,7 @@ def get_csv_writer(datafile, delimiter, fmode="w"):
     try:
         f = open(datafile, fmode, newline="", encoding=ENCODING)
         writer = csv.writer(
-            f, escapechar="\\", delimiter=delimiter, quoting=csv.QUOTE_MINIMAL)
+            f, delimiter=delimiter, quoting=csv.QUOTE_MINIMAL)
     except Exception as e:
         raise e
     return writer, f
@@ -196,14 +196,10 @@ def get_csv_dict_reader(
             raise
 
     # QUOTE_NONE or QUOTE_MINIMAL
-    if quote_none:
-        dreader = csv.DictReader(
-            f, fieldnames=fieldnames, quoting=csv.QUOTE_NONE,
-            escapechar='\\', delimiter=delimiter)
+    if quote_none is False:
+        dreader = csv.DictReader(f, fieldnames=fieldnames, delimiter=delimiter)
     else:
-        dreader = csv.DictReader(
-            f, fieldnames=fieldnames,
-            escapechar='\\', delimiter=delimiter)
+        dreader = csv.DictReader(f, fieldnames=fieldnames, quoting=csv.QUOTE_NONE, delimiter=delimiter)
 
     return dreader, f
 
@@ -274,7 +270,7 @@ def get_header(filename):
     """
     header = None
     try:
-        f = open(filename, 'r', encoding='utf-8')
+        f = open(filename, 'r', newline="", encoding='utf-8')
         header = f.readline()
     except Exception as e:
         print('Failed to read first line of {}: {}'.format(filename, e))
@@ -412,7 +408,7 @@ def chunk_files(big_csv_filename):
     boundary_pairs = identify_chunks(big_csv_filename)
 
     try:
-        bigf = open(big_csv_filename, 'r', encoding='utf-8')
+        bigf = open(big_csv_filename, 'r', newline="", encoding='utf-8')
         header = bigf.readline()
         line = bigf.readline()
         big_recno = 1
@@ -422,7 +418,7 @@ def chunk_files(big_csv_filename):
 
             try:
                 # Start writing the smaller file
-                chunkf = open(chunk_fname, 'w', encoding='utf-8')
+                chunkf = open(chunk_fname, 'w', newline="", encoding='utf-8')
                 chunkf.write('{}'.format(header))
 
                 while big_recno <= stop and line:
@@ -477,3 +473,30 @@ if __name__ == "__main__":
         boundary_pairs = identify_chunks(args.big_csv_filename)
         chunk_filenames = chunk_files(args.big_csv_filename)
         print(f"boundary_pairs = {boundary_pairs}")
+
+
+"""
+import csv
+import os
+import sys
+
+from bison.common.constants import DATA_PATH, ENCODING, GBIF, LOG
+
+trouble = "1698055779"
+fname = "gbif_2022-02-15_chunk-1-207706.csv"
+
+encoding = "utf-8"
+delimiter = "\t"
+
+csvfile = os.path.join(DATA_PATH, fname)
+f = open(csvfile, "r", newline="", encoding=encoding)
+header = next(f)
+f.close    
+tmpflds = header.split(delimiter)
+fieldnames = [fld.strip() for fld in tmpflds]
+
+f = open(csvfile, "r", newline="", encoding=encoding)
+
+rdr = csv.DictReader(f, fieldnames=fieldnames, delimiter=delimiter)
+
+"""
