@@ -243,15 +243,16 @@ class NNSL:
             Set of authority identifiers valid for use as foreign keys in related datasets.
         """
         authorities = set()
-        with open(self.auth_fname, "r", newline="") as csvfile:
-            rdr = csv.DictReader(
-                csvfile,
-                fieldnames=RIIS_AUTHORITY.HEADER,
-                delimiter=RIIS.DELIMITER,
-                quotechar=RIIS.QUOTECHAR,
-            )
-            for row in rdr:
-                authorities.add(row[RIIS_AUTHORITY.KEY])
+        rdr, f = get_csv_dict_reader(self.auth_fname, RIIS.DELIMITER)
+        # with open(self.auth_fname, "r", newline="") as csvfile:
+        #     rdr = csv.DictReader(
+        #         csvfile,
+        #         fieldnames=RIIS_AUTHORITY.HEADER,
+        #         delimiter=RIIS.DELIMITER,
+        #         quotechar=RIIS.QUOTECHAR,
+        #     )
+        for row in rdr:
+            authorities.add(row[RIIS_AUTHORITY.KEY])
         return authorities
 
     # ...............................................
@@ -341,7 +342,7 @@ class NNSL:
             infname = self._csvfile
             header = RIIS_SPECIES.HEADER
 
-        rdr, inf = get_csv_dict_reader(infname, RIIS.DELIMITER, fieldnames=header, quote_none=False)
+        rdr, inf = get_csv_dict_reader(infname, RIIS.DELIMITER)
         self._log.debug(f"Reading RIIS from {infname}")
         try:
             for row in rdr:

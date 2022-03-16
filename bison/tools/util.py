@@ -9,7 +9,7 @@ import subprocess
 import sys
 import time
 
-from bison.common.constants import DATA_PATH, ENCODING, GBIF, LOG
+from bison.common.constants import DATA_PATH, ENCODING, EXTRA_CSV_FIELD, GBIF, LOG
 
 
 # ...............................................
@@ -114,15 +114,14 @@ def get_csv_writer(datafile, delimiter, fmode="w"):
     csv.field_size_limit(sys.maxsize)
     try:
         f = open(datafile, fmode, newline="", encoding=ENCODING)
-        writer = csv.writer(
-            f, delimiter=delimiter, quoting=csv.QUOTE_MINIMAL)
+        writer = csv.writer(f, delimiter=delimiter, quoting=csv.QUOTE_MINIMAL)
     except Exception as e:
         raise e
     return writer, f
 
 
 # .............................................................................
-def get_csv_dict_writer(csvfile, header, delimiter, fmode="w", encoding=ENCODING, overwrite=True):
+def get_csv_dict_writer(csvfile, header, delimiter, fmode="w", encoding=ENCODING, extrasaction="ignore", overwrite=True):
     """Create a CSV dictionary writer and write the header.
 
     Args:
@@ -131,6 +130,7 @@ def get_csv_dict_writer(csvfile, header, delimiter, fmode="w", encoding=ENCODING
         delimiter (str): field separator
         fmode (str): Write ('w') or append ('a')
         encoding (str): Encoding for output file
+        extrasaction (str): Action to take if there are fields in a record dictionary not present in fieldnames
         overwrite (bool): True to delete an existing file before write
 
     Returns:
@@ -148,7 +148,7 @@ def get_csv_dict_writer(csvfile, header, delimiter, fmode="w", encoding=ENCODING
         csv.field_size_limit(sys.maxsize)
         try:
             f = open(csvfile, fmode, newline="", encoding=encoding)
-            writer = csv.DictWriter(f, fieldnames=header, delimiter=delimiter)
+            writer = csv.DictWriter(f, fieldnames=header, delimiter=delimiter, extrasaction=extrasaction)
         except Exception as e:
             raise e
         else:
@@ -159,16 +159,14 @@ def get_csv_dict_writer(csvfile, header, delimiter, fmode="w", encoding=ENCODING
 
 
 # .............................................................................
-def get_csv_dict_reader(
-        csvfile, delimiter, fieldnames=None, encoding=ENCODING, quote_none=False):
-    """Create a CSV dictionary writer and write the header.
+def get_csv_dict_reader(csvfile, delimiter, encoding=ENCODING, restkey=EXTRA_CSV_FIELD):
+    """Create a CSV dictionary reader from a file with the first line containing fieldnames.
 
     Args:
         csvfile: output CSV file for reading
         delimiter: delimiter between fields
-        fieldnames (list): if header is not in the file, use these fieldnames
         encoding (str): type of encoding
-        quote_none (bool): True for csv.QUOTE_NONE or False for csv.QUOTE_MINIMAL
+        restval (str): fieldname for extra fields in a record not present in header
 
     Returns:
         writer (csv.DictReader) ready to read
@@ -187,19 +185,7 @@ def get_csv_dict_reader(
     except PermissionError:
         raise
 
-    if fieldnames is None:
-        try:
-            header = next(f)
-            tmpflds = header.split(delimiter)
-            fieldnames = [fld.strip() for fld in tmpflds]
-        except Exception:
-            raise
-
-    # QUOTE_NONE or QUOTE_MINIMAL
-    if quote_none is False:
-        dreader = csv.DictReader(f, fieldnames=fieldnames, delimiter=delimiter)
-    else:
-        dreader = csv.DictReader(f, fieldnames=fieldnames, quoting=csv.QUOTE_NONE, delimiter=delimiter)
+    dreader = csv.DictReader(f, quoting=csv.QUOTE_MINIMAL, delimiter=delimiter, restkey=restkey)
 
     return dreader, f
 
@@ -259,7 +245,7 @@ def logit(logger, msg):
 
 
 # .............................................................................
-def get_header(filename):
+def get_fieldnames(filename, delimiter):
     """Find fieldnames from the first line of a CSV file.
 
     Args:
@@ -272,11 +258,13 @@ def get_header(filename):
     try:
         f = open(filename, 'r', newline="", encoding='utf-8')
         header = f.readline()
+        tmpflds = header.split(delimiter)
+        fieldnames = [fld.strip() for fld in tmpflds]
     except Exception as e:
         print('Failed to read first line of {}: {}'.format(filename, e))
     finally:
         f.close()
-    return header
+    return fieldnames
 
 
 # .............................................................................
@@ -483,6 +471,7 @@ import sys
 from bison.common.constants import DATA_PATH, ENCODING, GBIF, LOG
 
 trouble = "1698055779"
+
 fname = "gbif_2022-02-15_chunk-1-207706.csv"
 
 encoding = "utf-8"

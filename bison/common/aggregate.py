@@ -128,8 +128,7 @@ class Aggregator():
     def _summarize_annotations_by_location(self):
         # Reset summary
         self.locations = {}
-        csv_rdr, inf = get_csv_dict_reader(
-            self._csvfile, GBIF.DWCA_DELIMITER, encoding=ENCODING, quote_none=False)
+        csv_rdr, inf = get_csv_dict_reader(self._csvfile, GBIF.DWCA_DELIMITER, encoding=ENCODING)
         try:
             for rec in csv_rdr:
                 species_key = self._get_compound_key(rec[GBIF.ACC_TAXON_FLD], rec[GBIF.ACC_NAME_FLD])
@@ -172,7 +171,7 @@ class Aggregator():
     def read_location_aggregates(self, summary_filename_list):
         for sum_fname in summary_filename_list:
             try:
-                csv_rdr, inf = get_csv_dict_reader(sum_fname, GBIF.DWCA_DELIMITER, fieldnames=SUMMARY_HEADER)
+                csv_rdr, inf = get_csv_dict_reader(sum_fname, GBIF.DWCA_DELIMITER)
                 for rec in csv_rdr:
                     self._add_record_to_location_summaries(rec[LOCATION_KEY], rec[SPECIES_KEY], count=rec[COUNT_KEY])
             except Exception as e:
@@ -211,9 +210,7 @@ class Aggregator():
         # Read summaries of occurrences and aggregate
         for summary_filename in summary_filename_list:
             try:
-                csv_rdr, inf = get_csv_dict_reader(
-                    summary_filename, GBIF.DWCA_DELIMITER, fieldnames=SUMMARY_HEADER, encoding=ENCODING,
-                    quote_none=False)
+                csv_rdr, inf = get_csv_dict_reader(summary_filename, GBIF.DWCA_DELIMITER, encoding=ENCODING)
                 for rec in csv_rdr:
                     self._add_record_to_location_summaries(rec[LOCATION_KEY], rec[SPECIES_KEY], count=rec[COUNT_KEY])
             except Exception as e:

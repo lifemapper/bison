@@ -29,12 +29,7 @@ class TestRIISInput(NNSL):
         missing_authorities = {}
         authorities = self._read_authorities()
         with open(self.riis_fname, "r", newline="") as csvfile:
-            rdr = csv.DictReader(
-                csvfile,
-                fieldnames=self.riis_header,
-                delimiter=RIIS.DELIMITER,
-                quotechar=RIIS.QUOTECHAR,
-            )
+            rdr = csv.DictReader(csvfile, delimiter=RIIS.DELIMITER)
             for row in rdr:
                 # Skip header
                 if not rdr.line_num == 1:
@@ -69,13 +64,9 @@ class TestRIISInput(NNSL):
         long_lines = []
         row_count = 0
 
+
         with open(fname, "r", newline="") as csvfile:
-            rdr = csv.DictReader(
-                csvfile,
-                fieldnames=header,
-                delimiter=RIIS.DELIMITER,
-                quotechar=RIIS.QUOTECHAR,
-            )
+            rdr = csv.DictReader(csvfile, delimiter=RIIS.DELIMITER)
             for row in rdr:
                 # skip header
                 if not rdr.line_num == 1:
