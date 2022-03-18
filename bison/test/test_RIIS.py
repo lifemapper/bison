@@ -64,7 +64,6 @@ class TestRIISInput(NNSL):
         long_lines = []
         row_count = 0
 
-
         with open(fname, "r", newline="") as csvfile:
             rdr = csv.DictReader(csvfile, delimiter=RIIS.DELIMITER)
             for row in rdr:

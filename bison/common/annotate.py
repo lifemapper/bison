@@ -3,7 +3,7 @@ import os
 
 from bison.common.constants import (
     ENCODING, EXTRA_CSV_FIELD, GBIF, LOG, NEW_RESOLVED_COUNTY, NEW_RESOLVED_STATE, NEW_RIIS_ASSESSMENT_FLD,
-    NEW_RIIS_KEY_FLD, RIIS_SPECIES, US_CENSUS_COUNTY, US_CENSUS_STATE, US_STATES)
+    NEW_RIIS_KEY_FLD, POINT_BUFFER_RANGE, RIIS_SPECIES, US_CENSUS_COUNTY, US_STATES)
 from bison.common.gbif import DwcData
 from bison.common.geoindex import GeoResolver, GeoException
 from bison.common.riis import NNSL
@@ -19,6 +19,7 @@ class Annotator():
 
         Args:
             gbif_occ_filename (str): full path of CSV occurrence file to annotate
+            nnsl (bison.common.riis.NNSL): object containing USGS RIIS data for annotating records
             logger (object): logger for saving relevant processing messages
         """
         datapath, _ = os.path.split(gbif_occ_filename)
@@ -74,18 +75,6 @@ class Annotator():
         return outfname
 
     # ...............................................
-    @property
-    def annotated_dwc_fname(self):
-        """Construct a filename for the annotated GBIF DWC file from the original.
-
-        Returns:
-            outfname: output filename derived from the input GBIF DWC filename
-        """
-        basename, ext = os.path.splitext(self._csvfile)
-        outfname = f"{basename}_annotated{ext}"
-        return outfname
-
-    # ...............................................
     def _open_input_output(self):
         """Open the DwcData for reading and the csv_writer for writing.
 
@@ -95,7 +84,7 @@ class Annotator():
             Exception: on failure to open the DwcData csvreader.
             Exception: on failure to open the csv_writer.
         """
-        outfname = self.annotated_dwc_fname
+        outfname = self.construct_annotated_name(self._csvfile)
         try:
             self._dwcdata.open()
         except Exception:
@@ -188,17 +177,14 @@ class Annotator():
             Exception: on failure to open input or output data.
             Exception: on unexpected failure to read or write data.
         """
+        trouble = "1698055779"
+        trouble_next = "1698058398"
         try:
             # Open the original DwC data file for read, and the annotated file for write.
             _ = self._open_input_output()
         except Exception:
             raise
         else:
-            # Create geospatial index to identify county/state of points
-            self._geo_county.initialize_geospatial_data()
-            buffer_vals = [(i / 10.0) for i in range(1, 11)]
-            fieldnames = self._dwcdata.fieldnames
-
             try:
                 # iterate over DwC records
                 dwcrec = self._dwcdata.get_record()
@@ -208,16 +194,12 @@ class Annotator():
                         self._log.debug(f"*** Record number {self._dwcdata.recno}, gbifID: {gbif_id} ***")
 
                     # Debug: examine data
-                    trouble = "1698055779"
-                    trouble_next = "1698058398"
                     if gbif_id == trouble:
-                        self._log.debug(f"Found gbifID {trouble}")
+                        self._log.debug(f"Found troubled gbifID {trouble}")
                     if gbif_id == trouble_next:
-                        self._log.debug(f"Not so troubling")
-
-                    rec_keys = set(dwcrec.keys())
+                        self._log.debug("Not so troubling")
                     if EXTRA_CSV_FIELD in dwcrec.keys():
-                        self._log.debug(f"Extra fields detected: possible bad read for record {gbif_id}:")
+                        self._log.debug(f"Extra fields detected: possible bad read for record {gbif_id}")
 
                     # Initialize new fields
                     county = state = riis_assessment = riis_key = None
@@ -225,12 +207,11 @@ class Annotator():
                     # Find county and state for these coords
                     try:
                         county, state = self._find_county_state(
-                            dwcrec[GBIF.LON_FLD], dwcrec[GBIF.LAT_FLD], buffer_vals=buffer_vals)
+                            dwcrec[GBIF.LON_FLD], dwcrec[GBIF.LAT_FLD], buffer_vals=POINT_BUFFER_RANGE)
                     except ValueError as e:
                         self._log.error(f"Record gbifID: {gbif_id}: {e}")
                     except GeoException as e:
                         self._log.error(f"Record gbifID: {gbif_id}: {e}")
-
 
                     # Find RIIS records for this acceptedTaxonKey
                     taxkey = dwcrec[GBIF.ACC_TAXON_FLD]

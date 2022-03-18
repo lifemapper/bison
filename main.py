@@ -4,9 +4,12 @@ import os
 
 from bison.common.aggregate import Aggregator
 from bison.common.annotate import Annotator
-from bison.common.constants import GBIF, DATA_PATH, EXTRA_CSV_FIELD, RIIS_SPECIES
+from bison.common.constants import (
+    GBIF, DATA_PATH, EXTRA_CSV_FIELD, LOG, NEW_RESOLVED_COUNTY, NEW_RESOLVED_STATE, POINT_BUFFER_RANGE, RIIS_SPECIES,
+    US_CENSUS_COUNTY)
+from bison.common.geoindex import GeoResolver, GeoException
 from bison.common.riis import NNSL
-from bison.tools.util import chunk_files, delete_file, get_csv_dict_reader, get_logger, identify_chunk_files
+from bison.tools.util import chunk_files, delete_file, get_logger, identify_chunk_files
 
 
 # .............................................................................
@@ -68,6 +71,46 @@ def annotate_occurrence_files(input_filenames, logger):
 
 
 # .............................................................................
+def summarize_annotations(annotated_filenames, logger):
+    """Annotate GBIF records with census state and county, and RIIS key and assessment.
+
+    Args:
+        annotated_filenames (list): list of full filenames containing annotated GBIF data.
+        logger (object): logger for saving relevant processing messages
+
+    Returns:
+        state_aggregation_filenames (list): full filenames of species counts and percentages for each state.
+        cty_aggregation_filename (list): full filenames of species counts and percentages for each county-state.
+    """
+    summary_filenames = []
+    for csv_filename in annotated_filenames:
+        agg = Aggregator(csv_filename, logger=logger)
+        summary_filename = agg.summarize_write_locations()
+        summary_filenames.append(summary_filename)
+    return summary_filenames
+
+
+# .............................................................................
+def summarize_summaries(summary_filenames, logger):
+    """Annotate GBIF records with census state and county, and RIIS key and assessment.
+
+    Args:
+        summary_filenames (list): list of full filenames containing GBIF data summarized by state/county for RIIS
+            assessment of records.
+        logger (object): logger for saving relevant processing messages
+
+    Returns:
+        state_aggregation_filenames (list): full filenames of species counts and percentages for each state.
+        cty_aggregation_filename (list): full filenames of species counts and percentages for each county-state.
+    """
+    # Create a new Aggregator, ignore file used for construction,
+    agg = Aggregator(summary_filenames[0], logger=logger)
+    # read summaries from all files
+    state_aggregation_filenames, cty_aggregation_filenames = agg.aggregate_write_for_locations(summary_filenames)
+    return state_aggregation_filenames, cty_aggregation_filenames
+
+
+# .............................................................................
 def summarize_occurrence_contents(input_filenames, logger):
     """Annotate GBIF records with census state and county, and RIIS key and assessment.
 
@@ -79,16 +122,10 @@ def summarize_occurrence_contents(input_filenames, logger):
         state_aggregation_filenames (list): full filenames of species counts and percentages for each state.
         cty_aggregation_filename (list): full filenames of species counts and percentages for each county-state.
     """
-    summary_filenames = []
-    for csv_filename in input_filenames:
-        agg = Aggregator(csv_filename, logger=logger)
-        summary_filename = agg.summarize_write_locations()
-        summary_filenames.append(summary_filename)
+    summary_filenames = summarize_annotations(input_filenames, logger)
 
-    # Create a new Aggregator, ignore annotated occurrence file used for construction,
-    agg = Aggregator(input_filenames[0], logger=logger)
     # read summaries from all files
-    state_aggregation_filenames, cty_aggregation_filenames = agg.aggregate_write_for_locations(summary_filenames)
+    state_aggregation_filenames, cty_aggregation_filenames = summarize_summaries(summary_filenames, logger)
     return state_aggregation_filenames, cty_aggregation_filenames
 
 
@@ -119,19 +156,93 @@ def identify_subset_files(big_csv_filename, logger):
 
     return chunk_filenames
 
+
 # .............................................................................
-def log_output(logger, msg, outlist=[]):
+def log_output(logger, msg, outlist=None):
+    """Log output.
+
+    Args:
+        logger: logger
+        msg: Message
+        outlist: optional list of strings to be printed on individual lines
+    """
     msg = f"{msg}\n"
-    for elt in outlist:
-        msg += f"  {elt}\n"
+    if outlist is not None:
+        for elt in outlist:
+            msg += f"  {elt}\n"
     logger.info(msg)
+
+
+# ...............................................
+def _find_county_state(geo_county, lon, lat, buffer_vals):
+    county = state = None
+    if None not in (lon, lat):
+        # Intersect coordinates with county boundaries for state and county values
+        try:
+            fldvals, ogr_seconds = geo_county.find_enclosing_polygon(lon, lat, buffer_vals=buffer_vals)
+        except ValueError:
+            raise
+        except GeoException:
+            raise
+        county = fldvals[NEW_RESOLVED_COUNTY]
+        state = fldvals[NEW_RESOLVED_STATE]
+    return county, state, ogr_seconds
 
 
 # .............................................................................
 def test_bad_line(input_filenames, logger):
+    """Test troublesome lines.
+
+    Args:
+        input_filenames: List of files to test, looking for troublesome data.
+        logger: logger for writing messages.
+
+    Raises:
+        Exception: on unexpected read error
+    """
+    trouble = "1698055779"
+    trouble_next = "1698058398"
+    geo_county = GeoResolver(US_CENSUS_COUNTY.FILE, US_CENSUS_COUNTY.CENSUS_BISON_MAP, logger)
     for csvfile in input_filenames:
-        f = open(csvfile, "r", newline="", encoding="utf-8")
-        dreader = csv.DictReader(f, quoting=csv.QUOTE_MINIMAL, delimiter="\t", restkey=EXTRA_CSV_FIELD)
+        try:
+            f = open(csvfile, "r", newline="", encoding="utf-8")
+            rdr = csv.DictReader(f, quoting=csv.QUOTE_NONE, delimiter="\t", restkey=EXTRA_CSV_FIELD)
+        except Exception as e:
+            logger.error(f"Unexpected open error {e} on file {csvfile}")
+        else:
+            logger.info(f"Opened file {csvfile}")
+            try:
+                # iterate over DwC records
+                dwcrec = next(rdr)
+                while dwcrec is not None:
+                    gbif_id = dwcrec[GBIF.ID_FLD]
+                    if (rdr.line_num % LOG.INTERVAL) == 0:
+                        logger.debug(f"*** Record number {rdr.line_num}, gbifID: {gbif_id} ***")
+
+                    # Debug: examine data
+                    if gbif_id == trouble:
+                        logger.debug(f"Found gbifID {trouble} on line {rdr.line_num}")
+                    if gbif_id == trouble_next:
+                        logger.debug(f"Not so troubling on line {rdr.line_num}")
+
+                    if EXTRA_CSV_FIELD in dwcrec.keys():
+                        logger.debug(f"Extra fields detected: possible bad read for record {gbif_id} on line {rdr.line_num}")
+
+                    # Find county and state for these coords
+                    try:
+                        _county, _state, ogr_seconds = _find_county_state(
+                            geo_county, dwcrec[GBIF.LON_FLD], dwcrec[GBIF.LAT_FLD], buffer_vals=POINT_BUFFER_RANGE)
+                    except ValueError as e:
+                        logger.error(f"Record gbifID: {gbif_id}: {e}")
+                    except GeoException as e:
+                        logger.error(f"Record gbifID: {gbif_id}: {e}")
+                    if ogr_seconds > 0.75:
+                        logger.debug(f"Record gbifID: {gbif_id}; OGR time {ogr_seconds}")
+
+                    dwcrec = next(rdr)
+
+            except Exception as e:
+                logger.error(f"Unexpected read error {e} on file {csvfile}")
 
 
 # .............................................................................
@@ -145,7 +256,8 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(
         description="Execute one or more steps of annotating GBIF data with RIIS assessments, and summarizing by species, county, and state")
-    parser.add_argument("cmd", type=str, default="split")
+    parser.add_argument(
+        "cmd", type=str, choices=("resolve", "split", "annotate", "summarize", "aggregate", "full", "test_bad_data"), default="test_bad_data")
     parser.add_argument(
         "big_csv_filename", type=str, default=gbif_infile,
         help="The full path to GBIF input species occurrence data.")
@@ -157,25 +269,24 @@ if __name__ == '__main__':
     cmd = args.cmd
     big_csv_filename = os.path.join(DATA_PATH, args.big_csv_filename)
     do_split = True if args.do_split.lower() in ("yes", "y", "true", "1") else False
-    logger = get_logger(DATA_PATH, logname=f"main_{cmd}")
 
     # # Test data
-    # big_csv_filename = os.path.join(DATA_PATH, "/home/astewart/git/bison/data/gbif_2022-02-15_100k_chunk-27781-33336.csv")
-    # do_split = False
-    # cmd = "annotate"
+    # big_csv_filename = os.path.join(DATA_PATH, "gbif_2022-02-15.csv")
+    # cmd = "test_bad_data"
 
+    logger = get_logger(DATA_PATH, logname=f"main_{cmd}")
     if cmd == "resolve":
         resolved_riis_filename = resolve_riis_taxa(riis_filename, logger)
         print(resolved_riis_filename)
         log_output(logger, f"Resolved RIIS filename: {resolved_riis_filename}")
+    elif cmd == "split":
+        input_filenames = identify_subset_files(big_csv_filename, logger)
+        log_output(logger, "Input filenames:", outlist=input_filenames)
     else:
         if do_split is True:
             input_filenames = identify_subset_files(big_csv_filename, logger)
         else:
             input_filenames = [big_csv_filename]
-
-        log_output(logger, "Input filenames:", outlist=input_filenames)
-
         # Make sure files to be processed exist
         for csv_fname in input_filenames:
             if not os.path.exists(csv_fname):
@@ -187,8 +298,17 @@ if __name__ == '__main__':
 
         elif cmd == "summarize":
             annotated_filenames = [Annotator.construct_annotated_name(csvfile) for csvfile in input_filenames]
-            state_aggregation_filenames, cty_aggregation_filenames = summarize_occurrence_contents(
-                annotated_filenames, logger)
+            # Summarize each annotated file by state and county, write summary to a file
+            summary_filenames = summarize_annotations(annotated_filenames, logger)
+            log_output(
+                logger, "Aggregated county/state filenames:", outlist=summary_filenames)
+
+        elif cmd == "aggregate":
+            annotated_filenames = [Annotator.construct_annotated_name(csvfile) for csvfile in input_filenames]
+            summary_filenames = [Aggregator.construct_summary_name(annfile) for annfile in annotated_filenames]
+            # Aggregate all summary files then write summaries for each state and county to a file for that region
+            state_aggregation_filenames, cty_aggregation_filenames = summarize_summaries(
+                summary_filenames, logger)
             state_aggregation_filenames.extend(cty_aggregation_filenames)
             log_output(
                 logger, "Aggregated county/state filenames:", outlist=state_aggregation_filenames)
@@ -200,6 +320,9 @@ if __name__ == '__main__':
             log_output(
                 logger, "Aggregated county/state filenames:",
                 outlist=state_aggregation_filenames.extend(cty_aggregation_filenames))
+
+        elif cmd == "test_bad_data":
+            test_bad_line(input_filenames, logger)
 
         else:
             logger.error(f"Unsupported command '{cmd}'")
