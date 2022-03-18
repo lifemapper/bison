@@ -159,24 +159,29 @@ def get_csv_dict_writer(csvfile, header, delimiter, fmode="w", encoding=ENCODING
 
 
 # .............................................................................
-def get_csv_dict_reader(csvfile, delimiter, encoding=ENCODING, restkey=EXTRA_CSV_FIELD):
+def get_csv_dict_reader(csvfile, delimiter, encoding=ENCODING, quote_none=False, restkey=EXTRA_CSV_FIELD):
     """Create a CSV dictionary reader from a file with the first line containing fieldnames.
 
     Args:
         csvfile: output CSV file for reading
         delimiter: delimiter between fields
         encoding (str): type of encoding
-        restval (str): fieldname for extra fields in a record not present in header
+        quote_none (bool): True opens csvfile with QUOTE_NONE, False opens with QUOTE_MINIMAL
+        restkey (str): fieldname for extra fields in a record not present in header
 
     Returns:
-        writer (csv.DictReader) ready to read
-        f (file handle)
+        rdr (csv.DictReader): DictReader ready to read
+        f (object): open file handle
 
     Raises:
         FileNotFoundError: on missing csvfile
         PermissionError: on improper permissions on csvfile
-        Exception: on failure to parse first line into fieldnames
     """
+    if quote_none is True:
+        quoting = csv.QUOTE_NONE
+    else:
+        quoting = csv.QUOTE_MINIMAL
+
     try:
         #  If csvfile is a file object, it should be opened with newline=""
         f = open(csvfile, "r", newline="", encoding=encoding)
@@ -185,9 +190,9 @@ def get_csv_dict_reader(csvfile, delimiter, encoding=ENCODING, restkey=EXTRA_CSV
     except PermissionError:
         raise
 
-    dreader = csv.DictReader(f, quoting=csv.QUOTE_MINIMAL, delimiter=delimiter, restkey=restkey)
+    rdr = csv.DictReader(f, quoting=quoting, delimiter=delimiter, restkey=restkey)
 
-    return dreader, f
+    return rdr, f
 
 
 # .............................................................................
@@ -250,6 +255,7 @@ def get_fieldnames(filename, delimiter):
 
     Args:
          filename (str): Full filename for a CSV file with a header.
+         delimiter (str): Delimiter between fields in file records.
 
     Returns:
          header (list): list of fieldnames in the first line of the file
@@ -390,6 +396,9 @@ def chunk_files(big_csv_filename):
     Raises:
         Exception: on failure to open or write to a chunk file
         Exception: on failure to open or read the big_csv_filename
+
+    Note:
+        Write chunk file records exactly as read, no corrections applied.
     """
     in_base_filename, ext = os.path.splitext(big_csv_filename)
     chunk_filenames = []
@@ -480,7 +489,7 @@ delimiter = "\t"
 csvfile = os.path.join(DATA_PATH, fname)
 f = open(csvfile, "r", newline="", encoding=encoding)
 header = next(f)
-f.close    
+f.close
 tmpflds = header.split(delimiter)
 fieldnames = [fld.strip() for fld in tmpflds]
 

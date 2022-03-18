@@ -1,8 +1,7 @@
 """Common classes for Specimen Occurrence record processing."""
-
 import os
 
-from bison.common.constants import (DATA_PATH, ENCODING, GBIF, LOG)
+from bison.common.constants import (DATA_PATH, ENCODING, EXTRA_CSV_FIELD, GBIF, LOG)
 from bison.tools.util import get_csv_dict_reader, get_logger, logit
 
 
@@ -53,12 +52,24 @@ class DwcData(object):
         """Open a GBIF datafile with a csv.DictReader.
 
         Raises:
-            Exception: on failure to open csvfile and get a csv.DictReader
+            FileNotFoundError: on missing csvfile
+            PermissionError: on improper permissions on csvfile
+            Exception: on failure to open csvfile and/or get a csv.DictReader
+
+        Note:
+            Must open GBIF data with quoting=QUOTE_NONE
         """
         try:
-            self._csv_reader, self._inf = get_csv_dict_reader(self._csvfile, GBIF.DWCA_DELIMITER, encoding=ENCODING)
-        except Exception:
+            self._csv_reader, self._inf = get_csv_dict_reader(
+                self._csvfile, GBIF.DWCA_DELIMITER, encoding=ENCODING, quote_none=True, restkey=EXTRA_CSV_FIELD)
+        except FileNotFoundError:
             raise
+        except PermissionError:
+            raise
+        except Exception as e:
+            raise Exception(f"Unexpected open error {e} on file {self._csvfile}")
+        else:
+            self._log.info(f"Opened GBIF data file {self._csvfile}")
 
     # ...............................................
     def close(self):

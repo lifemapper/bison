@@ -32,9 +32,10 @@ class GeoResolver(object):
         self.spatial_index = None
         self.spatial_feats = None
         self.bison_spatial_fields = None
+        self._initialize_geospatial_data()
 
     # ...............................................
-    def initialize_geospatial_data(self):
+    def _initialize_geospatial_data(self):
         """Create a spatial index for the features in self._spatial_filename."""
         driver = ogr.GetDriverByName("ESRI Shapefile")
 
@@ -92,12 +93,13 @@ class GeoResolver(object):
                 self._log.info(
                     f"Nearest polygon to point returned {len(intersect_fids)} counties")
             else:
-                for buffer in buffer_vals:
-                    geom = geom.Buffer(buffer)
-                    # Intersect with spatial index to get ID (fid) of intersecting features
-                    intersect_fids = list(self.spatial_index.intersection(geom.GetEnvelope()))
-                    if intersect_fids:
-                        break
+                if buffer_vals is not None:
+                    for buffer in buffer_vals:
+                        geom = geom.Buffer(buffer)
+                        # Intersect with spatial index to get ID (fid) of intersecting features
+                        intersect_fids = list(self.spatial_index.intersection(geom.GetEnvelope()))
+                        if intersect_fids:
+                            break
                 if not intersect_fids:
                     self._log.error(f"Failed to intersect point buffered to {buffer} dd with spatial index")
                 else:
@@ -111,13 +113,13 @@ class GeoResolver(object):
         # Get feature ID from intersecting feature
         fid = self._get_first_best_feature(geom, intersect_fids)
         if fid is None:
-            # Try increasingly large buffer, (0.1 dd ~= 11.1 km, 1 dd ~= 111 km)
-            for buffer in buffer_vals:
-                geom = geom.Buffer(buffer)
-                fid = self._get_first_best_feature(geom, intersect_fids)
-                if fid is not None:
-                    break
-
+            if buffer_vals is not None:
+                # Try increasingly large buffer, (0.1 dd ~= 11.1 km, 1 dd ~= 111 km)
+                for buffer in buffer_vals:
+                    geom = geom.Buffer(buffer)
+                    fid = self._get_first_best_feature(geom, intersect_fids)
+                    if fid is not None:
+                        break
         if fid is None:
             raise GeoException(
                 f"Failed to intersect point buffered {buffer} dd with any of {len(intersect_fids)} features")
@@ -132,7 +134,7 @@ class GeoResolver(object):
         # Intersect with spatial index to get ID (fid) of intersecting features
         geom, intersect_fids = self._intersect_with_spatial_index(pt, buffer_vals)
         if not intersect_fids:
-            raise GeoException(f"Failed to intersect or find nearest polygon with spatial index")
+            raise GeoException("Failed to intersect or find nearest polygon with spatial index")
 
         # Pull attributes of interest from intersecting feature
         try:
@@ -143,7 +145,7 @@ class GeoResolver(object):
         return fldvals
 
     # ...............................................
-    def find_enclosing_polygon(self, lon, lat, buffer_vals=[]):
+    def find_enclosing_polygon(self, lon, lat, buffer_vals=None):
         """Return attributes of polygon enclosing these coordinates.
 
         Args:
@@ -190,9 +192,10 @@ class GeoException(Exception):
         """Constructor.
 
         Args:
-            message: optional message to be displayed when raised.
+            message: optional message attached to Exception.
         """
         Exception(message)
+
 
 """
 import os

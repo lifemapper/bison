@@ -96,8 +96,27 @@ class Aggregator():
         return part1, part2
 
     # ...............................................
+    @classmethod
+    def construct_summary_name(cls, csvfile):
+        """Construct a filename for the summarized version of csvfile.
+
+        Args:
+            csvfile (str): full filename used to construct an annotated filename for this data.
+
+        Returns:
+            outfname: output filename derived from the annotated GBIF DWC filename
+        """
+        basename, ext = os.path.splitext(csvfile)
+        outfname = f"{basename}_summary{ext}"
+        return outfname
+
+    # ...............................................
     def _add_record_to_location_summaries(self, location, species_key, count=1):
         # locations = {county_or_state: {species: count,  ... } ... }
+        try:
+            count = int(count)
+        except ValueError:
+            raise ValueError(f"Species count {count} must be an integer")
         # Add to summary of unique locations
         try:
             # Is location present?
@@ -116,7 +135,8 @@ class Aggregator():
         # Add to summary of counties by state
         try:
             county, state = self._parse_compound_key(location)
-        except:
+        except ValueError as e:
+            self._log.error(f"{e}")
             pass
         else:
             if state and county:
@@ -166,9 +186,13 @@ class Aggregator():
         finally:
             outf.close()
 
-
     # ...............................................
     def read_location_aggregates(self, summary_filename_list):
+        """Read summary files and combine summaries in self.locations.
+
+        Args:
+            summary_filename_list: list of full filenames of summary files.
+        """
         for sum_fname in summary_filename_list:
             try:
                 csv_rdr, inf = get_csv_dict_reader(sum_fname, GBIF.DWCA_DELIMITER)
@@ -187,36 +211,35 @@ class Aggregator():
             summary_filename: full output filename for CSV summary of annotated occurrence file. CSV fields are
                  [SPECIES_KEY, GBIF_TAXON_KEY, ASSESS_KEY, STATE_KEY, COUNTY_KEY, COUNT_KEY].
         """
-        basename, ext = os.path.splitext(self._csvfile)
-        summary_filename = f"{basename}_summary{ext}"
+        summary_filename = self.construct_summary_name(self._csvfile)
         # Summarize and write
         self._summarize_annotations_by_location()
         self._write_summary(summary_filename)
         return summary_filename
 
-    # ...............................................
-    def _summarize_summaries(self, summary_filename_list):
-        """Read annotated data from summary files and populate the self.locations dictionary.
-
-        Args:
-            summary_filename_list (list): list of full summary input filenames to be read.
-
-        Raises:
-            Exception: on unexpected read error
-
-        Note: [LOCATION_KEY, SPECIES_KEY, COUNT_KEY]
-        """
-        self.locations = {}
-        # Read summaries of occurrences and aggregate
-        for summary_filename in summary_filename_list:
-            try:
-                csv_rdr, inf = get_csv_dict_reader(summary_filename, GBIF.DWCA_DELIMITER, encoding=ENCODING)
-                for rec in csv_rdr:
-                    self._add_record_to_location_summaries(rec[LOCATION_KEY], rec[SPECIES_KEY], count=rec[COUNT_KEY])
-            except Exception as e:
-                raise Exception(f"Failed to read summary file {summary_filename}: {e}")
-            finally:
-                inf.close()
+    # # ...............................................
+    # def _summarize_summaries(self, summary_filename_list):
+    #     """Read annotated data from summary files and populate the self.locations dictionary.
+    #
+    #     Args:
+    #         summary_filename_list (list): list of full summary input filenames to be read.
+    #
+    #     Raises:
+    #         Exception: on unexpected read error
+    #
+    #     Note: [LOCATION_KEY, SPECIES_KEY, COUNT_KEY]
+    #     """
+    #     self.locations = {}
+    #     # Read summaries of occurrences and aggregate
+    #     for summary_filename in summary_filename_list:
+    #         try:
+    #             csv_rdr, inf = get_csv_dict_reader(summary_filename, GBIF.DWCA_DELIMITER, encoding=ENCODING)
+    #             for rec in csv_rdr:
+    #                 self._add_record_to_location_summaries(rec[LOCATION_KEY], rec[SPECIES_KEY], count=rec[COUNT_KEY])
+    #         except Exception as e:
+    #             raise Exception(f"Failed to read summary file {summary_filename}: {e}")
+    #         finally:
+    #             inf.close()
 
     # ...............................................
     def _get_riis_species(self):
@@ -242,14 +265,15 @@ class Aggregator():
                 except KeyError:
                     assess = "presumed_native"
 
-            recs.append([species, count, assess])
+                recs.append([species, count, assess])
         return recs
 
     # ...............................................
-    def _write_statecounty_aggregate(self, nnsl, state, county=None):
+    def _write_statecounty_aggregate(self, datapath, nnsl, state, county=None):
         """Summarize aggregated data for a location by species.
 
         Args:
+            datapath (str): output path for aggregate file
             nnsl (bison.common.riis.NNSL): Non-native species list object
             state (str): 2-character state code
             county (str): County name from census data.
@@ -264,10 +288,10 @@ class Aggregator():
         """
         if county is None:
             location = state
-            summary_filename = f"state_{state}.csv"
+            summary_filename = os.path.join(datapath, "out", f"state_{state}.csv")
         else:
             location = self._get_compound_key(county, state)
-            summary_filename = f"county_{county}_{state}.csv"
+            summary_filename = os.path.join(datapath, "out", f"county_{county}_{state}.csv")
 
         if state in ("AK", "HI"):
             region = state
@@ -275,19 +299,22 @@ class Aggregator():
             region = "L48"
 
         try:
-            csv_wtr, outf = get_csv_writer(summary_filename, GBIF.DWCA_DELIMITER, fmode="w")
-            csv_wtr.writerow(STATE_COUNTY_HEADER)
-
-            for loc_key, species_counts in self.locations.items():
-                # Only examine this state or this county's records
-                if location == loc_key:
-                    records = self._examine_species_for_location(region, species_counts, nnsl)
-                    for rec in records:
-                        csv_wtr.writerow(rec)
-        except Exception as e:
-            raise Exception(f"Unknown write error on {summary_filename}: {e}")
-        finally:
-            outf.close()
+            species_counts = self.locations[location]
+        except KeyError:
+            self._log.warn(f"No species occurrences found for state {state}, county {county}")
+            summary_filename = None
+        else:
+            try:
+                csv_wtr, outf = get_csv_writer(summary_filename, GBIF.DWCA_DELIMITER, fmode="w")
+                csv_wtr.writerow(STATE_COUNTY_HEADER)
+                # Write all records found
+                records = self._examine_species_for_location(region, species_counts, nnsl)
+                for rec in records:
+                    csv_wtr.writerow(rec)
+            except Exception as e:
+                raise Exception(f"Unknown write error on {summary_filename}: {e}")
+            finally:
+                outf.close()
 
         return summary_filename
 
@@ -305,19 +332,19 @@ class Aggregator():
         Raises:
             Exception: on unexpected write error
         """
-        if not self.locations:
-            self.read_location_aggregates(summary_filename_list)
+        self.locations = {}
+        datapath, _ = os.path.split(summary_filename_list[0])
+        self.read_location_aggregates(summary_filename_list)
 
-        state_aggregation_filenames = []
-        cty_aggregation_filenames = []
+        state_aggregation_filenames = set()
+        cty_aggregation_filenames = set()
         nnsl = self._get_riis_species()
-        self._summarize_summaries(summary_filename_list)
 
         for state, counties in self.states.items():
-            state_agg_fname = self._write_statecounty_aggregate(nnsl, state)
-            state_aggregation_filenames.append(state_agg_fname)
+            state_agg_fname = self._write_statecounty_aggregate(datapath, nnsl, state)
+            state_aggregation_filenames.add(state_agg_fname)
             for county in counties:
-                cty_agg_fname = self._write_statecounty_aggregate(nnsl, state, county=county)
-                cty_aggregation_filenames.append(cty_agg_fname)
+                cty_agg_fname = self._write_statecounty_aggregate(datapath, nnsl, state, county=county)
+                cty_aggregation_filenames.add(cty_agg_fname)
 
         return state_aggregation_filenames, cty_aggregation_filenames

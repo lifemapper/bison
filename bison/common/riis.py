@@ -337,10 +337,8 @@ class NNSL:
                 raise FileNotFoundError(f"File {self.gbif_resolved_riis_fname} does not exist")
             else:
                 infname = self.gbif_resolved_riis_fname
-                header = self.gbif_resolved_riis_header
         else:
             infname = self._csvfile
-            header = RIIS_SPECIES.HEADER
 
         rdr, inf = get_csv_dict_reader(infname, RIIS.DELIMITER)
         self._log.debug(f"Reading RIIS from {infname}")

@@ -8,6 +8,7 @@ ERR_SEPARATOR = "------------"
 NEW_RIIS_KEY_FLD = "riis_occurrence_id"
 NEW_RIIS_ASSESSMENT_FLD = "riis_assessment"
 # Geospatial data for intersecting with points to identify state and county for points
+POINT_BUFFER_RANGE = [(i / 10.0) for i in range(1, 11)]
 NEW_RESOLVED_COUNTY = "georef_cty"
 NEW_RESOLVED_STATE = "georef_st"
 AGGREGATOR_DELIMITER = "__"
