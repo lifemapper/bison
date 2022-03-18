@@ -80,6 +80,9 @@ class Annotator():
 
         Also reads the first record and writes the header.
 
+        Returns:
+            outfname: full filename of the output file
+
         Raises:
             Exception: on failure to open the DwcData csvreader.
             Exception: on failure to open the csv_writer.
@@ -101,7 +104,7 @@ class Annotator():
         except Exception:
             raise Exception(f"Failed to open file or csv_writer for {outfname}")
 
-        return header
+        return outfname
 
     # ...............................................
     def close(self):
@@ -181,7 +184,7 @@ class Annotator():
         trouble_next = "1698058398"
         try:
             # Open the original DwC data file for read, and the annotated file for write.
-            _ = self._open_input_output()
+            annotated_dwc_fname = self._open_input_output()
         except Exception:
             raise
         else:
@@ -239,9 +242,9 @@ class Annotator():
 
                     dwcrec = self._dwcdata.get_record()
             except Exception as e:
-                raise Exception(f"Unexpected error {e} reading {self._dwcdata.input_file} or writing {self.annotated_dwc_fname}")
+                raise Exception(f"Unexpected error {e} reading {self._dwcdata.input_file} or writing {annotated_dwc_fname}")
 
-        return self.annotated_dwc_fname
+        return annotated_dwc_fname
 
     # ...............................................
     def _find_county_state(self, lon, lat, buffer_vals):

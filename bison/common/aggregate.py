@@ -192,6 +192,9 @@ class Aggregator():
 
         Args:
             summary_filename_list: list of full filenames of summary files.
+
+        Raises:
+            Exception: on failure to open or read a file.
         """
         for sum_fname in summary_filename_list:
             try:
@@ -328,9 +331,6 @@ class Aggregator():
         Returns:
             state_aggregation_filenames (list): full filenames of species counts and percentages for each state.
             cty_aggregation_filename (list): full filenames of species counts and percentages for each county-state.
-
-        Raises:
-            Exception: on unexpected write error
         """
         self.locations = {}
         datapath, _ = os.path.split(summary_filename_list[0])

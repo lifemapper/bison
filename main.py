@@ -196,9 +196,6 @@ def test_bad_line(input_filenames, logger):
     Args:
         input_filenames: List of files to test, looking for troublesome data.
         logger: logger for writing messages.
-
-    Raises:
-        Exception: on unexpected read error
     """
     trouble = "1698055779"
     trouble_next = "1698058398"
@@ -252,7 +249,7 @@ if __name__ == '__main__':
 
     riis_filename = os.path.join(DATA_PATH, RIIS_SPECIES.FNAME)
     gbif_infile = os.path.join(DATA_PATH, GBIF.INPUT_DATA)
-    gbif_infile = os.path.join(DATA_PATH, "gbif_2022-02-15_100k.csv")
+    gbif_infile = os.path.join(DATA_PATH, "gbif_2022-02-15.csv")
 
     parser = argparse.ArgumentParser(
         description="Execute one or more steps of annotating GBIF data with RIIS assessments, and summarizing by species, county, and state")
