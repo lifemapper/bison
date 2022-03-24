@@ -2,8 +2,8 @@
 import os
 
 from bison.common.constants import (
-    ENCODING, EXTRA_CSV_FIELD, GBIF, LOG, NEW_RESOLVED_COUNTY, NEW_RESOLVED_STATE, NEW_RIIS_ASSESSMENT_FLD,
-    NEW_RIIS_KEY_FLD, POINT_BUFFER_RANGE, RIIS_SPECIES, US_CENSUS_COUNTY, US_STATES)
+    ENCODING, EXTRA_CSV_FIELD, GBIF, LOG, NEW_RESOLVED_COUNTY, NEW_RESOLVED_STATE,
+    NEW_RIIS_ASSESSMENT_FLD, NEW_RIIS_KEY_FLD, POINT_BUFFER_RANGE, RIIS_SPECIES, US_CENSUS_COUNTY, US_STATES)
 from bison.common.gbif import DwcData
 from bison.common.geoindex import GeoResolver, GeoException
 from bison.common.riis import NNSL
@@ -150,27 +150,24 @@ class Annotator():
         riis_key = None
         for iisrec in iis_reclist:
             # Double check NNSL dict key == RIIS resolved key == occurrence accepted key
-            if dwcrec[GBIF.ACC_TAXON_FLD] != iisrec[RIIS_SPECIES.NEW_GBIF_KEY]:
+            if dwcrec[GBIF.ACC_TAXON_FLD] != iisrec.gbif_taxon_key:
                 self._log.debug("WTF is happening?!?")
 
             # Look for AK or HI
-            if ((state == "AK" and iisrec[RIIS_SPECIES.LOCALITY_FLD] == "AK")
-                    or (state == "HI" and iisrec[RIIS_SPECIES.LOCALITY_FLD] == "HI")):
-                riis_assessment = iisrec[RIIS_SPECIES.ASSESSMENT_FLD]
-                riis_key = iisrec[RIIS_SPECIES.KEY]
+            if ((state == "AK" and iisrec.locality == "AK")
+                    or (state == "HI" and iisrec.locality == "HI")):
+                riis_assessment = iisrec.assessment.lower()
+                riis_key = iisrec.occurrence_id
 
             # Not AK or HI, is it L48?
-            elif state in self._conus_states and iisrec[RIIS_SPECIES.LOCALITY_FLD] == "L48":
-                riis_assessment = iisrec[RIIS_SPECIES.ASSESSMENT_FLD]
-                riis_key = iisrec[RIIS_SPECIES.KEY]
-
-        if riis_assessment and riis_key:
-            self._log.info(f"Adding assessment {riis_assessment} to record {dwcrec[GBIF.ID_FLD]}")
+            elif state in self._conus_states and iisrec.locality == "L48":
+                riis_assessment = iisrec.assessment.lower()
+                riis_key = iisrec.occurrence_id
 
         return riis_assessment, riis_key
 
     # ...............................................
-    def append_dwca_records(self):
+    def annotate_dwca_records(self):
         """Resolve and append state, county, RIIS assessment, and RIIS key to GBIF DWC occurrence records.
 
         Returns:
@@ -219,7 +216,7 @@ class Annotator():
                     # Find RIIS records for this acceptedTaxonKey
                     taxkey = dwcrec[GBIF.ACC_TAXON_FLD]
                     try:
-                        iis_reclist = self.nnsl.data[taxkey]
+                        iis_reclist = self.nnsl.by_gbif_taxkey[taxkey]
                     except Exception:
                         iis_reclist = []
 

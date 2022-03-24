@@ -65,7 +65,7 @@ def annotate_occurrence_files(input_filenames, logger):
     nnsl.read_riis(read_resolved=True)
     for csv_filename in input_filenames:
         ant = Annotator(csv_filename, nnsl=nnsl, logger=logger)
-        annotated_dwc_fname = ant.append_dwca_records()
+        annotated_dwc_fname = ant.annotate_dwca_records()
         annotated_filenames.append(annotated_dwc_fname)
     return annotated_filenames
 
@@ -79,13 +79,13 @@ def summarize_annotations(annotated_filenames, logger):
         logger (object): logger for saving relevant processing messages
 
     Returns:
-        state_aggregation_filenames (list): full filenames of species counts and percentages for each state.
-        cty_aggregation_filename (list): full filenames of species counts and percentages for each county-state.
+        summary_filenames (list): full filenames of summaries of location, species, occurrence counts, one file
+            per each file in annotated_filenames.
     """
     summary_filenames = []
     for csv_filename in annotated_filenames:
         agg = Aggregator(csv_filename, logger=logger)
-        summary_filename = agg.summarize_write_locations()
+        summary_filename = agg.summarize_by_file()
         summary_filenames.append(summary_filename)
     return summary_filenames
 
@@ -106,27 +106,9 @@ def summarize_summaries(summary_filenames, logger):
     # Create a new Aggregator, ignore file used for construction,
     agg = Aggregator(summary_filenames[0], logger=logger)
     # read summaries from all files
-    state_aggregation_filenames, cty_aggregation_filenames = agg.aggregate_write_for_locations(summary_filenames)
-    return state_aggregation_filenames, cty_aggregation_filenames
-
-
-# .............................................................................
-def summarize_occurrence_contents(input_filenames, logger):
-    """Annotate GBIF records with census state and county, and RIIS key and assessment.
-
-    Args:
-        input_filenames (list): list of full filenames containing GBIF data for annotation.
-        logger (object): logger for saving relevant processing messages
-
-    Returns:
-        state_aggregation_filenames (list): full filenames of species counts and percentages for each state.
-        cty_aggregation_filename (list): full filenames of species counts and percentages for each county-state.
-    """
-    summary_filenames = summarize_annotations(input_filenames, logger)
-
-    # read summaries from all files
-    state_aggregation_filenames, cty_aggregation_filenames = summarize_summaries(summary_filenames, logger)
-    return state_aggregation_filenames, cty_aggregation_filenames
+    location_aggregation_filenames = agg.summarize_by_location(summary_filenames)
+    agg.summarize_by_assessment(location_aggregation_filenames)
+    return location_aggregation_filenames
 
 
 # .............................................................................
@@ -267,9 +249,9 @@ if __name__ == '__main__':
     big_csv_filename = os.path.join(DATA_PATH, args.big_csv_filename)
     do_split = True if args.do_split.lower() in ("yes", "y", "true", "1") else False
 
-    # # Test data
+    # Test data
     # big_csv_filename = os.path.join(DATA_PATH, "gbif_2022-02-15.csv")
-    # cmd = "test_bad_data"
+    cmd = "annotate"
 
     logger = get_logger(DATA_PATH, logname=f"main_{cmd}")
     if cmd == "resolve":
@@ -304,19 +286,21 @@ if __name__ == '__main__':
             annotated_filenames = [Annotator.construct_annotated_name(csvfile) for csvfile in input_filenames]
             summary_filenames = [Aggregator.construct_summary_name(annfile) for annfile in annotated_filenames]
             # Aggregate all summary files then write summaries for each state and county to a file for that region
-            state_aggregation_filenames, cty_aggregation_filenames = summarize_summaries(
-                summary_filenames, logger)
-            state_aggregation_filenames.extend(cty_aggregation_filenames)
+            location_aggregation_filenames = summarize_summaries(summary_filenames, logger)
             log_output(
-                logger, "Aggregated county/state filenames:", outlist=state_aggregation_filenames)
+                logger, "Aggregated county/state filenames:", outlist=location_aggregation_filenames)
 
         elif cmd == "full":
             annotated_filenames = annotate_occurrence_files(input_filenames, logger)
-            state_aggregation_filenames, cty_aggregation_filenames = summarize_occurrence_contents(
-                annotated_filenames, logger)
+            log_output(logger, "Annotated filenames:", outlist=annotated_filenames)
+            # Summarize each annotated file by state and county, write summary to a file
+            summary_filenames = summarize_annotations(annotated_filenames, logger)
             log_output(
-                logger, "Aggregated county/state filenames:",
-                outlist=state_aggregation_filenames.extend(cty_aggregation_filenames))
+                logger, "Aggregated county/state filenames:", outlist=summary_filenames)
+            # Aggregate all summary files then write summaries for each state and county to a file for that region
+            location_aggregation_filenames = summarize_summaries(summary_filenames, logger)
+            log_output(
+                logger, "Aggregated county/state filenames:", outlist=location_aggregation_filenames)
 
         elif cmd == "test_bad_data":
             test_bad_line(input_filenames, logger)
