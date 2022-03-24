@@ -3,7 +3,7 @@ import csv
 import os
 
 from bison.common.constants import (
-    ERR_SEPARATOR, GBIF, LINENO_FLD, LOG, RIIS, RIIS_AUTHORITY, RIIS_SPECIES)
+    ERR_SEPARATOR, GBIF, LINENO_FLD, LOG, NEW_GBIF_KEY_FLD, NEW_GBIF_SCINAME_FLD, RIIS, RIIS_AUTHORITY, RIIS_SPECIES)
 from bison.tools.gbif_api import GbifSvc
 from bison.tools.util import get_csv_dict_reader, get_csv_dict_writer, get_logger
 
@@ -38,8 +38,8 @@ class RIISRec():
             ValueError: on non-integer GBIF taxonKey or non-integer ITIS TSN
         """
         self.data = record
-        self.data[RIIS_SPECIES.NEW_GBIF_KEY_FLD] = new_gbif_key
-        self.data[RIIS_SPECIES.NEW_GBIF_SCINAME_FLD] = new_gbif_name
+        self.data[NEW_GBIF_KEY_FLD] = new_gbif_key
+        self.data[NEW_GBIF_SCINAME_FLD] = new_gbif_name
         self.data[LINENO_FLD] = line_num
         self.name = standardize_name(record[RIIS_SPECIES.SCINAME_FLD], record[RIIS_SPECIES.SCIAUTHOR_FLD])
 
@@ -66,6 +66,46 @@ class RIISRec():
         # else:
         #     if is_accepted:
         #         self.data[RIIS_SPECIES.TAXON_AUTHORITY_FLD] = taxon_authority[start_idx:]
+
+    # ...............................................
+    @property
+    def locality(self):
+        """Public property for locality value.
+
+        Returns:
+            locality value
+        """
+        return self.data[RIIS_SPECIES.LOCALITY_FLD]
+
+    # ...............................................
+    @property
+    def assessment(self):
+        """Public property for locality value.
+
+        Returns:
+            RIIS assessment value
+        """
+        return self.data[RIIS_SPECIES.ASSESSMENT_FLD]
+
+    # ...............................................
+    @property
+    def occurrence_id(self):
+        """Public property for RIIS occurrenceID value.
+
+        Returns:
+            RIIS occurrence_id value
+        """
+        return self.data[RIIS_SPECIES.KEY]
+
+    # ...............................................
+    @property
+    def gbif_taxon_key(self):
+        """Public property for GBIF accepted taxon key value.
+
+        Returns:
+            latest resolved GBIF accepted taxon key value
+        """
+        return self.data[NEW_GBIF_KEY_FLD]
 
     # ...............................................
     def update_data(self, gbif_key, gbif_sciname):
@@ -231,8 +271,8 @@ class NNSL:
             raise Exception(f"Unexpected file header found in {self._csvfile}")
 
         # Trimmed and updated Non-native Species List, built from RIIS
-        self.nnsl_by_species = None
-        self.nnsl_by_id = None
+        self.by_gbif_taxkey = None
+        self.by_riis_id = None
         self.nnsl_header = None
 
     # ...............................................
@@ -293,7 +333,7 @@ class NNSL:
         """
         riis_recs = []
         try:
-            riis_recs = self.nnsl_by_id[gbif_taxon_key]
+            riis_recs = self.by_riis_id[gbif_taxon_key]
         except KeyError:
             # Taxon is not present
             pass
@@ -329,8 +369,8 @@ class NNSL:
             Exception: on read error
         """
         self.bad_species = {}
-        self.nnsl_by_species = {}
-        self.nnsl_by_id = {}
+        self.by_gbif_taxkey = {}
+        self.by_riis_id = {}
         if read_resolved is True:
             # Use species data with updated GBIF taxonomic resolution if exists
             if not os.path.exists(self.gbif_resolved_riis_fname):
@@ -348,8 +388,8 @@ class NNSL:
                 if lineno > 1:
                     # Read new gbif resolutions if they exist
                     if read_resolved is True:
-                        new_gbif_key = row[RIIS_SPECIES.NEW_GBIF_KEY_FLD]
-                        new_gbif_name = row[RIIS_SPECIES.NEW_GBIF_SCINAME_FLD]
+                        new_gbif_key = row[NEW_GBIF_KEY_FLD]
+                        new_gbif_name = row[NEW_GBIF_SCINAME_FLD]
                     else:
                         new_gbif_key = new_gbif_name = None
                     # Create record of original data and optional new data
@@ -366,12 +406,12 @@ class NNSL:
                         index = new_gbif_key
                     # Group records by matching name/taxon
                     try:
-                        self.nnsl_by_species[index].append(rec)
+                        self.by_gbif_taxkey[index].append(rec)
                     except KeyError:
-                        self.nnsl_by_species[index] = [rec]
+                        self.by_gbif_taxkey[index] = [rec]
 
                     # Use RIIS occurrenceID for dictionary key
-                    self.nnsl_by_id[row[RIIS_SPECIES.KEY]] = rec
+                    self.by_riis_id[row[RIIS_SPECIES.KEY]] = rec
 
         except Exception as e:
             raise(e)
@@ -486,14 +526,14 @@ class NNSL:
         """
         msgdict = {}
 
-        if not self.nnsl_by_species:
+        if not self.by_gbif_taxkey:
             self.read_riis(read_resolved=False)
 
         name_count = 0
         rec_count = 0
         gbif_svc = GbifSvc()
         try:
-            for name, reclist in self.nnsl_by_species.items():
+            for name, reclist in self.by_gbif_taxkey.items():
                 # Resolve each name, update each record (1-3) for that name
                 try:
                     # Try to match, if match is not 'accepted', repeat with returned accepted keys
@@ -510,7 +550,7 @@ class NNSL:
                         # Update record in dictionary nnsl_by_species with name keys
                         rec.update_data(new_key, new_name)
                         # Update dictionary nnsl_by_id with Occid keys
-                        self.nnsl_by_id[rec.data[RIIS_SPECIES.KEY]] = rec
+                        self.by_riis_id[rec.data[RIIS_SPECIES.KEY]] = rec
                         rec_count += 1
 
                     if (name_count % LOG.INTERVAL) == 0:
@@ -541,11 +581,11 @@ class NNSL:
         """
         msgdict = {}
         # Make sure data is present
-        if not self.nnsl_by_id:
+        if not self.by_riis_id:
             raise Exception("RIIS dictionary is not present")
         else:
-            keys = list(self.nnsl_by_id.keys())
-            tstrec = self.nnsl_by_id[keys[0]]
+            keys = list(self.by_riis_id.keys())
+            tstrec = self.by_riis_id[keys[0]]
             try:
                 tstrec.data[RIIS_SPECIES.NEW_GBIF_KEY_FLD]
             except KeyError:
@@ -564,7 +604,7 @@ class NNSL:
         self._log.debug(f"Writing resolved RIIS to {outfname}")
         rec_count = 0
         try:
-            for name, rec in self.nnsl_by_id.items():
+            for name, rec in self.by_riis_id.items():
                 # write each record
                 try:
                     writer.writerow(rec.data)

@@ -5,12 +5,19 @@ BISON_DELIMITER = "$"
 ENCODING = "utf-8"
 LINENO_FLD = "LINENO"
 ERR_SEPARATOR = "------------"
-NEW_RIIS_KEY_FLD = "riis_occurrence_id"
-NEW_RIIS_ASSESSMENT_FLD = "riis_assessment"
 # Geospatial data for intersecting with points to identify state and county for points
 POINT_BUFFER_RANGE = [(i / 10.0) for i in range(1, 11)]
+
+# Append these to DwC data for Census state/county resolution and RIIS resolution
 NEW_RESOLVED_COUNTY = "georef_cty"
 NEW_RESOLVED_STATE = "georef_st"
+NEW_RIIS_KEY_FLD = "riis_occurrence_id"
+NEW_RIIS_ASSESSMENT_FLD = "riis_assessment"
+
+# Append these to RIIS data for GBIF accepted taxon resolution
+NEW_GBIF_KEY_FLD = "gbif_res_taxonkey"
+NEW_GBIF_SCINAME_FLD = "gbif_res_scientificName"
+
 AGGREGATOR_DELIMITER = "__"
 EXTRA_CSV_FIELD = "rest_values"
 
@@ -308,8 +315,6 @@ class RIIS_SPECIES:
     RANK_FLD = "taxonRank"
     ASSESSMENT_FLD = "Introduced or Invasive"
     TAXON_AUTHORITY_FLD = "taxonomicStatus"
-    NEW_GBIF_KEY_FLD = "gbif_res_taxonkey"
-    NEW_GBIF_SCINAME_FLD = "gbif_res_scientificName"
     HEADER = [
         "locality",
         "scientificName",
