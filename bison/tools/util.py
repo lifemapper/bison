@@ -361,6 +361,7 @@ def get_chunk_filename(in_base_filename, start, stop, ext):
     chunk_filename = f"{in_base_filename}_chunk-{start}-{stop}_raw{ext}"
     return chunk_filename
 
+
 # .............................................................................
 def parse_chunk_filename(chunk_filename):
     """Create a consistent filename for chunks of a larger file.

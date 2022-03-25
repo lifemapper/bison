@@ -362,6 +362,7 @@ class NNSL:
 
         Args:
             gbif_taxon_key (str): unique identifier for GBIF taxon record
+            region (str): RIIS-defined US region for assessment, choices are AK, HI, L48
 
         Returns:
             dict of 0 or more, like {"AK": "introduced", "HI": "invasive", "L48": "introduced"}
