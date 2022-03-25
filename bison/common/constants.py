@@ -94,6 +94,25 @@ US_STATES = {
     "Wyoming": "WY",
 }
 
+SPECIES_KEY = "species_key"
+ASSESS_KEY = "assessment"
+STATE_KEY = "state"
+COUNTY_KEY = "county"
+LOCATION_KEY = "location"
+COUNT_KEY = "count"
+
+
+class LMBISON_HEADER:
+    """Headers for temporary and final output files."""
+    SUMMARY_FILE = [LOCATION_KEY, SPECIES_KEY, COUNT_KEY]
+    REGION_FILE = [SPECIES_KEY, COUNT_KEY, ASSESS_KEY]
+    GBIF_RIIS_SUMMARY_FILE = [
+        STATE_KEY, COUNTY_KEY,
+        "introduced_species", "invasive_species", "presumed_native_species", "all_species",
+        "pct_introduced_all_species", "pct_invasive_all_species", "pct_presumed_native_species",
+        "introduced_occurrences", "invasive_occurrences", "presumed_native_occurrences", "all_occurrences",
+        "pct_introduced_all_occurrences", "pct_invasive_all_occurrences", "pct_presumed_native_occurrences"]
+
 
 # .............................................................................
 class US_CENSUS_COUNTY:
