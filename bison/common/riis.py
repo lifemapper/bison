@@ -85,7 +85,7 @@ class RIISRec():
         Returns:
             RIIS assessment value
         """
-        return self.data[RIIS_SPECIES.ASSESSMENT_FLD]
+        return self.data[RIIS_SPECIES.ASSESSMENT_FLD].lower()
 
     # ...............................................
     @property
@@ -333,7 +333,7 @@ class NNSL:
         """
         riis_recs = []
         try:
-            riis_recs = self.by_riis_id[gbif_taxon_key]
+            riis_recs = self.by_gbif_taxkey[gbif_taxon_key]
         except KeyError:
             # Taxon is not present
             pass
@@ -355,6 +355,26 @@ class NNSL:
         for riis in riis_recs:
             assessments[riis.data[RIIS_SPECIES.LOCALITY_FLD]] = riis.data[RIIS_SPECIES.ASSESSMENT_FLD]
         return assessments
+
+    # ...............................................
+    def get_assessment_for_gbif_taxonkey_region(self, gbif_taxon_key, region):
+        """Get all RIIS assessments for this GBIF taxonKey.
+
+        Args:
+            gbif_taxon_key (str): unique identifier for GBIF taxon record
+
+        Returns:
+            dict of 0 or more, like {"AK": "introduced", "HI": "invasive", "L48": "introduced"}
+                for the species with this GBIF taxonKey
+        """
+        assess = "presumed_native"
+        recid = None
+        riis_recs = self.get_riis_by_gbif_taxonkey(gbif_taxon_key)
+        for riis in riis_recs:
+            if region == riis.locality:
+                assess = riis.assessment
+                recid = riis.occurrence_id
+        return assess, recid
 
     # ...............................................
     def read_riis(self, read_resolved=False):

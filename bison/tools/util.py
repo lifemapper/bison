@@ -358,8 +358,34 @@ def get_chunk_filename(in_base_filename, start, stop, ext):
     Returns:
         chunk_filename: standardized filename for the chunk of data
     """
-    chunk_filename = f"{in_base_filename}_chunk-{start}-{stop}{ext}"
+    chunk_filename = f"{in_base_filename}_chunk-{start}-{stop}_raw{ext}"
     return chunk_filename
+
+# .............................................................................
+def parse_chunk_filename(chunk_filename):
+    """Create a consistent filename for chunks of a larger file.
+
+    Args:
+        chunk_filename: standardized base filename for the chunk of data
+
+    Returns:
+        in_base_filename (str): common base filename for all chunks
+        start (int): line number in the large file that serves as the first record of the chunk file
+        stop (int): line number in the large file that serves as the last record of the chunk file
+        ext (str): file extension for the chunk file
+    """
+    idx = chunk_filename.index("_chunk")
+    in_base_filename = chunk_filename[:idx]
+
+    basename, ext = os.path.splitext(chunk_filename)
+    parts = basename.split("_")
+    for i in range(len(parts)):
+        if parts[i].startswith("chunk"):
+            chunk_idx = i
+            break
+    _, start, stop = parts[chunk_idx].split("-")
+
+    return in_base_filename, start, stop, ext
 
 
 # .............................................................................

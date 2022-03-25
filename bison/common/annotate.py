@@ -8,7 +8,7 @@ from bison.common.gbif import DwcData
 from bison.common.geoindex import GeoResolver, GeoException
 from bison.common.riis import NNSL
 
-from bison.tools.util import (get_csv_dict_writer, get_logger)
+from bison.tools.util import (get_csv_dict_writer, get_logger, parse_chunk_filename)
 
 
 # .............................................................................
@@ -62,7 +62,7 @@ class Annotator():
     # ...............................................
     @classmethod
     def construct_annotated_name(cls, csvfile):
-        """Construct a filename for the annotated version of csvfile.
+        """Construct a full filename for the annotated version of csvfile.
 
         Args:
             csvfile (str): full filename used to construct an annotated filename for this data.
@@ -70,8 +70,15 @@ class Annotator():
         Returns:
             outfname: output filename derived from the input GBIF DWC filename
         """
-        basename, ext = os.path.splitext(csvfile)
-        outfname = f"{basename}_annotated{ext}"
+        pth, basefilename = os.path.split(csvfile)
+        basename, ext = os.path.splitext(basefilename)
+        try:
+            rawidx = basename.index("_raw")
+            basename = basename[:rawidx]
+        except ValueError:
+            pass
+        newbasefilename = f"{basename}_annotated{ext}"
+        outfname = os.path.join(pth, newbasefilename)
         return outfname
 
     # ...............................................
@@ -129,42 +136,42 @@ class Annotator():
             return True
         return False
 
-    # ...............................................
-    def assess_occurrence(self, dwcrec, county, state, iis_reclist):
-        """Find RIIS assessment matching the acceptedTaxonKey and state in this record.
-
-        Args:
-            dwcrec (dict): dictionary of original DwC specimen occurrence record
-            county (str): county returned from geospatial intersection of point with YS boundaries
-            state (str): state returned from geospatial intersection of point with YS boundaries
-            iis_reclist (list of dict): list of RIIS records with acceptedTaxonKey matching the
-                acceptedTaxonKey for this occurrence
-
-        Returns:
-            riis_assessment: Determination of "introduced" or "invasive" for this
-                record with species in this locaation.
-            riis_id: locally unique RIIS occurrenceID identifying this determination
-                for this species in this location.
-        """
-        riis_assessment = None
-        riis_key = None
-        for iisrec in iis_reclist:
-            # Double check NNSL dict key == RIIS resolved key == occurrence accepted key
-            if dwcrec[GBIF.ACC_TAXON_FLD] != iisrec.gbif_taxon_key:
-                self._log.debug("WTF is happening?!?")
-
-            # Look for AK or HI
-            if ((state == "AK" and iisrec.locality == "AK")
-                    or (state == "HI" and iisrec.locality == "HI")):
-                riis_assessment = iisrec.assessment.lower()
-                riis_key = iisrec.occurrence_id
-
-            # Not AK or HI, is it L48?
-            elif state in self._conus_states and iisrec.locality == "L48":
-                riis_assessment = iisrec.assessment.lower()
-                riis_key = iisrec.occurrence_id
-
-        return riis_assessment, riis_key
+    # # ...............................................
+    # def assess_occurrence(self, dwcrec, county, state, iis_reclist):
+    #     """Find RIIS assessment matching the acceptedTaxonKey and state in this record.
+    #
+    #     Args:
+    #         dwcrec (dict): dictionary of original DwC specimen occurrence record
+    #         county (str): county returned from geospatial intersection of point with YS boundaries
+    #         state (str): state returned from geospatial intersection of point with YS boundaries
+    #         iis_reclist (list of dict): list of RIIS records with acceptedTaxonKey matching the
+    #             acceptedTaxonKey for this occurrence
+    #
+    #     Returns:
+    #         riis_assessment: Determination of "introduced" or "invasive" for this
+    #             record with species in this locaation.
+    #         riis_id: locally unique RIIS occurrenceID identifying this determination
+    #             for this species in this location.
+    #     """
+    #     riis_assessment = None
+    #     riis_key = None
+    #     for iisrec in iis_reclist:
+    #         # Double check NNSL dict key == RIIS resolved key == occurrence accepted key
+    #         if dwcrec[GBIF.ACC_TAXON_FLD] != iisrec.gbif_taxon_key:
+    #             self._log.debug("WTF is happening?!?")
+    #
+    #         # Look for AK or HI
+    #         if ((state == "AK" and iisrec.locality == "AK")
+    #                 or (state == "HI" and iisrec.locality == "HI")):
+    #             riis_assessment = iisrec.assessment.lower()
+    #             riis_key = iisrec.occurrence_id
+    #
+    #         # Not AK or HI, is it L48?
+    #         elif state in self._conus_states and iisrec.locality == "L48":
+    #             riis_assessment = iisrec.assessment.lower()
+    #             riis_key = iisrec.occurrence_id
+    #
+    #     return riis_assessment, riis_key
 
     # ...............................................
     def annotate_dwca_records(self):
@@ -185,13 +192,14 @@ class Annotator():
         except Exception:
             raise
         else:
+            self._log.info(f"Annotating {self._csvfile} to create {annotated_dwc_fname}")
             try:
                 # iterate over DwC records
                 dwcrec = self._dwcdata.get_record()
                 while dwcrec is not None:
                     gbif_id = dwcrec[GBIF.ID_FLD]
                     if (self._dwcdata.recno % LOG.INTERVAL) == 0:
-                        self._log.debug(f"*** Record number {self._dwcdata.recno}, gbifID: {gbif_id} ***")
+                        self._log.info(f"*** Record number {self._dwcdata.recno}, gbifID: {gbif_id} ***")
 
                     # Debug: examine data
                     if gbif_id == trouble:
@@ -213,16 +221,22 @@ class Annotator():
                     except GeoException as e:
                         self._log.error(f"Record gbifID: {gbif_id}: {e}")
 
-                    # Find RIIS records for this acceptedTaxonKey
-                    taxkey = dwcrec[GBIF.ACC_TAXON_FLD]
-                    try:
-                        iis_reclist = self.nnsl.by_gbif_taxkey[taxkey]
-                    except Exception:
-                        iis_reclist = []
+                    if state in ("AK", "HI"):
+                        region = state
+                    else:
+                        region = "L48"
 
-                    if county and state and iis_reclist:
-                        riis_assessment, riis_key = self.assess_occurrence(
-                            dwcrec, county, state, iis_reclist)
+                    # # Find RIIS records for this acceptedTaxonKey
+                    taxkey = dwcrec[GBIF.ACC_TAXON_FLD]
+                    # try:
+                    #     iis_reclist = self.nnsl.by_gbif_taxkey[taxkey]
+                    # except Exception:
+                    #     iis_reclist = []
+                    riis_assessment, riis_key = self.nnsl.get_assessment_for_gbif_taxonkey_region(taxkey, region)
+
+                    # if county and state and iis_reclist:
+                    #     riis_assessment, riis_key = self.assess_occurrence(
+                    #         dwcrec, county, state, iis_reclist)
 
                     # Add county, state and RIIS assessment to record
                     dwcrec[NEW_RESOLVED_COUNTY] = county
