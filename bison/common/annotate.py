@@ -52,17 +52,39 @@ class Annotator():
         self._all_states = self._conus_states.copy()
         self._all_states.extend(["Alaska", "Hawaii", "AK", "HI"])
 
-        # Test DwC record contents
-        self.good_locations = {}
-        self.bad_locations = {}
-        self.missing_states = 0
-        self.matched_states = 0
-        self.mismatched_states = 0
+        # # Test DwC record contents
+        # self.good_locations = {}
+        # self.bad_locations = {}
+        # self.missing_states = 0
+        # self.matched_states = 0
+        # self.mismatched_states = 0
 
     # ...............................................
     @classmethod
     def construct_annotated_name(cls, csvfile):
         """Construct a full filename for the annotated version of csvfile.
+
+        Args:
+            csvfile (str): full filename used to construct an annotated filename for this data.
+
+        Returns:
+            outfname: output filename derived from the input GBIF DWC filename
+        """
+        pth, basefilename = os.path.split(csvfile)
+        basename, ext = os.path.splitext(basefilename)
+        try:
+            rawidx = basename.index("_raw")
+            basename = basename[:rawidx]
+        except ValueError:
+            pass
+        newbasefilename = f"{basename}_annotated{ext}"
+        outfname = os.path.join(pth, newbasefilename)
+        return outfname
+
+    # ...............................................
+    @classmethod
+    def construct_annotated_pattern(cls, csvfile):
+        """Construct a full filename pattern matching the annotated file(s) of csvfile.
 
         Args:
             csvfile (str): full filename used to construct an annotated filename for this data.

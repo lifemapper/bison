@@ -11,32 +11,30 @@ class TestAnnotator(Annotator):
     """Class for testing downloaded simple GBIF CSV file."""
 
     # .............................................................................
-    def __init__(self, datapath, gbif_occ_fname, do_resolve=False, logger=None):
+    def __init__(self, gbif_occ_filename, nnsl=None, logger=None):
         """Constructor reads RIIS species file and opens a CSVReader to the GBIF data.
 
         Args:
-            datapath (str): base directory for datafiles
-            gbif_occ_fname (str): base filename for GBIF occurrence CSV file
-            do_resolve (bool): flag indicating whether to query GBIF for updated accepted name/key
+            gbif_occ_filename (str): full path of CSV occurrence file to annotate
+            nnsl (bison.common.riis.NNSL): object containing USGS RIIS data for annotating records
             logger (object): logger for saving relevant processing messages
         """
-        Annotator.__init__(
-            self, datapath, gbif_occ_fname, do_resolve=do_resolve, logger=logger)
+        Annotator.__init__(self, gbif_occ_filename, nnsl=nnsl, logger=logger)
 
     # .............................................................................
     def test_annotate_records(self):
         """Test annotating records and returning summarized errors in state field."""
         print(f"Appending records to: {self._csvfile}")
-        self.append_dwca_records()
-        print(f"   Matched states: {self.matched_states}")
-        print(f"   Mis-matched states: {self.mismatched_states}")
-        print(f"   Missing states: {self.missing_states}")
-        print("   Good states: ")
+        self.annotate_dwca_records()
+        # print(f"   Matched states: {self.matched_states}")
+        # print(f"   Mis-matched states: {self.mismatched_states}")
+        # print(f"   Missing states: {self.missing_states}")
+        # print("   Good states: ")
         for st, counties in self.good_locations.items():
             print(f"  {st}: {counties}")
-        print("   Bad states: ")
-        for st, counties in self.bad_locations.items():
-            print(f"  {st}: {counties}")
+        # print("   Bad states: ")
+        # for st, counties in self.bad_locations.items():
+        #     print(f"  {st}: {counties}")
 
 
 # .............................................................................

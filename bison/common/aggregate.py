@@ -2,32 +2,26 @@
 import os
 
 from bison.common.constants import (
-    AGGREGATOR_DELIMITER, ENCODING, GBIF, NEW_RESOLVED_COUNTY, NEW_RESOLVED_STATE, RIIS_SPECIES, US_STATES)
+    AGGREGATOR_DELIMITER, ENCODING, GBIF, NEW_RESOLVED_COUNTY, NEW_RESOLVED_STATE, RIIS_SPECIES, US_STATES,
+    SPECIES_KEY, ASSESS_KEY, LOCATION_KEY, COUNT_KEY, LMBISON_HEADER)
 from bison.common.riis import NNSL
 
 from bison.tools.util import (get_csv_writer, get_csv_dict_reader, get_logger)
 
 # For each temporary summary file, 3 fields, for each location: location, species, count
 # Summary files are used to individually process manageably-sized files, then read and aggregate summaries for final output
-SPECIES_KEY = "species_key"
-ASSESS_KEY = "assessment"
-STATE_KEY = "state"
-COUNTY_KEY = "county"
-LOCATION_KEY = "location"
-COUNT_KEY = "count"
-PERCENT_KEY = "percent_of_total"
-SUMMARY_HEADER = [LOCATION_KEY, SPECIES_KEY, COUNT_KEY]
-
-# Data Product 1: For each state or county file, 3 fields, for each species: species, count, assessment
-STATE_COUNTY_HEADER = [SPECIES_KEY, COUNT_KEY, ASSESS_KEY]
-# Data Product 2: For each state and county, 1 record with counts and percents of
-#                 introduced, invasive, presumed_native occurrences and species
-GBIF_RIIS_SUMMARY_HEADER = [
-    STATE_KEY, COUNTY_KEY,
-    "introduced_species", "invasive_species",  "presumed_native_species", "all_species",
-    "pct_introduced_all_species", "pct_invasive_all_species", "pct_presumed_native_species",
-    "introduced_occurrences", "invasive_occurrences", "presumed_native_occurrences", "all_occurrences",
-    "pct_introduced_all_occurrences", "pct_invasive_all_occurrences", "pct_presumed_native_occurrences"]
+# SUMMARY_HEADER = [LOCATION_KEY, SPECIES_KEY, COUNT_KEY]
+#
+# # Data Product 1: For each state or county file, 3 fields, for each species: species, count, assessment
+# REGION_FILE_HEADER = [SPECIES_KEY, COUNT_KEY, ASSESS_KEY]
+# # Data Product 2: For each state and county, 1 record with counts and percents of
+# #                 introduced, invasive, presumed_native occurrences and species
+# GBIF_RIIS_SUMMARY_HEADER = [
+#     STATE_KEY, COUNTY_KEY,
+#     "introduced_species", "invasive_species",  "presumed_native_species", "all_species",
+#     "pct_introduced_all_species", "pct_invasive_all_species", "pct_presumed_native_species",
+#     "introduced_occurrences", "invasive_occurrences", "presumed_native_occurrences", "all_occurrences",
+#     "pct_introduced_all_occurrences", "pct_invasive_all_occurrences", "pct_presumed_native_occurrences"]
 
 
 # .............................................................................
@@ -333,7 +327,7 @@ class Aggregator():
         # header = [LOCATION_KEY, SPECIES_KEY, COUNT_KEY]
         try:
             csv_wtr, outf = get_csv_writer(summary_filename, GBIF.DWCA_DELIMITER, fmode="w")
-            csv_wtr.writerow(SUMMARY_HEADER)
+            csv_wtr.writerow(LMBISON_HEADER.SUMMARY_FILE)
             self._log.info(f"Writing region summaries to {summary_filename}")
 
             # Location keys are state and county_state
@@ -470,7 +464,7 @@ class Aggregator():
         else:
             try:
                 csv_wtr, outf = get_csv_writer(summary_filename, GBIF.DWCA_DELIMITER, fmode="w")
-                csv_wtr.writerow(STATE_COUNTY_HEADER)
+                csv_wtr.writerow(LMBISON_HEADER.REGION_FILE)
                 # Write all records found
                 records = self._examine_species_for_location(region, species_counts, nnsl)
                 for rec in records:
@@ -588,7 +582,7 @@ class Aggregator():
         assess_summary_filename = os.path.join(datapath, "riis_summary.csv")
         try:
             csvwtr, outf = get_csv_writer(assess_summary_filename, GBIF.DWCA_DELIMITER, fmode="w", overwrite=True)
-            csvwtr.writerow(GBIF_RIIS_SUMMARY_HEADER)
+            csvwtr.writerow(LMBISON_HEADER.GBIF_RIIS_SUMMARY_FILE)
         except Exception as e:
             raise Exception(f"Unknown open/csv error on {assess_summary_filename}: {e}")
 

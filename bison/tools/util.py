@@ -1,6 +1,7 @@
 """Common file handling tools used in various BISON modules."""
 import csv
 import logging
+import glob
 from logging.handlers import RotatingFileHandler
 import math
 from multiprocessing import cpu_count
@@ -280,38 +281,101 @@ def get_fieldnames(filename, delimiter):
 
 
 # .............................................................................
-def get_line_count(filename):
+def _check_existence(filename_or_pattern):
+    is_pattern = False
+    # Check good input file/s
+    if filename_or_pattern.index("*") > 0 or filename_or_pattern.index("?") > 0:
+        is_pattern = True
+        files = glob.glob(filename_or_pattern)
+        if len(files) == 0:
+            raise FileNotFoundError(f"No files match the pattern {filename_or_pattern}")
+    elif not os.path.exists(filename_or_pattern):
+        raise FileNotFoundError(f"File {filename_or_pattern} does not exist")
+
+    return is_pattern
+
+
+# .............................................................................
+def _parse_wc_output(subproc_output):
+    # Return has list of byte-strings, the first contains one or more output lines, the last byte-string is empty.
+    # Multiple matching files will produce multiple lines, with total on the last line
+    output = subproc_output[0]
+    lines = output.split(b"\n")
+    # The last line is empty
+    lines = lines[:-1]
+    line_of_interest = None
+    # Find and split line of interest
+    if len(lines) == 1:
+        line_of_interest = lines[0]
+    else:
+        for ln in lines:
+            try:
+                ln.index(b"total")
+            except ValueError:
+                pass
+            else:
+                line_of_interest = ln
+    if line_of_interest is None:
+        raise Exception(f"Failed to get line with results from {subproc_output}")
+    elts = line_of_interest.strip().split(b" ")
+    # Count is first element in line
+    tmp = elts[0]
+    try:
+        line_count = int(tmp)
+    except ValueError:
+        raise Exception(f"First element on results line {line_of_interest} is not an integer")
+    return line_count
+
+
+# .............................................................................
+def count_lines(filename_or_pattern, grep_strings=None):
     """Find total number of lines in a file.
 
     Args:
-        filename (str): file to count lines
+        filename_or_pattern (str): filepath, with or without wildcards, to count lines for
+        grep_strings (list): list of strings to find in lines
 
     Returns:
-        line_count (int): number of lines in the file
+        line_count (int): number of lines in the file containing all of the strings in str_list
 
     Raises:
-        Exception: on unknown error in line count subprocess
-        FileNotFoundError: on missing input file
+        FileNotFoundError: file pattern matches no files
+        FileNotFoundError: file does not exist
+
+    Assumptions:
+        Existence of the command line tool "grep".
+        Existence of the command line tool "wc"
+        Output of "wc" consists of one or more lines with the pattern: <count>  <filename>
+            If more than one file is being examined, the last line will have the pattern: <count>  total
     """
     line_count = None
-    if os.path.exists(filename):
-        cmd = f"wc -l {filename}"
-        sp = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        sp_outs = sp.communicate()
-        # Return has list of byte strings, which has line count and filename?
-        for info in sp_outs:
-            try:
-                results = info.split(b' ')
-                tmp = results[0]
-                line_count = int(tmp)
-                break
-            except Exception as e:
-                print(e)
-                pass
-        if line_count is None:
-            raise Exception(f"Failed to get line count from {sp_outs}")
+    try:
+        _check_existence(filename_or_pattern)
+    except FileNotFoundError:
+        raise
+
+    # Assemble bash command
+    if grep_strings is not None:
+        # start with grep command
+        st = grep_strings.pop(0)
+        cmd = f"grep {st} {filename_or_pattern} | "
+        # add additional grep commands
+        while len(grep_strings) > 0:
+            st = grep_strings.pop(0)
+            cmd += f"grep {st} | "
+        # count output produced from greps
+        cmd += "wc -l"
     else:
-        raise FileNotFoundError(filename)
+        # count all lines
+        cmd = f"wc -l {filename_or_pattern}"
+
+    # Run command in a shell
+    sp = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    sp_outs = sp.communicate()
+
+    # Retrieve the total count
+    line_count = _parse_wc_output(sp_outs)
+
     return line_count
 
 
@@ -333,7 +397,7 @@ def identify_chunks(big_csv_filename):
     start_stop_pairs = []
 
     # in_base_filename, ext = os.path.splitext(big_csv_filename)
-    rec_count = get_line_count(big_csv_filename) - 1
+    rec_count = count_lines(big_csv_filename) - 1
     chunk_size = math.ceil(rec_count / cpus2use)
 
     start = 1
@@ -410,8 +474,6 @@ def identify_chunk_files(big_csv_filename):
     boundary_pairs = identify_chunks(big_csv_filename)
     for (start, stop) in boundary_pairs:
         chunk_fname = get_chunk_filename(in_base_filename, start, stop, ext)
-        # if os.path.exists(chunk_fname):
-        #     print(f"File {chunk_fname} exists")
         chunk_filenames.append(chunk_fname)
     return chunk_filenames
 
@@ -510,24 +572,50 @@ import csv
 import os
 import sys
 
-from bison.common.constants import DATA_PATH, ENCODING, GBIF, LOG
+pattern = "/home/astewart/git/bison/data/gbif_2022-03-16_100k_chunk*annotated.csv"
+fname = "/home/astewart/git/bison/data/out/riis_summary.csv"
 
-trouble = "1698055779"
+line_count = None
+# Check good input file/s
+if filename_or_pattern.index("*") > 0 or filename_or_pattern.index("?") > 0:
+    files = glob.glob(filename_or_pattern)
+    if len(files) == 0:
+        raise FileNotFoundError(f"No files match the pattern {filename_or_pattern}")
+elif not os.path.exists(filename_or_pattern):
+    raise FileNotFoundError(f"File {filename_or_pattern} does not exist")
 
-fname = "gbif_2022-02-15_chunk-1-207706.csv"
+# Assemble bash command
+if strlist is not None:
+    # start with grep command
+    st = strlist.pop(0)
+    cmd = f"grep {st} {filename_or_pattern} | "
+    # add additional grep commands
+    while len(strlist) > 0:
+        st = strlist.pop(0)
+        cmd += f"grep {st} | "
+    # count lines produced from greps
+    cmd += "wc -l"
+else:
+    # count all lines
+    cmd = f"wc -l {filename_or_pattern}"
 
-encoding = "utf-8"
-delimiter = "\t"
-
-csvfile = os.path.join(DATA_PATH, fname)
-f = open(csvfile, "r", newline="", encoding=encoding)
-header = next(f)
-f.close
-tmpflds = header.split(delimiter)
-fieldnames = [fld.strip() for fld in tmpflds]
-
-f = open(csvfile, "r", newline="", encoding=encoding)
-
-rdr = csv.DictReader(f, fieldnames=fieldnames, delimiter=delimiter)
-
+# Run command in a shell
+sp = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+sp_outs = sp.communicate()
+# Return has list of byte strings, which has line count and filename?
+for info in sp_outs:
+    try:
+        results = info.split(b' ')
+        tmp = results[0]
+        try:
+            line_count = int(tmp)
+            break
+        except ValueError:
+            pass
+    except Exception as e:
+        print(e)
+        pass
+if line_count is None:
+    raise Exception(f"Failed to get line count from {sp_outs}")
+return line_count
 """
