@@ -10,7 +10,7 @@ from bison.common.constants import (
     US_CENSUS_COUNTY)
 from bison.common.geoindex import GeoResolver, GeoException
 from bison.common.riis import NNSL
-from bison.tools.util import chunk_files, delete_file, get_logger, identify_chunk_files, parse_chunk_filename
+from bison.tools.util import chunk_files, delete_file, get_logger, identify_chunk_files
 
 
 # .............................................................................
@@ -146,13 +146,12 @@ def summarize_assessments(region_summary_filenames, logger):
     """Annotate GBIF records with census state and county, and RIIS key and assessment.
 
     Args:
-        summary_filenames (list): list of full filenames containing GBIF data summarized by state/county for RIIS
+        region_summary_filenames (list): list of full filenames containing GBIF data summarized by state/county for RIIS
             assessment of records.
         logger (object): logger for saving relevant processing messages
 
     Returns:
-        state_aggregation_filenames (list): full filenames of species counts and percentages for each state.
-        cty_aggregation_filename (list): full filenames of species counts and percentages for each county-state.
+        assess_summary_filename (str): full filename of occurrence and species counts and percentages for each state.
     """
     # Create a new Aggregator, ignore file used for construction,
     agg = Aggregator(region_summary_filenames[0], logger=logger)
@@ -353,7 +352,6 @@ if __name__ == '__main__':
             region_summary_filenames = glob.glob(state_pattern)
             region_summary_filenames.extend(glob.glob(county_pattern))
             assess_summary_filename = summarize_assessments(region_summary_filenames, logger)
-
 
         elif cmd == "full":
             annotated_filenames = annotate_occurrence_files(input_filenames, logger)

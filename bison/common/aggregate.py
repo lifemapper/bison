@@ -29,6 +29,7 @@ RIIS_HEADER = [
     "introduced_occurrences", "invasive_occurrences", "presumed_native_occurrences", "all_occurrences",
     "pct_introduced_all_occurrences", "pct_invasive_all_occurrences", "pct_presumed_native_occurrences"]
 
+
 # .............................................................................
 class Aggregator():
     """Class for summarizing GBIF data annotated with USGS Introduced and Invasive species assessments.
@@ -450,8 +451,7 @@ class Aggregator():
             summary_filename_list (list): list of full summary input filenames to be read.
 
         Returns:
-            state_aggregation_filenames (list): full filenames of species counts and percentages for each state.
-            cty_aggregation_filename (list): full filenames of species counts and percentages for each county-state.
+            region_summary_filenames (list): full region filenames of counts and percentages for each species.
         """
         self.locations = {}
         datapath, _ = os.path.split(summary_filename_list[0])
@@ -477,11 +477,11 @@ class Aggregator():
         """Read annotated data from one or more files, summarize by species, and by location.
 
         Args:
-            summary_filename_list (list): list of full summary input filenames for which to aggregate totals by RIIS.
+            region_summary_filenames (list): full region filenames of counts and percentages for each species.
 
         Returns:
-            summary_filename (str): full filenames of introduced, invasive, presumed_native counts and percentages for
-                each county-state.
+            assess_summary_filename (str): full filename of introduced, invasive, presumed_native counts and percentages
+                for each region.
 
         Raises:
             Exception: on unexpected open or write error

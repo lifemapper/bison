@@ -8,7 +8,7 @@ from bison.common.gbif import DwcData
 from bison.common.geoindex import GeoResolver, GeoException
 from bison.common.riis import NNSL
 
-from bison.tools.util import (get_csv_dict_writer, get_logger, parse_chunk_filename)
+from bison.tools.util import (get_csv_dict_writer, get_logger)
 
 
 # .............................................................................
