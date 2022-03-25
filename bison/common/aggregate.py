@@ -7,8 +7,8 @@ from bison.common.riis import NNSL
 
 from bison.tools.util import (get_csv_writer, get_csv_dict_reader, get_logger)
 
-# For each summary file, 3 fields, for each location: location, species, count
-# Summary files are used only internally, to process multiple smaller files, then read summaries for output
+# For each temporary summary file, 3 fields, for each location: location, species, count
+# Summary files are used to individually process manageably-sized files, then read and aggregate summaries for final output
 SPECIES_KEY = "species_key"
 ASSESS_KEY = "assessment"
 STATE_KEY = "state"
@@ -20,26 +20,14 @@ SUMMARY_HEADER = [LOCATION_KEY, SPECIES_KEY, COUNT_KEY]
 
 # Data Product 1: For each state or county file, 3 fields, for each species: species, count, assessment
 STATE_COUNTY_HEADER = [SPECIES_KEY, COUNT_KEY, ASSESS_KEY]
-RIIS_HEADER = [STATE_KEY, COUNTY_KEY, ASSESS_KEY, COUNT_KEY, PERCENT_KEY]
+# Data Product 2: For each state and county, 1 record with counts and percents of
+#                 introduced, invasive, presumed_native occurrences and species
 RIIS_HEADER = [
     STATE_KEY, COUNTY_KEY,
-    "introduced_species", "invasive_species",  "all_species",
-    "pct_introduced_all_species", "pct_invasive_all_species",
-    "introduced_occurrences", "invasive_occurrences", "all_occurrences",
-    "pct_introduced_all_occurrences", "pct_invasive_all_occurrences"]
-#                                location,
-#                                bad # species, total # species, bad/total % species,
-#                                bad # occurrences, total # occurrences, bad/total % occurrences
-BAD_SPECIES_COUNT = "introduced_species_count"
-TOTAL_SPECIES_COUNT = "total_species_count"
-BAD_SPECIES_PERCENT = "percent_introduced_to_total_species"
-BAD_OCC_COUNT = "introduced_occurrence_count"
-TOTAL_OCC_COUNT = "total_occurrence_count"
-BAD_OCC_PERCENT = "percent_introduced_to_total_occurrences"
-AGGREGATE_HEADER = [
-    LOCATION_KEY, BAD_SPECIES_COUNT, TOTAL_SPECIES_COUNT, BAD_SPECIES_PERCENT,
-    BAD_OCC_COUNT, TOTAL_OCC_COUNT, BAD_OCC_PERCENT]
-
+    "introduced_species", "invasive_species",  "presumed_native_species", "all_species",
+    "pct_introduced_all_species", "pct_invasive_all_species", "pct_presumed_native_species",
+    "introduced_occurrences", "invasive_occurrences", "presumed_native_occurrences", "all_occurrences",
+    "pct_introduced_all_occurrences", "pct_invasive_all_occurrences", "pct_presumed_native_occurrences"]
 
 # .............................................................................
 class Aggregator():
@@ -197,10 +185,11 @@ class Aggregator():
                 self.states[state].add(county)
 
     # ...............................................
-    def _summarize_annotations_by_location(self):
+    def _summarize_annotations_by_region(self):
         # Reset summary
         self.locations = {}
         csv_rdr, inf = get_csv_dict_reader(self._csvfile, GBIF.DWCA_DELIMITER, encoding=ENCODING)
+        self._log.info(f"Summarizing annotations in {self._csvfile} by region")
         try:
             for rec in csv_rdr:
                 species_key = self._get_compound_key(rec[GBIF.ACC_TAXON_FLD], rec[GBIF.ACC_NAME_FLD])
@@ -219,7 +208,7 @@ class Aggregator():
             inf.close()
 
     # ...............................................
-    def _write_location_summary(self, summary_filename):
+    def _write_region_summary(self, summary_filename):
         # locations = {county_or_state: {species: count,
         #                                ...}
         #              ...}
@@ -227,6 +216,7 @@ class Aggregator():
         try:
             csv_wtr, outf = get_csv_writer(summary_filename, GBIF.DWCA_DELIMITER, fmode="w")
             csv_wtr.writerow(SUMMARY_HEADER)
+            self._log.info(f"Writing region summaries to {summary_filename}")
 
             # Location keys are state and county_state
             for location, sp_info in self.locations.items():
@@ -268,8 +258,9 @@ class Aggregator():
         """
         summary_filename = self.construct_summary_name(self._csvfile)
         # Summarize and write
-        self._summarize_annotations_by_location()
-        self._write_location_summary(summary_filename)
+        self._summarize_annotations_by_region()
+        self._write_region_summary(summary_filename)
+        self._log.info(f"Summarized species by region from {self._csvfile} to {summary_filename}")
         return summary_filename
 
     # # ...............................................
@@ -316,7 +307,7 @@ class Aggregator():
 
                 assessments = nnsl.get_assessments_for_gbif_taxonkey(gbif_taxon_key)
                 try:
-                    assess = assessments[region]
+                    assess = assessments[region].lower()
                 except KeyError:
                     assess = "presumed_native"
 
@@ -324,7 +315,7 @@ class Aggregator():
         return recs
 
     # ...............................................
-    def _write_statecounty_aggregate(self, datapath, nnsl, state, county=None):
+    def _write_region_aggregate(self, datapath, nnsl, state, county=None):
         """Summarize aggregated data for a location by species.
 
         Args:
@@ -366,6 +357,7 @@ class Aggregator():
                 records = self._examine_species_for_location(region, species_counts, nnsl)
                 for rec in records:
                     csv_wtr.writerow(rec)
+                self._log.info(f"Wrote region summaries to {summary_filename}")
             except Exception as e:
                 raise Exception(f"Unknown write error on {summary_filename}: {e}")
             finally:
@@ -374,25 +366,29 @@ class Aggregator():
         return summary_filename
 
     # ...............................................
-    def _summarize_location_by_riis(csvwriter, loc_summary_file, state, county=None):
+    def _summarize_region_by_riis(self, csvwriter, loc_summary_file, state, county=None):
         # read [SPECIES_KEY, COUNT_KEY, ASSESS_KEY]
         # write [STATE_KEY, COUNTY_KEY,
-        #     "introduced_species", "invasive_species",  "all_species",
-        #     "pct_introduced_all_species", "pct_invasive_all_species",
-        #     "introduced_occurrences", "invasive_occurrences", "all_occurrences",
-        #     "pct_introduced_all_occurrences", "pct_invasive_all_occurrences"]
+        #     "introduced_species", "invasive_species",  "presumed_native_species", "all_species",
+        #     "pct_introduced_all_species", "pct_invasive_all_species", "pct_presumed_native_species",
+        #     "introduced_occurrences", "invasive_occurrences", "presumed_native_occurrences", "all_occurrences",
+        #     "pct_introduced_all_occurrences", "pct_invasive_all_occurrences", "pct_presumed_native_occurrences"]
         assess = {"introduced": {}, "invasive": {}, "presumed_native": {}}
         try:
             rdr, inf = get_csv_dict_reader(loc_summary_file, GBIF.DWCA_DELIMITER, encoding=ENCODING, quote_none=False)
             for rec in rdr:
-                assess[rec[ASSESS_KEY]][rec[SPECIES_KEY]] = rec[COUNT_KEY]
+                try:
+                    count = int(rec[COUNT_KEY])
+                except ValueError:
+                    raise
+                assess[rec[ASSESS_KEY]][rec[SPECIES_KEY]] = count
         except Exception as e:
             raise Exception(f"Unknown read error on {loc_summary_file}: {e}")
         finally:
             inf.close()
 
-        species_total = 0
-        occ_total = 0
+        species_total = occ_total = 0
+        # Count introduced/invasive
         for ass_key, sp_counts in assess.items():
             ass_occ_total = 0
             ass_species_total = 0
@@ -409,19 +405,45 @@ class Aggregator():
             elif ass_key == "invasive":
                 invasive_species_total = ass_species_total
                 invasive_occ_total = ass_occ_total
-        pct_invasive_species = (invasive_species_total / species_total)
+            elif ass_key == "presumed_native":
+                native_species_total = ass_species_total
+                native_occ_total = ass_occ_total
+
+        assessed_sp_total = intro_species_total + invasive_species_total + native_species_total
+        if assessed_sp_total != species_total:
+            self._log.info(f"Assessed species totals for {state} {county}: {assessed_sp_total} <> {species_total}")
+        assessed_occ_total = intro_occ_total + invasive_occ_total + native_occ_total
+        if assessed_occ_total != occ_total:
+            self._log.info(f"Assessed occurrence totals for {state} {county}: {assessed_occ_total} <> {occ_total}")
+
         pct_intro_species = (intro_species_total / species_total)
-        pct_invasive_occ = (invasive_occ_total / occ_total)
+        pct_invasive_species = (invasive_species_total / species_total)
+        pct_native_species = (native_species_total / species_total)
+        pct_species = pct_intro_species + pct_invasive_species + pct_native_species
+        if pct_species != 1:
+            self._log.info(f"Percent species totals for {state} {county}: {pct_species} <> 1.0")
+
         pct_intro_occ = (intro_occ_total / occ_total)
+        pct_invasive_occ = (invasive_occ_total / occ_total)
+        pct_native_occ = (native_occ_total / occ_total)
+        pct_occ = pct_intro_occ + pct_invasive_occ + pct_native_occ
+        if pct_occ != 1:
+            self._log.info(f"Percent occ totals for {state} {county}: {pct_occ} <> 1.0")
 
         csvwriter.writerow([
             state, county,
-            intro_species_total, invasive_species_total, species_total, pct_intro_species, pct_invasive_species,
-            intro_occ_total, invasive_occ_total, occ_total, pct_intro_occ, pct_invasive_occ
+            intro_species_total, invasive_species_total, native_species_total, species_total,
+            pct_intro_species, pct_invasive_species, pct_native_species,
+            intro_occ_total, invasive_occ_total, native_occ_total, occ_total,
+            pct_intro_occ, pct_invasive_occ, pct_native_occ
         ])
 
+        return (
+            intro_species_total, invasive_species_total, native_species_total, species_total,
+            intro_occ_total, invasive_occ_total, native_occ_total, occ_total)
+
     # ...............................................
-    def summarize_by_location(self, summary_filename_list):
+    def summarize_regions(self, summary_filename_list):
         """Read annotated data from one or more files, summarize by species, and by location.
 
         Args:
@@ -434,21 +456,24 @@ class Aggregator():
         self.locations = {}
         datapath, _ = os.path.split(summary_filename_list[0])
         self.read_location_aggregates(summary_filename_list)
+        self._log.info("Read summarized annotations to aggregate by region")
 
-        location_aggregation_filenames = set()
+        region_summary_filenames = []
         nnsl = self._get_riis_species()
 
         for state, counties in self.states.items():
-            state_agg_fname = self._write_statecounty_aggregate(datapath, nnsl, state)
-            location_aggregation_filenames.add(state_agg_fname)
+            state_agg_fname = self._write_region_aggregate(datapath, nnsl, state)
+            if state_agg_fname is not None:
+                region_summary_filenames.append(state_agg_fname)
             for county in counties:
-                cty_agg_fname = self._write_statecounty_aggregate(datapath, nnsl, state, county=county)
-                location_aggregation_filenames.add(cty_agg_fname)
+                cty_agg_fname = self._write_region_aggregate(datapath, nnsl, state, county=county)
+                if cty_agg_fname is not None:
+                    region_summary_filenames.append(cty_agg_fname)
 
-        return location_aggregation_filenames
+        return region_summary_filenames
 
     # ...............................................
-    def summarize_by_assessment(self, summary_filename_list):
+    def summarize_assessments(self, region_summary_filenames):
         """Read annotated data from one or more files, summarize by species, and by location.
 
         Args:
@@ -464,22 +489,43 @@ class Aggregator():
         [STATE_KEY, COUNTY_KEY, ASSESS_KEY, COUNT_KEY, PERCENT_KEY]
         """
         self.locations = {}
-        for _fname in summary_filename_list:
+        for _fname in region_summary_filenames:
             break
         datapath, _ = os.path.split(_fname)
-        summary_filename = os.path.join(datapath, "out", "riis_summary.csv")
+        assess_summary_filename = os.path.join(datapath, "riis_summary.csv")
         try:
-            csvwtr, outf = get_csv_writer(summary_filename, GBIF.DWCA_DELIMITER, fmode="w")
+            csvwtr, outf = get_csv_writer(assess_summary_filename, GBIF.DWCA_DELIMITER, fmode="w")
             csvwtr.writerow(RIIS_HEADER)
-
-            # Summarize introduced/invasive/native in each location
-            for locfile in summary_filename_list:
-                state, county = self.parse_location_summary_name(locfile)
-                self._summarize_location_by_riis(csvwtr, locfile, state, county=county)
-
         except Exception as e:
-            raise Exception(f"Unknown write error on {summary_filename}: {e}")
+            raise Exception(f"Unknown open/csv error on {assess_summary_filename}: {e}")
+
+        intro_species_total = invasive_species_total = native_species_total = species_total = 0
+        intro_occ_total = invasive_occ_total = native_occ_total = occ_total = 0
+        try:
+            # Summarize introduced/invasive/native in each location
+            for region_file in region_summary_filenames:
+                state, county = self.parse_location_summary_name(region_file)
+                (intro_species, invasive_species, native_species, species, intro_occ, invasive_occ, native_occ,
+                    occ) = self._summarize_region_by_riis(csvwtr, region_file, state, county=county)
+
+                intro_species_total += intro_species
+                invasive_species_total += invasive_species
+                native_species_total += native_species
+                species_total += species
+                intro_occ_total += intro_occ
+                invasive_occ_total += invasive_occ
+                native_occ_total += native_occ
+                occ_total += occ
+
+            assessed_sp_total = intro_species_total + invasive_species_total + native_species_total
+            self._log.info(f"Assessed species totals {assessed_sp_total} ?= {species_total}")
+            assessed_occ_total = intro_occ_total + invasive_occ_total + native_occ_total
+            self._log.info(f"Assessed occurrence totals {assessed_occ_total} ?= {occ_total}")
+
+            self._log.info(f"Wrote RIIS assessment summaries to {assess_summary_filename}")
+        except Exception as e:
+            raise Exception(f"Unknown write error on {assess_summary_filename}: {e}")
         finally:
             outf.close()
 
-        return summary_filename
+        return assess_summary_filename

@@ -1,5 +1,6 @@
 """Main script to execute all elements of the summarize-GBIF BISON workflow."""
 import csv
+import glob
 import os
 
 from bison.common.aggregate import Aggregator
@@ -9,7 +10,7 @@ from bison.common.constants import (
     US_CENSUS_COUNTY)
 from bison.common.geoindex import GeoResolver, GeoException
 from bison.common.riis import NNSL
-from bison.tools.util import chunk_files, delete_file, get_logger, identify_chunk_files
+from bison.tools.util import chunk_files, delete_file, get_logger, identify_chunk_files, parse_chunk_filename
 
 
 # .............................................................................
@@ -91,7 +92,35 @@ def summarize_annotations(annotated_filenames, logger):
 
 
 # .............................................................................
-def summarize_summaries(summary_filenames, logger):
+def summarize_region_assessment(summary_filenames, logger):
+    """Annotate GBIF records with census state and county, and RIIS key and assessment.
+
+    Args:
+        summary_filenames (list): list of full filenames containing GBIF data summarized by state/county for RIIS
+            assessment of records.
+        logger (object): logger for saving relevant processing messages
+
+    Returns:
+        state_aggregation_filenames (list): full filenames of species counts and percentages for each state.
+        cty_aggregation_filename (list): full filenames of species counts and percentages for each county-state.
+    """
+    aggregated_filenames = []
+    # Create a new Aggregator, ignore file used for construction,
+    agg = Aggregator(summary_filenames[0], logger=logger)
+
+    # Aggregate by region
+    region_summary_filenames = agg.summarize_regions(summary_filenames)
+    aggregated_filenames.extend(region_summary_filenames)
+
+    # Aggregate by RIIS assessment
+    assess_summary_filename = agg.summarize_assessments(region_summary_filenames)
+    aggregated_filenames.append(assess_summary_filename)
+
+    return aggregated_filenames
+
+
+# .............................................................................
+def summarize_regions(summary_filenames, logger):
     """Annotate GBIF records with census state and county, and RIIS key and assessment.
 
     Args:
@@ -105,10 +134,33 @@ def summarize_summaries(summary_filenames, logger):
     """
     # Create a new Aggregator, ignore file used for construction,
     agg = Aggregator(summary_filenames[0], logger=logger)
-    # read summaries from all files
-    location_aggregation_filenames = agg.summarize_by_location(summary_filenames)
-    agg.summarize_by_assessment(location_aggregation_filenames)
-    return location_aggregation_filenames
+
+    # Aggregate by region
+    region_summary_filenames = agg.summarize_regions(summary_filenames)
+
+    return region_summary_filenames
+
+
+# .............................................................................
+def summarize_assessments(region_summary_filenames, logger):
+    """Annotate GBIF records with census state and county, and RIIS key and assessment.
+
+    Args:
+        summary_filenames (list): list of full filenames containing GBIF data summarized by state/county for RIIS
+            assessment of records.
+        logger (object): logger for saving relevant processing messages
+
+    Returns:
+        state_aggregation_filenames (list): full filenames of species counts and percentages for each state.
+        cty_aggregation_filename (list): full filenames of species counts and percentages for each county-state.
+    """
+    # Create a new Aggregator, ignore file used for construction,
+    agg = Aggregator(region_summary_filenames[0], logger=logger)
+
+    # Aggregate by RIIS assessment
+    assess_summary_filename = agg.summarize_assessments(region_summary_filenames)
+
+    return assess_summary_filename
 
 
 # .............................................................................
@@ -249,11 +301,15 @@ if __name__ == '__main__':
     big_csv_filename = os.path.join(DATA_PATH, args.big_csv_filename)
     do_split = True if args.do_split.lower() in ("yes", "y", "true", "1") else False
 
+    # ...............................................
     # Test data
-    # big_csv_filename = os.path.join(DATA_PATH, "gbif_2022-02-15.csv")
-    cmd = "annotate"
+    # ...............................................
+    cmd = "aggregate"
+    # ...............................................
+    # ...............................................
 
     logger = get_logger(DATA_PATH, logname=f"main_{cmd}")
+    logger.info(f"Command: {cmd}")
     if cmd == "resolve":
         resolved_riis_filename = resolve_riis_taxa(riis_filename, logger)
         print(resolved_riis_filename)
@@ -272,12 +328,13 @@ if __name__ == '__main__':
                 raise FileNotFoundError(f"Expected file {csv_fname} does not exist")
 
         if cmd == "annotate":
+            # Annotate DwC records with county, state, and if found, RIIS assessment and RIIS occurrenceID
             annotated_filenames = annotate_occurrence_files(input_filenames, logger)
             log_output(logger, "Annotated filenames:", outlist=annotated_filenames)
 
         elif cmd == "summarize":
             annotated_filenames = [Annotator.construct_annotated_name(csvfile) for csvfile in input_filenames]
-            # Summarize each annotated file by state and county, write summary to a file
+            # Summarize each annotated file by region (state and county) write summary to a file
             summary_filenames = summarize_annotations(annotated_filenames, logger)
             log_output(
                 logger, "Aggregated county/state filenames:", outlist=summary_filenames)
@@ -285,10 +342,18 @@ if __name__ == '__main__':
         elif cmd == "aggregate":
             annotated_filenames = [Annotator.construct_annotated_name(csvfile) for csvfile in input_filenames]
             summary_filenames = [Aggregator.construct_summary_name(annfile) for annfile in annotated_filenames]
-            # Aggregate all summary files then write summaries for each state and county to a file for that region
-            location_aggregation_filenames = summarize_summaries(summary_filenames, logger)
+            # Aggregate all summary files then write summaries for each region to its own file
+            region_assess_summary_filenames = summarize_region_assessment(summary_filenames, logger)
             log_output(
-                logger, "Aggregated county/state filenames:", outlist=location_aggregation_filenames)
+                logger, "Region filenames, assessment filename:", outlist=region_assess_summary_filenames)
+
+        elif cmd == "summarize_assessments":
+            state_pattern = os.path.join(DATA_PATH, "out", "state*")
+            county_pattern = os.path.join(DATA_PATH, "out", "county*")
+            region_summary_filenames = glob.glob(state_pattern)
+            region_summary_filenames.extend(glob.glob(county_pattern))
+            assess_summary_filename = summarize_assessments(region_summary_filenames, logger)
+
 
         elif cmd == "full":
             annotated_filenames = annotate_occurrence_files(input_filenames, logger)
@@ -298,9 +363,9 @@ if __name__ == '__main__':
             log_output(
                 logger, "Aggregated county/state filenames:", outlist=summary_filenames)
             # Aggregate all summary files then write summaries for each state and county to a file for that region
-            location_aggregation_filenames = summarize_summaries(summary_filenames, logger)
+            region_assess_summary_filenames = summarize_region_assessment(summary_filenames, logger)
             log_output(
-                logger, "Aggregated county/state filenames:", outlist=location_aggregation_filenames)
+                logger, "Region filenames, assessment filename:", outlist=region_assess_summary_filenames)
 
         elif cmd == "test_bad_data":
             test_bad_line(input_filenames, logger)
