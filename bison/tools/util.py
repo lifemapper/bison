@@ -93,13 +93,14 @@ def ready_filename(fullfilename, overwrite=True):
 
 
 # .............................................................................
-def get_csv_writer(datafile, delimiter, fmode="w"):
+def get_csv_writer(datafile, delimiter, fmode="w", overwrite=True):
     """Create a CSV writer.
 
     Args:
         datafile: output CSV file for writing
         delimiter: field separator
         fmode: Write ('w') or append ('a')
+        overwrite (bool): True to delete an existing file before write
 
     Returns:
         writer (csv.writer) ready to write
@@ -107,16 +108,21 @@ def get_csv_writer(datafile, delimiter, fmode="w"):
 
     Raises:
         Exception: on failure to create a csv writer
+        FileExistsError: on existing file if overwrite is False
     """
     if fmode not in ("w", "a"):
         raise Exception("File mode must be 'w' (write) or 'a' (append)")
 
-    csv.field_size_limit(sys.maxsize)
-    try:
-        f = open(datafile, fmode, newline="", encoding=ENCODING)
-        writer = csv.writer(f, delimiter=delimiter, quoting=csv.QUOTE_MINIMAL)
-    except Exception as e:
-        raise e
+    if ready_filename(datafile, overwrite=overwrite):
+        csv.field_size_limit(sys.maxsize)
+        try:
+            f = open(datafile, fmode, newline="", encoding=ENCODING)
+            writer = csv.writer(f, delimiter=delimiter, quoting=csv.QUOTE_MINIMAL)
+        except Exception as e:
+            raise e
+    else:
+        raise FileExistsError
+
     return writer, f
 
 

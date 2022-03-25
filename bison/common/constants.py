@@ -49,6 +49,7 @@ US_STATES = {
     "Colorado": "CO",
     "Connecticut": "CT",
     "Delaware": "DE",
+    "District of Columbia": "DC",
     "Florida": "FL",
     "Georgia": "GA",
     "Hawaii": "HI",

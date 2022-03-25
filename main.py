@@ -163,7 +163,7 @@ def summarize_assessments(region_summary_filenames, logger):
 
 
 # .............................................................................
-def identify_subset_files(big_csv_filename, logger):
+def find_or_create_subset_files(big_csv_filename, logger):
     """Find or create subset files from a large file based on the file size and number of CPUs.
 
     Args:
@@ -303,7 +303,8 @@ if __name__ == '__main__':
     # ...............................................
     # Test data
     # ...............................................
-    cmd = "aggregate"
+    cmd = "summarize_assessments"
+    big_csv_filename = os.path.join(DATA_PATH, "gbif_2022-03-16_100k.csv")
     # ...............................................
     # ...............................................
 
@@ -314,11 +315,11 @@ if __name__ == '__main__':
         print(resolved_riis_filename)
         log_output(logger, f"Resolved RIIS filename: {resolved_riis_filename}")
     elif cmd == "split":
-        input_filenames = identify_subset_files(big_csv_filename, logger)
+        input_filenames = find_or_create_subset_files(big_csv_filename, logger)
         log_output(logger, "Input filenames:", outlist=input_filenames)
     else:
         if do_split is True:
-            input_filenames = identify_subset_files(big_csv_filename, logger)
+            input_filenames = find_or_create_subset_files(big_csv_filename, logger)
         else:
             input_filenames = [big_csv_filename]
         # Make sure files to be processed exist
