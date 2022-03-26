@@ -187,11 +187,9 @@ class Aggregator():
             self.states[st] = set()
 
     # ...............................................
-    def _get_compound_key(self, part1, part2):
-        if part1 and part2:
-            return f"{part1}{AGGREGATOR_DELIMITER}{part2}"
-        else:
-            self._log.error(f"Why missing part1 {part1} or part2 {part2}")
+    @classmethod
+    def construct_compound_key(cls, part1, part2):
+        return f"{part1}{AGGREGATOR_DELIMITER}{part2}"
 
     # ...............................................
     def _parse_compound_key(self, compound_key):
@@ -238,6 +236,20 @@ class Aggregator():
         else:
             basename = f"county_{state}_{county}.csv"
         outfname = os.path.join(datapath, "out", basename)
+        return outfname
+
+    # ...............................................
+    @classmethod
+    def construct_assessment_summary_name(cls, datapath):
+        """Construct a filename for the RIIS assessment summary file.
+
+        Args:
+            datapath (str): full directory path for computations and output.
+
+        Returns:
+            outfname: output filename
+        """
+        outfname = os.path.join(datapath, "out", "riis_summary.csv")
         return outfname
 
     # ...............................................
@@ -304,10 +316,10 @@ class Aggregator():
         self._log.info(f"Summarizing annotations in {self._csvfile} by region")
         try:
             for rec in csv_rdr:
-                species_key = self._get_compound_key(rec[GBIF.ACC_TAXON_FLD], rec[GBIF.ACC_NAME_FLD])
+                species_key = self.construct_compound_key(rec[GBIF.ACC_TAXON_FLD], rec[GBIF.ACC_NAME_FLD])
                 state = rec[NEW_RESOLVED_STATE]
                 county = rec[NEW_RESOLVED_COUNTY]
-                county_state = self._get_compound_key(state, county)
+                county_state = self.construct_compound_key(state, county)
 
                 self._add_record_to_location_summaries(county_state, species_key)
                 self._add_record_to_location_summaries(state, species_key)
@@ -375,30 +387,6 @@ class Aggregator():
         self._log.info(f"Summarized species by region from {self._csvfile} to {summary_filename}")
         return summary_filename
 
-    # # ...............................................
-    # def _summarize_summaries(self, summary_filename_list):
-    #     """Read annotated data from summary files and populate the self.locations dictionary.
-    #
-    #     Args:
-    #         summary_filename_list (list): list of full summary input filenames to be read.
-    #
-    #     Raises:
-    #         Exception: on unexpected read error
-    #
-    #     Note: [LOCATION_KEY, SPECIES_KEY, COUNT_KEY]
-    #     """
-    #     self.locations = {}
-    #     # Read summaries of occurrences and aggregate
-    #     for summary_filename in summary_filename_list:
-    #         try:
-    #             csv_rdr, inf = get_csv_dict_reader(summary_filename, GBIF.DWCA_DELIMITER, encoding=ENCODING)
-    #             for rec in csv_rdr:
-    #                 self._add_record_to_location_summaries(rec[LOCATION_KEY], rec[SPECIES_KEY], count=rec[COUNT_KEY])
-    #         except Exception as e:
-    #             raise Exception(f"Failed to read summary file {summary_filename}: {e}")
-    #         finally:
-    #             inf.close()
-
     # ...............................................
     def _get_riis_species(self):
         riis_filename = os.path.join(self._datapath, RIIS_SPECIES.FNAME)
@@ -446,10 +434,10 @@ class Aggregator():
         """
         if county is None:
             location = state
-            summary_filename = self.construct_location_summary_name(datapath, state)
+            summary_filename = self.construct_location_summary_name(self._datapath, state)
         else:
-            location = self._get_compound_key(state, county)
-            summary_filename = self.construct_location_summary_name(datapath, state, county=county)
+            location = self.construct_compound_key(state, county)
+            summary_filename = self.construct_location_summary_name(self._datapath, state, county=county)
 
         if state in ("AK", "HI"):
             region = state
@@ -576,10 +564,8 @@ class Aggregator():
             Exception: on unexpected open or write error
         """
         self.locations = {}
-        for _fname in region_summary_filenames:
-            break
-        datapath, _ = os.path.split(_fname)
-        assess_summary_filename = os.path.join(datapath, "riis_summary.csv")
+        assess_summary_filename = self.construct_assessment_summary_name(self._datapath)
+
         try:
             csvwtr, outf = get_csv_writer(assess_summary_filename, GBIF.DWCA_DELIMITER, fmode="w", overwrite=True)
             csvwtr.writerow(LMBISON_HEADER.GBIF_RIIS_SUMMARY_FILE)
