@@ -282,10 +282,16 @@ def get_fieldnames(filename, delimiter):
 
 # .............................................................................
 def _check_existence(filename_or_pattern):
-    is_pattern = False
-    # Check good input file/s
-    if filename_or_pattern.index("*") > 0 or filename_or_pattern.index("?") > 0:
-        is_pattern = True
+    is_pattern = True
+    # Wildcards?
+    try:
+        filename_or_pattern.index("*")
+    except ValueError:
+        try:
+            filename_or_pattern.index("?")
+        except ValueError:
+            is_pattern = False
+    if is_pattern:
         files = glob.glob(filename_or_pattern)
         if len(files) == 0:
             raise FileNotFoundError(f"No files match the pattern {filename_or_pattern}")

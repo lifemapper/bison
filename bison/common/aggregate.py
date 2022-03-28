@@ -71,6 +71,52 @@ class RIIS_Counts():
             raise Exception("Cannot add group (species) counts to individual occurrence counts")
 
     # .............................................................................
+    def add_to(self, assessment, value=1):
+        """Add the values in another RIIS_Counts object to values in this object.
+
+        Args:
+            other (RIIS_Counts): another object for which to add values to self
+
+        Raises:
+            Exception: on attempt to add different types of counts together
+        """
+        if assessment == "introduced":
+            self.introduced += int(value)
+        elif assessment == "invasive":
+            self.invasive += int(value)
+        elif assessment == "presumed_native":
+            self.presumed_native += int(value)
+        else:
+            raise Exception(f"Cannot add to invalid assessment {assessment}")
+
+    # .............................................................................
+    def equals(self, other):
+        """Compare the values in another RIIS_Counts object to values in this object.
+
+        Args:
+            other (RIIS_Counts): another object for which to add values to self
+
+        Returns:
+            boolean indicating whether self and other attribute values are equivalent.
+
+        Raises:
+            Exception: on attempt to add different types of counts together
+        """
+        if self.is_group is other.is_group:
+            if self.introduced != other.introduced:
+                self._log.info(f"Introduced count: self {self.introduced} <> other {other.introduced}")
+                return False
+            if self.invasive != other.invasive:
+                self._log.info(f"Invasive count: self {self.introduced} <> other {other.introduced}")
+                return False
+            if self.presumed_native != other.presumed_native:
+                self._log.info(f"Presumed_native count: self {self.presumed_native} <> other {other.presumed_native}")
+                return False
+        else:
+            raise Exception("Cannot add group (species) counts to individual occurrence counts")
+        return True
+
+    # .............................................................................
     @property
     def total(self):
         """Return the total introduced, invasive, and presumed native counts.
@@ -189,10 +235,29 @@ class Aggregator():
     # ...............................................
     @classmethod
     def construct_compound_key(cls, part1, part2):
+        """Construct a compound key for dictionaries.
+
+        Args:
+            part1 (str): first element of compound key.
+            part2 (str): second element of compound key.
+
+        Returns:
+             str combining part1 and part2 to use as a dictionary key.
+        """
         return f"{part1}{AGGREGATOR_DELIMITER}{part2}"
 
     # ...............................................
-    def _parse_compound_key(self, compound_key):
+    @classmethod
+    def parse_compound_key(cls, compound_key):
+        """Parse a compound key into its elements.
+
+        Args:
+             compound_key (str): key combining 2 elements.
+
+        Returns:
+            part1 (str): first element of compound key.
+            second (str): first element of compound key.
+        """
         parts = compound_key.split(AGGREGATOR_DELIMITER)
         part1 = parts[0]
         if len(parts) == 2:

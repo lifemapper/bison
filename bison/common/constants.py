@@ -101,17 +101,36 @@ COUNTY_KEY = "county"
 LOCATION_KEY = "location"
 COUNT_KEY = "count"
 
+ASSESS_VALUES = ("introduced", "invasive", "presumed_native")
 
+INTRODUCED_SPECIES = "introduced_species"
+INVASIVE_SPECIES = "invasive_species"
+NATIVE_SPECIES = "presumed_native_species"
+TOTAL_SPECIES = "all_species"
+PCT_INTRODUCED_SPECIES = "pct_introduced_all_species"
+PCT_INVASIVE_SPECIES = "pct_invasive_all_species"
+PCT_NATIVE_SPECIES = "pct_presumed_native_species",
+
+INTRODUCED_OCCS = "introduced_occurrences"
+INVASIVE_OCCS = "invasive_occurrences"
+NATIVE_OCCS = "presumed_native_occurrences"
+TOTAL_OCCS = "all_occurrences"
+PCT_INTRODUCED_OCCS = "pct_introduced_all_occurrences"
+PCT_INVASIVE_OCCS = "pct_invasive_all_occurrences"
+PCT_NATIVE_OCCS = "pct_presumed_native_occurrences"
+
+
+# .............................................................................
 class LMBISON_HEADER:
     """Headers for temporary and final output files."""
     SUMMARY_FILE = [LOCATION_KEY, SPECIES_KEY, COUNT_KEY]
     REGION_FILE = [SPECIES_KEY, COUNT_KEY, ASSESS_KEY]
     GBIF_RIIS_SUMMARY_FILE = [
         STATE_KEY, COUNTY_KEY,
-        "introduced_species", "invasive_species", "presumed_native_species", "all_species",
-        "pct_introduced_all_species", "pct_invasive_all_species", "pct_presumed_native_species",
-        "introduced_occurrences", "invasive_occurrences", "presumed_native_occurrences", "all_occurrences",
-        "pct_introduced_all_occurrences", "pct_invasive_all_occurrences", "pct_presumed_native_occurrences"]
+        INTRODUCED_SPECIES, INVASIVE_SPECIES, NATIVE_SPECIES, TOTAL_SPECIES,
+        PCT_INTRODUCED_SPECIES, PCT_INVASIVE_SPECIES, PCT_NATIVE_SPECIES,
+        INTRODUCED_OCCS, INVASIVE_OCCS, NATIVE_OCCS, TOTAL_OCCS,
+        PCT_INTRODUCED_OCCS, PCT_INVASIVE_OCCS, PCT_NATIVE_OCCS]
 
 
 # .............................................................................
