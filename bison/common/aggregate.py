@@ -75,7 +75,8 @@ class RIIS_Counts():
         """Add the values in another RIIS_Counts object to values in this object.
 
         Args:
-            other (RIIS_Counts): another object for which to add values to self
+            assessment (str): type of assessment for which to add values
+            value (int): count to add to the appropriate assessment
 
         Raises:
             Exception: on attempt to add different types of counts together
@@ -257,6 +258,9 @@ class Aggregator():
         Returns:
             part1 (str): first element of compound key.
             second (str): first element of compound key.
+
+        Raises:
+            ValueError: on unexpected input
         """
         parts = compound_key.split(AGGREGATOR_DELIMITER)
         part1 = parts[0]
