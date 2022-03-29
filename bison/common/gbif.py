@@ -68,9 +68,7 @@ class DwcData(object):
             raise
         except Exception as e:
             raise Exception(f"Unexpected open error {e} on file {self._csvfile}")
-
         # self._log.info(f"Opened GBIF data file {self._csvfile}")
-
 
     # ...............................................
     def close(self):

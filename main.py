@@ -10,6 +10,7 @@ from bison.common.constants import (
     US_CENSUS_COUNTY)
 from bison.common.geoindex import GeoResolver, GeoException
 from bison.common.riis import NNSL
+from bison.test.test_outputs import Counter
 from bison.tools.util import chunk_files, delete_file, get_logger, identify_chunk_files
 
 
@@ -303,7 +304,7 @@ if __name__ == '__main__':
     # ...............................................
     # Test data
     # ...............................................
-    cmd = "aggregate"
+    cmd = "annotate"
     big_csv_filename = os.path.join(DATA_PATH, "gbif_2022-03-16_100k.csv")
     # ...............................................
 
@@ -345,6 +346,10 @@ if __name__ == '__main__':
             region_assess_summary_filenames = summarize_region_assessment(summary_filenames, logger)
             log_output(
                 logger, "Region filenames, assessment filename:", outlist=region_assess_summary_filenames)
+
+        elif cmd == "test":
+            record_counter = Counter(big_csv_filename, do_split=True, logger=logger)
+            record_counter.compare_counts()
 
         elif cmd == "summarize_assessments":
             state_pattern = os.path.join(DATA_PATH, "out", "state*")
