@@ -9,6 +9,7 @@ from bison.common.constants import (
     US_CENSUS_COUNTY)
 from bison.common.riis import NNSL
 from bison.tools.geoindex import GeoResolver, GeoException
+from bison.tools.parallel import parallel_annotate
 from bison.tools.util import chunk_files, delete_file, get_logger, identify_chunk_files
 from bison.test.test_outputs import Counter
 
@@ -317,8 +318,11 @@ if __name__ == '__main__':
 
         if cmd == "annotate":
             # Annotate DwC records with county, state, and if found, RIIS assessment and RIIS occurrenceID
-            annotated_filenames = annotate_occurrence_files(input_filenames, logger)
-            log_output(logger, "Annotated filenames:", outlist=annotated_filenames)
+            if do_split is True:
+                parallel_annotate(input_filenames)
+            else:
+                annotated_filenames = annotate_occurrence_files(input_filenames, logger)
+                log_output(logger, "Annotated filenames:", outlist=annotated_filenames)
 
         elif cmd == "summarize":
             annotated_filenames = [Annotator.construct_annotated_name(csvfile) for csvfile in input_filenames]
