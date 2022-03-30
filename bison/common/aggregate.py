@@ -370,7 +370,7 @@ class Aggregator():
 
         # Add to summary of counties by state
         try:
-            state, county = self._parse_compound_key(location)
+            state, county = self.parse_compound_key(location)
         except ValueError:
             raise
         else:
@@ -470,7 +470,7 @@ class Aggregator():
             # All these species are for the location of interest
             for species_key, count in species_counts.items():
                 try:
-                    gbif_taxon_key, species = self._parse_compound_key(species_key)
+                    gbif_taxon_key, species = self.parse_compound_key(species_key)
                 except ValueError:
                     raise (f"Error in species_key {species_key}, should contain name and taxonKey")
 
