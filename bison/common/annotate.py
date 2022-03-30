@@ -5,9 +5,8 @@ from bison.common.constants import (
     ENCODING, EXTRA_CSV_FIELD, GBIF, LOG, NEW_RESOLVED_COUNTY, NEW_RESOLVED_STATE,
     NEW_RIIS_ASSESSMENT_FLD, NEW_RIIS_KEY_FLD, POINT_BUFFER_RANGE, RIIS_SPECIES, US_CENSUS_COUNTY, US_STATES)
 from bison.common.gbif import DwcData
-from bison.common.geoindex import GeoResolver, GeoException
 from bison.common.riis import NNSL
-
+from bison.tools.geoindex import GeoResolver, GeoException
 from bison.tools.util import (get_csv_dict_writer, get_logger)
 
 
@@ -38,7 +37,8 @@ class Annotator():
             self.nnsl.read_riis(read_resolved=True)
 
         # Must georeference points to add new, consistent state and county fields
-        self._geo_county = GeoResolver(US_CENSUS_COUNTY.FILE, US_CENSUS_COUNTY.CENSUS_BISON_MAP, self._log)
+        geofile = os.path.join(self._datapath, US_CENSUS_COUNTY.FILE)
+        self._geo_county = GeoResolver(geofile, US_CENSUS_COUNTY.CENSUS_BISON_MAP, self._log)
 
         # Input reader
         self._dwcdata = DwcData(self._csvfile, logger=logger)
@@ -51,13 +51,6 @@ class Annotator():
                 self._conus_states.extend([k, v])
         self._all_states = self._conus_states.copy()
         self._all_states.extend(["Alaska", "Hawaii", "AK", "HI"])
-
-        # # Test DwC record contents
-        # self.good_locations = {}
-        # self.bad_locations = {}
-        # self.missing_states = 0
-        # self.matched_states = 0
-        # self.mismatched_states = 0
 
     # ...............................................
     @classmethod
