@@ -7,10 +7,10 @@ from bison.common.annotate import Annotator
 from bison.common.constants import (
     GBIF, DATA_PATH, EXTRA_CSV_FIELD, LOG, NEW_RESOLVED_COUNTY, NEW_RESOLVED_STATE, POINT_BUFFER_RANGE, RIIS_SPECIES,
     US_CENSUS_COUNTY)
-from bison.common.geoindex import GeoResolver, GeoException
 from bison.common.riis import NNSL
-from bison.test.test_outputs import Counter
+from bison.tools.geoindex import GeoResolver, GeoException
 from bison.tools.util import chunk_files, delete_file, get_logger, identify_chunk_files
+from bison.test.test_outputs import Counter
 
 
 # .............................................................................
@@ -218,7 +218,8 @@ def test_bad_line(input_filenames, logger):
     """
     trouble = "1698055779"
     trouble_next = "1698058398"
-    geo_county = GeoResolver(US_CENSUS_COUNTY.FILE, US_CENSUS_COUNTY.CENSUS_BISON_MAP, logger)
+    geofile = os.path.join(DATA_PATH, US_CENSUS_COUNTY.FILE)
+    geo_county = GeoResolver(geofile, US_CENSUS_COUNTY.CENSUS_BISON_MAP, logger)
     for csvfile in input_filenames:
         try:
             f = open(csvfile, "r", newline="", encoding="utf-8")
