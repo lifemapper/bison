@@ -30,3 +30,4 @@ data/cb_2020_us_state_500k.zip
 data/state*csv
 data/county*csv
 data/out
+data/gbif_2022-03-16_2m.csv
