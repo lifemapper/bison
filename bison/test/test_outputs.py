@@ -5,7 +5,8 @@ import os
 from bison.common.aggregate import Aggregator, RIIS_Counts
 from bison.common.gbif import DwcData
 from bison.common.constants import (
-    ASSESS_VALUES, DATA_PATH, GBIF, NEW_RESOLVED_COUNTY, INTRODUCED_SPECIES, INVASIVE_SPECIES, NATIVE_SPECIES,
+    ASSESS_VALUES, DATA_PATH, GBIF, NEW_RESOLVED_COUNTY,
+    INTRODUCED_OCCS, INTRODUCED_SPECIES, INVASIVE_OCCS, INVASIVE_SPECIES, NATIVE_OCCS, NATIVE_SPECIES,
     NEW_RESOLVED_STATE, NEW_RIIS_ASSESSMENT_FLD, SPECIES_KEY, STATE_KEY, COUNTY_KEY, ASSESS_KEY, COUNT_KEY)
 from bison.tools.util import get_csv_dict_reader, get_logger
 
@@ -163,9 +164,9 @@ class Counter():
             for rec in rdr:
                 if rec[STATE_KEY] == state:
                     # occurrence counts
-                    intro_occ = rec[INTRODUCED_SPECIES]
-                    inv_occ = rec[INVASIVE_SPECIES]
-                    native_occ = rec[NATIVE_SPECIES]
+                    intro_occ = rec[INTRODUCED_OCCS]
+                    inv_occ = rec[INVASIVE_OCCS]
+                    native_occ = rec[NATIVE_OCCS]
                     # species/group counts
                     intro_sp = rec[INTRODUCED_SPECIES]
                     inv_sp = rec[INVASIVE_SPECIES]
@@ -222,16 +223,15 @@ class Counter():
 
     # .............................................................................
     def _log_comparison(self, truth_counts, summary_counts, compare_type, source):
-        self._log.info(f"{compare_type} introduced, invasive, presumed_native count from annotated records: ")
+        self._log.info(f"Compare annotation counts to {source} ({compare_type}) introduced, invasive, presumed_native: ")
         self._log.info(
-            f"    {truth_counts.invasive}, {truth_counts.introduced}, {truth_counts.presumed_native}")
-        self._log.info(f"{compare_type} introduced, invasive, presumed_native records from {source}: ")
+            f"    {truth_counts.introduced}, {truth_counts.invasive}, {truth_counts.presumed_native}")
         self._log.info(
-            f"    {summary_counts.invasive}, {summary_counts.introduced}, {summary_counts.presumed_native}")
+            f"    {summary_counts.introduced}, {summary_counts.invasive}, {summary_counts.presumed_native}")
         if truth_counts.equals(summary_counts):
             self._log.info("Success!")
         else:
-            self._log.info("Fail! Annotations do not match summaries")
+            self._log.info("FAIL! Annotations do not match summaries")
         self._log.info("")
 
     # .............................................................................
@@ -247,7 +247,7 @@ class Counter():
         self._log.info("--------------------------------------")
 
         # Ground truth: Count matching lines for species and region in annotated records
-        gtruth_state_occ_counts, gtruth_county_occ_counts = self._count_annotated_records_for_species(
+        gtruth_state_occXspecies, gtruth_county_occXspecies = self._count_annotated_records_for_species(
             species_name, taxkey, state, county)
 
         # Counts from state and county summary files
@@ -255,30 +255,31 @@ class Counter():
         county_loc_occ_counts = self._get_region_count(species_name, state, county=county)
 
         # Compare
-        self._log_comparison(gtruth_state_occ_counts, state_loc_occ_counts, f"{state} {species_name} occurrence", f"{state} summary")
-        self._log_comparison(gtruth_county_occ_counts, county_loc_occ_counts, f"{county} {species_name} occurrence", f"{county} summary")
+        self._log_comparison(gtruth_state_occXspecies, state_loc_occ_counts, f"{state} {species_name} occurrence", f"{state} summary")
+        self._log_comparison(gtruth_county_occXspecies, county_loc_occ_counts, f"{county} {species_name} occurrence", f"{county} summary")
 
         self._log.info("--------------------------------------")
-        self._log.info(f"Compare `ground truth` assessment occurrences {county} {state} to RIIS summary")
+        self._log.info(f"Compare `ground truth` assessment (occurrences) {county} {state} to RIIS summary")
         self._log.info("--------------------------------------")
 
         # Ground truth: Count matching lines for assessment and region in annotated records
-        (gtruth_state_occ_riis_counts, gtruth_cty_occ_riis_counts, gtruth_state_species_counts,
-            gtruth_cty_species_counts) = self._count_annotated_records_for_assessments(state, county)
+        (gtruth_state_occXassess, gtruth_cty_occXassess, gtruth_state_speciesXassess,
+            gtruth_cty_speciesXassess) = self._count_annotated_records_for_assessments(state, county)
 
         # Counts from RIIS assessment summary
         (st_species_counts, st_occ_counts) = self._get_assess_summary(state)
         (cty_species_counts, cty_occ_counts) = self._get_assess_summary(state, county=county)
 
-        self._log_comparison(gtruth_state_occ_riis_counts, st_occ_counts, f"{state} occurrence", "RIIS summary")
-        self._log_comparison(gtruth_cty_occ_riis_counts, cty_occ_counts, f"{county} occurrence", "RIIS summary")
+        # Compare
+        self._log_comparison(gtruth_state_occXassess, st_occ_counts, f"{state} occurrence", "RIIS summary")
+        self._log_comparison(gtruth_cty_occXassess, cty_occ_counts, f"{county} occurrence", "RIIS summary")
 
         # Compare species counts
         self._log.info("--------------------------------------")
-        self._log.info(f"Compare `ground truth` assessment species {county} {state} to RIIS summary")
+        self._log.info(f"Compare `ground truth` assessment (species) {county} {state} to RIIS summary")
         self._log.info("--------------------------------------")
-        self._log_comparison(gtruth_state_species_counts, st_species_counts, f"{state} species", "RIIS summary")
-        self._log_comparison(gtruth_cty_species_counts, cty_species_counts, f"{county} species", "RIIS summary")
+        self._log_comparison(gtruth_state_speciesXassess, st_species_counts, f"{state} species", "RIIS summary")
+        self._log_comparison(gtruth_cty_speciesXassess, cty_species_counts, f"{county} species", "RIIS summary")
 
 
 # .............................................................................

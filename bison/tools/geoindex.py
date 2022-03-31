@@ -4,17 +4,15 @@ import ogr
 import rtree
 import time
 
-from bison.common.constants import DATA_PATH
-
 
 # .............................................................................
 class GeoResolver(object):
     """Object for intersecting coordinates with a polygon shapefile."""
-    def __init__(self, spatial_fname, spatial_fields, logger):
+    def __init__(self, full_spatial_fname, spatial_fields, logger):
         """Construct a geospatial index to intersect with a set of coordinates.
 
         Args:
-            spatial_fname (str): filename for a shapefile to construct index from
+            full_spatial_fname (str): full filename for a shapefile to construct index from
             spatial_fields (dict): dictionary containing keys that are fieldnames for
                 polygon attributes of interest and values that are new fields for
                 the intersected points.
@@ -23,7 +21,7 @@ class GeoResolver(object):
         Raises:
             FileNotFoundError: if spatial_fname does not exist on the file system
         """
-        full_spatial_fname = os.path.join(DATA_PATH, spatial_fname)
+        # full_spatial_fname = os.path.join(DATA_PATH, spatial_fname)
         if not os.path.exists(full_spatial_fname):
             raise FileNotFoundError
         self._log = logger
