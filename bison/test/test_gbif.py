@@ -1,5 +1,7 @@
 """Module to test the contents of the input GBIF csv occurrence data file."""
-from bison.common.constants import DATA_PATH, GBIF
+import os
+
+from bison.common.constants import BIG_DATA_PATH, GBIF, LOG
 from bison.common.gbif import DwcData
 from bison.tools.gbif_api import GbifSvc
 from bison.tools.util import get_logger
@@ -51,9 +53,9 @@ if __name__ == "__main__":
     csvfile = GBIF.TEST_DATA
 
     # Test the taxonkey contents in GBIF simple CSV download file
-    logger = get_logger(DATA_PATH, logname=logname)
+    logger = get_logger(os.path.join(BIG_DATA_PATH, LOG.DIR), logname=logname)
 
-    Tst = TestGBIFData(DATA_PATH, csvfile, logger)
+    Tst = TestGBIFData(BIG_DATA_PATH, csvfile, logger)
     Tst.test_gbif_name_accepted()
 
 """

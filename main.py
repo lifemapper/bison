@@ -5,8 +5,8 @@ import os
 from bison.common.aggregate import Aggregator
 from bison.common.annotate import Annotator
 from bison.common.constants import (
-    GBIF, DATA_PATH, EXTRA_CSV_FIELD, LOG, NEW_RESOLVED_COUNTY, NEW_RESOLVED_STATE, POINT_BUFFER_RANGE, RIIS_SPECIES,
-    US_CENSUS_COUNTY)
+    GBIF, BIG_DATA_PATH, DATA_PATH, EXTRA_CSV_FIELD, LOG, NEW_RESOLVED_COUNTY, NEW_RESOLVED_STATE, POINT_BUFFER_RANGE,
+    RIIS_SPECIES, US_CENSUS_COUNTY)
 from bison.common.riis import NNSL
 from bison.tools.geoindex import GeoResolver, GeoException
 from bison.tools.parallel import parallel_annotate
@@ -269,8 +269,9 @@ if __name__ == '__main__':
     import argparse
 
     riis_filename = os.path.join(DATA_PATH, RIIS_SPECIES.FNAME)
-    gbif_infile = os.path.join(DATA_PATH, GBIF.INPUT_DATA)
-    gbif_infile = os.path.join(DATA_PATH, "gbif_2022-03-16.csv")
+    gbif_infile = os.path.join(BIG_DATA_PATH, GBIF.INPUT_DATA)
+    # wc -l =
+    gbif_infile = os.path.join(BIG_DATA_PATH, "gbif_2022-03-16.csv")
 
     parser = argparse.ArgumentParser(
         description=("Execute one or more steps of annotating GBIF data with RIIS assessments, and summarizing by " +
@@ -288,7 +289,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     cmd = args.cmd
-    big_csv_filename = os.path.join(DATA_PATH, args.big_csv_filename)
+    big_csv_filename = os.path.join(BIG_DATA_PATH, args.big_csv_filename)
     do_split = True if args.do_split.lower() in ("yes", "y", "true", "1") else False
 
     # ...............................................
@@ -298,7 +299,7 @@ if __name__ == '__main__':
     # big_csv_filename = os.path.join(DATA_PATH, "gbif_2022-03-16_100k.csv")
     # ...............................................
 
-    logger = get_logger(DATA_PATH, logname=f"main_{cmd}")
+    logger = get_logger(os.path.join(DATA_PATH, LOG.DIR), logname=f"main_{cmd}")
     logger.info(f"Command: {cmd}")
     if cmd == "resolve":
         resolved_riis_filename = resolve_riis_taxa(riis_filename, logger)

@@ -4,13 +4,9 @@
 
 data/.~lock*
 data/*updated*csv
-data/*log
-data/gbif*100k.csv
-data/gbif_2022-02-15.csv
+data/log/
 data/*zip
-data/*annotated*
 data/*xml
-data/*chunk*csv
 
 venv/
 /.pytest_cache/
@@ -30,5 +26,4 @@ data/cb_2020_us_state_500k.zip
 data/state*csv
 data/county*csv
 data/out
-data/gbif_2022-03-16_2m.csv
-data/gbif_2022-03-16.csv
+big_data

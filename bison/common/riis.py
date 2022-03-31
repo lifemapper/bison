@@ -259,7 +259,7 @@ class NNSL:
         self._csvfile = riis_filename
 
         if logger is None:
-            logger = get_logger(datapath)
+            logger = get_logger(os.path.join(datapath, LOG.DIR))
         self._log = logger
 
         self.auth_fname = f"{os.path.join(self._datapath, RIIS_AUTHORITY.FNAME)}.{RIIS.DATA_EXT}"

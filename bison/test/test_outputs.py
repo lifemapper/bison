@@ -5,7 +5,7 @@ import os
 from bison.common.aggregate import Aggregator, RIIS_Counts
 from bison.common.gbif import DwcData
 from bison.common.constants import (
-    ASSESS_VALUES, DATA_PATH, GBIF, NEW_RESOLVED_COUNTY,
+    ASSESS_VALUES, BIG_DATA_PATH, DATA_PATH, GBIF, NEW_RESOLVED_COUNTY, LOG,
     INTRODUCED_OCCS, INTRODUCED_SPECIES, INVASIVE_OCCS, INVASIVE_SPECIES, NATIVE_OCCS, NATIVE_SPECIES,
     NEW_RESOLVED_STATE, NEW_RIIS_ASSESSMENT_FLD, SPECIES_KEY, STATE_KEY, COUNTY_KEY, ASSESS_KEY, COUNT_KEY)
 from bison.tools.util import get_csv_dict_reader, get_logger
@@ -41,7 +41,7 @@ class Counter():
         self.summary_annotated_pattern = os.path.join(self._datapath, f"{base_pattern}*annotated_summary{ext}")
 
         if logger is None:
-            logger = get_logger(self._datapath)
+            logger = get_logger(os.path.join(self._datapath, LOG.DIR))
         self._log = logger
 
     # .............................................................................
@@ -287,7 +287,7 @@ class Counter():
 if __name__ == '__main__':
     import argparse
 
-    gbif_infile = os.path.join(DATA_PATH, "gbif_2022-03-16.csv")
+    gbif_infile = os.path.join(BIG_DATA_PATH, "gbif_2022-03-16.csv")
 
     parser = argparse.ArgumentParser(
         description="Test outputs of summarized GBIF data with RIIS assessments.")
@@ -301,7 +301,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
     base_big_csv_filename = args.big_csv_filename
     do_split = True if args.do_split.lower() in ("yes", "y", "true", "1") else False
-    logger = get_logger(DATA_PATH, logname="main_test_outputs")
 
     # ...............................................
     # Test data
@@ -312,7 +311,8 @@ if __name__ == '__main__':
     # # Basename for constructing temporary files
     in_base_filename, ext = os.path.splitext(base_big_csv_filename)
     # Full path to input data
-    big_csv_filename = os.path.join(DATA_PATH, args.big_csv_filename)
+    big_csv_filename = os.path.join(BIG_DATA_PATH, base_big_csv_filename)
+    logger = get_logger(os.path.join(BIG_DATA_PATH, LOG.DIR), logname="main_test_outputs")
 
     record_counter = Counter(big_csv_filename, do_split=True, logger=logger)
     record_counter.compare_counts()

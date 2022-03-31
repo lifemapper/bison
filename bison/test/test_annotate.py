@@ -2,7 +2,7 @@
 import os
 
 from bison.common.annotate import Annotator
-from bison.common.constants import GBIF, DATA_PATH
+from bison.common.constants import BIG_DATA_PATH, DATA_PATH, GBIF, LOG
 from bison.common.riis import NNSL
 from bison.tools.util import get_logger, chunk_files
 
@@ -40,9 +40,9 @@ class TestAnnotator(Annotator):
 # .............................................................................
 if __name__ == "__main__":
     # Test the taxonkey contents in GBIF simple CSV download file
-    logger = get_logger(DATA_PATH, logname="test_annotate")
+    big_gbif_fname = os.path.join(BIG_DATA_PATH, GBIF.TEST_DATA)
+    logger = get_logger(os.path.join(BIG_DATA_PATH, LOG.DIR), logname="test_annotate")
     nnsl_data = NNSL(DATA_PATH, logger=logger)
-    big_gbif_fname = os.path.join(DATA_PATH, GBIF.TEST_DATA)
 
     chunk_fnames = chunk_files(big_gbif_fname)
     for fname in chunk_fnames:

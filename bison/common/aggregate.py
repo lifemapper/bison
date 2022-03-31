@@ -3,7 +3,7 @@ import os
 
 from bison.common.constants import (
     AGGREGATOR_DELIMITER, ENCODING, GBIF, NEW_RESOLVED_COUNTY, NEW_RESOLVED_STATE, RIIS_SPECIES, US_STATES,
-    SPECIES_KEY, ASSESS_KEY, LOCATION_KEY, COUNT_KEY, LMBISON_HEADER)
+    SPECIES_KEY, ASSESS_KEY, LOCATION_KEY, COUNT_KEY, LMBISON_HEADER, LOG, OUT_DIR)
 from bison.common.riis import NNSL
 
 from bison.tools.util import (get_csv_writer, get_csv_dict_reader, get_logger)
@@ -240,12 +240,15 @@ class Aggregator():
         self._datapath = datapath
         self._csvfile = annotated_filename
         if logger is None:
-            logger = get_logger(datapath)
+            logger = get_logger(os.path.join(datapath, LOG.DIR))
         # Hold all counties found in each state
         self.states = {}
         self._init_states()
 
+        if logger is None:
+            logger = get_logger(os.path.join(datapath, LOG.DIR))
         self._log = logger
+
         # {county_or_state: {species: count, ... }
         #  ...  }
         self.locations = {}
@@ -327,7 +330,7 @@ class Aggregator():
             basename = f"state_{state}.csv"
         else:
             basename = f"county_{state}_{county}.csv"
-        outfname = os.path.join(datapath, "out", basename)
+        outfname = os.path.join(datapath, OUT_DIR, basename)
         return outfname
 
     # ...............................................
@@ -341,7 +344,7 @@ class Aggregator():
         Returns:
             outfname: output filename
         """
-        outfname = os.path.join(datapath, "out", "riis_summary.csv")
+        outfname = os.path.join(datapath, OUT_DIR, "riis_summary.csv")
         return outfname
 
     # ...............................................
