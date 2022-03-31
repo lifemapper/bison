@@ -105,13 +105,10 @@ class RIIS_Counts():
         """
         if self.is_group is other.is_group:
             if self.introduced != other.introduced:
-                self._log.info(f"Introduced count: self {self.introduced} <> other {other.introduced}")
                 return False
             if self.invasive != other.invasive:
-                self._log.info(f"Invasive count: self {self.introduced} <> other {other.introduced}")
                 return False
             if self.presumed_native != other.presumed_native:
-                self._log.info(f"Presumed_native count: self {self.presumed_native} <> other {other.presumed_native}")
                 return False
         else:
             raise Exception("Cannot add group (species) counts to individual occurrence counts")
@@ -133,9 +130,13 @@ class RIIS_Counts():
         """Compute the percent introduced of total count.
 
         Returns:
-            percentage of introduced count to total count
+            percentage of introduced count to total count or "n/a" if total is 0.
         """
-        return (self.introduced / self.total)
+        try:
+            pct = (self.introduced / self.total)
+        except ZeroDivisionError:
+            return "n/a"
+        return pct
 
     # .............................................................................
     @property
@@ -145,17 +146,25 @@ class RIIS_Counts():
         Returns:
             string of the percentage of introduced count to total count, rounded to 3 places right of the decimal
         """
-        return f"{self.percent_introduced:.3f}"
+        try:
+            pct_str = f"{self.percent_introduced:.3f}"
+        except SyntaxError:
+            return self.percent_introduced
+        return pct_str
 
     # .............................................................................
     @property
     def percent_invasive(self):
-        """Compute the percent invasive of total count.
+        """Compute the percent invasive of total count or "n/a" if total is 0.
 
         Returns:
-            percentage of invasive count to total count
+            percentage of invasive count to total count or "n/a" if total is 0
         """
-        return (self.invasive / self.total)
+        try:
+            pct = (self.invasive / self.total)
+        except ZeroDivisionError:
+            return "n/a"
+        return pct
 
     # .............................................................................
     @property
@@ -163,9 +172,14 @@ class RIIS_Counts():
         """The rounded percent invasive of total count, as a string.
 
         Returns:
-            string of the percentage of invasive count to total count, rounded to 3 places right of the decimal
+            string of the percentage of invasive count to total count, rounded to 3 places right of the decimal,
+                or "n/a" if total is 0
         """
-        return f"{self.percent_invasive:.3f}"
+        try:
+            pct_str = f"{self.percent_invasive:.3f}"
+        except SyntaxError:
+            return self.percent_invasive
+        return pct_str
 
     # .............................................................................
     @property
@@ -173,9 +187,13 @@ class RIIS_Counts():
         """Compute the percent presumed_native of total count.
 
         Returns:
-            percentage of presumed_native count to total count
+            percentage of presumed_native count to total count or "n/a" if total is 0
         """
-        return (self.presumed_native / self.total)
+        try:
+            pct = (self.presumed_native / self.total)
+        except ZeroDivisionError:
+            return "n/a"
+        return pct
 
     # .............................................................................
     @property
@@ -184,8 +202,13 @@ class RIIS_Counts():
 
         Returns:
             string of the percentage of presumed_native count to total count, rounded to 3 places right of the decimal
+                 or "n/a" if total is 0
         """
-        return f"{self.percent_presumed_native:.3f}"
+        try:
+            pct_str = f"{self.percent_presumed_native:.3f}"
+        except SyntaxError:
+            return self.percent_presumed_native
+        return pct_str
 
 
 # .............................................................................

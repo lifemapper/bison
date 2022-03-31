@@ -117,8 +117,8 @@ class RIISRec():
             gbif_sciname (str):  current GBIF accepted scientific name, in the GBIF Backbone
                 Taxonomy, for a scientific name
         """
-        self.data[RIIS_SPECIES.NEW_GBIF_KEY_FLD] = gbif_key
-        self.data[RIIS_SPECIES.NEW_GBIF_SCINAME_FLD] = gbif_sciname
+        self.data[NEW_GBIF_KEY_FLD] = gbif_key
+        self.data[NEW_GBIF_SCINAME_FLD] = gbif_sciname
 
     # ...............................................
     def is_name_match(self, rrec):
@@ -207,7 +207,7 @@ class RIISRec():
         Returns:
             True if self and rrec GBIF key match.
         """
-        return (self.data[RIIS_SPECIES.GBIF_KEY] == self.data[RIIS_SPECIES.NEW_GBIF_KEY_FLD])
+        return (self.data[RIIS_SPECIES.GBIF_KEY] == self.data[NEW_GBIF_KEY_FLD])
 
     # ...............................................
     def is_taxauthority_match(self, rrec):
@@ -316,8 +316,8 @@ class NNSL:
             updated_riis_header: fieldnames for the updated file
         """
         header = RIIS_SPECIES.HEADER.copy()
-        header.append(RIIS_SPECIES.NEW_GBIF_KEY_FLD)
-        header.append(RIIS_SPECIES.NEW_GBIF_SCINAME_FLD)
+        header.append(NEW_GBIF_KEY_FLD)
+        header.append(NEW_GBIF_SCINAME_FLD)
         header.append(LINENO_FLD)
         return header
 
@@ -608,7 +608,7 @@ class NNSL:
             keys = list(self.by_riis_id.keys())
             tstrec = self.by_riis_id[keys[0]]
             try:
-                tstrec.data[RIIS_SPECIES.NEW_GBIF_KEY_FLD]
+                tstrec.data[NEW_GBIF_KEY_FLD]
             except KeyError:
                 raise Exception("RIIS records have not been resolved to GBIF accepted taxa")
 
