@@ -1,7 +1,7 @@
 """Common classes for Specimen Occurrence record processing."""
 import os
 
-from bison.common.constants import (DATA_PATH, ENCODING, EXTRA_CSV_FIELD, GBIF, LOG)
+from bison.common.constants import (BIG_DATA_PATH, DATA_PATH, ENCODING, EXTRA_CSV_FIELD, GBIF, LOG)
 from bison.tools.util import get_csv_dict_reader, get_logger, logit
 
 
@@ -27,7 +27,7 @@ class DwcData(object):
         self._datapath = datapath
         self._csvfile = occ_filename
         if logger is None:
-            logger = get_logger(datapath)
+            logger = get_logger(os.path.join(datapath, LOG.DIR))
         self._log = logger
 
         # Open file
@@ -194,7 +194,7 @@ if __name__ == '__main__':
 
     logname = "test_gbif"
     # csvfile = GBIF.TEST_DATA
-    csvfile = os.path.join(DATA_PATH, "gbif_2022-02-15_testbad_10.csv")
+    csvfile = os.path.join(BIG_DATA_PATH, "gbif_2022-02-15_testbad_10.csv")
     logger = get_logger(DATA_PATH, logname=logname)
 
     dwcdata = DwcData(csvfile, logger)

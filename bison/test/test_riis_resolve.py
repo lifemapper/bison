@@ -1,5 +1,5 @@
 """Test the GBIF and ITIS taxonomic resolution provided in the US-RIIS table."""
-from bison.common.constants import (DATA_PATH, ERR_SEPARATOR, LINENO_FLD, RIIS_SPECIES)
+from bison.common.constants import (DATA_PATH, ERR_SEPARATOR, LINENO_FLD, LOG, RIIS_SPECIES)
 from bison.common.riis import NNSL
 from bison.tools.util import logit, get_logger
 
@@ -234,7 +234,8 @@ class TestRIISTaxonomy(NNSL):
 
 # .............................................................................
 if __name__ == "__main__":
-    logger = get_logger(DATA_PATH, "test_riis_resolve")
+    import os
+    logger = get_logger(os.path.join(DATA_PATH, LOG.DIR), "test_riis_resolve")
 
     tt = TestRIISTaxonomy(DATA_PATH, logger=logger)
     tt.test_missing_taxon_authority_resolution()

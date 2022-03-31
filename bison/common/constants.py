@@ -1,6 +1,7 @@
 """Constants for GBIF, BISON, RIIS, and processed outputs, used across modules."""
-
-DATA_PATH = '/home/astewart/git/bison/data'
+BIG_DATA_PATH = "/home/astewart/git/bison/big_data"
+DATA_PATH = "/home/astewart/git/bison/data"
+OUT_DIR = "out"
 BISON_DELIMITER = "$"
 ENCODING = "utf-8"
 LINENO_FLD = "LINENO"
@@ -176,7 +177,7 @@ class GBIF:
     MATCH_FLD = "matchType"
     STATUS_FLD = "taxonomicStatus"
     ORG_FOREIGN_KEY = "publishingOrganizationKey"
-    INPUT_DATA = "gbif_2022-02-15.csv"
+    INPUT_DATA = "gbif_2022-03-16.csv"
     DWCA_DATASET_DIR = "dataset"
     DWCA_META_FNAME = "meta.xml"
     DWCA_INTERPRETED = "occurrence"
@@ -275,6 +276,7 @@ class GBIF:
 
 class LOG:
     """Constants for logging across the project."""
+    DIR = "log"
     INTERVAL = 10000
     FORMAT = ' '.join([
         "%(asctime)s",

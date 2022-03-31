@@ -4,6 +4,7 @@ from concurrent.futures import ProcessPoolExecutor
 import os
 
 from bison.common.annotate import Annotator
+from bison.common.constants import LOG
 from bison.tools.util import get_logger
 
 
@@ -34,7 +35,7 @@ def parallel_annotate(input_filenames):
         for in_csv_fn in input_filenames:
             datapath, basefname = os.path.split(in_csv_fn)
             basename, _ = os.path.splitext(basefname)
-            logger = get_logger(datapath, f"annotate_{basename}")
+            logger = get_logger(os.path.join(datapath, LOG.DIR), f"annotate_{basename}")
             executor.submit(annotate_occurrence_file, in_csv_fn, logger)
 
     annotated_filenames = [Annotator.construct_annotated_name(csvfile) for csvfile in input_filenames]

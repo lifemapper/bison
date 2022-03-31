@@ -26,7 +26,7 @@ class Annotator():
         self._csvfile = gbif_occ_filename
 
         if logger is None:
-            logger = get_logger(datapath)
+            logger = get_logger(os.path.join(datapath, LOG.DIR))
         self._log = logger
 
         if nnsl is not None:

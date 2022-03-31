@@ -10,7 +10,7 @@ import subprocess
 import sys
 import time
 
-from bison.common.constants import DATA_PATH, ENCODING, EXTRA_CSV_FIELD, GBIF, LOG
+from bison.common.constants import BIG_DATA_PATH, DATA_PATH, ENCODING, EXTRA_CSV_FIELD, GBIF, LOG
 
 
 # ...............................................
@@ -203,11 +203,11 @@ def get_csv_dict_reader(csvfile, delimiter, encoding=ENCODING, quote_none=False,
 
 
 # .............................................................................
-def get_logger(outpath, logname=None):
+def get_logger(logpath, logname=None):
     """Get a logger that logs to file and to console in an established format.
 
     Args:
-        outpath (str): path for the logfile
+        logpath (str): path for the logfile
         logname: name for the logger and basename for the logfile.
 
     Returns:
@@ -215,13 +215,14 @@ def get_logger(outpath, logname=None):
     """
     level = logging.DEBUG
     if logname is not None:
-        logfname = os.path.join(outpath, logname + '.log')
+        logfname = os.path.join(logpath, logname + '.log')
     else:
         # get log filename
         logname, _ = os.path.splitext(os.path.basename(__file__))
         secs = time.time()
         timestamp = "{}".format(time.strftime("%Y%m%d-%H%M", time.localtime(secs)))
-        logfname = os.path.join(outpath, logname + '_{}.log'.format(timestamp))
+        logfname = os.path.join(logpath, logname + '_{}.log'.format(timestamp))
+    # Delete file if exists; make directory if missing
     ready_filename(logfname, overwrite=True)
 
     # get logger
@@ -555,13 +556,12 @@ def chunk_files(big_csv_filename):
 if __name__ == "__main__":
     import argparse
 
-    default_infile = os.path.join(DATA_PATH, GBIF.INPUT_DATA)
-    default_output_basename = os.path.join(DATA_PATH)
+    default_infile = os.path.join(BIG_DATA_PATH, GBIF.INPUT_DATA)
 
     parser = argparse.ArgumentParser(description="Split")
     parser.add_argument("cmd", type=str, default="split")
     parser.add_argument(
-        "big_csv_filename", type=str, default=GBIF.INPUT_DATA,
+        "big_csv_filename", type=str, default=default_infile,
         help='The full path to GBIF input species occurrence data.')
     args = parser.parse_args()
 
