@@ -318,11 +318,12 @@ if __name__ == '__main__':
 
         if cmd == "annotate":
             # Annotate DwC records with county, state, and if found, RIIS assessment and RIIS occurrenceID
-            if do_split is True:
-                parallel_annotate(input_filenames)
-            else:
-                annotated_filenames = annotate_occurrence_files(input_filenames, logger)
-                log_output(logger, "Annotated filenames:", outlist=annotated_filenames)
+            annotated_filenames = annotate_occurrence_files(input_filenames, logger)
+            # if do_split is True:
+            #     parallel_annotate(input_filenames)
+            # else:
+            #     annotated_filenames = annotate_occurrence_files(input_filenames, logger)
+            #     log_output(logger, "Annotated filenames:", outlist=annotated_filenames)
 
         elif cmd == "summarize":
             annotated_filenames = [Annotator.construct_annotated_name(csvfile) for csvfile in input_filenames]
