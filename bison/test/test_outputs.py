@@ -5,7 +5,7 @@ import os
 from bison.common.aggregate import Aggregator, RIIS_Counts
 from bison.common.gbif import DwcData
 from bison.common.constants import (
-    ASSESS_VALUES, BIG_DATA_PATH, DATA_PATH, GBIF, NEW_RESOLVED_COUNTY, LOG,
+    ASSESS_VALUES, BIG_DATA_PATH, GBIF, NEW_RESOLVED_COUNTY, LOG,
     INTRODUCED_OCCS, INTRODUCED_SPECIES, INVASIVE_OCCS, INVASIVE_SPECIES, NATIVE_OCCS, NATIVE_SPECIES,
     NEW_RESOLVED_STATE, NEW_RIIS_ASSESSMENT_FLD, SPECIES_KEY, STATE_KEY, COUNTY_KEY, ASSESS_KEY, COUNT_KEY)
 from bison.tools.util import get_csv_dict_reader, get_logger
