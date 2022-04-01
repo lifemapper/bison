@@ -405,7 +405,8 @@ def identify_chunks(big_csv_filename):
 
     # in_base_filename, ext = os.path.splitext(big_csv_filename)
     if big_csv_filename.endswith("gbif_2022-03-16.csv"):
-        rec_count = 15
+        # shortcut
+        rec_count = 753770802 - 1
     else:
         rec_count = count_lines(big_csv_filename) - 1
     chunk_size = math.ceil(rec_count / cpus2use)
