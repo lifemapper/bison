@@ -36,6 +36,16 @@ pip3 install <python dependencies>
 * When running a commit (and the pre-commit hooks), if files are modified, make sure to
   restage them, then run commit again to ensure that changes are saved.
 
+# Documentation
+
+* Auto-generate readthedocs: https://docs.readthedocs.io/en/stable/intro/getting-started-with-mkdocs.html
+
+```commandline
+    (venv)$ pip3 install mkdocs
+```
+
+
+
 # Testing
 * Include execution of tests in pre-commit hooks, example in
   [Specify7](https://github.com/specify/specify7/blob/production/.pre-commit-config.yaml)

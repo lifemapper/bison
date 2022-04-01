@@ -295,11 +295,11 @@ if __name__ == '__main__':
     # ...............................................
     # Test data
     # ...............................................
-    # cmd = "test"
+    cmd = "summarize"
     # big_csv_filename = os.path.join(DATA_PATH, "gbif_2022-03-16_100k.csv")
     # ...............................................
 
-    logger = get_logger(os.path.join(DATA_PATH, LOG.DIR), logname=f"main_{cmd}")
+    logger = get_logger(os.path.join(BIG_DATA_PATH, LOG.DIR), logname=f"main_{cmd}")
     logger.info(f"Command: {cmd}")
     if cmd == "resolve":
         resolved_riis_filename = resolve_riis_taxa(riis_filename, logger)

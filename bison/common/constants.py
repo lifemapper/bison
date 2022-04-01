@@ -137,6 +137,7 @@ class LMBISON_HEADER:
 # .............................................................................
 class US_CENSUS_COUNTY:
     """File and fieldnames for census county boundary data, mapping to bison fieldnames."""
+    PATH = DATA_PATH
     FILE = "cb_2020_us_county_500k.shp"
     CENSUS_BISON_MAP = {"NAME": NEW_RESOLVED_COUNTY, "STUSPS": NEW_RESOLVED_STATE}
 
@@ -144,6 +145,7 @@ class US_CENSUS_COUNTY:
 # .............................................................................
 class US_CENSUS_STATE:
     """File and fieldnames for census state boundary data, mapping to bison fieldnames."""
+    PATH = DATA_PATH
     FILE = "cb_2020_us_state_500k.shp"
     CENSUS_BISON_MAP = {"STUSPS": NEW_RESOLVED_STATE}
 

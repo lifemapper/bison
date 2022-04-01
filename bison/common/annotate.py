@@ -2,7 +2,7 @@
 import os
 
 from bison.common.constants import (
-    ENCODING, EXTRA_CSV_FIELD, GBIF, LOG, NEW_RESOLVED_COUNTY, NEW_RESOLVED_STATE,
+    DATA_PATH, ENCODING, EXTRA_CSV_FIELD, GBIF, LOG, NEW_RESOLVED_COUNTY, NEW_RESOLVED_STATE,
     NEW_RIIS_ASSESSMENT_FLD, NEW_RIIS_KEY_FLD, POINT_BUFFER_RANGE, RIIS_SPECIES, US_CENSUS_COUNTY, US_STATES)
 from bison.common.gbif import DwcData
 from bison.common.riis import NNSL
@@ -37,7 +37,7 @@ class Annotator():
             self.nnsl.read_riis(read_resolved=True)
 
         # Must georeference points to add new, consistent state and county fields
-        geofile = os.path.join(self._datapath, US_CENSUS_COUNTY.FILE)
+        geofile = os.path.join(US_CENSUS_COUNTY.PATH, US_CENSUS_COUNTY.FILE)
         self._geo_county = GeoResolver(geofile, US_CENSUS_COUNTY.CENSUS_BISON_MAP, self._log)
 
         # Input reader
