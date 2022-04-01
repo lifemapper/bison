@@ -10,7 +10,7 @@ import subprocess
 import sys
 import time
 
-from bison.common.constants import BIG_DATA_PATH, DATA_PATH, ENCODING, EXTRA_CSV_FIELD, GBIF, LOG
+from bison.common.constants import BIG_DATA_PATH, ENCODING, EXTRA_CSV_FIELD, GBIF, LOG
 
 
 # ...............................................
@@ -404,7 +404,10 @@ def identify_chunks(big_csv_filename):
     start_stop_pairs = []
 
     # in_base_filename, ext = os.path.splitext(big_csv_filename)
-    rec_count = count_lines(big_csv_filename) - 1
+    if big_csv_filename.endswith("gbif_2022-03-16.csv"):
+        rec_count = 15
+    else:
+        rec_count = count_lines(big_csv_filename) - 1
     chunk_size = math.ceil(rec_count / cpus2use)
 
     start = 1
