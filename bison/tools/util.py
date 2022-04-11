@@ -545,6 +545,7 @@ def chunk_files(big_csv_filename):
             finally:
                 # After got to stop, close and add filename to list
                 chunkf.close()
+                print(f"Wrote lines {start} to {stop} to {chunk_fname}")
                 chunk_filenames.append(chunk_fname)
 
     except Exception as e:
