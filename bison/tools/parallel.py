@@ -1,11 +1,11 @@
 """Run a single process concurrently across local CPUs."""
-# import argparse
+import argparse
 from concurrent.futures import ProcessPoolExecutor
 import os
 
 from bison.common.annotate import Annotator
-from bison.common.constants import LOG
-from bison.tools.util import get_logger
+from bison.common.constants import LOG, BIG_DATA_PATH
+from bison.tools.util import get_logger, identify_chunk_files
 
 
 # .............................................................................
@@ -25,7 +25,7 @@ def annotate_occurrence_file(input_filename, logger):
 
 
 # .............................................................................
-def parallel_annotate(input_filenames):
+def parallel_annotate(input_filenames, main_logger):
     """Main method for parallel execution of DwC annotation script.
 
     Args:
@@ -35,29 +35,27 @@ def parallel_annotate(input_filenames):
         for in_csv_fn in input_filenames:
             datapath, basefname = os.path.split(in_csv_fn)
             basename, _ = os.path.splitext(basefname)
+
+            main_logger.info(f"Submit {basefname} for annotation")
             logger = get_logger(os.path.join(datapath, LOG.DIR), f"annotate_{basename}")
             executor.submit(annotate_occurrence_file, in_csv_fn, logger)
 
     annotated_filenames = [Annotator.construct_annotated_name(csvfile) for csvfile in input_filenames]
     for fn in annotated_filenames:
         if not os.path.exists(fn):
-            logger.info(f"File {fn} does not yet exist")
+            main_logger.info(f"File {fn} does not yet exist")
 
-#
-# # .............................................................................
-# if __name__ == '__main__':
-#     """Main method for script."""
-#     parser = argparse.ArgumentParser()
-#     parser.add_argument(
-#         'csv_filename', type=str, help='Input record CSV file path.')
-#     parser.add_argument(
-#         'terrestrial_shapefile_path', type=str,
-#         help='Terrestrial shapefile for intersection.')
-#     parser.add_argument(
-#         'marine_shapefile_path', type=str,
-#         help='Marine shapefile for intersection.')
-#     parser.add_argument(
-#         'out_csv_path', type=str,
-#         help='File path for output recordds CSV file.')
-#     args = parser.parse_args()
-#     logger = get_logger(DATA_PATH, logname="test_annotate")
+    return annotated_filenames
+
+
+# .............................................................................
+if __name__ == '__main__':
+    """Main method for script."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        'big_csv_filename', type=str, help='Input original CSV filename with path.')
+    args = parser.parse_args()
+
+    chunk_filenames = identify_chunk_files(args.big_csv_filename)
+    parallel_annotate(chunk_filenames)
+

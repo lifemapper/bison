@@ -26,7 +26,7 @@ def split_files(big_csv_filename, logger):
         chunk_filenames (list): full filenames for subset files.
     """
     chunk_filenames = chunk_files(big_csv_filename)
-    logger.info(f"Chunk files created: {chunk_filenames}")
+    logger.info(f"{len(chunk_filenames)} chunk files created.")
     return chunk_filenames
 
 
@@ -308,6 +308,7 @@ if __name__ == '__main__':
         input_filenames = find_or_create_subset_files(big_csv_filename, logger)
         log_output(logger, "Input filenames:", outlist=input_filenames)
     else:
+        # Find or create subset files if requested
         if do_split is True:
             input_filenames = find_or_create_subset_files(big_csv_filename, logger)
         else:
@@ -319,7 +320,12 @@ if __name__ == '__main__':
 
         if cmd == "annotate":
             # Annotate DwC records with county, state, and if found, RIIS assessment and RIIS occurrenceID
-            annotated_filenames = annotate_occurrence_files(input_filenames, logger)
+            if len(input_filenames) > 1:
+                log_output(logger, "Annotate files in parallel: ", outlist=input_filenames)
+                annotated_filenames = parallel_annotate(input_filenames)
+            else:
+                annotated_filenames = annotate_occurrence_files(input_filenames, logger)
+            log_output(logger, "Annotated filenames:", outlist=annotated_filenames)
             # if do_split is True:
             #     parallel_annotate(input_filenames)
             # else:

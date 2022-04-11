@@ -151,43 +151,6 @@ class Annotator():
             return True
         return False
 
-    # # ...............................................
-    # def assess_occurrence(self, dwcrec, county, state, iis_reclist):
-    #     """Find RIIS assessment matching the acceptedTaxonKey and state in this record.
-    #
-    #     Args:
-    #         dwcrec (dict): dictionary of original DwC specimen occurrence record
-    #         county (str): county returned from geospatial intersection of point with YS boundaries
-    #         state (str): state returned from geospatial intersection of point with YS boundaries
-    #         iis_reclist (list of dict): list of RIIS records with acceptedTaxonKey matching the
-    #             acceptedTaxonKey for this occurrence
-    #
-    #     Returns:
-    #         riis_assessment: Determination of "introduced" or "invasive" for this
-    #             record with species in this locaation.
-    #         riis_id: locally unique RIIS occurrenceID identifying this determination
-    #             for this species in this location.
-    #     """
-    #     riis_assessment = None
-    #     riis_key = None
-    #     for iisrec in iis_reclist:
-    #         # Double check NNSL dict key == RIIS resolved key == occurrence accepted key
-    #         if dwcrec[GBIF.ACC_TAXON_FLD] != iisrec.gbif_taxon_key:
-    #             self._log.debug("WTF is happening?!?")
-    #
-    #         # Look for AK or HI
-    #         if ((state == "AK" and iisrec.locality == "AK")
-    #                 or (state == "HI" and iisrec.locality == "HI")):
-    #             riis_assessment = iisrec.assessment.lower()
-    #             riis_key = iisrec.occurrence_id
-    #
-    #         # Not AK or HI, is it L48?
-    #         elif state in self._conus_states and iisrec.locality == "L48":
-    #             riis_assessment = iisrec.assessment.lower()
-    #             riis_key = iisrec.occurrence_id
-    #
-    #     return riis_assessment, riis_key
-
     # ...............................................
     def annotate_dwca_records(self):
         """Resolve and append state, county, RIIS assessment, and RIIS key to GBIF DWC occurrence records.
@@ -199,8 +162,6 @@ class Annotator():
             Exception: on failure to open input or output data.
             Exception: on unexpected failure to read or write data.
         """
-        trouble = "1698055779"
-        trouble_next = "1698058398"
         try:
             # Open the original DwC data file for read, and the annotated file for write.
             annotated_dwc_fname = self._open_input_output()
@@ -217,12 +178,8 @@ class Annotator():
                         self._log.info(f"*** Record number {self._dwcdata.recno}, gbifID: {gbif_id} ***")
 
                     # Debug: examine data
-                    if gbif_id == trouble:
-                        self._log.debug(f"Found troubled gbifID {trouble}")
-                    if gbif_id == trouble_next:
-                        self._log.debug("Not so troubling")
-                    if EXTRA_CSV_FIELD in dwcrec.keys():
-                        self._log.debug(f"Extra fields detected: possible bad read for record {gbif_id}")
+                    # if EXTRA_CSV_FIELD in dwcrec.keys():
+                    #     self._log.debug(f"Extra fields detected: possible bad read for record {gbif_id}")
 
                     # Initialize new fields
                     county = state = riis_assessment = riis_key = None
@@ -243,15 +200,7 @@ class Annotator():
 
                     # # Find RIIS records for this acceptedTaxonKey
                     taxkey = dwcrec[GBIF.ACC_TAXON_FLD]
-                    # try:
-                    #     iis_reclist = self.nnsl.by_gbif_taxkey[taxkey]
-                    # except Exception:
-                    #     iis_reclist = []
                     riis_assessment, riis_key = self.nnsl.get_assessment_for_gbif_taxonkey_region(taxkey, region)
-
-                    # if county and state and iis_reclist:
-                    #     riis_assessment, riis_key = self.assess_occurrence(
-                    #         dwcrec, county, state, iis_reclist)
 
                     # Add county, state and RIIS assessment to record
                     dwcrec[NEW_RESOLVED_COUNTY] = county

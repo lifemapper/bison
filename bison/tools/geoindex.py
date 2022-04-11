@@ -132,9 +132,9 @@ class GeoResolver(object):
                     else:
                         self._log.info(
                             f"Intersected point buffered {buffer} dd returned {len(intersect_fids)} features")
-            else:
-                self._log.info(
-                    f"Nearest polygon to point returned {len(intersect_fids)} counties")
+            # else:
+            #     self._log.info(
+            #         f"Nearest polygon to point returned {len(intersect_fids)} counties")
         return intersect_fids
 
     # ...............................................
