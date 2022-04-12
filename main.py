@@ -70,18 +70,22 @@ def annotate_occurrence_files(input_filenames, logger):
         annotated_filenames: full filenames for GBIF data newly annotated with state, county, RIIS assessment,
             and RIIS key.  If a file exists, do not re-annotate.
     """
-    annotated_filenames = []
-    nnsl = NNSL(riis_filename, logger=logger)
-    nnsl.read_riis(read_resolved=True)
-    for csv_filename in input_filenames:
-        # If this one is complete, do not re-annotate
-        outfname = Annotator.construct_annotated_name(csv_filename)
-        if os.path.exists(outfname):
-            logger.info(f"Annotations exist in {outfname}, moving on.")
-        else:
-            ant = Annotator(csv_filename, nnsl=nnsl, logger=logger)
-            annotated_dwc_fname = ant.annotate_dwca_records()
-            annotated_filenames.append(annotated_dwc_fname)
+    if len(input_filenames) > 1:
+        log_output(logger, "Annotate files in parallel: ", outlist=input_filenames)
+        annotated_filenames = parallel_annotate_multiprocess(input_filenames, logger)
+    else:
+        annotated_filenames = []
+        nnsl = NNSL(riis_filename, logger=logger)
+        nnsl.read_riis(read_resolved=True)
+        for csv_filename in input_filenames:
+            # If this one is complete, do not re-annotate
+            outfname = Annotator.construct_annotated_name(csv_filename)
+            if os.path.exists(outfname):
+                logger.info(f"Annotations exist in {outfname}, moving on.")
+            else:
+                ant = Annotator(csv_filename, nnsl=nnsl, logger=logger)
+                annotated_dwc_fname = ant.annotate_dwca_records()
+                annotated_filenames.append(annotated_dwc_fname)
     return annotated_filenames
 
 
@@ -326,29 +330,22 @@ if __name__ == '__main__':
                 raise FileNotFoundError(f"Expected file {csv_fname} does not exist")
 
         if cmd == "annotate":
-            # annotated_filenames = annotate_occurrence_files(input_filenames, logger)
             # Annotate DwC records with county, state, and if found, RIIS assessment and RIIS occurrenceID
-            if len(input_filenames) > 1:
-                log_output(logger, "Annotate files in parallel: ", outlist=input_filenames)
-                annotated_filenames = parallel_annotate_multiprocess(input_filenames, logger)
-            else:
-                annotated_filenames = annotate_occurrence_files(input_filenames, logger)
-            log_output(logger, "Annotated filenames:", outlist=annotated_filenames)
+            annotated_filenames = annotate_occurrence_files(input_filenames, logger)
+            log_output(logger, "Newly annotated filenames:", outlist=annotated_filenames)
 
         elif cmd == "summarize":
             annotated_filenames = [Annotator.construct_annotated_name(csvfile) for csvfile in input_filenames]
             # Summarize each annotated file by region (state and county) write summary to a file
             summary_filenames = summarize_annotations(annotated_filenames, logger)
-            log_output(
-                logger, "Aggregated county/state filenames:", outlist=summary_filenames)
+            log_output(logger, "Aggregated county/state filenames:", outlist=summary_filenames)
 
         elif cmd == "aggregate":
             annotated_filenames = [Annotator.construct_annotated_name(csvfile) for csvfile in input_filenames]
             summary_filenames = [Aggregator.construct_summary_name(annfile) for annfile in annotated_filenames]
             # Aggregate all summary files then write summaries for each region to its own file
             region_assess_summary_filenames = summarize_region_assessment(summary_filenames, logger)
-            log_output(
-                logger, "Region filenames, assessment filename:", outlist=region_assess_summary_filenames)
+            log_output(logger, "Region filenames, assessment filename:", outlist=region_assess_summary_filenames)
 
         elif cmd == "test":
             record_counter = Counter(big_csv_filename, do_split=True, logger=logger)
