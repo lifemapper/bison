@@ -9,7 +9,7 @@ from bison.common.constants import (
     RIIS_SPECIES, US_CENSUS_COUNTY)
 from bison.common.riis import NNSL
 from bison.tools.geoindex import GeoResolver, GeoException
-# from bison.tools.parallel import parallel_annotate
+from bison.tools.parallel import parallel_annotate_multiprocess
 from bison.tools.util import chunk_files, delete_file, get_logger, identify_chunk_files
 from bison.test.test_outputs import Counter
 
@@ -284,7 +284,7 @@ if __name__ == '__main__':
         description=("Execute one or more steps of annotating GBIF data with RIIS assessments, and summarizing by " +
                      "species, county, and state"))
     parser.add_argument(
-        "cmd", type=str, choices=("resolve", "split", "annotate", "summarize", "aggregate", "test_bad_data"),
+        "cmd", type=str, choices=("resolve", "split", "annotate", "summarize", "aggregate", "test"),
         default="test_bad_data")
     parser.add_argument(
         "big_csv_filename", type=str, default=gbif_infile,
@@ -326,19 +326,14 @@ if __name__ == '__main__':
                 raise FileNotFoundError(f"Expected file {csv_fname} does not exist")
 
         if cmd == "annotate":
-            annotated_filenames = annotate_occurrence_files(input_filenames, logger)
-            # # Annotate DwC records with county, state, and if found, RIIS assessment and RIIS occurrenceID
-            # if len(input_filenames) > 1:
-            #     log_output(logger, "Annotate files in parallel: ", outlist=input_filenames)
-            #     annotated_filenames = parallel_annotate(input_filenames, logger)
-            # else:
-            #     annotated_filenames = annotate_occurrence_files(input_filenames, logger)
+            # annotated_filenames = annotate_occurrence_files(input_filenames, logger)
+            # Annotate DwC records with county, state, and if found, RIIS assessment and RIIS occurrenceID
+            if len(input_filenames) > 1:
+                log_output(logger, "Annotate files in parallel: ", outlist=input_filenames)
+                annotated_filenames = parallel_annotate_multiprocess(input_filenames, logger)
+            else:
+                annotated_filenames = annotate_occurrence_files(input_filenames, logger)
             log_output(logger, "Annotated filenames:", outlist=annotated_filenames)
-            # if do_split is True:
-            #     parallel_annotate(input_filenames)
-            # else:
-            #     annotated_filenames = annotate_occurrence_files(input_filenames, logger)
-            #     log_output(logger, "Annotated filenames:", outlist=annotated_filenames)
 
         elif cmd == "summarize":
             annotated_filenames = [Annotator.construct_annotated_name(csvfile) for csvfile in input_filenames]

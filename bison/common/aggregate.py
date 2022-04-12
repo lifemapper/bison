@@ -2,7 +2,7 @@
 import os
 
 from bison.common.constants import (
-    AGGREGATOR_DELIMITER, ENCODING, GBIF, NEW_RESOLVED_COUNTY, NEW_RESOLVED_STATE, RIIS_SPECIES, US_STATES,
+    AGGREGATOR_DELIMITER, DATA_PATH, ENCODING, GBIF, NEW_RESOLVED_COUNTY, NEW_RESOLVED_STATE, RIIS_SPECIES, US_STATES,
     SPECIES_KEY, ASSESS_KEY, LOCATION_KEY, COUNT_KEY, LMBISON_HEADER, LOG, OUT_DIR)
 from bison.common.riis import NNSL
 
@@ -484,7 +484,7 @@ class Aggregator():
 
     # ...............................................
     def _get_riis_species(self):
-        riis_filename = os.path.join(self._datapath, RIIS_SPECIES.FNAME)
+        riis_filename = os.path.join(DATA_PATH, RIIS_SPECIES.FNAME)
         nnsl = NNSL(riis_filename, logger=self._log)
         nnsl.read_riis(read_resolved=True)
         return nnsl

@@ -308,6 +308,22 @@ class NNSL:
         return updated_riis_fname
 
     # ...............................................
+    @classmethod
+    def get_gbif_resolved_riis_fname(cls, orig_riis_filename):
+        """Construct a filename for the resolved RIIS from the original.
+
+        Args:
+            orig_riis_filename (str): full original (non-resolved) RIIS filename
+
+        Returns:
+            updated_riis_fname: output filename derived from the input RIIS filename
+        """
+        basename, ext = os.path.splitext(orig_riis_filename)
+        updated_riis_fname = f"{basename}_updated_gbif{ext}"
+        return updated_riis_fname
+
+
+    # ...............................................
     @property
     def gbif_resolved_riis_header(self):
         """Construct the expected header for the resolved RIIS.
