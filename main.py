@@ -9,7 +9,7 @@ from bison.common.constants import (
     RIIS_SPECIES, US_CENSUS_COUNTY)
 from bison.common.riis import NNSL
 from bison.tools.geoindex import GeoResolver, GeoException
-from bison.tools.parallel import parallel_annotate
+# from bison.tools.parallel import parallel_annotate
 from bison.tools.util import chunk_files, delete_file, get_logger, identify_chunk_files
 from bison.test.test_outputs import Counter
 
@@ -67,15 +67,21 @@ def annotate_occurrence_files(input_filenames, logger):
         logger (object): logger for saving relevant processing messages
 
     Returns:
-        annotated_filenames: fill filenames for GBIF data annotated with state, county, RIIS assessment, and RIIS key.
+        annotated_filenames: full filenames for GBIF data newly annotated with state, county, RIIS assessment,
+            and RIIS key.  If a file exists, do not re-annotate.
     """
     annotated_filenames = []
     nnsl = NNSL(riis_filename, logger=logger)
     nnsl.read_riis(read_resolved=True)
     for csv_filename in input_filenames:
-        ant = Annotator(csv_filename, nnsl=nnsl, logger=logger)
-        annotated_dwc_fname = ant.annotate_dwca_records()
-        annotated_filenames.append(annotated_dwc_fname)
+        # If this one is complete, do not re-annotate
+        outfname = Annotator.construct_annotated_name(csv_filename)
+        if os.path.exists(outfname):
+            logger.info(f"Annotations exist in {outfname}, moving on.")
+        else:
+            ant = Annotator(csv_filename, nnsl=nnsl, logger=logger)
+            annotated_dwc_fname = ant.annotate_dwca_records()
+            annotated_filenames.append(annotated_dwc_fname)
     return annotated_filenames
 
 
@@ -266,6 +272,7 @@ def test_bad_line(input_filenames, logger):
 # .............................................................................
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
+    """Main script to execute all elements of the summarize-GBIF BISON workflow."""
     import argparse
 
     riis_filename = os.path.join(DATA_PATH, RIIS_SPECIES.FNAME)
