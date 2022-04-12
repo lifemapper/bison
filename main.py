@@ -319,12 +319,13 @@ if __name__ == '__main__':
                 raise FileNotFoundError(f"Expected file {csv_fname} does not exist")
 
         if cmd == "annotate":
-            # Annotate DwC records with county, state, and if found, RIIS assessment and RIIS occurrenceID
-            if len(input_filenames) > 1:
-                log_output(logger, "Annotate files in parallel: ", outlist=input_filenames)
-                annotated_filenames = parallel_annotate(input_filenames)
-            else:
-                annotated_filenames = annotate_occurrence_files(input_filenames, logger)
+            annotated_filenames = annotate_occurrence_files(input_filenames, logger)
+            # # Annotate DwC records with county, state, and if found, RIIS assessment and RIIS occurrenceID
+            # if len(input_filenames) > 1:
+            #     log_output(logger, "Annotate files in parallel: ", outlist=input_filenames)
+            #     annotated_filenames = parallel_annotate(input_filenames, logger)
+            # else:
+            #     annotated_filenames = annotate_occurrence_files(input_filenames, logger)
             log_output(logger, "Annotated filenames:", outlist=annotated_filenames)
             # if do_split is True:
             #     parallel_annotate(input_filenames)
