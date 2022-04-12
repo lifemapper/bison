@@ -4,7 +4,7 @@ from concurrent.futures import ProcessPoolExecutor
 import os
 
 from bison.common.annotate import Annotator
-from bison.common.constants import LOG, BIG_DATA_PATH
+from bison.common.constants import LOG
 from bison.tools.util import get_logger, identify_chunk_files
 
 
@@ -30,6 +30,10 @@ def parallel_annotate(input_filenames, main_logger):
 
     Args:
         input_filenames (list): list of full filenames containing GBIF data for annotation.
+        main_logger (logger): logger for the process that calls this function, initiating subprocesses
+
+    Returns:
+        annotated_filenames: list of resulting annotated files
     """
     with ProcessPoolExecutor() as executor:
         for in_csv_fn in input_filenames:
@@ -58,4 +62,3 @@ if __name__ == '__main__':
 
     chunk_filenames = identify_chunk_files(args.big_csv_filename)
     parallel_annotate(chunk_filenames)
-

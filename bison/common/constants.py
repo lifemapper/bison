@@ -279,7 +279,7 @@ class GBIF:
 class LOG:
     """Constants for logging across the project."""
     DIR = "log"
-    INTERVAL = 10000
+    INTERVAL = 1000000
     FORMAT = ' '.join([
         "%(asctime)s",
         "%(funcName)s",
