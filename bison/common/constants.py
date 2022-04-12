@@ -110,7 +110,7 @@ NATIVE_SPECIES = "presumed_native_species"
 TOTAL_SPECIES = "all_species"
 PCT_INTRODUCED_SPECIES = "pct_introduced_all_species"
 PCT_INVASIVE_SPECIES = "pct_invasive_all_species"
-PCT_NATIVE_SPECIES = "pct_presumed_native_species",
+PCT_NATIVE_SPECIES = "pct_presumed_native_species"
 
 INTRODUCED_OCCS = "introduced_occurrences"
 INVASIVE_OCCS = "invasive_occurrences"
