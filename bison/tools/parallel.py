@@ -1,14 +1,14 @@
 """Run a single process concurrently across local CPUs."""
-import argparse
 from datetime import datetime
 # from concurrent.futures import ProcessPoolExecutor
 from multiprocessing import Pool, cpu_count
 import os
 
+from bison.common.aggregate import Aggregator
 from bison.common.annotate import Annotator
 from bison.common.constants import DATA_PATH, LOG, RIIS_SPECIES
 from bison.common.riis import NNSL
-from bison.tools.util import get_logger, identify_chunk_files, parse_chunk_filename
+from bison.tools.util import get_logger
 
 
 # .............................................................................
@@ -20,11 +20,15 @@ def annotate_occurrence_file(input_filename):
 
     Returns:
         annotated_dwc_fname: full filename for GBIF data annotated with state, county, RIIS assessment, and RIIS key.
+
+    Raises:
+        FileNotFoundError: on missing input file
     """
+    if not os.path.exists(input_filename):
+        raise FileNotFoundError(input_filename)
+
     datapath, basefname = os.path.split(input_filename)
-    basename, _ = os.path.splitext(basefname)
-    in_base_filename, start, stop, ext = parse_chunk_filename(basename)
-    logger = get_logger(os.path.join(datapath, LOG.DIR), f"annotate_{start}-{stop}")
+    logger = get_logger(os.path.join(datapath, LOG.DIR), f"annotate_{basefname}")
     logger.info(f"Submit {basefname} for annotation")
 
     orig_riis_filename = os.path.join(DATA_PATH, RIIS_SPECIES.FNAME)
@@ -97,17 +101,48 @@ def parallel_annotate_multiprocess(input_filenames, main_logger):
 
 
 # .............................................................................
-if __name__ == '__main__':
-    """Main method for script."""
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        'big_csv_filename', type=str, help='Input original CSV filename with path.')
-    args = parser.parse_args()
+def summarize_annotations(ann_filename):
+    """Summarize data in an annotated GBIF DwC file by state, county, and RIIS assessment.
 
-    big_csv = args.big_csv_filename
-    datapath, basefname = os.path.split(big_csv)
-    basename, _ = os.path.splitext(basefname)
-    logger = get_logger(os.path.join(datapath, LOG.DIR), f"annotate_{basename}")
-    chunk_filenames = identify_chunk_files(big_csv)
+    Args:
+        ann_filename (str): full filename to an annotated GBIF data file.
 
-    parallel_annotate_multiprocess(chunk_filenames, logger)
+    Returns:
+        summary_filename (str): full filename of a summary file
+
+    Raises:
+        FileNotFoundError: on missing input file
+    """
+    if not os.path.exists(ann_filename):
+        raise FileNotFoundError(ann_filename)
+
+    datapath, basefname = os.path.split(ann_filename)
+    logger = get_logger(os.path.join(datapath, LOG.DIR), f"annotate_{basefname}")
+    logger.info(f"Submit {basefname} for summarizing.")
+
+    logger.info("Start Time : {}".format(datetime.now()))
+    agg = Aggregator(ann_filename, logger=logger)
+    summary_filename = agg.summarize_by_file()
+    logger.info("End Time : {}".format(datetime.now()))
+    return summary_filename
+
+
+# .............................................................................
+def parallel_summarize_multiprocess(annotated_filenames):
+    """Main method for parallel execution of summarization script.
+
+    Args:
+        annotated_filenames (list): list of full filenames containing annotated GBIF data.
+
+    Returns:
+        annotated_dwc_fnames (list): list of full output filenames
+    """
+    # Do not use all CPUs
+    pool = Pool(cpu_count() - 2)
+    # Map input files asynchronously onto function
+    map_result = pool.map_async(summarize_annotations, annotated_filenames)
+    # Wait for results
+    map_result.wait()
+    summary_filenames = map_result.get()
+
+    return summary_filenames

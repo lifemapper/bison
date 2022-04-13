@@ -6,7 +6,7 @@ from bison.common.constants import (
     SPECIES_KEY, ASSESS_KEY, LOCATION_KEY, COUNT_KEY, LMBISON_HEADER, LOG, OUT_DIR)
 from bison.common.riis import NNSL
 
-from bison.tools.util import (get_csv_writer, get_csv_dict_reader, get_logger)
+from bison.tools.util import (get_csv_writer, get_csv_dict_reader, get_logger, ready_filename)
 
 # For each temporary summary file, 3 fields, for each location: location, species, count
 # Summary files are used to individually process manageably-sized files, then read and aggregate summaries for final output
@@ -430,11 +430,12 @@ class Aggregator():
             inf.close()
 
     # ...............................................
-    def _write_region_summary(self, summary_filename):
+    def _write_region_summary(self, summary_filename, overwrite=True):
         # locations = {county_or_state: {species: count,
         #                                ...}
         #              ...}
         # header = [LOCATION_KEY, SPECIES_KEY, COUNT_KEY]
+        ready_filename(summary_filename, overwrite=overwrite)
         try:
             csv_wtr, outf = get_csv_writer(summary_filename, GBIF.DWCA_DELIMITER, fmode="w")
             csv_wtr.writerow(LMBISON_HEADER.SUMMARY_FILE)
@@ -472,7 +473,7 @@ class Aggregator():
 
     # ...............................................
     def summarize_by_file(self):
-        """Read an annotated file, summarize by species and location, write to a csvfile.
+        """Read an annotated file, summarize by species and location, write to a csvfile, overwriting any existing file.
 
         Returns:
             summary_filename: full output filename for CSV summary of annotated occurrence file. CSV fields are
@@ -481,7 +482,7 @@ class Aggregator():
         summary_filename = self.construct_summary_name(self._csvfile)
         # Summarize and write
         self._summarize_annotations_by_region()
-        self._write_region_summary(summary_filename)
+        self._write_region_summary(summary_filename, overwrite=True)
         self._log.info(f"Summarized species by region from {self._csvfile} to {summary_filename}")
         return summary_filename
 

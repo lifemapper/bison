@@ -10,7 +10,7 @@ from bison.common.constants import (
     RIIS_SPECIES, US_CENSUS_COUNTY)
 from bison.common.riis import NNSL
 from bison.tools.geoindex import GeoResolver, GeoException
-from bison.tools.parallel import parallel_annotate_multiprocess
+from bison.tools.parallel import parallel_annotate_multiprocess, parallel_summarize_multiprocess
 from bison.tools.util import chunk_files, delete_file, get_logger, identify_chunk_files
 from bison.test.test_outputs import Counter
 
@@ -71,11 +71,11 @@ def annotate_occurrence_files(input_filenames, logger):
         annotated_filenames: full filenames for GBIF data newly annotated with state, county, RIIS assessment,
             and RIIS key.  If a file exists, do not re-annotate.
     """
+    annotated_filenames = []
     if len(input_filenames) > 1:
         log_output(logger, "Annotate files in parallel: ", outlist=input_filenames)
         annotated_filenames = parallel_annotate_multiprocess(input_filenames, logger)
     else:
-        annotated_filenames = []
         nnsl = NNSL(riis_filename, logger=logger)
         nnsl.read_riis(read_resolved=True)
         for csv_filename in input_filenames:
@@ -103,10 +103,14 @@ def summarize_annotations(annotated_filenames, logger):
             per each file in annotated_filenames.
     """
     summary_filenames = []
-    for csv_filename in annotated_filenames:
-        agg = Aggregator(csv_filename, logger=logger)
-        summary_filename = agg.summarize_by_file()
-        summary_filenames.append(summary_filename)
+    if len(annotated_filenames) > 1:
+        log_output(logger, "Summarize files in parallel: ", outlist=annotated_filenames)
+        summary_filenames = parallel_summarize_multiprocess(annotated_filenames)
+    else:
+        for ann_filename in annotated_filenames:
+            agg = Aggregator(ann_filename, logger=logger)
+            summary_filename = agg.summarize_by_file()
+            summary_filenames.append(summary_filename)
     return summary_filenames
 
 
