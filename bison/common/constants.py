@@ -81,6 +81,7 @@ US_STATES = {
     "Oklahoma": "OK",
     "Oregon": "OR",
     "Pennsylvania": "PA",
+    "Puerto Rico": "PR",
     "Rhode Island": "RI",
     "South Carolina": "SC",
     "South Dakota": "SD",
