@@ -401,7 +401,10 @@ class Aggregator():
             raise
         else:
             if county is not None:
-                self.states[state].add(county)
+                try:
+                    self.states[state].add(county)
+                except KeyError:
+                    self._log.error(f"Unexpected state {state} found")
 
     # ...............................................
     def _summarize_annotations_by_region(self):
