@@ -1,5 +1,6 @@
 """Main script to execute all elements of the summarize-GBIF BISON workflow."""
 import csv
+from datetime import datetime
 import os
 
 from bison.common.aggregate import Aggregator
@@ -312,6 +313,8 @@ if __name__ == '__main__':
 
     logger = get_logger(os.path.join(BIG_DATA_PATH, LOG.DIR), logname=f"main_{cmd}")
     logger.info(f"Command: {cmd}")
+    logger.info("Start Time : {}".format(datetime.now()))
+
     if cmd == "resolve":
         resolved_riis_filename = resolve_riis_taxa(riis_filename, logger)
         log_output(logger, f"Resolved RIIS filename: {resolved_riis_filename}")
@@ -356,3 +359,5 @@ if __name__ == '__main__':
 
         else:
             logger.error(f"Unsupported command '{cmd}'")
+
+    logger.info("End Time : {}".format(datetime.now()))

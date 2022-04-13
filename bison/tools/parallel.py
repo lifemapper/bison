@@ -58,8 +58,6 @@ def parallel_annotate_multiprocess(input_filenames, main_logger):
         else:
             infiles.append(in_csv)
 
-    main_logger.info("Start Time : {}".format(datetime.now()))
-
     # Do not use all CPUs
     pool = Pool(cpu_count() - 2)
     # Map input files asynchronously onto function
@@ -67,7 +65,6 @@ def parallel_annotate_multiprocess(input_filenames, main_logger):
     # Wait for results
     map_result.wait()
     annotated_dwc_fnames = map_result.get()
-    main_logger.info("End Time : {}".format(datetime.now()))
 
     return annotated_dwc_fnames
 
