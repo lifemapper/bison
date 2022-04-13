@@ -117,7 +117,7 @@ def summarize_annotations(ann_filename):
         raise FileNotFoundError(ann_filename)
 
     datapath, basefname = os.path.split(ann_filename)
-    logger = get_logger(os.path.join(datapath, LOG.DIR), f"annotate_{basefname}")
+    logger = get_logger(os.path.join(datapath, LOG.DIR), f"summarize_{basefname}")
     logger.info(f"Submit {basefname} for summarizing.")
 
     logger.info("Start Time : {}".format(datetime.now()))
