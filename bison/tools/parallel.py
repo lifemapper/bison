@@ -129,19 +129,28 @@ def summarize_annotations(ann_filename):
 
 
 # .............................................................................
-def parallel_summarize_multiprocess(annotated_filenames):
+def parallel_summarize_multiprocess(annotated_filenames, main_logger):
     """Main method for parallel execution of summarization script.
 
     Args:
         annotated_filenames (list): list of full filenames containing annotated GBIF data.
+        main_logger (logger): logger for the process that calls this function, initiating subprocesses
 
     Returns:
         annotated_dwc_fnames (list): list of full output filenames
     """
+    infiles = []
+    for in_csv in annotated_filenames:
+        out_csv = Aggregator.construct_summary_name(in_csv)
+        if os.path.exists(out_csv):
+            main_logger.info(f"Annotations exist in {out_csv}, moving on.")
+        else:
+            infiles.append(in_csv)
+
     # Do not use all CPUs
     pool = Pool(cpu_count() - 2)
     # Map input files asynchronously onto function
-    map_result = pool.map_async(summarize_annotations, annotated_filenames)
+    map_result = pool.map_async(summarize_annotations, infiles)
     # Wait for results
     map_result.wait()
     summary_filenames = map_result.get()
