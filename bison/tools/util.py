@@ -184,6 +184,8 @@ def get_csv_dict_reader(csvfile, delimiter, encoding=ENCODING, quote_none=False,
         FileNotFoundError: on missing csvfile
         PermissionError: on improper permissions on csvfile
     """
+    csv.field_size_limit(sys.maxsize)
+
     if quote_none is True:
         quoting = csv.QUOTE_NONE
     else:
