@@ -122,7 +122,7 @@ def summarize_annotations(ann_filename):
 
     logger.info("Start Time : {}".format(datetime.now()))
     agg = Aggregator(ann_filename, logger=logger)
-    summary_filename = agg.summarize_by_file()
+    summary_filename = agg.summarize_by_file(overwrite=False)
     logger.info("End Time : {}".format(datetime.now()))
     return summary_filename
 

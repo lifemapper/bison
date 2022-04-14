@@ -105,11 +105,11 @@ def summarize_annotations(annotated_filenames, logger):
     summary_filenames = []
     if len(annotated_filenames) > 1:
         log_output(logger, "Summarize files in parallel: ", outlist=annotated_filenames)
-        summary_filenames = parallel_summarize_multiprocess(annotated_filenames)
+        summary_filenames = parallel_summarize_multiprocess(annotated_filenames, overwrite=False)
     else:
         for ann_filename in annotated_filenames:
             agg = Aggregator(ann_filename, logger=logger)
-            summary_filename = agg.summarize_by_file()
+            summary_filename = agg.summarize_by_file(overwrite=False)
             summary_filenames.append(summary_filename)
     return summary_filenames
 
