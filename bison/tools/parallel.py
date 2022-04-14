@@ -102,7 +102,7 @@ def parallel_annotate_multiprocess(input_filenames, main_logger):
 
 # .............................................................................
 def summarize_annotations(ann_filename):
-    """Summarize data in an annotated GBIF DwC file by state, county, and RIIS assessment.
+    """Summarize data in an annotated GBIF DwC file by state, county, and RIIS assessment, do not overwrite existing file.
 
     Args:
         ann_filename (str): full filename to an annotated GBIF data file.
@@ -113,6 +113,7 @@ def summarize_annotations(ann_filename):
     Raises:
         FileNotFoundError: on missing input file
     """
+    overwrite = False
     if not os.path.exists(ann_filename):
         raise FileNotFoundError(ann_filename)
 
