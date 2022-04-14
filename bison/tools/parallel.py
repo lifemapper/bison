@@ -143,7 +143,7 @@ def parallel_summarize_multiprocess(annotated_filenames, main_logger):
     for in_csv in annotated_filenames:
         out_csv = Aggregator.construct_summary_name(in_csv)
         if os.path.exists(out_csv):
-            main_logger.info(f"Annotations exist in {out_csv}, moving on.")
+            main_logger.info(f"Summaries exist in {out_csv}, moving on.")
         else:
             infiles.append(in_csv)
 
