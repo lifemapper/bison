@@ -2,7 +2,7 @@
 import os
 
 from bison.common.constants import (
-    AGGREGATOR_DELIMITER, DATA_PATH, ENCODING, GBIF, NEW_RESOLVED_COUNTY, NEW_RESOLVED_STATE, RIIS_SPECIES, US_STATES,
+    AGGREGATOR_DELIMITER, DATA_PATH, ENCODING, EXTRA_CSV_FIELD, GBIF, NEW_RESOLVED_COUNTY, NEW_RESOLVED_STATE, RIIS_SPECIES, US_STATES,
     SPECIES_KEY, ASSESS_KEY, LOCATION_KEY, COUNT_KEY, LMBISON_HEADER, LOG, OUT_DIR)
 from bison.common.riis import NNSL
 
@@ -410,7 +410,8 @@ class Aggregator():
     def _summarize_annotations_by_region(self):
         # Reset summary
         self.locations = {}
-        csv_rdr, inf = get_csv_dict_reader(self._csvfile, GBIF.DWCA_DELIMITER, encoding=ENCODING)
+        csv_rdr, inf = get_csv_dict_reader(
+            self._csvfile, GBIF.DWCA_DELIMITER, encoding=ENCODING, quote_none=True, restkey=EXTRA_CSV_FIELD)
         self._log.info(f"Summarizing annotations in {self._csvfile} by region")
         try:
             for rec in csv_rdr:
@@ -472,9 +473,11 @@ class Aggregator():
                 inf.close()
 
     # ...............................................
-    def summarize_by_file(self):
-        """Read an annotated file, summarize by species and location, write to a csvfile, overwriting any existing file.
+    def summarize_by_file(self, overwrite=True):
+        """Read an annotated file, summarize by species and location, write to a csvfile.
 
+        Args:
+            overwrite (bool): Flag indicating whether to overwrite or skip existing files.
         Returns:
             summary_filename: full output filename for CSV summary of annotated occurrence file. CSV fields are
                  [SPECIES_KEY, GBIF_TAXON_KEY, ASSESS_KEY, STATE_KEY, COUNTY_KEY, COUNT_KEY].
@@ -482,7 +485,7 @@ class Aggregator():
         summary_filename = self.construct_summary_name(self._csvfile)
         # Summarize and write
         self._summarize_annotations_by_region()
-        self._write_region_summary(summary_filename, overwrite=True)
+        self._write_region_summary(summary_filename, overwrite=overwrite)
         self._log.info(f"Summarized species by region from {self._csvfile} to {summary_filename}")
         return summary_filename
 
