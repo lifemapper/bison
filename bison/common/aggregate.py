@@ -1,4 +1,5 @@
 """Common classes for adding USGS RIIS info to GBIF occurrences."""
+import csv
 import os
 
 from bison.common.constants import (
@@ -423,8 +424,13 @@ class Aggregator():
                 self._add_record_to_location_summaries(county_state, species_key)
                 self._add_record_to_location_summaries(state, species_key)
 
+        except csv.Error as ce:
+            self._log.error(f"Failed to read annotated occurrences line {csv_rdr.line_num} from {self._csvfile}: {ce}")
         except Exception as e:
-            raise Exception(f"Failed to read annotated occurrences from {self._csvfile}: {e}")
+            self._log.error(
+                f"Exception {type(e)}: Failed to read annotated occurrences line {csv_rdr.line_num} from {self._csvfile}: {e}")
+
+            # raise Exception(f"Failed to read annotated occurrences line {csv_rdr.line_num} from {self._csvfile}: {e}")
 
         finally:
             csv_rdr = None
