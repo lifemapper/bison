@@ -404,11 +404,13 @@ class NNSL:
                 raise FileNotFoundError(f"File {self.gbif_resolved_riis_fname} does not exist")
             else:
                 infname = self.gbif_resolved_riis_fname
+                expected_header = self.gbif_resolved_riis_header
         else:
             infname = self._csvfile
+            expected_header = RIIS_SPECIES.HEADER
 
         # Test and clean headers of non-ascii characters
-        good_header = self._fix_header(infname, RIIS_SPECIES.HEADER)
+        good_header = self._fix_header(infname, expected_header)
         if good_header is False:
             raise Exception(f"Unexpected file header found in {self._csvfile}")
         rdr, inf = get_csv_dict_reader(infname, RIIS.DELIMITER, fieldnames=good_header, quote_none=False)
