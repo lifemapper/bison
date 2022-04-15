@@ -166,12 +166,13 @@ def get_csv_dict_writer(csvfile, header, delimiter, fmode="w", encoding=ENCODING
 
 
 # .............................................................................
-def get_csv_dict_reader(csvfile, delimiter, encoding=ENCODING, quote_none=False, restkey=EXTRA_CSV_FIELD):
+def get_csv_dict_reader(csvfile, delimiter, fieldnames=None, encoding=ENCODING, quote_none=False, restkey=EXTRA_CSV_FIELD):
     """Create a CSV dictionary reader from a file with the first line containing fieldnames.
 
     Args:
-        csvfile: output CSV file for reading
-        delimiter: delimiter between fields
+        csvfile (str): output CSV file for reading
+        delimiter (char): delimiter between fields
+        fieldnames (list): strings with corrected fieldnames, cleaned of illegal characters, for use with records.
         encoding (str): type of encoding
         quote_none (bool): True opens csvfile with QUOTE_NONE, False opens with QUOTE_MINIMAL
         restkey (str): fieldname for extra fields in a record not present in header
@@ -199,7 +200,10 @@ def get_csv_dict_reader(csvfile, delimiter, encoding=ENCODING, quote_none=False,
     except PermissionError:
         raise
 
-    rdr = csv.DictReader(f, quoting=quoting, delimiter=delimiter, restkey=restkey)
+    if fieldnames is not None:
+        rdr = csv.DictReader(f, fieldnames=fieldnames, quoting=quoting, delimiter=delimiter, restkey=restkey)
+    else:
+        rdr = csv.DictReader(f, quoting=quoting, delimiter=delimiter, restkey=restkey)
 
     return rdr, f
 
