@@ -6,12 +6,12 @@ import os
 from bison.common.aggregate import Aggregator
 from bison.common.annotate import Annotator
 from bison.common.constants import (
-    GBIF, BIG_DATA_PATH, DATA_PATH, EXTRA_CSV_FIELD, LOG, NEW_RESOLVED_COUNTY, NEW_RESOLVED_STATE, POINT_BUFFER_RANGE,
-    RIIS_SPECIES, US_CENSUS_COUNTY)
+    GBIF, BIG_DATA_PATH, DATA_PATH, ENCODING, EXTRA_CSV_FIELD, LOG, NEW_RESOLVED_COUNTY, NEW_RESOLVED_STATE,
+    POINT_BUFFER_RANGE, RIIS_SPECIES, US_CENSUS_COUNTY)
 from bison.common.riis import NNSL
 from bison.tools.geoindex import GeoResolver, GeoException
 from bison.tools.parallel import parallel_annotate_multiprocess, parallel_summarize_multiprocess
-from bison.tools.util import chunk_files, delete_file, get_logger, identify_chunk_files
+from bison.tools.util import chunk_files, delete_file, get_csv_dict_reader, get_logger, identify_chunk_files
 from bison.test.test_outputs import Counter
 
 
@@ -106,7 +106,7 @@ def summarize_annotations(annotated_filenames, logger):
     if len(annotated_filenames) > 1:
         log_output(logger, "Summarize files in parallel: ", outlist=annotated_filenames)
         # Does not overwrite existing summary files
-        summary_filenames = parallel_summarize_multiprocess(annotated_filenames)
+        summary_filenames = parallel_summarize_multiprocess(annotated_filenames, logger)
     else:
         for ann_filename in annotated_filenames:
             agg = Aggregator(ann_filename, logger=logger)
@@ -227,15 +227,13 @@ def _find_county_state(geo_county, lon, lat, buffer_vals):
 
 
 # .............................................................................
-def test_bad_line(input_filenames, logger):
-    """Test troublesome lines.
+def test_bad_line(input_filenames, logger, trouble_id):
+    """Test georeferencing line with gbif_id .
 
     Args:
         input_filenames: List of files to test, looking for troublesome data.
         logger: logger for writing messages.
     """
-    trouble = "1698055779"
-    trouble_next = "1698058398"
     geofile = os.path.join(DATA_PATH, US_CENSUS_COUNTY.FILE)
     geo_county = GeoResolver(geofile, US_CENSUS_COUNTY.CENSUS_BISON_MAP, logger)
     for csvfile in input_filenames:
@@ -255,13 +253,12 @@ def test_bad_line(input_filenames, logger):
                         logger.debug(f"*** Record number {rdr.line_num}, gbifID: {gbif_id} ***")
 
                     # Debug: examine data
-                    if gbif_id == trouble:
-                        logger.debug(f"Found gbifID {trouble} on line {rdr.line_num}")
-                    if gbif_id == trouble_next:
-                        logger.debug(f"Not so troubling on line {rdr.line_num}")
+                    if gbif_id == trouble_id:
+                        logger.debug(f"Found gbifID {trouble_id} on line {rdr.line_num}")
 
                     if EXTRA_CSV_FIELD in dwcrec.keys():
-                        logger.debug(f"Extra fields detected: possible bad read for record {gbif_id} on line {rdr.line_num}")
+                        logger.debug(
+                            f"Extra fields detected: possible bad read for record {gbif_id} on line {rdr.line_num}")
 
                     # Find county and state for these coords
                     try:
@@ -278,6 +275,41 @@ def test_bad_line(input_filenames, logger):
 
             except Exception as e:
                 logger.error(f"Unexpected read error {e} on file {csvfile}")
+
+
+# .............................................................................
+def read_bad_line(in_filename, logger, gbif_id=None, line_num=None):
+    """Test troublesome lines.
+
+    Args:
+        in_filename: File to test, looking for troublesome data.
+        logger: logger for writing messages.
+        gbif_id (int): target GBIF identifier we are searching for
+        line_num (int): target line number we are searching for
+    """
+    if gbif_id is None and line_num is None:
+        raise Exception("Must provide troublesome gbifID or line number")
+
+    rdr, inf = get_csv_dict_reader(
+        in_filename, GBIF.DWCA_DELIMITER, encoding=ENCODING, quote_none=True, restkey=EXTRA_CSV_FIELD)
+
+    try:
+        for dwcrec in rdr:
+            if (rdr.line_num % LOG.INTERVAL) == 0:
+                logger.debug(f"*** Record number {rdr.line_num}, gbifID: {gbif_id} ***")
+
+            # Debug: examine data
+            if gbif_id == dwcrec[GBIF.ID_FLD]:
+                logger.debug(f"Found gbifID {gbif_id} on line {rdr.line_num}")
+            elif rdr.line_num == line_num:
+                logger.debug(f"Found line {rdr.line_num}")
+
+            if EXTRA_CSV_FIELD in dwcrec.keys():
+                logger.debug(
+                    f"Extra fields detected: possible bad read for record {gbif_id} on line {rdr.line_num}")
+
+    except Exception as e:
+        logger.error(f"Unexpected read error {e} on file {in_filename}")
 
 
 # .............................................................................
@@ -362,6 +394,9 @@ if __name__ == '__main__':
 
         elif cmd == "test_bad_data":
             test_bad_line(input_filenames, logger)
+
+        elif cmd == "find_bad_record":
+            read_bad_line(big_csv_filename, logger, gbif_id=None, line_num=9868792)
 
         else:
             logger.error(f"Unsupported command '{cmd}'")
