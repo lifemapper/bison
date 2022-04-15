@@ -74,6 +74,42 @@ class Counter():
         return spname, taxkey, county, state
 
     # .............................................................................
+    @classmethod
+    def count_assessments(cls, annotated_occ_filename):
+        """Count records for each of the valid assessments in a file.
+
+        Args:
+            annotated_occ_filename (str): full filename of annotated file to summarize.
+
+        Returns:
+            assessments (dict): dictionary with keys for each valid assessment type, and total record count for each.
+
+        Raises:
+            Exception: on unknown open or read error.
+        """
+        # Get one species name and county-state with riis_assessment from annotated occurrences file
+        assessments = {}
+        for val in ASSESS_VALUES:
+            assessments[val] = 0
+
+        dwcdata = DwcData(annotated_occ_filename)
+        try:
+            dwcdata.open()
+
+            # Find the species of the first record with riis_assessment
+            rec = dwcdata.get_record()
+            while rec is not None:
+                ass = rec[NEW_RIIS_ASSESSMENT_FLD]
+                assessments[ass] += 1
+                rec = dwcdata.get_record()
+        except Exception as e:
+            raise Exception(f"Unknown exception {e} on file {annotated_occ_filename}")
+        finally:
+            dwcdata.close()
+
+        return assessments
+
+    # .............................................................................
     def _count_annotated_records_for_species(self, spname, taxkey, state, county):
         annotated_filenames = glob.glob(self.annotated_filename_pattern)
         state_counts = RIIS_Counts(is_group=False, logger=self._log)

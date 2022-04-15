@@ -3,14 +3,13 @@ import csv
 from datetime import datetime
 import os
 
-from bison.common.aggregate import Aggregator
-from bison.common.annotate import Annotator
+from bison.common.aggregate import Aggregator, parallel_summarize, summarize_annotations
+from bison.common.annotate import Annotator, annotate_occurrence_file, parallel_annotate
 from bison.common.constants import (
     GBIF, BIG_DATA_PATH, DATA_PATH, ENCODING, EXTRA_CSV_FIELD, LOG, NEW_RESOLVED_COUNTY, NEW_RESOLVED_STATE,
     POINT_BUFFER_RANGE, RIIS_SPECIES, US_CENSUS_COUNTY)
 from bison.common.riis import NNSL
 from bison.tools.geoindex import GeoResolver, GeoException
-from bison.tools.parallel import parallel_annotate_multiprocess, parallel_summarize_multiprocess
 from bison.tools.util import chunk_files, delete_file, get_csv_dict_reader, get_logger, identify_chunk_files
 from bison.test.test_outputs import Counter
 
@@ -48,7 +47,7 @@ def resolve_riis_taxa(riis_filename, logger):
     try:
         nnsl.resolve_riis_to_gbif_taxa()
         logger.info(f"Resolved {len(nnsl.by_riis_id)} taxa in {riis_filename}, next, write.")
-        count = nnsl.write_resolved_riis()
+        count = nnsl.write_resolved_riis(overwrite=True)
         logger.info(f"Wrote {count} records to {resolved_riis_filename}.")
     except Exception as e:
         logger.error(f"Unexpected failure {e} in resolve_riis_taxa")
@@ -74,24 +73,32 @@ def annotate_occurrence_files(input_filenames, logger):
     annotated_filenames = []
     if len(input_filenames) > 1:
         log_output(logger, "Annotate files in parallel: ", outlist=input_filenames)
-        annotated_filenames = parallel_annotate_multiprocess(input_filenames, logger)
+        annotated_filenames = parallel_annotate(input_filenames, logger)
     else:
-        nnsl = NNSL(riis_filename, logger=logger)
-        nnsl.read_riis(read_resolved=True)
-        for csv_filename in input_filenames:
-            # If this one is complete, do not re-annotate
-            outfname = Annotator.construct_annotated_name(csv_filename)
-            if os.path.exists(outfname):
-                logger.info(f"Annotations exist in {outfname}, moving on.")
-            else:
-                ant = Annotator(csv_filename, nnsl=nnsl, logger=logger)
-                annotated_dwc_fname = ant.annotate_dwca_records()
-                annotated_filenames.append(annotated_dwc_fname)
+        csv_filename = input_filenames[0]
+        # If this one is complete, do not re-annotate
+        outfname = Annotator.construct_annotated_name(csv_filename)
+        if os.path.exists(outfname):
+            logger.info(f"Annotations exist in {outfname}, moving on.")
+        else:
+            annotated_dwc_fname = annotate_occurrence_file(csv_filename)
+            annotated_filenames.append(annotated_dwc_fname)
+
+        # nnsl = NNSL(riis_filename, logger=logger)
+        # nnsl.read_riis(read_resolved=True)
+        # # If this one is complete, do not re-annotate
+        # outfname = Annotator.construct_annotated_name(csv_filename)
+        # if os.path.exists(outfname):
+        #     logger.info(f"Annotations exist in {outfname}, moving on.")
+        # else:
+        #     ant = Annotator(csv_filename, nnsl=nnsl, logger=logger)
+        #     annotated_dwc_fname = ant.annotate_dwca_records()
+        #     annotated_filenames.append(annotated_dwc_fname)
     return annotated_filenames
 
 
 # .............................................................................
-def summarize_annotations(annotated_filenames, logger):
+def summarize_annotated_files(annotated_filenames, logger):
     """Annotate GBIF records with census state and county, and RIIS key and assessment.
 
     Args:
@@ -106,13 +113,17 @@ def summarize_annotations(annotated_filenames, logger):
     if len(annotated_filenames) > 1:
         log_output(logger, "Summarize files in parallel: ", outlist=annotated_filenames)
         # Does not overwrite existing summary files
-        summary_filenames = parallel_summarize_multiprocess(annotated_filenames, logger)
+        summary_filenames = parallel_summarize(annotated_filenames, logger)
     else:
-        for ann_filename in annotated_filenames:
-            agg = Aggregator(ann_filename, logger=logger)
-            # Do not overwrite existing summary file
-            summary_filename = agg.summarize_by_file(overwrite=False)
-            summary_filenames.append(summary_filename)
+        ann_filename = annotated_filenames[0]
+        # Do not overwrite existing summary file
+        summary_filename = summarize_annotations(ann_filename)
+        summary_filenames.append(summary_filename)
+
+        # agg = Aggregator(ann_filename, logger=logger)
+        # # Do not overwrite existing summary file
+        # summary_filename = agg.summarize_by_file(overwrite=False)
+        # summary_filenames.append(summary_filename)
     return summary_filenames
 
 
@@ -233,6 +244,7 @@ def test_bad_line(input_filenames, logger, trouble_id):
     Args:
         input_filenames: List of files to test, looking for troublesome data.
         logger: logger for writing messages.
+        trouble_id: gbifID for bad record to find
     """
     geofile = os.path.join(DATA_PATH, US_CENSUS_COUNTY.FILE)
     geo_county = GeoResolver(geofile, US_CENSUS_COUNTY.CENSUS_BISON_MAP, logger)
@@ -286,6 +298,9 @@ def read_bad_line(in_filename, logger, gbif_id=None, line_num=None):
         logger: logger for writing messages.
         gbif_id (int): target GBIF identifier we are searching for
         line_num (int): target line number we are searching for
+
+    Raises:
+        Exception: on missing one of gbif_id or line_num.
     """
     if gbif_id is None and line_num is None:
         raise Exception("Must provide troublesome gbifID or line number")
@@ -345,8 +360,9 @@ if __name__ == '__main__':
     # ...............................................
     # Test data
     # ...............................................
-    # cmd = "split"
-    # big_csv_filename = os.path.join(DATA_PATH, "gbif_2022-03-16_100k.csv")
+    # cmd = "resolve"
+    # do_split = False
+    # big_csv_filename = os.path.join(BIG_DATA_PATH, "gbif_2022-03-16_chunk-1-41876156_raw.csv")
     # ...............................................
 
     logger = get_logger(os.path.join(BIG_DATA_PATH, LOG.DIR), logname=f"main_{cmd}")
@@ -378,7 +394,7 @@ if __name__ == '__main__':
         elif cmd == "summarize":
             annotated_filenames = [Annotator.construct_annotated_name(csvfile) for csvfile in input_filenames]
             # Summarize each annotated file by region (state and county) write summary to a file
-            summary_filenames = summarize_annotations(annotated_filenames, logger)
+            summary_filenames = summarize_annotated_files(annotated_filenames, logger)
             log_output(logger, "Aggregated county/state filenames:", outlist=summary_filenames)
 
         elif cmd == "aggregate":
@@ -389,8 +405,15 @@ if __name__ == '__main__':
             log_output(logger, "Region filenames, assessment filename:", outlist=region_assess_summary_filenames)
 
         elif cmd == "test":
-            record_counter = Counter(big_csv_filename, do_split=True, logger=logger)
-            record_counter.compare_counts()
+            assessments = Counter.count_assessments(input_filenames[0])
+            check_further = True
+            for ass, count in assessments.items():
+                if count == 0:
+                    check_further = False
+                    logger.warn(f"Zero records found with {ass} assessment in {input_filenames[0]}")
+            if check_further is True:
+                record_counter = Counter(big_csv_filename, do_split=True, logger=logger)
+                record_counter.compare_counts()
 
         elif cmd == "test_bad_data":
             test_bad_line(input_filenames, logger)
