@@ -339,7 +339,8 @@ if __name__ == '__main__':
     gbif_infile = os.path.join(BIG_DATA_PATH, "gbif_2022-03-16.csv")
 
     parser = argparse.ArgumentParser(
-        description=("Execute one or more steps of annotating GBIF data with RIIS assessments, and summarizing by " +
+        description=("Execute one or more steps of annotating GBIF data with RIIS " +
+                     "assessments, and summarizing by " +
                      "species, county, and state"))
     parser.add_argument(
         "cmd", type=str, choices=("resolve", "split", "annotate", "summarize", "aggregate", "test"),

@@ -177,11 +177,13 @@ class Annotator():
                 while dwcrec is not None:
                     gbif_id = dwcrec[GBIF.ID_FLD]
                     if (self._dwcdata.recno % LOG.INTERVAL) == 0:
-                        self._log.info(f"*** Record number {self._dwcdata.recno}, gbifID: {gbif_id} ***")
+                        self._log.info(
+                            f"*** Record number {self._dwcdata.recno}, "
+                            + f"gbifID: {gbif_id} ***")
 
                     # Debug: examine data
                     # if EXTRA_CSV_FIELD in dwcrec.keys():
-                    #     self._log.debug(f"Extra fields detected: possible bad read for record {gbif_id}")
+                    #     self._log.debug(f"Extra fields detected: record {gbif_id}")
 
                     # Initialize new fields
                     county = state = riis_assessment = riis_key = None
@@ -189,7 +191,8 @@ class Annotator():
                     # Find county and state for these coords
                     try:
                         county, state = self._find_county_state(
-                            dwcrec[GBIF.LON_FLD], dwcrec[GBIF.LAT_FLD], buffer_vals=POINT_BUFFER_RANGE)
+                            dwcrec[GBIF.LON_FLD], dwcrec[GBIF.LAT_FLD],
+                            buffer_vals=POINT_BUFFER_RANGE)
                     except ValueError as e:
                         self._log.error(f"Record gbifID: {gbif_id}: {e}")
                     except GeoException as e:
@@ -202,7 +205,9 @@ class Annotator():
 
                     # # Find RIIS records for this acceptedTaxonKey
                     taxkey = dwcrec[GBIF.ACC_TAXON_FLD]
-                    riis_assessment, riis_key = self.nnsl.get_assessment_for_gbif_taxonkey_region(taxkey, region)
+                    (riis_assessment,
+                     riis_key) = self.nnsl.get_assessment_for_gbif_taxonkey_region(
+                        taxkey, region)
 
                     # Add county, state and RIIS assessment to record
                     dwcrec[NEW_RESOLVED_COUNTY] = county
@@ -213,13 +218,17 @@ class Annotator():
                     try:
                         self._csv_writer.writerow(dwcrec)
                     except ValueError as e:
-                        self._log.error(f"ValueError {e} on record with gbifID {gbif_id}")
+                        self._log.error(
+                            f"ValueError {e} on record with gbifID {gbif_id}")
                     except Exception as e:
-                        self._log.error(f"Unknown error {e} record with gbifID {gbif_id}")
+                        self._log.error(
+                            f"Unknown error {e} record with gbifID {gbif_id}")
 
                     dwcrec = self._dwcdata.get_record()
             except Exception as e:
-                raise Exception(f"Unexpected error {e} reading {self._dwcdata.input_file} or writing {annotated_dwc_fname}")
+                raise Exception(
+                    f"Unexpected error {e} reading {self._dwcdata.input_file} or "
+                    + f"writing {annotated_dwc_fname}")
 
         return annotated_dwc_fname
 
