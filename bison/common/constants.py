@@ -2,7 +2,6 @@
 BIG_DATA_PATH = "/home/astewart/git/bison/big_data"
 DATA_PATH = "/home/astewart/git/bison/data"
 OUT_DIR = "out"
-BISON_DELIMITER = "$"
 ENCODING = "utf-8"
 LINENO_FLD = "LINENO"
 ERR_SEPARATOR = "------------"
