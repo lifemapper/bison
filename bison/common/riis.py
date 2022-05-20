@@ -248,9 +248,6 @@ class NNSL:
             riis_filename (str): Path to the base of the input data, used to construct full
                 filenames from basepath and relative path constants.
             logger (object): logger for writing messages to file and console
-
-        Raises:
-            Exception: on unexpected file header
         """
         datapath, fname_w_ext = os.path.split(riis_filename)
         basename, ext = os.path.splitext(fname_w_ext)
@@ -263,12 +260,6 @@ class NNSL:
         self._log = logger
 
         self.auth_fname = f"{os.path.join(self._datapath, RIIS_AUTHORITY.FNAME)}.{RIIS.DATA_EXT}"
-
-        # Test and clean headers of non-ascii characters
-        self._test_header(self.auth_fname, RIIS_AUTHORITY.HEADER)
-        good_header = self._test_header(self._csvfile, RIIS_SPECIES.HEADER)
-        if good_header is False:
-            raise Exception(f"Unexpected file header found in {self._csvfile}")
 
         # Trimmed and updated Non-native Species List, built from RIIS
         self.by_gbif_taxkey = None
@@ -321,7 +312,6 @@ class NNSL:
         basename, ext = os.path.splitext(orig_riis_filename)
         updated_riis_fname = f"{basename}_updated_gbif{ext}"
         return updated_riis_fname
-
 
     # ...............................................
     @property
@@ -414,10 +404,17 @@ class NNSL:
                 raise FileNotFoundError(f"File {self.gbif_resolved_riis_fname} does not exist")
             else:
                 infname = self.gbif_resolved_riis_fname
+                expected_header = self.gbif_resolved_riis_header
         else:
             infname = self._csvfile
+            expected_header = RIIS_SPECIES.HEADER
 
-        rdr, inf = get_csv_dict_reader(infname, RIIS.DELIMITER)
+        # Test and clean headers of non-ascii characters
+        good_header = self._fix_header(infname, expected_header)
+        if good_header is False:
+            raise Exception(f"Unexpected file header found in {self._csvfile}")
+        rdr, inf = get_csv_dict_reader(infname, RIIS.DELIMITER, fieldnames=good_header, quote_none=False)
+
         self._log.debug(f"Reading RIIS from {infname}")
         try:
             for row in rdr:
@@ -675,8 +672,8 @@ class NNSL:
         return better_name
 
     # ...............................................
-    def _test_header(self, fname, expected_header):
-        """Compare the actual header in fname with an expected_header.
+    def _fix_header(self, fname, expected_header):
+        """Return a cleaned version of the header, correcting any fieldnames with illegal characters.
 
         Print warnings if actual fieldnames contain non-ascii characters.  Print errors
         if the actual header does not contain the same fieldnames, in the same order, as
@@ -687,9 +684,9 @@ class NNSL:
             expected_header (list): list of fieldnames expected for the data file
 
         Returns:
-             list of fieldnames from the actual header, stripped of non-ascii characters
+             False if header has unexpected fields, otherwise a list of fieldnames from the actual header,
+                stripped of non-ascii characters
         """
-        success = True
         with open(fname, "r", newline="") as csvfile:
             rdr = csv.reader(csvfile, delimiter=RIIS.DELIMITER)
             header = next(rdr)
@@ -700,15 +697,18 @@ class NNSL:
             self._log.error(
                 f"[Error] Header has {fld_count} fields, != {len(expected_header)} expected")
 
+        good_header = []
         for i in range(len(header)):
-            # Test header fieldnames
+            # Test header fieldnames, correct if necessary
             good_fieldname = self._only_ascii(header[i])
+            good_header.append(good_fieldname)
+
             if good_fieldname != expected_header[i]:
-                success = False
                 self._log.error(ERR_SEPARATOR)
                 self._log.error(
                     f"[Error] Header {header[i]} != {expected_header[i]} expected")
-        return success
+                return False
+        return good_header
 
 
 # .............................................................................

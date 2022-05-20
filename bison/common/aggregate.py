@@ -1,5 +1,7 @@
 """Common classes for adding USGS RIIS info to GBIF occurrences."""
 import csv
+from datetime import datetime
+from multiprocessing import Pool, cpu_count
 import os
 
 from bison.common.constants import (
@@ -232,7 +234,7 @@ class Aggregator():
             logger (object): logger for saving relevant processing messages
 
         Raises:
-            FileNotFoundError: on any missing file in occ_filename_list
+            FileNotFoundError: on missing annotated_filename
         """
         if not os.path.exists(annotated_filename):
             raise FileNotFoundError(f"File {annotated_filename} does not exist")
@@ -484,9 +486,10 @@ class Aggregator():
 
         Args:
             overwrite (bool): Flag indicating whether to overwrite or skip existing files.
+
         Returns:
-            summary_filename: full output filename for CSV summary of annotated occurrence file. CSV fields are
-                 [SPECIES_KEY, GBIF_TAXON_KEY, ASSESS_KEY, STATE_KEY, COUNTY_KEY, COUNT_KEY].
+            summary_filename: full output filename for CSV summary of annotated occurrence file, with fields:
+                 SPECIES_KEY, GBIF_TAXON_KEY, ASSESS_KEY, STATE_KEY, COUNTY_KEY, COUNT_KEY
         """
         summary_filename = self.construct_summary_name(self._csvfile)
         # Summarize and write
@@ -708,3 +711,63 @@ class Aggregator():
             outf.close()
 
         return assess_summary_filename
+
+
+# .............................................................................
+def summarize_annotations(ann_filename):
+    """Summarize data in an annotated GBIF DwC file by state, county, and RIIS assessment, do not overwrite existing file.
+
+    Args:
+        ann_filename (str): full filename of an annotated GBIF data file.
+
+    Returns:
+        summary_filename (str): full filename of a summary file
+
+    Raises:
+        FileNotFoundError: on missing input file
+    """
+    overwrite = False
+    if not os.path.exists(ann_filename):
+        raise FileNotFoundError(ann_filename)
+
+    datapath, basefname = os.path.split(ann_filename)
+    logger = get_logger(os.path.join(datapath, LOG.DIR), f"summarize_{basefname}")
+    logger.info(f"Submit {basefname} for summarizing.")
+
+    logger.info("Start Time : {}".format(datetime.now()))
+    agg = Aggregator(ann_filename, logger=logger)
+    summary_filename = agg.summarize_by_file(overwrite=overwrite)
+    logger.info("End Time : {}".format(datetime.now()))
+    return summary_filename
+
+
+# .............................................................................
+def parallel_summarize(annotated_filenames, main_logger):
+    """Main method for parallel execution of summarization script.
+
+    Args:
+        annotated_filenames (list): list of full filenames containing annotated GBIF data.
+        main_logger (logger): logger for the process that calls this function, initiating subprocesses
+
+    Returns:
+        annotated_dwc_fnames (list): list of full output filenames
+    """
+    infiles = []
+    for in_csv in annotated_filenames:
+        out_csv = Aggregator.construct_summary_name(in_csv)
+        if os.path.exists(out_csv):
+            main_logger.info(f"Summaries exist in {out_csv}, moving on.")
+        else:
+            infiles.append(in_csv)
+
+    main_logger.info("Parallel Summarize Start Time : {}".format(datetime.now()))
+    # Do not use all CPUs
+    pool = Pool(cpu_count() - 2)
+    # Map input files asynchronously onto function
+    map_result = pool.map_async(summarize_annotations, infiles)
+    # Wait for results
+    map_result.wait()
+    summary_filenames = map_result.get()
+    main_logger.info("Parallel Summarize End Time : {}".format(datetime.now()))
+
+    return summary_filenames
