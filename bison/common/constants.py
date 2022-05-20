@@ -166,6 +166,7 @@ class ITIS:
 # .............................................................................
 class GBIF:
     """Constants for GBIF DWCA fields, APIs, and their request and response objects."""
+    INPUT_DATA = "gbif_2022-05-19.csv"
     URL = "http://api.gbif.org/v1"
     UUID_KEY = "key"
     ID_FLD = "gbifID"
@@ -180,7 +181,6 @@ class GBIF:
     MATCH_FLD = "matchType"
     STATUS_FLD = "taxonomicStatus"
     ORG_FOREIGN_KEY = "publishingOrganizationKey"
-    INPUT_DATA = "gbif_2022-03-16.csv"
     DWCA_DATASET_DIR = "dataset"
     DWCA_META_FNAME = "meta.xml"
     DWCA_INTERPRETED = "occurrence"
