@@ -331,16 +331,14 @@ def read_bad_line(in_filename, logger, gbif_id=None, line_num=None):
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
     """Main script to execute all elements of the summarize-GBIF BISON workflow."""
+    COMMANDS = ("resolve", "split", "annotate", "summarize", "aggregate", "test")
     import argparse
 
     parser = argparse.ArgumentParser(
         description=(
                 "Execute one or more steps of annotating GBIF data with RIIS " +
                 "assessments, and summarizing by species, county, and state"))
-    parser.add_argument(
-        "cmd", type=str,
-        choices=("resolve", "split", "annotate", "summarize", "aggregate", "test"),
-        default="test_bad_data")
+    parser.add_argument("cmd", type=str, choices=COMMANDS, default="test_bad_data")
     parser.add_argument(
         "--riis_filename", type=str, default=RIIS_SPECIES.FNAME,
         help="The full path to US RIIS input file.")
@@ -353,6 +351,8 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     cmd = args.cmd
+    if cmd not in COMMANDS:
+        raise Exception(f"Unknown command {cmd}")
 
     # Args may be full path, or base filename in default path
     gbif_filename = args.gbif_filename
