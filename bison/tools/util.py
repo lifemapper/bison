@@ -563,20 +563,23 @@ def chunk_files(big_csv_filename):
 if __name__ == "__main__":
     import argparse
 
-    default_infile = os.path.join(BIG_DATA_PATH, GBIF.INPUT_DATA)
-
     parser = argparse.ArgumentParser(description="Split")
     parser.add_argument("cmd", type=str, default="split")
     parser.add_argument(
-        "big_csv_filename", type=str, default=default_infile,
+        "gbif_filename", type=str, default=GBIF.INPUT_DATA,
         help='The full path to GBIF input species occurrence data.')
     args = parser.parse_args()
+
+    # Args may be full path, or base filename in default path
+    gbif_filename = args.gbif_filename
+    if not os.path.exists(gbif_filename):
+        gbif_filename = os.path.join(BIG_DATA_PATH, gbif_filename)
 
     if args.cmd != "split":
         print("Only `split` is currently supported")
     else:
-        boundary_pairs = identify_chunks(args.big_csv_filename)
-        chunk_filenames = chunk_files(args.big_csv_filename)
+        boundary_pairs = identify_chunks(args.gbif_filename)
+        chunk_filenames = chunk_files(args.gbif_filename)
         print(f"boundary_pairs = {boundary_pairs}")
 
 

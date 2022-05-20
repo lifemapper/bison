@@ -16,17 +16,17 @@ from bison.test.test_outputs import Counter
 
 
 # .............................................................................
-def split_files(big_csv_filename, logger):
+def split_files(gbif_filename, logger):
     """Split files into smaller subsets for faster processing.
 
     Args:
-        big_csv_filename (str): full filename for splitting into smaller files.
+        gbif_filename (str): full filename for splitting into smaller files.
         logger (object): logger for saving relevant processing messages
 
     Returns:
         chunk_filenames (list): full filenames for subset files.
     """
-    chunk_filenames = chunk_files(big_csv_filename)
+    chunk_filenames = chunk_files(gbif_filename)
     logger.info(f"{len(chunk_filenames)} chunk files created.")
     return chunk_filenames
 
@@ -167,17 +167,17 @@ def summarize_regions(summary_filenames, logger):
 
 
 # .............................................................................
-def find_or_create_subset_files(big_csv_filename, logger):
+def find_or_create_subset_files(gbif_filename, logger):
     """Find or create subset files from a large file based on the file size and number of CPUs.
 
     Args:
-        big_csv_filename (str): full filename of data file to be subsetted into chunks.
+        gbif_filename (str): full filename of data file to be subsetted into chunks.
         logger (object): logger for saving relevant processing messages
 
     Returns:
         input_filenames (list): full filenames for subset files created from large input file.
     """
-    chunk_filenames = identify_chunk_files(big_csv_filename)
+    chunk_filenames = identify_chunk_files(gbif_filename)
     # If any are missing, delete them all and split
     re_split = False
     for chunk_fname in chunk_filenames:
@@ -189,7 +189,7 @@ def find_or_create_subset_files(big_csv_filename, logger):
         for chunk_fname in chunk_filenames:
             delete_file(chunk_fname)
         # Resplit into subset files
-        chunk_filenames = split_files(big_csv_filename, logger)
+        chunk_filenames = split_files(gbif_filename, logger)
 
     return chunk_filenames
 
@@ -318,35 +318,41 @@ if __name__ == '__main__':
     """Main script to execute all elements of the summarize-GBIF BISON workflow."""
     import argparse
 
-    riis_filename = os.path.join(DATA_PATH, RIIS_SPECIES.FNAME)
-    gbif_infile = os.path.join(BIG_DATA_PATH, GBIF.INPUT_DATA)
-    # wc -l =
-    gbif_infile = os.path.join(BIG_DATA_PATH, "gbif_2022-03-16.csv")
-
     parser = argparse.ArgumentParser(
-        description=("Execute one or more steps of annotating GBIF data with RIIS assessments, and summarizing by " +
-                     "species, county, and state"))
+        description=(
+                "Execute one or more steps of annotating GBIF data with RIIS " +
+                "assessments, and summarizing by species, county, and state"))
     parser.add_argument(
-        "cmd", type=str, choices=("resolve", "split", "annotate", "summarize", "aggregate", "test"),
+        "cmd", type=str,
+        choices=("resolve", "split", "annotate", "summarize", "aggregate", "test"),
         default="test_bad_data")
     parser.add_argument(
-        "big_csv_filename", type=str, default=gbif_infile,
+        "--riis_filename", type=str, default=RIIS_SPECIES.FNAME,
+        help="The full path to US RIIS input file.")
+    parser.add_argument(
+        "--gbif_filename", type=str, default=GBIF.INPUT_DATA,
         help="The full path to GBIF input species occurrence data.")
     parser.add_argument(
         "--do-split", type=str, choices=("True", "False"), default="True",
-        help=("True to process subsetted/chunked files; False to process big_csv_filename directly.  Command 'split' " +
-              "assumes do_subset is True"))
+        help=("True to process subsetted files; False to process gbif_filename directly."))
 
     args = parser.parse_args()
     cmd = args.cmd
-    big_csv_filename = os.path.join(BIG_DATA_PATH, args.big_csv_filename)
+
+    # Args may be full path, or base filename in default path
+    gbif_filename = args.gbif_filename
+    if not os.path.exists(gbif_filename):
+        gbif_filename = os.path.join(BIG_DATA_PATH, gbif_filename)
+    riis_filename = args.riis_filename
+    if not os.path.exists(riis_filename):
+        riis_filename = os.path.join(DATA_PATH, riis_filename)
+
     do_split = True if args.do_split.lower() in ("yes", "y", "true", "1") else False
 
     # ...............................................
     # Test data
     # ...............................................
     # cmd = "split"
-    # big_csv_filename = os.path.join(DATA_PATH, "gbif_2022-03-16_100k.csv")
     # ...............................................
 
     logger = get_logger(os.path.join(BIG_DATA_PATH, LOG.DIR), logname=f"main_{cmd}")
@@ -356,16 +362,20 @@ if __name__ == '__main__':
     if cmd == "resolve":
         resolved_riis_filename = resolve_riis_taxa(riis_filename, logger)
         log_output(logger, f"Resolved RIIS filename: {resolved_riis_filename}")
+
     elif cmd == "split":
-        input_filenames = find_or_create_subset_files(big_csv_filename, logger)
+        if not os.path.exists(gbif_filename):
+            raise FileNotFoundError(f"Expected file {gbif_filename} does not exist")
+        input_filenames = find_or_create_subset_files(gbif_filename, logger)
         log_output(logger, "Input filenames:", outlist=input_filenames)
+
     else:
         # Find or create subset files if requested
         if do_split is True:
-            input_filenames = find_or_create_subset_files(big_csv_filename, logger)
+            input_filenames = find_or_create_subset_files(gbif_filename, logger)
         else:
-            input_filenames = [big_csv_filename]
-        # Make sure files to be processed exist
+            input_filenames = [gbif_filename]
+        # Make sure input files exist
         for csv_fname in input_filenames:
             if not os.path.exists(csv_fname):
                 raise FileNotFoundError(f"Expected file {csv_fname} does not exist")
@@ -389,14 +399,14 @@ if __name__ == '__main__':
             log_output(logger, "Region filenames, assessment filename:", outlist=region_assess_summary_filenames)
 
         elif cmd == "test":
-            record_counter = Counter(big_csv_filename, do_split=True, logger=logger)
+            record_counter = Counter(gbif_filename, do_split=True, logger=logger)
             record_counter.compare_counts()
 
         elif cmd == "test_bad_data":
             test_bad_line(input_filenames, logger)
 
         elif cmd == "find_bad_record":
-            read_bad_line(big_csv_filename, logger, gbif_id=None, line_num=9868792)
+            read_bad_line(gbif_filename, logger, gbif_id=None, line_num=9868792)
 
         else:
             logger.error(f"Unsupported command '{cmd}'")
