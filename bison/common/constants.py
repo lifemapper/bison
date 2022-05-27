@@ -13,6 +13,7 @@ NEW_RESOLVED_COUNTY = "georef_cty"
 NEW_RESOLVED_STATE = "georef_st"
 NEW_RIIS_KEY_FLD = "riis_occurrence_id"
 NEW_RIIS_ASSESSMENT_FLD = "riis_assessment"
+NEW_FILTER_FLAG = "do_summarize"
 
 # Append these to RIIS data for GBIF accepted taxon resolution
 NEW_GBIF_KEY_FLD = "gbif_res_taxonkey"
@@ -171,6 +172,7 @@ class GBIF:
     ID_FLD = "gbifID"
     NAME_FLD = "scientificName"
     TAXON_FLD = "taxonKey"
+    RANK_FLD = "taxonRank"
     ACC_NAME_FLD = "acceptedScientificName"
     ACC_TAXON_FLD = "acceptedTaxonKey"
     STATE_FLD = "stateProvince"
@@ -191,6 +193,9 @@ class GBIF:
         "saveme": ["key", "title", "description", "created", "modified", "homepage"],
         "preserve_format": ["description", "homepage"],
     }
+    ACCEPT_RANK_VALUES = [
+        "species", "subspecies", "variety", "form", "infraspecific_name",
+        "infrasubspecific_name"]
     DSET_KEYS = {
         "apitype": "dataset",
         "saveme": [

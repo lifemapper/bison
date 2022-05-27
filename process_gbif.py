@@ -356,18 +356,21 @@ if __name__ == '__main__':
 
     # Args may be full path, or base filename in default path
     gbif_filename = args.gbif_filename
-    if not os.path.exists(gbif_filename):
-        gbif_filename = os.path.join(BIG_DATA_PATH, gbif_filename)
     riis_filename = args.riis_filename
-    if not os.path.exists(riis_filename):
-        riis_filename = os.path.join(DATA_PATH, riis_filename)
-
     do_split = True if args.do_split.lower() in ("yes", "y", "true", "1") else False
 
-    # ...............................................
-    # Test data
-    # cmd = "split"
-    # ...............................................
+    # # ...............................................
+    # # Test data
+    # cmd = "annotate"
+    # gbif_filename = "gbif_2022-05-19.csv"
+    # riis_filename = "US-RIIS_MasterList.csv"
+    # do_split = True
+    # # ...............................................
+
+    if not os.path.exists(gbif_filename):
+        gbif_filename = os.path.join(BIG_DATA_PATH, gbif_filename)
+    if not os.path.exists(riis_filename):
+        riis_filename = os.path.join(DATA_PATH, riis_filename)
 
     logger = get_logger(os.path.join(BIG_DATA_PATH, LOG.DIR), logname=f"main_{cmd}")
     logger.info(f"Command: {cmd}")
@@ -395,9 +398,11 @@ if __name__ == '__main__':
                 raise FileNotFoundError(f"Expected file {csv_fname} does not exist")
 
         if cmd == "annotate":
+            log_output(logger, f"Command = {cmd}")
+            log_output(logger, "Input filenames", outlist=input_filenames)
             # Annotate DwC records with county, state, and if found, RIIS assessment and RIIS occurrenceID
-            annotated_filenames = annotate_occurrence_files(input_filenames, logger)
-            log_output(logger, "Newly annotated filenames:", outlist=annotated_filenames)
+            # annotated_filenames = annotate_occurrence_files(input_filenames, logger)
+            # log_output(logger, "Newly annotated filenames:", outlist=annotated_filenames)
 
         elif cmd == "summarize":
             annotated_filenames = [Annotator.construct_annotated_name(csvfile) for csvfile in input_filenames]
