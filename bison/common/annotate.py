@@ -5,7 +5,8 @@ import os
 
 from bison.common.constants import (
     DATA_PATH, ENCODING, GBIF, LOG, NEW_RESOLVED_COUNTY, NEW_RESOLVED_STATE,
-    NEW_RIIS_ASSESSMENT_FLD, NEW_RIIS_KEY_FLD, POINT_BUFFER_RANGE, RIIS_SPECIES, US_CENSUS_COUNTY, US_STATES)
+    NEW_RIIS_ASSESSMENT_FLD, NEW_RIIS_KEY_FLD, NEW_FILTER_FLAG, POINT_BUFFER_RANGE,
+    RIIS_SPECIES, US_CENSUS_COUNTY, US_STATES)
 from bison.common.gbif import DwcData
 from bison.common.riis import NNSL
 from bison.tools.geoindex import GeoResolver, GeoException
@@ -53,6 +54,8 @@ class Annotator():
                 self._conus_states.extend([k, v])
         self._all_states = self._conus_states.copy()
         self._all_states.extend(["Alaska", "Hawaii", "AK", "HI"])
+        self.bad_ranks = set()
+        self.rank_filtered_records = 0
 
     # ...............................................
     @classmethod
@@ -154,6 +157,56 @@ class Annotator():
         return False
 
     # ...............................................
+    def annotate_one_record(self, dwcrec):
+        """Append fields to GBIF record, then write to file.
+
+        Args:
+            dwcrec: one original GBIF DwC record
+
+        Returns:
+            dwcrec: one annotated GBIF DwC record
+        """
+        gbif_id = dwcrec[GBIF.ID_FLD]
+        if (self._dwcdata.recno % LOG.INTERVAL) == 0:
+            self._log.info(
+                f"*** Record number {self._dwcdata.recno}, gbifID: {gbif_id} ***")
+
+        # Find county and state for these coords
+        county = state = None
+        try:
+            county, state = self._find_county_state(
+                dwcrec[GBIF.LON_FLD], dwcrec[GBIF.LAT_FLD],
+                buffer_vals=POINT_BUFFER_RANGE)
+        except ValueError as e:
+            self._log.error(f"Record gbifID: {gbif_id}: {e}")
+        except GeoException as e:
+            self._log.error(f"Record gbifID: {gbif_id}: {e}")
+
+        region = "L48"
+        if state in ("AK", "HI"):
+            region = state
+
+        # Find RIIS records for this acceptedTaxonKey
+        taxkey = dwcrec[GBIF.ACC_TAXON_FLD]
+        (riis_assessment, riis_key) = self.nnsl.get_assessment_for_gbif_taxonkey_region(
+            taxkey, region)
+
+        # Determine whether to include this in summaries
+        dwcrec[NEW_FILTER_FLAG] = "true"
+        if dwcrec[GBIF.RANK_FLD] not in GBIF.ACCEPT_RANK_VALUES:
+            dwcrec[NEW_FILTER_FLAG] = "false"
+            self.bad_ranks.add(dwcrec[GBIF.RANK_FLD])
+            self.rank_filtered_records += 1
+
+        # Add county, state and RIIS assessment to record
+        dwcrec[NEW_RESOLVED_COUNTY] = county
+        dwcrec[NEW_RESOLVED_STATE] = state
+        dwcrec[NEW_RIIS_ASSESSMENT_FLD] = riis_assessment
+        dwcrec[NEW_RIIS_KEY_FLD] = riis_key
+
+        return dwcrec
+
+    # ...............................................
     def annotate_dwca_records(self):
         """Resolve and append state, county, RIIS assessment, and RIIS key to GBIF DWC occurrence records.
 
@@ -175,60 +228,27 @@ class Annotator():
                 # iterate over DwC records
                 dwcrec = self._dwcdata.get_record()
                 while dwcrec is not None:
-                    gbif_id = dwcrec[GBIF.ID_FLD]
-                    if (self._dwcdata.recno % LOG.INTERVAL) == 0:
-                        self._log.info(
-                            f"*** Record number {self._dwcdata.recno}, "
-                            + f"gbifID: {gbif_id} ***")
-
-                    # Debug: examine data
-                    # if EXTRA_CSV_FIELD in dwcrec.keys():
-                    #     self._log.debug(f"Extra fields detected: record {gbif_id}")
-
-                    # Initialize new fields
-                    county = state = riis_assessment = riis_key = None
-
-                    # Find county and state for these coords
+                    # Annotate
+                    dwcrec_ann = self.annotate_one_record(dwcrec)
+                    # Write
                     try:
-                        county, state = self._find_county_state(
-                            dwcrec[GBIF.LON_FLD], dwcrec[GBIF.LAT_FLD],
-                            buffer_vals=POINT_BUFFER_RANGE)
-                    except ValueError as e:
-                        self._log.error(f"Record gbifID: {gbif_id}: {e}")
-                    except GeoException as e:
-                        self._log.error(f"Record gbifID: {gbif_id}: {e}")
-
-                    if state in ("AK", "HI"):
-                        region = state
-                    else:
-                        region = "L48"
-
-                    # # Find RIIS records for this acceptedTaxonKey
-                    taxkey = dwcrec[GBIF.ACC_TAXON_FLD]
-                    (riis_assessment,
-                     riis_key) = self.nnsl.get_assessment_for_gbif_taxonkey_region(
-                        taxkey, region)
-
-                    # Add county, state and RIIS assessment to record
-                    dwcrec[NEW_RESOLVED_COUNTY] = county
-                    dwcrec[NEW_RESOLVED_STATE] = state
-                    dwcrec[NEW_RIIS_ASSESSMENT_FLD] = riis_assessment
-                    dwcrec[NEW_RIIS_KEY_FLD] = riis_key
-
-                    try:
-                        self._csv_writer.writerow(dwcrec)
+                        self._csv_writer.writerow(dwcrec_ann)
                     except ValueError as e:
                         self._log.error(
-                            f"ValueError {e} on record with gbifID {gbif_id}")
+                            f"ValueError {e} on record, gbifID {dwcrec[GBIF.ID_FLD]}")
                     except Exception as e:
                         self._log.error(
-                            f"Unknown error {e} record with gbifID {gbif_id}")
-
+                            f"Unknown error {e} record, gbifID {dwcrec[GBIF.ID_FLD]}")
+                    # Get next
                     dwcrec = self._dwcdata.get_record()
             except Exception as e:
                 raise Exception(
                     f"Unexpected error {e} reading {self._dwcdata.input_file} or "
                     + f"writing {annotated_dwc_fname}")
+
+        self._log.info(
+            f"Annotate records filtered out {self.rank_filtered_records} " +
+            f"records with {self.bad_ranks} ranks")
 
         return annotated_dwc_fname
 
