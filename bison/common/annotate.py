@@ -186,17 +186,34 @@ class Annotator():
         if state in ("AK", "HI"):
             region = state
 
-        # Find RIIS records for this acceptedTaxonKey
-        taxkey = dwcrec[GBIF.ACC_TAXON_FLD]
-        (riis_assessment, riis_key) = self.nnsl.get_assessment_for_gbif_taxonkey_region(
-            taxkey, region)
-
-        # Determine whether to include this in summaries
+        # Identify whether this record is above Species rank
+        # (exclude higher level determinations from resolution and summary)
         dwcrec[NEW_FILTER_FLAG] = "true"
         if dwcrec[GBIF.RANK_FLD] not in GBIF.ACCEPT_RANK_VALUES:
             dwcrec[NEW_FILTER_FLAG] = "false"
             self.bad_ranks.add(dwcrec[GBIF.RANK_FLD])
             self.rank_filtered_records += 1
+        # Species or below
+        else:
+            # Find RIIS records for this acceptedTaxonKey.
+            taxkeys = [dwcrec[GBIF.ACC_TAXON_FLD]]
+            if (dwcrec[GBIF.RANK_FLD].lower() != "species"
+                    and dwcrec[GBIF.ACC_TAXON_FLD] != dwcrec[GBIF.SPECIES_KEY_FLD]):
+                # If acceptedTaxonKey is below species, find RIIS records for species
+                # key too.
+                taxkeys.append(dwcrec[GBIF.SPECIES_KEY_FLD])
+
+        # Find RIIS records for this acceptedTaxonKey.  If  acceptedTaxonKey
+        # taxkey = dwcrec[GBIF.ACC_TAXON_FLD]
+        (riis_assessment, riis_key) = self.nnsl.get_assessment_for_gbif_taxonkeys_region(
+            taxkeys, region)
+        #
+        # # Determine whether to include this in summaries
+        # dwcrec[NEW_FILTER_FLAG] = "true"
+        # if dwcrec[GBIF.RANK_FLD] not in GBIF.ACCEPT_RANK_VALUES:
+        #     dwcrec[NEW_FILTER_FLAG] = "false"
+        #     self.bad_ranks.add(dwcrec[GBIF.RANK_FLD])
+        #     self.rank_filtered_records += 1
 
         # Add county, state and RIIS assessment to record
         dwcrec[NEW_RESOLVED_COUNTY] = county

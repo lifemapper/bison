@@ -363,11 +363,13 @@ class NNSL:
         return assessments
 
     # ...............................................
-    def get_assessment_for_gbif_taxonkey_region(self, gbif_taxon_key, region):
+    def get_assessment_for_gbif_taxonkeys_region(self, gbif_taxon_keys, region):
         """Get all RIIS assessments for this GBIF taxonKey.
 
         Args:
-            gbif_taxon_key (str): unique identifier for GBIF taxon record
+            gbif_taxon_keys (list of str): unique identifier for GBIF taxon record. For
+                records identified to a rank lower than species, check assessment for
+                species key also.
             region (str): RIIS-defined US region for assessment, choices are AK, HI, L48
 
         Returns:
@@ -376,7 +378,9 @@ class NNSL:
         """
         assess = "presumed_native"
         recid = None
-        riis_recs = self.get_riis_by_gbif_taxonkey(gbif_taxon_key)
+        riis_recs = []
+        for gbif_taxon_key in gbif_taxon_keys:
+            riis_recs.extend(self.get_riis_by_gbif_taxonkey(gbif_taxon_key))
         for riis in riis_recs:
             if region == riis.locality:
                 assess = riis.assessment

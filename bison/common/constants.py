@@ -176,6 +176,7 @@ class GBIF:
     ACC_NAME_FLD = "acceptedScientificName"
     ACC_TAXON_FLD = "acceptedTaxonKey"
     STATE_FLD = "stateProvince"
+    SPECIES_KEY_FLD = "speciesKey"
     COUNTY_FLD = "county"
     LAT_FLD = "decimalLatitude"
     LON_FLD = "decimalLongitude"

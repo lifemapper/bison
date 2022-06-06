@@ -133,19 +133,25 @@ This step annotates all GBIF DwC records with 5 additional fields, of 3 categori
    * `georef_cty`: County as determined by census boundaries
    * `georef_st`: State as determined by census boundaries
 
-2) RIIS identifier, and RIIS designation introduced, invasive, or presumed native.
-
-   * `riis_occurrence_id`: Matching RIIS unique identifier determination for this
-      record's acceptedScientificName and location.
-   * `riis_assessment`: RIIS assessment of introduced, invasive, or presumed_native, for
-      this record's species and location.
-
-3) a flag indicating whether to include this record in summaries, by marking all records
-   identified to taxonRank species and below as True, all above species as False.
+2) a flag indicating whether to annotate this record and include it in summaries, by
+   marking all records identified to taxonRank species and below as True, all above
+   species as False.
 
    * `do_summarize`: Mark records identified to taxonRank species or below
      (subspecies, variety, form, infraspecific_name, infrasubspecific_name)
      as True, all above as False.
+
+3) RIIS identifier, and RIIS designation introduced, invasive, or presumed native. This
+   assessment is computed from the occurrence record's taxon and region (Alaska, Hawaii,
+   or the Lower 48 states). If an occurrence record is determined to a level below
+   species (subspecies, variety, form, infraspecific_name, infrasubspecific_name),
+   check also the species (higher level) and location are identified as introduced or
+   invasive.
+
+   * `riis_occurrence_id`: Matching RIIS unique identifier determination for this
+      record's acceptedScientificName and location.
+   * `riis_assessment`: RIIS assessment of introduced, invasive, or presumed_native, for
+      this record's taxon and location.
 
 This step then writes out the annotated, flagged records.
 
