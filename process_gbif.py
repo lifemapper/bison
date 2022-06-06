@@ -401,8 +401,8 @@ if __name__ == '__main__':
             log_output(logger, f"Command = {cmd}")
             log_output(logger, "Input filenames", outlist=input_filenames)
             # Annotate DwC records with county, state, and if found, RIIS assessment and RIIS occurrenceID
-            # annotated_filenames = annotate_occurrence_files(input_filenames, logger)
-            # log_output(logger, "Newly annotated filenames:", outlist=annotated_filenames)
+            annotated_filenames = annotate_occurrence_files(input_filenames, logger)
+            log_output(logger, "Newly annotated filenames:", outlist=annotated_filenames)
 
         elif cmd == "summarize":
             annotated_filenames = [Annotator.construct_annotated_name(csvfile) for csvfile in input_filenames]

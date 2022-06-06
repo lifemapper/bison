@@ -410,9 +410,9 @@ def identify_chunks(big_csv_filename):
     start_stop_pairs = []
 
     # in_base_filename, ext = os.path.splitext(big_csv_filename)
-    if big_csv_filename.endswith("gbif_2022-03-16.csv"):
+    if big_csv_filename.endswith(GBIF.INPUT_DATA):
         # shortcut
-        rec_count = 753770802 - 1
+        rec_count = GBIF.INPUT_RECORD_COUNT
     else:
         rec_count = count_lines(big_csv_filename) - 1
     chunk_size = math.ceil(rec_count / cpus2use)
