@@ -172,7 +172,7 @@ class Annotator():
                 f"*** Record number {self._dwcdata.recno}, gbifID: {gbif_id} ***")
 
         # Find county and state for these coords
-        county = state = None
+        county = state = riis_assessment = riis_key = None
         try:
             county, state = self._find_county_state(
                 dwcrec[GBIF.LON_FLD], dwcrec[GBIF.LAT_FLD],
@@ -203,10 +203,10 @@ class Annotator():
                 # key too.
                 taxkeys.append(dwcrec[GBIF.SPECIES_KEY_FLD])
 
-        # Find RIIS records for this acceptedTaxonKey.  If  acceptedTaxonKey
-        # taxkey = dwcrec[GBIF.ACC_TAXON_FLD]
-        (riis_assessment, riis_key) = self.nnsl.get_assessment_for_gbif_taxonkeys_region(
-            taxkeys, region)
+            # Find RIIS records for this acceptedTaxonKey.  If  acceptedTaxonKey
+            # taxkey = dwcrec[GBIF.ACC_TAXON_FLD]
+            (riis_assessment, riis_key) = self.nnsl.get_assessment_for_gbif_taxonkeys_region(
+                taxkeys, region)
         #
         # # Determine whether to include this in summaries
         # dwcrec[NEW_FILTER_FLAG] = "true"

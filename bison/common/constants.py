@@ -167,6 +167,8 @@ class ITIS:
 class GBIF:
     """Constants for GBIF DWCA fields, APIs, and their request and response objects."""
     INPUT_DATA = "gbif_2022-05-19.csv"
+    # 730772042 lines, 1st is header + 730772041 records
+    INPUT_RECORD_COUNT = 730772041
     URL = "http://api.gbif.org/v1"
     UUID_KEY = "key"
     ID_FLD = "gbifID"
