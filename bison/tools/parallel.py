@@ -113,7 +113,7 @@ def summarize_annotations(ann_filename):
     Raises:
         FileNotFoundError: on missing input file
     """
-    overwrite = False
+    # overwrite = False
     if not os.path.exists(ann_filename):
         raise FileNotFoundError(ann_filename)
 
