@@ -397,7 +397,7 @@ class Aggregator():
             # Location not found, add location with species
             self.locations[location] = {species_key: count}
 
-        # Add to summary of counties by state
+        # Add to summary of counties encountered in states
         try:
             state, county = self.parse_compound_key(location)
         except ValueError:
@@ -414,25 +414,28 @@ class Aggregator():
         # Reset summary
         self.locations = {}
         csv_rdr, inf = get_csv_dict_reader(
-            self._csvfile, GBIF.DWCA_DELIMITER, encoding=ENCODING, quote_none=True, restkey=EXTRA_CSV_FIELD)
+            self._csvfile, GBIF.DWCA_DELIMITER, encoding=ENCODING, quote_none=True,
+            restkey=EXTRA_CSV_FIELD)
         self._log.info(f"Summarizing annotations in {self._csvfile} by region")
         try:
             for rec in csv_rdr:
-                species_key = self.construct_compound_key(rec[GBIF.ACC_TAXON_FLD], rec[GBIF.ACC_NAME_FLD])
+                species_key = self.construct_compound_key(
+                    rec[GBIF.ACC_TAXON_FLD], rec[GBIF.ACC_NAME_FLD])
                 state = rec[NEW_RESOLVED_STATE]
                 county = rec[NEW_RESOLVED_COUNTY]
-                county_state = self.construct_compound_key(state, county)
-
-                self._add_record_to_location_summaries(county_state, species_key)
-                self._add_record_to_location_summaries(state, species_key)
+                if state and county:
+                    county_state = self.construct_compound_key(state, county)
+                    self._add_record_to_location_summaries(county_state, species_key)
+                    self._add_record_to_location_summaries(state, species_key)
 
         except csv.Error as ce:
-            self._log.error(f"Failed to read annotated occurrences line {csv_rdr.line_num} from {self._csvfile}: {ce}")
+            self._log.error(
+                f"Failed to read annotated occurrences line {csv_rdr.line_num} from \
+                {self._csvfile}: {ce}")
         except Exception as e:
             self._log.error(
-                f"Exception {type(e)}: Failed to read annotated occurrences line {csv_rdr.line_num} from {self._csvfile}: {e}")
-
-            # raise Exception(f"Failed to read annotated occurrences line {csv_rdr.line_num} from {self._csvfile}: {e}")
+                f"Exception {type(e)}: Failed to read annotated occurrences line \
+                {csv_rdr.line_num} from {self._csvfile}: {e}")
 
         finally:
             csv_rdr = None
@@ -446,7 +449,8 @@ class Aggregator():
         # header = [LOCATION_KEY, SPECIES_KEY, COUNT_KEY]
         ready_filename(summary_filename, overwrite=overwrite)
         try:
-            csv_wtr, outf = get_csv_writer(summary_filename, GBIF.DWCA_DELIMITER, fmode="w")
+            csv_wtr, outf = get_csv_writer(
+                summary_filename, GBIF.DWCA_DELIMITER, fmode="w")
             csv_wtr.writerow(LMBISON_HEADER.SUMMARY_FILE)
             self._log.info(f"Writing region summaries to {summary_filename}")
 
@@ -474,7 +478,8 @@ class Aggregator():
             try:
                 csv_rdr, inf = get_csv_dict_reader(sum_fname, GBIF.DWCA_DELIMITER)
                 for rec in csv_rdr:
-                    self._add_record_to_location_summaries(rec[LOCATION_KEY], rec[SPECIES_KEY], count=rec[COUNT_KEY])
+                    self._add_record_to_location_summaries(
+                        rec[LOCATION_KEY], rec[SPECIES_KEY], count=rec[COUNT_KEY])
             except Exception as e:
                 raise Exception(f"Failed to open or read {sum_fname}: {e}")
             finally:
@@ -488,14 +493,16 @@ class Aggregator():
             overwrite (bool): Flag indicating whether to overwrite or skip existing files.
 
         Returns:
-            summary_filename: full output filename for CSV summary of annotated occurrence file, with fields:
-                 SPECIES_KEY, GBIF_TAXON_KEY, ASSESS_KEY, STATE_KEY, COUNTY_KEY, COUNT_KEY
+            summary_filename: full output filename for CSV summary of annotated
+                occurrence file, with fields:
+                SPECIES_KEY, GBIF_TAXON_KEY, ASSESS_KEY, STATE_KEY, COUNTY_KEY, COUNT_KEY
         """
         summary_filename = self.construct_summary_name(self._csvfile)
         # Summarize and write
         self._summarize_annotations_by_region()
         self._write_region_summary(summary_filename, overwrite=overwrite)
-        self._log.info(f"Summarized species by region from {self._csvfile} to {summary_filename}")
+        self._log.info(
+            f"Summarized species by region from {self._csvfile} to {summary_filename}")
         return summary_filename
 
     # ...............................................
