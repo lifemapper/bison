@@ -189,7 +189,7 @@ class Annotator():
         # Identify whether this record is above Species rank
         # (exclude higher level determinations from resolution and summary)
         dwcrec[NEW_FILTER_FLAG] = "true"
-        if dwcrec[GBIF.RANK_FLD] not in GBIF.ACCEPT_RANK_VALUES:
+        if dwcrec[GBIF.RANK_FLD].lower() not in GBIF.ACCEPT_RANK_VALUES:
             dwcrec[NEW_FILTER_FLAG] = "false"
             self.bad_ranks.add(dwcrec[GBIF.RANK_FLD])
             self.rank_filtered_records += 1
