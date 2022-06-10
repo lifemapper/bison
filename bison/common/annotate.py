@@ -158,14 +158,15 @@ class Annotator():
 
     # ...............................................
     def _filter_find_taxon_keys(self, dwcrec):
-        """Returns acceptedTaxonKey for the species and optionally a lower rank key.
+        """Returns acceptedTaxonKey for species and a lower rank key where determined.
 
         Args:
             dwcrec: one original GBIF DwC record
 
         Returns:
-            taxkeys (list of int): an accepted species GBIF taxonKey and, if the record
-                is determined to a lower rank, that accepted taxonKey.
+            taxkeys (list of int): if the record is Species rank or below, return the
+                accepted species GBIF taxonKey and, if lower than species, the lower
+                rank acceptedTaxonKey.
         """
         taxkeys = []
         # Identify whether this record is above Species rank
@@ -206,6 +207,8 @@ class Annotator():
         # Leave these fields None if the record is filtered out
         county = state = riis_assessment = riis_key = None
         filtered_taxkeys = self._filter_find_taxon_keys(dwcrec)
+
+        # Only append additional values to records that pass the filter tests.
         if filtered_taxkeys:
             try:
                 # Find county and state for these coords

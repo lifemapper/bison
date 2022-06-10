@@ -423,6 +423,8 @@ class Aggregator():
                     rec[GBIF.ACC_TAXON_FLD], rec[GBIF.ACC_NAME_FLD])
                 state = rec[NEW_RESOLVED_STATE]
                 county = rec[NEW_RESOLVED_COUNTY]
+                # If record is filtered out for any reason during annotation,
+                # state and county will be None
                 if state and county:
                     county_state = self.construct_compound_key(state, county)
                     self._add_record_to_location_summaries(county_state, species_key)
