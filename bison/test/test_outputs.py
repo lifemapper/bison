@@ -87,8 +87,9 @@ class Counter():
         Raises:
             Exception: on unknown open or read error.
         """
-        # Get one species name and county-state with riis_assessment from annotated occurrences file
-        assessments = {}
+        # Get one species name and county-state with riis_assessment from annotated
+        # occurrences file.  Filtered records are retained, but have assessment = ""
+        assessments = {"": 0}
         for val in ASSESS_VALUES:
             assessments[val] = 0
 
@@ -100,7 +101,10 @@ class Counter():
             rec = dwcdata.get_record()
             while rec is not None:
                 ass = rec[NEW_RIIS_ASSESSMENT_FLD]
-                assessments[ass] += 1
+                try:
+                    assessments[ass] += 1
+                except Exception as e:
+                    print(f"Here is e {e}")
                 rec = dwcdata.get_record()
         except Exception as e:
             raise Exception(f"Unknown exception {e} on file {annotated_occ_filename}")

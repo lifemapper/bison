@@ -418,17 +418,18 @@ if __name__ == '__main__':
             log_output(logger, "Region filenames, assessment filename:", outlist=region_assess_summary_filenames)
 
         elif cmd == "test":
-            # record_counter = Counter(gbif_filename, do_split=True, logger=logger)
-            # record_counter.compare_counts()
-            assessments = Counter.count_assessments(input_filenames[0])
-            check_further = True
-            for ass, count in assessments.items():
-                if count == 0:
-                    check_further = False
-                    logger.warn(f"Zero records found with {ass} assessment in {input_filenames[0]}")
-            if check_further is True:
-                record_counter = Counter(gbif_filename, do_split=True, logger=logger)
-                record_counter.compare_counts()
+            record_counter = Counter(gbif_filename, do_split=True, logger=logger)
+            record_counter.compare_counts()
+            # annotated_filenames = [Annotator.construct_annotated_name(csvfile) for csvfile in input_filenames]
+            # assessments = Counter.count_assessments(annotated_filenames[0])
+            # check_further = True
+            # for ass, count in assessments.items():
+            #     if count == 0:
+            #         check_further = False
+            #         logger.warn(f"Zero records found with {ass} assessment in {input_filenames[0]}")
+            # if check_further is True:
+            #     record_counter = Counter(gbif_filename, do_split=True, logger=logger)
+            #     record_counter.compare_counts()
 
         elif cmd == "test_bad_data":
             test_bad_line(input_filenames, logger)
