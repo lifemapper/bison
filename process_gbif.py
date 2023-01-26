@@ -128,28 +128,30 @@ def summarize_annotated_files(annotated_filenames, logger):
 
 
 # .............................................................................
-def summarize_region_assessment(summary_filenames, logger):
+def aggregate_summaries(summary_filenames, logger):
     """Annotate GBIF records with census state and county, and RIIS key and assessment.
 
     Args:
-        summary_filenames (list): list of full filenames containing GBIF data summarized by state/county for RIIS
-            assessment of records.
+        summary_filenames (list): list of full filenames containing GBIF data summarized
+            by state/county for RIIS assessment of records.
         logger (object): logger for saving relevant processing messages
 
     Returns:
-        state_aggregation_filenames (list): full filenames of species counts and percentages for each state.
-        cty_aggregation_filename (list): full filenames of species counts and percentages for each county-state.
+        state_aggregation_filenames (list): full filenames of species counts and
+            percentages for each state.
+        cty_aggregation_filename (list): full filenames of species counts and
+            percentages for each county-state.
     """
     aggregated_filenames = []
     # Create a new Aggregator, ignore file used for construction,
     agg = Aggregator(summary_filenames[0], logger=logger)
 
     # Aggregate by region
-    region_summary_filenames = agg.summarize_regions(summary_filenames)
+    region_summary_filenames = agg.aggregate_regions(summary_filenames)
     aggregated_filenames.extend(region_summary_filenames)
 
     # Aggregate by RIIS assessment
-    assess_summary_filename = agg.summarize_assessments(region_summary_filenames)
+    assess_summary_filename = agg.aggregate_assessments(region_summary_filenames)
     aggregated_filenames.append(assess_summary_filename)
 
     return aggregated_filenames
@@ -414,7 +416,7 @@ if __name__ == '__main__':
             annotated_filenames = [Annotator.construct_annotated_name(csvfile) for csvfile in input_filenames]
             summary_filenames = [Aggregator.construct_summary_name(annfile) for annfile in annotated_filenames]
             # Aggregate all summary files then write summaries for each region to its own file
-            region_assess_summary_filenames = summarize_region_assessment(summary_filenames, logger)
+            region_assess_summary_filenames = aggregate_summaries(summary_filenames, logger)
             log_output(logger, "Region filenames, assessment filename:", outlist=region_assess_summary_filenames)
 
         elif cmd == "test":
