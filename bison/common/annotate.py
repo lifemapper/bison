@@ -27,6 +27,7 @@ class Annotator():
         datapath, _ = os.path.split(gbif_occ_filename)
         self._datapath = datapath
         self._csvfile = gbif_occ_filename
+        self._inf = None
 
         if logger is None:
             logger = get_logger(os.path.join(datapath, LOG.DIR))
@@ -146,10 +147,10 @@ class Annotator():
     # ...............................................
     @property
     def is_open(self):
-        """Return true if any files are open.
+        """Return true if input or output files are open.
 
         Returns:
-            :type bool, True if CSV file is open, False if CSV file is closed
+            :type bool, True if a file is open, False if not
         """
         if ((self._inf is not None and not self._inf.closed)
                 or (self._outf is not None and not self._outf.closed)):

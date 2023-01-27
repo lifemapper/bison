@@ -2,9 +2,7 @@
 import requests
 import xml.etree.ElementTree as ET
 
-from bison.common.constants import (
-    ITIS_SOLR_URL, ITIS_NAME_KEY, ITIS_TSN_KEY, ITIS_VERNACULAR_QUERY, ITIS_URL_ESCAPES,
-    ITIS_NAMESPACE, ITIS_DATA_NAMESPACE)
+from bison.common.constants import ITIS
 from bison.tools.api import APISvc
 
 
@@ -58,14 +56,14 @@ class ITISSvc(APISvc):
         """
         common_names = []
         if tsn is not None:
-            url = ITIS_VERNACULAR_QUERY + str(tsn)
+            url = ITIS.VERNACULAR_QUERY + str(tsn)
             root = self._get_data_from_url(url, resp_type='xml')
 
-            retElt = root.find('{}return'.format(ITIS_NAMESPACE))
+            retElt = root.find('{}return'.format(ITIS.NAMESPACE))
             if retElt is not None:
-                cnEltLst = retElt.findall('{}commonNames'.format(ITIS_DATA_NAMESPACE))
+                cnEltLst = retElt.findall('{}commonNames'.format(ITIS.DATA_NAMESPACE))
                 for cnElt in cnEltLst:
-                    nelt = cnElt.find('{}commonName'.format(ITIS_DATA_NAMESPACE))
+                    nelt = cnElt.find('{}commonName'.format(ITIS.DATA_NAMESPACE))
                     if nelt is not None and nelt.text is not None:
                         common_names.append(nelt.text)
         return common_names
@@ -92,7 +90,7 @@ class ITISSvc(APISvc):
             retrieved records without a 'usage' element are not eligible for return
         """
         accepted_name = kingdom = None
-        url = "{}?q={}:{}&wt=json".format(ITIS_SOLR_URL, ITIS_TSN_KEY, tsn)
+        url = "{}?q={}:{}&wt=json".format(ITIS.SOLR_URL, ITIS.TSN_KEY, tsn)
         output = self._get_data_from_url(url, resp_type='json')
         try:
             data = output["response"]
@@ -138,9 +136,9 @@ class ITISSvc(APISvc):
         tsn = accepted_name = kingdom = None
         accepted_tsn_list = []
         escname = sciname
-        for replaceStr, withStr in ITIS_URL_ESCAPES:
+        for replaceStr, withStr in ITIS.URL_ESCAPES:
             escname = escname.replace(replaceStr, withStr)
-        url = "{}?q={}:{}&wt=json".format(ITIS_SOLR_URL, ITIS_NAME_KEY, escname)
+        url = "{}?q={}:{}&wt=json".format(ITIS.SOLR_URL, ITIS.NAME_KEY, escname)
         output = self._get_data_from_url(url, resp_type='json')
         try:
             data = output["response"]

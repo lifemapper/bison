@@ -97,6 +97,8 @@ US_STATES = {
 }
 
 SPECIES_KEY = "species_key"
+SCIENTIFIC_NAME_KEY = "accepted_scientific_name"
+SPECIES_NAME_KEY = "species_name"
 ASSESS_KEY = "assessment"
 STATE_KEY = "state"
 COUNTY_KEY = "county"
@@ -125,8 +127,11 @@ PCT_NATIVE_OCCS = "pct_presumed_native_occurrences"
 # .............................................................................
 class LMBISON_HEADER:
     """Headers for temporary and final output files."""
-    SUMMARY_FILE = [LOCATION_KEY, SPECIES_KEY, COUNT_KEY]
-    REGION_FILE = [SPECIES_KEY, COUNT_KEY, ASSESS_KEY]
+    # temporary summary of an annotated DwC file (subset/chunk of data)
+    SUMMARY_FILE = [LOCATION_KEY, SPECIES_KEY, SPECIES_NAME_KEY, COUNT_KEY]
+    # output summary of region
+    REGION_FILE = [SPECIES_KEY, SCIENTIFIC_NAME_KEY, SPECIES_NAME_KEY, COUNT_KEY, ASSESS_KEY]
+    # output summary of all data
     GBIF_RIIS_SUMMARY_FILE = [
         STATE_KEY, COUNTY_KEY,
         INTRODUCED_SPECIES, INVASIVE_SPECIES, NATIVE_SPECIES, TOTAL_SPECIES,
@@ -178,6 +183,7 @@ class GBIF:
     ACC_NAME_FLD = "acceptedScientificName"
     ACC_TAXON_FLD = "acceptedTaxonKey"
     STATE_FLD = "stateProvince"
+    SPECIES_NAME_FLD = "species"
     SPECIES_KEY_FLD = "speciesKey"
     COUNTY_FLD = "county"
     LAT_FLD = "decimalLatitude"
@@ -236,7 +242,7 @@ class GBIF:
         Returns:
             base URL for the GBIF Dataset API
         """
-        return "{}/{}/".format(GBIF.URL, GBIF.DSET_KEYS.apitype)
+        return "{}/{}/".format(GBIF.URL, GBIF.DSET_KEYS["apitype"])
 
     @classmethod
     def ORGANIZATION_URL(cls):
@@ -245,7 +251,7 @@ class GBIF:
         Returns:
             base URL for the GBIF Organization API
         """
-        return "{}/{}/".format(GBIF.URL, GBIF.ORG_KEYS.apitype)
+        return "{}/{}/".format(GBIF.URL, GBIF.ORG_KEYS["apitype"])
 
     @classmethod
     def BATCH_PARSER_URL(cls):

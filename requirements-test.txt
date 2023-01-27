@@ -1,0 +1,7 @@
+pre-commit
+coverage>=5.0
+coveralls
+pytest
+pytest-cov
+flake8
+flake8-bugbear
