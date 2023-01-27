@@ -12,6 +12,4 @@ dependencies:
   - coveralls
   - pytest
   - pytest-cov
-  - pip=21.3.1
-  - pip:
-    - specify-lmpy
+  - pip

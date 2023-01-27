@@ -3,7 +3,7 @@ import requests
 import xml.etree.ElementTree as ET
 
 from bison.common.constants import ITIS
-from bison.tools.api import APISvc
+from bison.providers.api import APISvc
 
 
 # .............................................................................

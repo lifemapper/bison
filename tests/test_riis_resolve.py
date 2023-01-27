@@ -1,7 +1,7 @@
 """Test the GBIF and ITIS taxonomic resolution provided in the US-RIIS table."""
 import os
 
-from bison.common.riis import NNSL
+from bison.providers.riis import NNSL
 
 
 class TestRIISTaxonomy(NNSL):

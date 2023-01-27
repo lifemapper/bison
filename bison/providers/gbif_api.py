@@ -2,7 +2,7 @@
 import requests
 
 from bison.common.constants import GBIF
-from bison.tools.api import APISvc
+from bison.providers.api import APISvc
 
 NEWLINE = "\n"
 CR_RETURN = "\r"

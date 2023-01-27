@@ -4,8 +4,8 @@ import os
 
 from bison.common.constants import (
     ERR_SEPARATOR, GBIF, LINENO_FLD, LOG, NEW_GBIF_KEY_FLD, NEW_GBIF_SCINAME_FLD, RIIS, RIIS_AUTHORITY, RIIS_SPECIES)
-from bison.tools.gbif_api import GbifSvc
-from bison.tools.util import get_csv_dict_reader, get_csv_dict_writer, get_logger
+from bison.providers.gbif_api import GbifSvc
+from bison.common.util import get_csv_dict_reader, get_csv_dict_writer, get_logger
 
 
 # .............................................................................

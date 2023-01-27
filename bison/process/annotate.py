@@ -7,10 +7,10 @@ from bison.common.constants import (
     DATA_PATH, ENCODING, GBIF, LOG, NEW_RESOLVED_COUNTY, NEW_RESOLVED_STATE,
     NEW_RIIS_ASSESSMENT_FLD, NEW_RIIS_KEY_FLD, POINT_BUFFER_RANGE,
     RIIS_SPECIES, US_CENSUS_COUNTY, US_STATES)
-from bison.common.gbif import DwcData
-from bison.common.riis import NNSL
-from bison.tools.geoindex import GeoResolver, GeoException
-from bison.tools.util import (get_csv_dict_writer, get_logger)
+from bison.providers.gbif import DwcData
+from bison.providers.riis import NNSL
+from bison.process.geoindex import GeoResolver, GeoException
+from bison.common.util import (get_csv_dict_writer, get_logger)
 
 
 # .............................................................................

@@ -1,5 +1,5 @@
 """Module to test appending RIIS determinations to GBIF occurrences."""
-from bison.common.annotate import Annotator
+from bison.process.annotate import Annotator
 
 
 class TestAnnotator(Annotator):

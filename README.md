@@ -9,7 +9,7 @@
 * Download GBIF data, query
   https://www.gbif.org/occurrence/search?country=US&has_coordinate=true&has_geospatial_issue=false&occurrence_status=present
 * Download option Darwin Core Archive (The taxonKey and scientific name in Simple CSV
-  option is not always accepted).
+  option is not always the accepted version).
 
 ### USGS RIIS
 
@@ -29,8 +29,8 @@ For 2 reasons, I did not project the census data:
 
 See https://gis.stackexchange.com/questions/170839/is-re-projection-needed-from-srid-4326-wgs-84-to-srid-4269-nad-83
 
-Occasionally a point would intersect with a county envelope (created for a spatial index)
-but not be contained within the returned geometry.  In that case, I returned the
+Occasionally a point would intersect with a county envelope (created for a spatial 
+index) but not be contained within the returned geometry.  In that case, I returned the
 values from the geometry nearest to the point.
 
 ### Census data for determining point county/state
@@ -62,7 +62,7 @@ pip3 install -r requirements.txt
 * Create test file with first 100K records + header
 
 ```commandline
-head -n 50001 occurrence.txt > gbif_2023-01-26_100k.csv
+head -n 10001 occurrence.txt > gbif_2023-01-26_10k.csv
 ```
 
 

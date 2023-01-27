@@ -4,11 +4,11 @@ from datetime import datetime
 from multiprocessing import Pool, cpu_count
 import os
 
-from bison.common.aggregate import Aggregator
-from bison.common.annotate import Annotator
+from bison.process.aggregate import Aggregator
+from bison.process.annotate import Annotator
 from bison.common.constants import DATA_PATH, LOG, RIIS_SPECIES
-from bison.common.riis import NNSL
-from bison.tools.util import get_logger
+from bison.providers.riis import NNSL
+from bison.common.util import get_logger
 
 
 # .............................................................................

@@ -2,7 +2,7 @@
 import os
 
 from bison.common.constants import (BIG_DATA_PATH, DATA_PATH, ENCODING, EXTRA_CSV_FIELD, GBIF, LOG)
-from bison.tools.util import get_csv_dict_reader, get_logger, logit
+from bison.common.util import get_csv_dict_reader, get_logger, logit
 
 
 # .............................................................................

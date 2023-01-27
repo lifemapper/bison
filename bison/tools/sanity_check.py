@@ -2,14 +2,14 @@
 import glob
 import os
 
-from bison.common.aggregate import Aggregator, RIIS_Counts
-from bison.common.gbif import DwcData
+from bison.process.aggregate import Aggregator, RIIS_Counts
+from bison.providers.gbif import DwcData
 from bison.common.constants import (
     ASSESS_VALUES, BIG_DATA_PATH, GBIF, NEW_RESOLVED_COUNTY, LOG,
     INTRODUCED_OCCS, INTRODUCED_SPECIES, INVASIVE_OCCS, INVASIVE_SPECIES,
     NATIVE_OCCS, NATIVE_SPECIES, NEW_RESOLVED_STATE, NEW_RIIS_ASSESSMENT_FLD,
     STATE_KEY, COUNTY_KEY, ASSESS_KEY, COUNT_KEY)
-from bison.tools.util import get_csv_dict_reader, get_logger
+from bison.common.util import get_csv_dict_reader, get_logger
 
 
 # .............................................................................

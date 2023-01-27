@@ -3,15 +3,15 @@ import csv
 from datetime import datetime
 import os
 
-from bison.common.aggregate import Aggregator, parallel_summarize, summarize_annotations
-from bison.common.annotate import Annotator, annotate_occurrence_file, parallel_annotate
+from bison.process.aggregate import Aggregator, parallel_summarize, summarize_annotations
+from bison.process.annotate import Annotator, annotate_occurrence_file, parallel_annotate
 from bison.common.constants import (
     GBIF, BIG_DATA_PATH, DATA_PATH, ENCODING, EXTRA_CSV_FIELD, LOG, NEW_RESOLVED_COUNTY, NEW_RESOLVED_STATE,
     POINT_BUFFER_RANGE, RIIS_SPECIES, US_CENSUS_COUNTY)
-from bison.common.riis import NNSL
-from bison.tools.geoindex import GeoResolver, GeoException
-from bison.tools.util import chunk_files, delete_file, get_csv_dict_reader, get_logger, identify_chunk_files
-from bison.test.test_outputs import Counter
+from bison.providers.riis_data import NNSL
+from bison.process.geoindex import GeoResolver, GeoException
+from bison.common.util import chunk_files, delete_file, get_csv_dict_reader, get_logger, identify_chunk_files
+from bison.tools.sanity_check import Counter
 
 
 # .............................................................................

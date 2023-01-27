@@ -1,7 +1,7 @@
 """Module to test the contents of the input GBIF csv occurrence data file."""
 import os
 
-from bison.common.gbif import DwcData
+from bison.providers.gbif import DwcData
 
 
 class TestGBIFData(DwcData):

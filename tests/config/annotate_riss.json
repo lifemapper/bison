@@ -1,0 +1,7 @@
+{
+    "log_filename": "/volumes/output/annotate_riis.log",
+    "log_console": true,
+    "report_filename": "/volumes/output/annotate_riis.rpt",
+    "riis_filename": "/volumes/input/2022/US-RIIS_MasterList.csv",
+    "annotated_riis_filename": "/volumes/output/US-RIIS_MasterList_annotated.csv"
+}

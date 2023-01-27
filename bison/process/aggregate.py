@@ -8,9 +8,9 @@ from bison.common.constants import (
     AGGREGATOR_DELIMITER, DATA_PATH, ENCODING, EXTRA_CSV_FIELD, GBIF,
     NEW_RESOLVED_COUNTY, NEW_RESOLVED_STATE, RIIS_SPECIES, US_STATES, LOG, OUT_DIR,
     SPECIES_NAME_KEY, SPECIES_KEY, ASSESS_KEY, LOCATION_KEY, COUNT_KEY, LMBISON_HEADER)
-from bison.common.riis import NNSL
+from bison.providers.riis import NNSL
 
-from bison.tools.util import (get_csv_writer, get_csv_dict_reader, get_logger, ready_filename)
+from bison.common.util import (get_csv_writer, get_csv_dict_reader, get_logger, ready_filename)
 
 
 # .............................................................................
