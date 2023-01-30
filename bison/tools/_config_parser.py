@@ -2,12 +2,15 @@
 import argparse
 import json
 import os.path
-import sys
 
 
 # .....................................................................................
 def build_parser(command, description):
     """Build an argparse.ArgumentParser object for the tool.
+
+    Args:
+        command (str): Command for argument parser.
+        description (str): Description of command processes.
 
     Returns:
         argparse.ArgumentParser: An argument parser for the tool's parameters.
@@ -50,6 +53,7 @@ def process_arguments(parser, config_arg=None):
             except json.decoder.JSONDecodeError:
                 raise
     return args
+
 
 # .....................................................................................
 def test_files(*filename_filefunction):

@@ -29,7 +29,7 @@ For 2 reasons, I did not project the census data:
 
 See https://gis.stackexchange.com/questions/170839/is-re-projection-needed-from-srid-4326-wgs-84-to-srid-4269-nad-83
 
-Occasionally a point would intersect with a county envelope (created for a spatial 
+Occasionally a point would intersect with a county envelope (created for a spatial
 index) but not be contained within the returned geometry.  In that case, I returned the
 values from the geometry nearest to the point.
 

@@ -1,5 +1,5 @@
 """Test the structure, size, and content of input US-RIIS data files."""
-from bison.providers.riis import NNSL
+from bison.providers.riis_data import NNSL
 
 
 class TestRIISInput(NNSL):

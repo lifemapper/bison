@@ -1,8 +1,8 @@
 """Common classes for Specimen Occurrence record processing."""
 import os
 
-from bison.common.constants import (BIG_DATA_PATH, DATA_PATH, ENCODING, EXTRA_CSV_FIELD, GBIF, LOG)
-from bison.common.util import get_csv_dict_reader, get_logger, logit
+from bison.common.constants import (ENCODING, EXTRA_CSV_FIELD, GBIF, LOG)
+from bison.common.util import get_csv_dict_reader
 
 
 # .............................................................................
@@ -16,7 +16,7 @@ class DwcData(object):
         where 1-5000 are lines to delete, and 10000 is the line on which to stop.
     """
     # ...............................................
-    def __init__(self, occ_filename, logger=None):
+    def __init__(self, occ_filename, logger):
         """Construct an object to read a GBIF datafile.
 
         Args:
@@ -26,8 +26,6 @@ class DwcData(object):
         datapath, _ = os.path.split(occ_filename)
         self._datapath = datapath
         self._csvfile = occ_filename
-        if logger is None:
-            logger = get_logger(os.path.join(datapath, LOG.DIR))
         self._log = logger
 
         # Open file
@@ -144,6 +142,7 @@ class DwcData(object):
         Returns:
             self.dwcrec: a dictionary containing GBIF record
         """
+        refname = "find_gbif_record"
         if self._csv_reader is None:
             self.open()
         found = False
@@ -156,12 +155,14 @@ class DwcData(object):
 
                 # Where are we
                 if (self.recno % LOG.INTERVAL) == 0:
-                    logit(self._log, '*** Record number {} ***'.format(self.recno))
+                    self._log.log(
+                        f"*** Record number {self.recno} ***", refname=refname)
             if (self.dwcrec is None and found is False):
-                logit(self._log, 'Failed to find {}'.format(gbifid))
+                self._log.log(f"Failed to find {gbifid}", refname=refname)
                 self.close()
         except Exception as e:
-            logit(self._log, 'Failed on line {}, exception {}'.format(self.recno, e))
+            self._log.log(
+                f"Failed on line {self.recno}, exception {e}", refname=refname)
         return self.dwcrec
 
 
@@ -187,66 +188,4 @@ class DwcData(object):
 
 # ...............................................
 if __name__ == '__main__':
-    # Bad record plus before and after
-    before = "1698052989"
-    bad = "1698055779"
-    after = "1698058398"
-
-    logname = "test_gbif"
-    # csvfile = GBIF.TEST_DATA
-    csvfile = os.path.join(BIG_DATA_PATH, "gbif_2022-02-15_testbad_10.csv")
-    logger = get_logger(DATA_PATH, logname=logname)
-
-    dwcdata = DwcData(csvfile, logger)
-    dwcdata.open()
-
-    finished = False
-    rec = dwcdata.get_record()
-    while rec is not None and not finished:
-        gbif_id = rec["gbifID"]
-        if gbif_id == before:
-            before_rec = rec
-        elif gbif_id == bad:
-            bad_rec = rec
-        elif gbif_id == after:
-            after_rec = rec
-            finished = True
-        rec = dwcdata.get_record()
-
-    print("fini")
-"""
-
-from bison.common.constants import DATA_PATH
-from bison.common.occurrence import *
-
-# Bad record plus before and after
-before = "1698052989"
-bad = "1698055779"
-after = "1698058398"
-
-logname = "test_gbif"
-# csvfile = GBIF.TEST_DATA
-csvfile = os.path.join(DATA_PATH, "gbif_2022-02-15_testbad_10.csv")
-logger = get_logger(DATA_PATH, logname=logname)
-
-dwcdata = DwcData(csvfile, logger)
-dwcdata.open()
-
-finished = False
-rec = dwcdata.get_record()
-
-while rec is not None and not finished:
-    gbif_id = rec["gbifID"]
-    if gbif_id == before:
-        before_rec = rec
-    elif gbif_id == bad:
-        bad_rec = rec
-    elif gbif_id == after:
-        after_rec = rec
-        finished = True
-    rec = dwcdata.get_record()
-
-
-
-Tst.test_gbif_name_accepted()
-"""
+    pass

@@ -5,18 +5,19 @@ import os
 
 from bison.common.constants import (
     DATA_PATH, ENCODING, GBIF, LOG, NEW_RESOLVED_COUNTY, NEW_RESOLVED_STATE,
-    NEW_RIIS_ASSESSMENT_FLD, NEW_RIIS_KEY_FLD, POINT_BUFFER_RANGE,
-    RIIS_SPECIES, US_CENSUS_COUNTY, US_STATES)
-from bison.providers.gbif import DwcData
-from bison.providers.riis import NNSL
+    NEW_RIIS_ASSESSMENT_FLD, NEW_RIIS_KEY_FLD, POINT_BUFFER_RANGE, RIIS,
+    US_CENSUS_COUNTY, US_STATES)
+from bison.common.log import Logger
+from bison.providers.gbif_data import DwcData
+from bison.providers.riis_data import NNSL
 from bison.process.geoindex import GeoResolver, GeoException
-from bison.common.util import (get_csv_dict_writer, get_logger)
+from bison.common.util import get_csv_dict_writer
 
 
 # .............................................................................
 class Annotator():
     """Class for adding USGS RIIS info to GBIF occurrences."""
-    def __init__(self, gbif_occ_filename, nnsl=None, logger=None):
+    def __init__(self, gbif_occ_filename, logger, nnsl=None):
         """Constructor.
 
         Args:
@@ -28,15 +29,12 @@ class Annotator():
         self._datapath = datapath
         self._csvfile = gbif_occ_filename
         self._inf = None
-
-        if logger is None:
-            logger = get_logger(os.path.join(datapath, LOG.DIR))
         self._log = logger
 
         if nnsl is not None:
             self.nnsl = nnsl
         else:
-            riis_filename = os.path.join(datapath, RIIS_SPECIES.FNAME)
+            riis_filename = os.path.join(datapath, RIIS.SPECIES_GEO_FNAME)
             self.nnsl = NNSL(riis_filename, logger=logger)
             self.nnsl.read_riis(read_resolved=True)
 
@@ -302,33 +300,39 @@ class Annotator():
 
 
 # .............................................................................
-def annotate_occurrence_file(input_filename):
+def annotate_occurrence_file(input_filename, log_directory):
     """Annotate GBIF records with census state and county, and RIIS key and assessment.
 
     Args:
         input_filename (str): full filename containing GBIF data for annotation.
+        log_directory (str): destination directory for logfile
 
     Returns:
-        annotated_dwc_fname: full filename for GBIF data annotated with state, county, RIIS assessment, and RIIS key.
+        annotated_dwc_fname: fullpath to GBIF data annotated with state, county,
+            RIIS assessment, and RIIS key.
+        log_directory (str): directory path for output logfile
 
     Raises:
         FileNotFoundError: on missing input file
     """
+    refname = "annotate_occurrence_file"
     if not os.path.exists(input_filename):
         raise FileNotFoundError(input_filename)
 
     datapath, basefname = os.path.split(input_filename)
-    logger = get_logger(os.path.join(datapath, LOG.DIR), f"annotate_{basefname}")
-    logger.info(f"Submit {basefname} for annotation")
+    logname = f"annotate_{basefname}"
+    log_fname = os.path.join(log_directory, logname)
+    logger = Logger(logname, log_fname, log_console=False)
+    logger.log(f"Submit {basefname} for annotation", refname=refname)
 
-    orig_riis_filename = os.path.join(DATA_PATH, RIIS_SPECIES.FNAME)
+    orig_riis_filename = os.path.join(DATA_PATH, RIIS.SPECIES_GEO_FNAME)
     nnsl = NNSL(orig_riis_filename, logger=logger)
     nnsl.read_riis(read_resolved=True)
 
-    logger.info("Start Time : {}".format(datetime.now()))
+    logger.log("Start Time : {}".format(datetime.now()), refname=refname)
     ant = Annotator(input_filename, nnsl=nnsl, logger=logger)
     annotated_dwc_fname = ant.annotate_dwca_records()
-    logger.info("End Time : {}".format(datetime.now()))
+    logger.log("End Time : {}".format(datetime.now()), refname=refname)
     return annotated_dwc_fname
 
 
@@ -337,29 +341,36 @@ def parallel_annotate(input_filenames, main_logger):
     """Main method for parallel execution of DwC annotation script.
 
     Args:
-        input_filenames (list): list of full filenames containing GBIF data for annotation.
-        main_logger (logger): logger for the process that calls this function, initiating subprocesses
+        input_filenames (list): list of full filenames containing GBIF data for
+            annotation.
+        main_logger (logger): logger for the process that calls this function,
+            initiating subprocesses
 
     Returns:
         annotated_dwc_fnames (list): list of full output filenames
     """
-    infiles = []
+    refname = "parallel_annotate"
+    inputs = []
     # Process only needed files
     for in_csv in input_filenames:
         out_csv = Annotator.construct_annotated_name(in_csv)
         if os.path.exists(out_csv):
-            main_logger.info(f"Annotations exist in {out_csv}, moving on.")
+            main_logger.log(
+                f"Annotations exist in {out_csv}, moving on.", refname=refname)
         else:
-            infiles.append(in_csv)
+            inputs.append((in_csv, main_logger.log_directory))
 
-    main_logger.info("Parallel Annotation Start Time : {}".format(datetime.now()))
+    main_logger.log(
+        "Parallel Annotation Start Time : {}".format(datetime.now()), refname=refname)
     # Do not use all CPUs
     pool = Pool(cpu_count() - 2)
     # Map input files asynchronously onto function
-    map_result = pool.map_async(annotate_occurrence_file, infiles)
+    # map_result = pool.map_async(annotate_occurrence_file, inputs)
+    map_result = pool.starmap_async(annotate_occurrence_file, inputs)
     # Wait for results
     map_result.wait()
     annotated_dwc_fnames = map_result.get()
-    main_logger.info("Parallel Annotation End Time : {}".format(datetime.now()))
+    main_logger.log(
+        "Parallel Annotation End Time : {}".format(datetime.now()), refname=refname)
 
     return annotated_dwc_fnames

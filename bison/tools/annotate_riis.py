@@ -1,9 +1,16 @@
+"""Tool for annotating USGS RIIS data with accepted names from GBIF."""
+import json
+import os
+
+from bison.common.log import Logger
+from bison.providers.riis_data import resolve_riis_taxa
 from bison.tools._config_parser import build_parser, process_arguments
 
 COMMAND = "annotate_riis"
 DESCRIPTION = """\
-Annotate a CSV file containing the USGS Registry for Introduced and Invasive 
+Annotate a CSV file containing the USGS Registry for Introduced and Invasive
 Species (RIIS) with accepted names from GBIF. """
+# Options to be placed in a configuration file for the command
 ARGUMENTS = {
     "required":
         {
@@ -18,40 +25,20 @@ ARGUMENTS = {
                     "type": str,
                     "help": "Filename to write the annotated RIIS list."
                 },
+        },
     "optional":
         {
             "log_filename":
                 {
                     "type": str,
                     "help": "Filename to write logging data."},
-            "log_console":
-                {
-                    "type": bool,
-                    "help": "`true` to write logging statements to console."
-                },
             "report_filename":
                 {
                     "type": str,
                     "help": "Filename to write summary metadata."}
 
-        }}
+        }
 }
-
-
-"""
-Note: 
-The tool requires a configuration file in JSON format, which has the following  
-required and optional parameters: 
-
-Required:
-    riis_filename: full path to the most current USGS RIIS Master List 
-    annotated_riis_filename: full path for writing the annotated RIIS list
-
-Optional:
-    log_filename: A file location to write logging data.
-    log_console: If provided, write logging statements to console.
-    report_filename: A file location to write summary metadata.
-"""
 
 
 # .....................................................................................
@@ -64,7 +51,25 @@ def cli():
     """
     parser = build_parser(COMMAND, DESCRIPTION)
     args = process_arguments(parser, config_arg='config_file')
+    script_name = os.path.splitext(os.path.basename(__file__))[0]
+    logger = Logger(
+        script_name,
+        log_filename=args.log_filename
+    )
 
+    report = resolve_riis_taxa(args.riis_filename, args.annotated_riis_filename, logger)
+
+    # If the output report was requested, write it
+    if args.report_filename:
+        try:
+            with open(args.report_filename, mode='wt') as out_file:
+                json.dump(report, out_file, indent=4)
+        except OSError:
+            raise
+        except IOError:
+            raise
+        logger.log(
+            f"Wrote report file to {args.report_filename}", refname=script_name)
 
 
 # .....................................................................................

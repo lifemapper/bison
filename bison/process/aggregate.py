@@ -5,12 +5,13 @@ from multiprocessing import Pool, cpu_count
 import os
 
 from bison.common.constants import (
-    AGGREGATOR_DELIMITER, DATA_PATH, ENCODING, EXTRA_CSV_FIELD, GBIF,
-    NEW_RESOLVED_COUNTY, NEW_RESOLVED_STATE, RIIS_SPECIES, US_STATES, LOG, OUT_DIR,
-    SPECIES_NAME_KEY, SPECIES_KEY, ASSESS_KEY, LOCATION_KEY, COUNT_KEY, LMBISON_HEADER)
-from bison.providers.riis import NNSL
+    AGGREGATOR_DELIMITER, ASSESS_KEY, COUNT_KEY, DATA_PATH, ENCODING, EXTRA_CSV_FIELD,
+    GBIF, LMBISON_HEADER, LOCATION_KEY, NEW_RESOLVED_COUNTY, NEW_RESOLVED_STATE,
+    OUT_DIR, RIIS, SPECIES_NAME_KEY, SPECIES_KEY, US_STATES)
+from bison.common.log import Logger
+from bison.common.util import (get_csv_writer, get_csv_dict_reader, ready_filename)
 
-from bison.common.util import (get_csv_writer, get_csv_dict_reader, get_logger, ready_filename)
+from bison.providers.riis_data import NNSL
 
 
 # .............................................................................
@@ -18,23 +19,26 @@ class RIIS_Counts():
     """Class for assembling counts for a RIIS assessment.
 
     Goal:
-        All US occurrences will be assessed by the USGS RIIS as introduced, invasive, or presumed_native. This class
-            contains counts for either occurrences or species, and asserts that the counts are consistent
-            (i.e. introduced + invasive + presumed_native = total
-            and %_introduced + %_invasive + %_presumed_native = 1.0)
+        All US occurrences will be assessed by the USGS RIIS as introduced, invasive,
+        or presumed_native. This class contains counts for either occurrences or
+        species, and asserts that the counts are consistent
+        (i.e. introduced + invasive + presumed_native = total AND
+              %_introduced + %_invasive + %_presumed_native = 1.0)
     """
-    def __init__(self, introduced=0, invasive=0, presumed_native=0, is_group=False, logger=None):
+    def __init__(
+            self, logger, introduced=0, invasive=0, presumed_native=0, is_group=False):
         """Constructor.
 
         Note:
             Counts are cast as integers.
 
         Args:
+            logger (object): logger for saving relevant processing messages
             introduced (int): Count of introduced group or occurrences
             invasive (int):  Count of introduced group or occurrences
             presumed_native (int): Count of presumed_native group or occurrences
-            is_group (bool): True if counts are for a group, such as species, or individual occurrences.
-            logger (object): logger for saving relevant processing messages
+            is_group (bool): True if counts are for a group, such as species, or
+                individual occurrences.
         """
         self.introduced = int(introduced)
         self.invasive = int(invasive)
@@ -212,7 +216,7 @@ class Aggregator():
        introduced occurrences and all occurrences, the percentage of introduced to all species, the percentage of
        introduced to all occurrences, all by state and county
     """
-    def __init__(self, annotated_filename, logger=None):
+    def __init__(self, annotated_filename, logger):
         """Constructor.
 
         Args:
@@ -228,15 +232,11 @@ class Aggregator():
         datapath, _ = os.path.split(annotated_filename)
         self._datapath = datapath
         self._csvfile = annotated_filename
-        if logger is None:
-            logger = get_logger(os.path.join(datapath, LOG.DIR))
+        self._log = logger
+
         # Hold all counties found in each state
         self.states = {}
         self._init_states()
-
-        if logger is None:
-            logger = get_logger(os.path.join(datapath, LOG.DIR))
-        self._log = logger
 
         # {county_or_state: {species: count, ... } ...  }
         self.locations = {}
@@ -519,7 +519,7 @@ class Aggregator():
 
     # ...............................................
     def _get_riis_species(self):
-        riis_filename = os.path.join(DATA_PATH, RIIS_SPECIES.FNAME)
+        riis_filename = os.path.join(DATA_PATH, RIIS.SPECIES_GEO_FNAME)
         nnsl = NNSL(riis_filename, logger=self._log)
         nnsl.read_riis(read_resolved=True)
         return nnsl
@@ -759,11 +759,12 @@ class Aggregator():
 
 
 # .............................................................................
-def summarize_annotations(ann_filename):
+def summarize_annotations(ann_filename, log_directory):
     """Summarize data in an annotated GBIF DwC file by state, county, and RIIS.
 
     Args:
         ann_filename (str): full filename of an annotated GBIF data file.
+        log_directory (str): destination directory for logfile
 
     Returns:
         summary_filename (str): full filename of a summary file
@@ -775,14 +776,15 @@ def summarize_annotations(ann_filename):
         raise FileNotFoundError(ann_filename)
 
     datapath, basefname = os.path.split(ann_filename)
-    logger = get_logger(os.path.join(datapath, LOG.DIR), f"summarize_{basefname}")
-    logger.info(f"Submit {basefname} for summarizing.")
+    refname = f"summarize_{basefname}"
+    logger = Logger(os.path.join(log_directory, f"{refname}.log"))
+    logger.log(f"Submit {basefname} for summarizing.", refname=refname)
 
-    logger.info("Start Time : {}".format(datetime.now()))
-    agg = Aggregator(ann_filename, logger=logger)
+    logger.log(f"Start Time : {datetime.now()}", refname=refname)
+    agg = Aggregator(ann_filename, logger)
     # Do not overwrite existing summary
     summary_filename = agg.summarize_by_file(overwrite=False)
-    logger.info("End Time : {}".format(datetime.now()))
+    logger.log(f"End Time : {datetime.now()}", refname=refname)
     return summary_filename
 
 
@@ -791,28 +793,33 @@ def parallel_summarize(annotated_filenames, main_logger):
     """Main method for parallel execution of summarization script.
 
     Args:
-        annotated_filenames (list): list of full filenames containing annotated GBIF data.
-        main_logger (logger): logger for the process that calls this function, initiating subprocesses
+        annotated_filenames (list): list of full filenames containing annotated
+            GBIF data.
+        main_logger (logger): logger for the process that calls this function,
+            initiating subprocesses
 
     Returns:
         annotated_dwc_fnames (list): list of full output filenames
     """
-    infiles = []
+    refname = "parallel_summarize"
+    inputs = []
     for in_csv in annotated_filenames:
         out_csv = Aggregator.construct_summary_name(in_csv)
         if os.path.exists(out_csv):
-            main_logger.info(f"Summaries exist in {out_csv}, moving on.")
+            main_logger.info(
+                f"Summaries exist in {out_csv}, moving on.", refname=refname)
         else:
-            infiles.append(in_csv)
+            inputs.append((in_csv, main_logger.log_directory))
 
-    main_logger.info("Parallel Summarize Start Time : {}".format(datetime.now()))
+    main_logger.info(
+        f"Parallel Summarize Start Time : {datetime.now()}", refname=refname)
     # Do not use all CPUs
     pool = Pool(cpu_count() - 2)
     # Map input files asynchronously onto function
-    map_result = pool.map_async(summarize_annotations, infiles)
+    map_result = pool.starmap_async(summarize_annotations, inputs)
     # Wait for results
     map_result.wait()
     summary_filenames = map_result.get()
-    main_logger.info("Parallel Summarize End Time : {}".format(datetime.now()))
+    main_logger.log(f"Parallel Summarize End Time : {datetime.now()}", refname=refname)
 
     return summary_filenames

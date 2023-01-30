@@ -1,16 +1,13 @@
 """Common file handling tools used in various BISON modules."""
 import csv
-import logging
 import glob
-from logging.handlers import RotatingFileHandler
 import math
 from multiprocessing import cpu_count
 import os
 import subprocess
 import sys
-import time
 
-from bison.common.constants import BIG_DATA_PATH, ENCODING, EXTRA_CSV_FIELD, GBIF, LOG
+from bison.common.constants import BIG_DATA_PATH, ENCODING, EXTRA_CSV_FIELD, GBIF
 
 
 # ...............................................
@@ -206,61 +203,6 @@ def get_csv_dict_reader(csvfile, delimiter, fieldnames=None, encoding=ENCODING, 
         rdr = csv.DictReader(f, quoting=quoting, delimiter=delimiter, restkey=restkey)
 
     return rdr, f
-
-
-# .............................................................................
-def get_logger(logpath, logname=None):
-    """Get a logger that logs to file and to console in an established format.
-
-    Args:
-        logpath (str): path for the logfile
-        logname: name for the logger and basename for the logfile.
-
-    Returns:
-         a logger
-    """
-    level = logging.DEBUG
-    if logname is not None:
-        logfname = os.path.join(logpath, logname + '.log')
-    else:
-        # get log filename
-        logname, _ = os.path.splitext(os.path.basename(__file__))
-        secs = time.time()
-        timestamp = "{}".format(time.strftime("%Y%m%d-%H%M", time.localtime(secs)))
-        logfname = os.path.join(logpath, logname + '_{}.log'.format(timestamp))
-    # Delete file if exists; make directory if missing
-    ready_filename(logfname, overwrite=True)
-
-    # get logger
-    log = logging.getLogger(logname)
-    log.setLevel(level)
-
-    # create file handlers
-    handlers = []
-    handlers.append(RotatingFileHandler(
-        logfname, maxBytes=LOG.FILE_MAX_BYTES, backupCount=LOG.FILE_BACKUP_COUNT))
-    handlers.append(logging.StreamHandler())
-    # set handlers
-    formatter = logging.Formatter(LOG.FORMAT, LOG.DATE_FORMAT)
-    for fh in handlers:
-        fh.setLevel(level)
-        fh.setFormatter(formatter)
-        log.addHandler(fh)
-    return log
-
-
-# ...............................................
-def logit(logger, msg):
-    """Log a message to the console or file.
-
-    Args:
-        logger (object): Logger for writing messages to file and console.
-        msg (str): Message to be written.
-    """
-    if logger is not None:
-        logger.info(msg)
-    else:
-        print(msg)
 
 
 # .............................................................................

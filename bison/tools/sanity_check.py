@@ -3,7 +3,7 @@ import glob
 import os
 
 from bison.process.aggregate import Aggregator, RIIS_Counts
-from bison.providers.gbif import DwcData
+from bison.providers.gbif_data import DwcData
 from bison.common.constants import (
     ASSESS_VALUES, BIG_DATA_PATH, GBIF, NEW_RESOLVED_COUNTY, LOG,
     INTRODUCED_OCCS, INTRODUCED_SPECIES, INVASIVE_OCCS, INVASIVE_SPECIES,
