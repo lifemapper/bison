@@ -6,13 +6,17 @@ class TestAnnotator(Annotator):
     """Class for testing downloaded simple GBIF CSV file."""
 
     # .............................................................................
-    def __init__(self, gbif_occ_filename, nnsl=None, logger=None):
+    def __init__(
+            self, gbif_occ_filename, logger, annotated_riis_filename=None, nnsl=None):
         """Constructor reads RIIS species file and opens a CSVReader to the GBIF data.
 
         Args:
             gbif_occ_filename (str): full path of CSV occurrence file to annotate
-            nnsl (bison.common.riis.NNSL): object containing USGS RIIS data for annotating records
             logger (object): logger for saving relevant processing messages
+            annotated_riis_filename (str): full filename of RIIS data annotated with
+                GBIF accepted taxon names.
+            nnsl (bison.common.riis.NNSL): object containing USGS RIIS data for
+                annotating records
         """
         Annotator.__init__(self, gbif_occ_filename, nnsl=nnsl, logger=logger)
 

@@ -32,9 +32,9 @@ RANKS = [
     "PROLES", "RACE", "SECTION", "SERIES", "SEROVAR", "SPECIES", "SPECIES_AGGREGATE",
     "STRAIN", "SUBCLASS", "SUBCOHORT", "SUBFAMILY", "SUBFORM", "SUBGENUS", "SUBKINGDOM",
     "SUBLEGION", "SUBORDER", "SUBPHYLUM", "SUBSECTION", "SUBSERIES", "SUBSPECIES",
-    "SUBTRIBE", "SUBVARIETY", "SUPERCLASS", "SUPERCOHORT", "SUPERFAMILY", "SUPERKINGDOM",
-    "SUPERLEGION", "SUPERORDER", "SUPERPHYLUM", "SUPERTRIBE", "SUPRAGENERIC_NAME",
-    "TRIBE", "UNRANKED", "VARIETY"]
+    "SUBTRIBE", "SUBVARIETY", "SUPERCLASS", "SUPERCOHORT", "SUPERFAMILY",
+    "SUPERKINGDOM", "SUPERLEGION", "SUPERORDER", "SUPERPHYLUM", "SUPERTRIBE",
+    "SUPRAGENERIC_NAME", "TRIBE", "UNRANKED", "VARIETY"]
 RANKS_BELOW_SPECIES = [
     "FORM", "SUBFORM",
     "FORMA_SPECIALIS",
@@ -130,7 +130,8 @@ class LMBISON_HEADER:
     # temporary summary of an annotated DwC file (subset/chunk of data)
     SUMMARY_FILE = [LOCATION_KEY, SPECIES_KEY, SPECIES_NAME_KEY, COUNT_KEY]
     # output summary of region
-    REGION_FILE = [SPECIES_KEY, SCIENTIFIC_NAME_KEY, SPECIES_NAME_KEY, COUNT_KEY, ASSESS_KEY]
+    REGION_FILE = [
+        SPECIES_KEY, SCIENTIFIC_NAME_KEY, SPECIES_NAME_KEY, COUNT_KEY, ASSESS_KEY]
     # output summary of all data
     GBIF_RIIS_SUMMARY_FILE = [
         STATE_KEY, COUNTY_KEY,
@@ -142,7 +143,7 @@ class LMBISON_HEADER:
 
 # .............................................................................
 class US_CENSUS_COUNTY:
-    """File and fieldnames for census county boundary data, mapping to bison fieldnames."""
+    """File and fieldnames for census county boundary data, map to bison fieldnames."""
     PATH = DATA_PATH
     FILE = "cb_2020_us_county_500k.shp"
     CENSUS_BISON_MAP = {"NAME": NEW_RESOLVED_COUNTY, "STUSPS": NEW_RESOLVED_STATE}
@@ -150,7 +151,7 @@ class US_CENSUS_COUNTY:
 
 # .............................................................................
 class US_CENSUS_STATE:
-    """File and fieldnames for census state boundary data, mapping to bison fieldnames."""
+    """File and fieldnames for census state boundary data, map to bison fieldnames."""
     PATH = DATA_PATH
     FILE = "cb_2020_us_state_500k.shp"
     CENSUS_BISON_MAP = {"STUSPS": NEW_RESOLVED_STATE}
@@ -171,7 +172,7 @@ class ITIS:
 # .............................................................................
 class GBIF:
     """Constants for GBIF DWCA fields, APIs, and their request and response objects."""
-    INPUT_DATA = "gbif_2022-05-19.csv"
+    INPUT_DATA = "gbif_2023-01-26_10k.csv"
     # 730772042 lines, 1st is header + 730772041 records
     INPUT_RECORD_COUNT = 730772041
     URL = "http://api.gbif.org/v1"
@@ -395,7 +396,7 @@ class RIIS:
 
 # # .............................................................................
 # class RIIS:
-#     """Constants for the US Register of Introduced and Invasive Species, "RIIS data."""
+#     """Constants for the US Register of Introduced and Invasive Species, RIIS."""
 #     DATA_DIR = "data"
 #     DATA_EXT = "csv"
 #     DELIMITER = ","

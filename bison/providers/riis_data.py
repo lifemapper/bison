@@ -11,7 +11,7 @@ from bison.common.util import get_csv_dict_reader, get_csv_dict_writer
 
 # .............................................................................
 def standardize_name(sci_name, sci_author):
-    """Construct a small record to hold relevant data for a RIIS species/locality record.
+    """Construct a small record to hold data for a RIIS species/locality record.
 
     Args:
         sci_name (str): canonical scientific name
@@ -27,13 +27,15 @@ def standardize_name(sci_name, sci_author):
 class RIISRec():
     """Class for comparing relevant fields in species data records."""
     def __init__(self, record, line_num, new_gbif_key=None, new_gbif_name=None):
-        """Construct a small record to hold relevant data for a RIIS species/locality record.
+        """Construct a record to hold relevant data for a RIIS species/locality record.
 
         Args:
             record (dict): original US RIIS record
             line_num (int): line number for this record in the original US RIIS file
-            new_gbif_key (int): Newly resolved GBIF TaxonKey, unique identifier for the accepted taxon.
-            new_gbif_name (str): Newly resolved GBIF scientific name to match new_gbif_key.
+            new_gbif_key (int): Newly resolved GBIF TaxonKey, unique identifier for the
+                accepted taxon.
+            new_gbif_name (str): Newly resolved GBIF scientific name to
+                match new_gbif_key.
 
         Raises:
             ValueError: on non-integer GBIF taxonKey or non-integer ITIS TSN
@@ -116,8 +118,8 @@ class RIISRec():
         Args:
             gbif_key (int): current GBIF accepted taxonKey, in the GBIF Backbone
                 Taxonomy, for a scientific name
-            gbif_sciname (str):  current GBIF accepted scientific name, in the GBIF Backbone
-                Taxonomy, for a scientific name
+            gbif_sciname (str):  current GBIF accepted scientific name, in the GBIF
+                Backbone Taxonomy, for a scientific name
         """
         self.data[NEW_GBIF_KEY_FLD] = gbif_key
         self.data[NEW_GBIF_SCINAME_FLD] = gbif_sciname
@@ -127,7 +129,7 @@ class RIISRec():
         """Test equality of scientific name, author and kingdom fields.
 
         Args:
-            rrec (bison.riis.RIISRec): object containing a BISON Introduced or Invasive species record
+            rrec (bison.riis.RIISRec): object containing a USGS RIIS species record
 
         Returns:
             True if self and rrec scientific name, author, and kingdom match.
@@ -138,13 +140,14 @@ class RIISRec():
 
     # ...............................................
     def is_duplicate(self, rrec):
-        """Test equality of all fields except the occurrenceID and linenum, effectively a duplicate.
+        """Test equality of all fields except the occurrenceID and linenum.
 
         Args:
-            rrec (bison.riis.RIISRec): object containing a BISON Introduced or Invasive species record
+            rrec (bison.riis.RIISRec): object containing a USGS RIIS record
 
         Returns:
-            True if self and rrec scientific name, author, kingdom, GBIF key, ITIS TSN, assessment, and location match.
+            True if self and rrec scientific name, author, kingdom, GBIF key,
+                ITIS TSN, assessment, and location match.
         """
         return (self.is_name_match(rrec)
                 and self.data[RIIS.GBIF_KEY] == rrec.data[RIIS.GBIF_KEY]
@@ -157,7 +160,7 @@ class RIISRec():
         """Test equality of scientific name, author and kingdom fields and locality.
 
         Args:
-            rrec (bison.riis.RIISRec): object containing a BISON Introduced or Invasive species record
+            rrec (bison.riis.RIISRec): object containing a USGS RIIS record
 
         Returns:
             True if self and rrec scientific name, author, kingdom, and location match.
@@ -170,7 +173,7 @@ class RIISRec():
         """Test equality of assessment and locality match.
 
         Args:
-            rrec (bison.riis.RIISRec): object containing a BISON Introduced or Invasive species record
+            rrec (bison.riis.RIISRec): object containing a USGS RIIS record
 
         Returns:
             True if self and rrec assessment and location match.
@@ -183,7 +186,7 @@ class RIISRec():
         """Test equality of GBIF taxonKey.
 
         Args:
-            rrec (bison.riis.RIISRec): object containing a BISON Introduced or Invasive species record
+            rrec (bison.riis.RIISRec): object containing a USGS RIIS record
 
         Returns:
             True if self and rrec GBIF key match.
@@ -195,7 +198,7 @@ class RIISRec():
         """Test equality of ITIS TSN.
 
         Args:
-            rrec (bison.riis.RIISRec): object containing a BISON Introduced or Invasive species record
+            rrec (bison.riis.RIISRec): object containing a USGS RIIS record
 
         Returns:
             True if self and rrec ITIS TSN match.
@@ -216,7 +219,7 @@ class RIISRec():
         """Test equality of taxon authority and authority key.
 
         Args:
-            rrec (bison.riis.RIISRec): object containing a BISON Introduced or Invasive species record
+            rrec (bison.riis.RIISRec): object containing a USGS RIIS record
 
         Returns:
             True if self and rrec name authority are both GBIF and GBIF keys match
@@ -243,31 +246,30 @@ class NNSL:
     """Class for reading, writing, comparing RIIS species data records."""
 
     # ...............................................
-    def __init__(self, riis_filename, logger=None):
-        """Constructor sets the authority and species files and headers expected for BISON-RIIS processing.
+    def __init__(self, riis_filename, is_annotated=False, logger=None):
+        """Set the authority and species files and headers expected for processing.
 
         Args:
-            riis_filename (str): Path to the base of the input data, used to construct full
-                filenames from basepath and relative path constants.
+            riis_filename (str): Path to the RIIS datafile, with or without annotations.
+            is_annotated (bool): Flag indicating whether RIIS file has been
+                annotated with GBIF accepted taxon names.
             logger (object): logger for writing messages to file and console
         """
-        datapath, fname_w_ext = os.path.split(riis_filename)
-
-        # self._riis_datapath = datapath
-        # self._resolved_riis_filename = gbif_resolved_riis_fname
         self._riis_filename = riis_filename
+        self._is_annotated = is_annotated
         self._log = logger
 
+        datapath, _ = os.path.split(riis_filename)
         self.auth_fname = f"{os.path.join(datapath, RIIS.AUTHORITY_FNAME)}.{RIIS.DATA_EXT}"
 
         # Trimmed and updated Non-native Species List, built from RIIS
-        self.by_gbif_taxkey = None
+        self.by_taxon = None
         self.by_riis_id = None
-        self.nnsl_header = None
+        self.bad_species = None
 
     # ...............................................
     def _read_authorities(self) -> set:
-        """Assemble a set of unique authority identifiers for use as foreign keys in the MasterList.
+        """Assemble a set of unique authority identifiers for joining the MasterList.
 
         Returns:
             Set of authority identifiers valid for use as foreign keys in related datasets.
@@ -286,23 +288,8 @@ class NNSL:
         return authorities
 
     # ...............................................
-    @classmethod
-    def get_gbif_resolved_riis_fname(cls, orig_riis_filename):
-        """Construct a filename for the resolved RIIS from the original.
-
-        Args:
-            orig_riis_filename (str): full original (non-resolved) RIIS filename
-
-        Returns:
-            updated_riis_fname: output filename derived from the input RIIS filename
-        """
-        basename, ext = os.path.splitext(orig_riis_filename)
-        updated_riis_fname = f"{basename}_updated_gbif{ext}"
-        return updated_riis_fname
-
-    # ...............................................
     @property
-    def gbif_resolved_riis_header(self):
+    def annotated_riis_header(self):
         """Construct the expected header for the resolved RIIS.
 
         Returns:
@@ -326,7 +313,7 @@ class NNSL:
         """
         riis_recs = []
         try:
-            riis_recs = self.by_gbif_taxkey[gbif_taxon_key]
+            riis_recs = self.by_taxon[gbif_taxon_key]
         except KeyError:
             # Taxon is not present
             pass
@@ -340,7 +327,8 @@ class NNSL:
             gbif_taxon_key (str): unique identifier for GBIF taxon record
 
         Returns:
-            dict of 0 or more, like {"AK": "introduced", "HI": "invasive", "L48": "introduced"}
+            dict of 0 or more, like
+                {"AK": "introduced", "HI": "invasive", "L48": "introduced"}
                 for the species with this GBIF taxonKey
         """
         assessments = {}
@@ -360,7 +348,8 @@ class NNSL:
             region (str): RIIS-defined US region for assessment, choices are AK, HI, L48
 
         Returns:
-            dict of 0 or more, like {"AK": "introduced", "HI": "invasive", "L48": "introduced"}
+            dict of 0 or more, like
+                {"AK": "introduced", "HI": "invasive", "L48": "introduced"}
                 for the species with this GBIF taxonKey
         """
         assess = "presumed_native"
@@ -375,74 +364,79 @@ class NNSL:
         return assess, recid
 
     # ...............................................
-    def read_riis(self, read_resolved=False):
+    def read_riis(self):
         """Assemble 2 dictionaries of records with valid and invalid data.
 
-        Args:
-            read_resolved (bool): True if reading amended RIIS data, with scientific
-                names resolved to the currently accepted taxon.
+        Notes:
+            Fills dictionary self.by_taxon with key of either the RIIS scientificName
+            or the GBIF acceptedTaxonId.
+            Fills dictionary self.by_riis_id with key of the unique key in RIIS data,
+            occurrenceId.
 
         Raises:
-            FileNotFoundError: if read_resolved is True but resolved data file does not exist
-            Exception: on read error
+            FileNotFoundError: on missing input filename
+            Exception: on unexpected, missing, or out-of-order header elements
+            Exception: on unknown read error
         """
-
+        # Reset data
         self.bad_species = {}
-        self.by_gbif_taxkey = {}
+        self.by_taxon = {}
         self.by_riis_id = {}
-        if read_resolved is True:
-            # Use species data with updated GBIF taxonomic resolution if exists
-            if not os.path.exists(self.gbif_resolved_riis_fname):
-                raise FileNotFoundError(f"File {self.gbif_resolved_riis_fname} does not exist")
-            else:
-                infname = self.gbif_resolved_riis_fname
-                expected_header = self.gbif_resolved_riis_header
+
+        # Test file and header
+        if not os.path.exists(self._riis_filename):
+            raise FileNotFoundError(f"File {self._riis_filename} does not exist")
+        if self._is_annotated is True:
+            expected_header = self.annotated_riis_header
         else:
-            infname = self._riis_filename
             expected_header = RIIS.SPECIES_GEO_HEADER
-
-        # Test and clean headers of non-ascii characters
-        good_header = self._fix_header(infname, expected_header)
-        if good_header is False:
+        # Clean header of non-ascii characters
+        good_header = self._clean_header(self._riis_filename, expected_header)
+        if good_header is None:
             raise Exception(f"Unexpected file header found in {self._riis_filename}")
-        rdr, inf = get_csv_dict_reader(infname, RIIS.DELIMITER, fieldnames=good_header, quote_none=False)
 
+        rdr, inf = get_csv_dict_reader(
+            self._riis_filename, RIIS.DELIMITER, fieldnames=good_header,
+            quote_none=False)
         self._log.log(
-            f"Reading RIIS from {infname}", refname=self.__class__.__name__,
+            f"Reading RIIS from {self._riis_filename}", refname=self.__class__.__name__,
             log_level=logging.INFO)
         try:
             for row in rdr:
                 lineno = rdr.line_num
                 if lineno > 1:
                     # Read new gbif resolutions if they exist
-                    if read_resolved is True:
+                    if self._is_annotated is True:
                         new_gbif_key = row[NEW_GBIF_KEY_FLD]
                         new_gbif_name = row[NEW_GBIF_SCINAME_FLD]
                     else:
                         new_gbif_key = new_gbif_name = None
                     # Create record of original data and optional new data
                     try:
-                        rec = RIISRec(row, lineno, new_gbif_key=new_gbif_key, new_gbif_name=new_gbif_name)
+                        rec = RIISRec(
+                            row, lineno, new_gbif_key=new_gbif_key,
+                            new_gbif_name=new_gbif_name)
                     except ValueError:
                         row[LINENO_FLD] = lineno
                         self.bad_species[lineno] = row
 
-                    # Organize the records by scientificName before query into GBIF, or failed query
-                    #                   or by GBIF taxonKey after successful query
+                    # Index records on scientificName if not annotated;
+                    # Index records on GBIF taxonkey if annotation exists;
+                    # i.e. group by species for easy lookup
                     index = rec.name
-                    if read_resolved is True and new_gbif_key is not None:
+                    if self._is_annotated is True and new_gbif_key is not None:
                         index = new_gbif_key
                     # Group records by matching name/taxon
                     try:
-                        self.by_gbif_taxkey[index].append(rec)
+                        self.by_taxon[index].append(rec)
                     except KeyError:
-                        self.by_gbif_taxkey[index] = [rec]
+                        self.by_taxon[index] = [rec]
 
-                    # Use RIIS occurrenceID for dictionary key
+                    # Also index on RIIS occurrenceID
                     self.by_riis_id[row[RIIS.SPECIES_GEO_KEY]] = rec
 
-        except Exception as e:
-            raise(e)
+        except Exception:
+            raise
         finally:
             inf.close()
 
@@ -545,26 +539,32 @@ class NNSL:
         return new_key, new_name, msg
 
     # ...............................................
-    def resolve_riis_to_gbif_taxa(self):
-        """Resolve accepted name and key from the GBIF taxonomic backbone, write to file.
+    def resolve_riis_to_gbif_taxa(self, outfname, overwrite=True):
+        """Annotate RIIS records with GBIF accepted taxon name/key, write to file.
+
+        Args:
+            outfname: full filename of an output file for the RIIS data annotated with
+                GBIF accepted taxon name and key
+            overwrite (bool): True to delete an existing updated RIIS file.
 
         Returns:
-            name_count: count of updated records
-            rec_count: count of resolved species
+            name_count (int): count of updated records
+            rec_count (int): count of resolved species
         """
         msgdict = {}
 
-        if not self.by_gbif_taxkey:
-            self.read_riis(read_resolved=False)
+        if not self.by_taxon:
+            self.read_riis()
 
         name_count = 0
         rec_count = 0
         gbif_svc = GbifSvc()
         try:
-            for name, reclist in self.by_gbif_taxkey.items():
+            for name, reclist in self.by_taxon.items():
                 # Resolve each name, update each record (1-3) for that name
                 try:
-                    # Try to match, if match is not 'accepted', repeat with returned accepted keys
+                    # Try to match, if match is not 'accepted', repeat with returned
+                    # accepted keys
                     data = reclist[0].data
                     new_key, new_name, msg = self._find_current_accepted_taxon(
                         gbif_svc, data[RIIS.SCINAME_FLD],
@@ -573,12 +573,13 @@ class NNSL:
                     self._add_msg(msgdict, name, msg)
                     name_count += 1
 
-                    # Supplement all records for this name with GBIF accepted key and sciname, then write
+                    # Supplement all records for this name with GBIF accepted key
+                    # and sciname, then write
                     for rec in reclist:
                         # Update record in dictionary nnsl_by_species with name keys
                         rec.update_data(new_key, new_name)
                         # Update dictionary nnsl_by_id with Occid keys
-                        self.by_riis_id[rec.data[RIIS.KEY]] = rec
+                        self.by_riis_id[rec.data[RIIS.SPECIES_GEO_KEY]] = rec
                         rec_count += 1
 
                     if (name_count % LOG.INTERVAL) == 0:
@@ -591,7 +592,7 @@ class NNSL:
         except Exception as e:
             self._add_msg(msgdict, "unknown_error", f"{e}")
 
-        self.write_resolved_riis(overwrite=True)
+        self.write_resolved_riis(outfname, overwrite=overwrite)
 
         return name_count, rec_count
 
@@ -619,10 +620,10 @@ class NNSL:
             try:
                 tstrec.data[NEW_GBIF_KEY_FLD]
             except KeyError:
-                raise Exception("RIIS records have not been resolved to GBIF accepted taxa")
+                raise Exception(
+                    "RIIS records have not been resolved to GBIF accepted taxa")
 
-        new_header = self.gbif_resolved_riis_header
-
+        new_header = self.annotated_riis_header
         try:
             writer, outf = get_csv_dict_writer(
                 outfname, new_header, RIIS.DELIMITER, fmode="w", overwrite=overwrite)
@@ -667,20 +668,20 @@ class NNSL:
         return better_name
 
     # ...............................................
-    def _fix_header(self, fname, expected_header):
-        """Return a cleaned version of the header, correcting any fieldnames with illegal characters.
+    def _clean_header(self, fname, expected_header):
+        """Return a cleaned version of the header, or False if errors are not fixable.
 
-        Print warnings if actual fieldnames contain non-ascii characters.  Print errors
-        if the actual header does not contain the same fieldnames, in the same order, as
-        the expected_header.
+        Correct any fieldnames with non-ascii characters, and print warnings.  Print
+        errors if the actual header does not contain the same fieldnames, in the same
+        order, as the expected_header.
 
         Args:
             fname (str): CSV data file containing header to check
             expected_header (list): list of fieldnames expected for the data file
 
         Returns:
-             False if header has unexpected fields, otherwise a list of fieldnames from the actual header,
-                stripped of non-ascii characters
+             False if header has unexpected fields, otherwise a list of fieldnames from
+                the actual header, stripped of non-ascii characters
         """
         with open(fname, "r", newline="") as csvfile:
             rdr = csv.reader(csvfile, delimiter=RIIS.DELIMITER)
@@ -707,7 +708,7 @@ class NNSL:
                 self._log.error(
                     f"[Error] Header {header[i]} != {expected_header[i]} expected",
                     refname=self.__class__.__name__, log_level=logging.ERROR)
-                return False
+                good_header = None
         return good_header
 
 
@@ -716,11 +717,12 @@ def resolve_riis_taxa(riis_filename, annotated_riis_filename, logger):
     """Resolve and write GBIF accepted names and taxonKeys in RIIS records.
 
     Args:
-        riis_filename (str): full filename for RIIS data records.
+        riis_filename (str): full filename for original RIIS data records.
+        annotated_riis_filename (str): full filename for output RIIS data records.
         logger (object): logger for saving relevant processing messages
 
     Returns:
-        resolved_riis_filename: full output filename for RIIS data records with updated taxa and taxonKeys from GBIF.
+        dictionary report of metadata/
     """
     refname = "resolve_riis_taxa"
     report = {
@@ -729,10 +731,10 @@ def resolve_riis_taxa(riis_filename, annotated_riis_filename, logger):
             "annotated_riis_filename": annotated_riis_filename
         }
     }
-    nnsl = NNSL(riis_filename, logger=logger)
+    nnsl = NNSL(riis_filename, annotated_riis_filename, logger=logger)
     # Update species data
     try:
-        nnsl.resolve_riis_to_gbif_taxa()
+        nnsl.resolve_riis_to_gbif_taxa(annotated_riis_filename, overwrite=True)
         report[refname]["riis_count"] = len(nnsl.by_riis_id)
         logger.log(
             f"Resolved {len(nnsl.by_riis_id)} taxa in {riis_filename}, next, write.",

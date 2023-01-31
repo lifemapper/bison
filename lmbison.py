@@ -1,23 +1,17 @@
 """Main script to execute all elements of the summarize-GBIF BISON workflow."""
 import csv
-from datetime import datetime
 import os
 
 from bison.common.constants import (
-    GBIF, BIG_DATA_PATH, DATA_PATH, ENCODING, EXTRA_CSV_FIELD, LOG, NEW_RESOLVED_COUNTY,
-    NEW_RESOLVED_STATE, POINT_BUFFER_RANGE, RIIS, US_CENSUS_COUNTY)
-from bison.common.log import Logger, log_output
+    GBIF, DATA_PATH, ENCODING, EXTRA_CSV_FIELD, LOG, NEW_RESOLVED_COUNTY,
+    NEW_RESOLVED_STATE, POINT_BUFFER_RANGE, US_CENSUS_COUNTY)
+from bison.common.log import log_output
 from bison.common.util import chunk_files, delete_file, get_csv_dict_reader, identify_chunk_files
 
-from bison.process.aggregate import (
-    Aggregator, parallel_summarize, summarize_annotations)
+from bison.process.aggregate import (Aggregator)
 from bison.process.annotate import (
     Annotator, annotate_occurrence_file, parallel_annotate)
 from bison.process.geoindex import GeoResolver, GeoException
-
-from bison.providers.riis_data import resolve_riis_taxa
-
-from bison.tools.sanity_check import Counter
 
 
 # .............................................................................
@@ -34,35 +28,6 @@ def split_files(gbif_filename, logger):
     chunk_filenames = chunk_files(gbif_filename)
     logger.info(f"{len(chunk_filenames)} chunk files created.")
     return chunk_filenames
-
-
-# # .............................................................................
-# def resolve_riis_taxa(riis_filename, annotated_riis_filename, logger):
-#     """Resolve and write GBIF accepted names and taxonKeys in RIIS records.
-#
-#     Args:
-#         riis_filename (str): full filename for RIIS data records.
-#         logger (object): logger for saving relevant processing messages
-#
-#     Returns:
-#         resolved_riis_filename: full output filename for RIIS data records with updated taxa and taxonKeys from GBIF.
-#     """
-#     resolved_riis_filename = None
-#     nnsl = NNSL(riis_filename, logger=logger)
-#     # Update species data
-#     try:
-#         nnsl.resolve_riis_to_gbif_taxa()
-#         logger.info(f"Resolved {len(nnsl.by_riis_id)} taxa in {riis_filename}, next, write.")
-#         count = nnsl.write_resolved_riis(overwrite=True)
-#         logger.info(f"Wrote {count} records to {resolved_riis_filename}.")
-#     except Exception as e:
-#         logger.error(f"Unexpected failure {e} in resolve_riis_taxa")
-#     else:
-#         if count != RIIS.SPECIES_GEO_DATA_COUNT:
-#             logger.debug(
-#                 f"Resolved {count} RIIS records, expecting " +
-#                 f"{RIIS.SPECIES_GEO_DATA_COUNT}")
-
 
 
 # .............................................................................
@@ -88,11 +53,12 @@ def annotate_occurrence_files(input_filenames, logger):
         if os.path.exists(outfname):
             logger.info(f"Annotations exist in {outfname}, moving on.")
         else:
-            annotated_dwc_fname = annotate_occurrence_file(csv_filename)
+            annotated_dwc_fname = annotate_occurrence_file(
+                csv_filename, logger.log_directory)
             annotated_filenames.append(annotated_dwc_fname)
 
         # nnsl = NNSL(riis_filename, logger=logger)
-        # nnsl.read_riis(read_resolved=True)
+        # nnsl.read_riis()
         # # If this one is complete, do not re-annotate
         # outfname = Annotator.construct_annotated_name(csv_filename)
         # if os.path.exists(outfname):
@@ -104,34 +70,34 @@ def annotate_occurrence_files(input_filenames, logger):
     return annotated_filenames
 
 
-# .............................................................................
-def summarize_annotated_files(annotated_filenames, logger):
-    """Annotate GBIF records with census state and county, and RIIS key and assessment.
-
-    Args:
-        annotated_filenames (list): list of full filenames containing annotated GBIF data.
-        logger (object): logger for saving relevant processing messages
-
-    Returns:
-        summary_filenames (list): full filenames of summaries of location, species, occurrence counts, one file
-            per each file in annotated_filenames.
-    """
-    summary_filenames = []
-    if len(annotated_filenames) > 1:
-        log_output(logger, "Summarize files in parallel: ", outlist=annotated_filenames)
-        # Does not overwrite existing summary files
-        summary_filenames = parallel_summarize(annotated_filenames, logger)
-    else:
-        ann_filename = annotated_filenames[0]
-        # Do not overwrite existing summary file
-        summary_filename = summarize_annotations(ann_filename, logger)
-        summary_filenames.append(summary_filename)
-
-        # agg = Aggregator(ann_filename, logger=logger)
-        # # Do not overwrite existing summary file
-        # summary_filename = agg.summarize_by_file(overwrite=False)
-        # summary_filenames.append(summary_filename)
-    return summary_filenames
+# # .............................................................................
+# def summarize_annotated_files(annotated_filenames, logger):
+#     """Annotate GBIF records with census state and county, and RIIS key and assessment.
+#
+#     Args:
+#         annotated_filenames (list): list of full filenames containing annotated GBIF data.
+#         logger (object): logger for saving relevant processing messages
+#
+#     Returns:
+#         summary_filenames (list): full filenames of summaries of location, species, occurrence counts, one file
+#             per each file in annotated_filenames.
+#     """
+#     summary_filenames = []
+#     if len(annotated_filenames) > 1:
+#         log_output(logger, "Summarize files in parallel: ", outlist=annotated_filenames)
+#         # Does not overwrite existing summary files
+#         summary_filenames = parallel_summarize(annotated_filenames, logger)
+#     else:
+#         ann_filename = annotated_filenames[0]
+#         # Do not overwrite existing summary file
+#         summary_filename = summarize_annotations(ann_filename, logger.log_directory)
+#         summary_filenames.append(summary_filename)
+#
+#         # agg = Aggregator(ann_filename, logger=logger)
+#         # # Do not overwrite existing summary file
+#         # summary_filename = agg.summarize_by_file(overwrite=False)
+#         # summary_filenames.append(summary_filename)
+#     return summary_filenames
 
 
 # .............................................................................

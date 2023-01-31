@@ -9,13 +9,14 @@ from bison.common.constants import (
     INTRODUCED_OCCS, INTRODUCED_SPECIES, INVASIVE_OCCS, INVASIVE_SPECIES,
     NATIVE_OCCS, NATIVE_SPECIES, NEW_RESOLVED_STATE, NEW_RIIS_ASSESSMENT_FLD,
     STATE_KEY, COUNTY_KEY, ASSESS_KEY, COUNT_KEY)
-from bison.common.util import get_csv_dict_reader, get_logger
+from bison.common.log import Logger
+from bison.common.util import get_csv_dict_reader
 
 
 # .............................................................................
 class Counter():
     """Class for comparing counts for a RIIS assessment."""
-    def __init__(self, csv_filename, do_split=True, logger=None):
+    def __init__(self, csv_filename, logger, do_split=True):
         """Constructor.
 
         Args:
@@ -30,8 +31,9 @@ class Counter():
         if not os.path.exists(csv_filename):
             raise FileNotFoundError(f"File {csv_filename} does not exist")
 
-        self._datapath, _ = os.path.split(csv_filename)
         self._csvfile = csv_filename
+        self._log = logger
+        self._datapath, _ = os.path.split(csv_filename)
 
         in_base_filename, ext = os.path.splitext(csv_filename)
         base_pattern = f"{in_base_filename}"
@@ -44,15 +46,11 @@ class Counter():
         self.summary_annotated_pattern = os.path.join(
             self._datapath, f"{base_pattern}*annotated_summary{ext}")
 
-        if logger is None:
-            logger = get_logger(os.path.join(self._datapath, LOG.DIR))
-        self._log = logger
-
     # .............................................................................
     def _get_random_species(self, annotated_occ_filename, assessment=ASSESS_VALUES[1]):
         # Get one species name, county, state with riis_assessment from annotated file
         accepted_spname = None
-        dwcdata = DwcData(annotated_occ_filename)
+        dwcdata = DwcData(annotated_occ_filename, self._log)
         try:
             dwcdata.open()
 
@@ -79,11 +77,12 @@ class Counter():
 
     # .............................................................................
     @classmethod
-    def count_assessments(cls, annotated_occ_filename):
+    def count_assessments(cls, annotated_occ_filename, logger):
         """Count records for each of the valid assessments in a file.
 
         Args:
             annotated_occ_filename (str): full filename of annotated file to summarize.
+            logger (object): logger for saving relevant processing messages
 
         Returns:
             assessments (dict): dictionary with keys for each valid assessment type,
@@ -98,7 +97,7 @@ class Counter():
         for val in ASSESS_VALUES:
             assessments[val] = 0
 
-        dwcdata = DwcData(annotated_occ_filename)
+        dwcdata = DwcData(annotated_occ_filename, logger)
         try:
             dwcdata.open()
 
@@ -125,7 +124,7 @@ class Counter():
         cty_counts = RIIS_Counts(is_group=False, logger=self._log)
         for fn in annotated_filenames:
             try:
-                dwcdata = DwcData(fn)
+                dwcdata = DwcData(fn, self._log)
                 dwcdata.open()
 
                 # Find the species of the first record with riis_assessment
@@ -146,17 +145,18 @@ class Counter():
                 dwcdata.close()
                 dwcdata = None
 
-        self._log.info(
+        self._log.log(
             f"Counted occurrences of {spname} in {state} and {county} in "
-            f"{len(annotated_filenames)} annotated files")
+            f"{len(annotated_filenames)} annotated files",
+            refname=self.__class__.__name__)
 
         return state_counts, cty_counts
 
     # .............................................................................
     def _count_annotated_records_for_assessments(self, state, county):
         annotated_filenames = glob.glob(self.annotated_filename_pattern)
-        state_occ_assessment_counts = RIIS_Counts(is_group=False, logger=self._log)
-        cty_occ_assessment_counts = RIIS_Counts(is_group=False, logger=self._log)
+        state_occ_assessment_counts = RIIS_Counts(self._log, is_group=False)
+        cty_occ_assessment_counts = RIIS_Counts(self._log, is_group=False)
         # Track species for each assessment in county and state
         cty_species = {}
         state_species = {}
@@ -166,7 +166,7 @@ class Counter():
 
         for fn in annotated_filenames:
             try:
-                dwcdata = DwcData(fn)
+                dwcdata = DwcData(fn, self._log)
                 dwcdata.open()
 
                 # Find the species of the first record with riis_assessment
@@ -193,19 +193,19 @@ class Counter():
                 dwcdata = None
 
         state_species_counts = RIIS_Counts(
-            introduced=len(state_species["introduced"]),
+            self._log, introduced=len(state_species["introduced"]),
             invasive=len(state_species["invasive"]),
             presumed_native=len(state_species["presumed_native"]),
-            is_group=True, logger=self._log)
+            is_group=True)
         cty_species_counts = RIIS_Counts(
-            introduced=len(cty_species["introduced"]),
+            self._log, introduced=len(cty_species["introduced"]),
             invasive=len(cty_species["invasive"]),
             presumed_native=len(cty_species["presumed_native"]),
-            is_group=True, logger=self._log)
+            is_group=True)
 
-        self._log.info(
+        self._log.log(
             f"Counted species for assessments in {state} and {county} in "
-            f"{len(annotated_filenames)} annotated files")
+            f"{len(annotated_filenames)} annotated files", refname=self.__class__.__name__)
 
         return state_occ_assessment_counts, cty_occ_assessment_counts, state_species_counts, cty_species_counts
 
@@ -228,23 +228,19 @@ class Counter():
                     if county is None:
                         if not rec[COUNTY_KEY]:
                             species_counts = RIIS_Counts(
-                                introduced=intro_sp, invasive=inv_sp,
-                                presumed_native=native_sp, is_group=True,
-                                logger=self._log)
+                                self._log, introduced=intro_sp, invasive=inv_sp,
+                                presumed_native=native_sp, is_group=True)
                             occ_counts = RIIS_Counts(
-                                introduced=intro_occ, invasive=inv_occ,
-                                presumed_native=native_occ, is_group=False,
-                                logger=self._log)
+                                self._log, introduced=intro_occ, invasive=inv_occ,
+                                presumed_native=native_occ, is_group=False)
                             break
                     elif rec[COUNTY_KEY] == county:
                         species_counts = RIIS_Counts(
-                            introduced=intro_sp, invasive=inv_sp,
-                            presumed_native=native_sp, is_group=True,
-                            logger=self._log)
+                            self._log, introduced=intro_sp, invasive=inv_sp,
+                            presumed_native=native_sp, is_group=True)
                         occ_counts = RIIS_Counts(
-                            introduced=intro_occ, invasive=inv_occ,
-                            presumed_native=native_occ, is_group=False,
-                            logger=self._log)
+                            self._log, introduced=intro_occ, invasive=inv_occ,
+                            presumed_native=native_occ, is_group=False)
                         break
         except Exception as e:
             raise Exception(
@@ -256,7 +252,7 @@ class Counter():
         region_summary_fname = Aggregator.construct_location_summary_name(
             self._datapath, state, county=county)
         # Get counts for all assessments of species_key in this region summary file
-        loc_occ_counts = RIIS_Counts(is_group=False, logger=self._log)
+        loc_occ_counts = RIIS_Counts(self._log, is_group=False)
         try:
             rdr, inf = get_csv_dict_reader(region_summary_fname, GBIF.DWCA_DELIMITER)
         except Exception as e:
@@ -281,28 +277,30 @@ class Counter():
         finally:
             inf.close()
 
-        self._log.info(
+        self._log.log(
             f"Read occurrence summary for {acc_species_name} in "
-            f"{region_summary_fname} summary file")
+            f"{region_summary_fname} summary file", refname=self.__class__.__name__)
 
         return loc_occ_counts
 
     # .............................................................................
     def _log_comparison(self, truth_counts, summary_counts, compare_type, source):
-        self._log.info(
+        self._log.log(
             f"Compare annotation counts to {source} ({compare_type}) introduced, "
-            f"invasive, presumed_native: ")
-        self._log.info(
+            f"invasive, presumed_native: ", refname=self.__class__.__name__)
+        self._log.log(
             f"    {truth_counts.introduced}, {truth_counts.invasive}, "
-            f"{truth_counts.presumed_native}")
-        self._log.info(
+            f"{truth_counts.presumed_native}", refname=self.__class__.__name__)
+        self._log.log(
             f"    {summary_counts.introduced}, {summary_counts.invasive}, "
-            f"{summary_counts.presumed_native}")
+            f"{summary_counts.presumed_native}", refname=self.__class__.__name__)
         if truth_counts.equals(summary_counts):
-            self._log.info("Success!")
+            self._log.log("Success!", refname=self.__class__.__name__)
         else:
-            self._log.info("FAIL! Annotations do not match summaries")
-        self._log.info("")
+            self._log.log(
+                "FAIL! Annotations do not match summaries",
+                refname=self.__class__.__name__)
+        self._log.log("", refname=self.__class__.__name__)
 
     # .............................................................................
     def compare_counts(self):
@@ -313,11 +311,13 @@ class Counter():
         acc_species_name, taxkey, county, state = self._get_random_species(
             filenames[midx], "invasive")
 
-        self._log.info("--------------------------------------")
-        self._log.info(
+        self._log.log(
+            "--------------------------------------", refname=self.__class__.__name__)
+        self._log.log(
             f"Compare `ground truth` occurrences of '{acc_species_name}' in "
-            f"{county} {state} to region summaries")
-        self._log.info("--------------------------------------")
+            f"{county} {state} to region summaries", refname=self.__class__.__name__)
+        self._log.log(
+            "--------------------------------------", refname=self.__class__.__name__)
 
         # Ground truth: Count matching lines for species and region in annotated records
         gtruth_state_occXspecies, gtruth_county_occXspecies = \
@@ -338,10 +338,13 @@ class Counter():
             gtruth_county_occXspecies, county_loc_occ_counts,
             f"{county} {acc_species_name} occurrence", f"{county} summary")
 
-        self._log.info("--------------------------------------")
-        self._log.info(f"Compare `ground truth` assessment (occurrences) "
-                       f"{county} {state} to RIIS summary")
-        self._log.info("--------------------------------------")
+        self._log.log(
+            "--------------------------------------", refname=self.__class__.__name__)
+        self._log.log(
+            f"Compare `ground truth` assessment (occurrences) {county} {state} to " +
+            "RIIS summary", refname=self.__class__.__name__)
+        self._log.log(
+            "--------------------------------------", refname=self.__class__.__name__)
 
         # Ground truth: Count matching lines for assessment and region in annotated recs
         (gtruth_state_occXassess, gtruth_cty_occXassess, gtruth_state_speciesXassess,
@@ -362,11 +365,13 @@ class Counter():
             f"{county} occurrence", "RIIS summary")
 
         # Compare species counts
-        self._log.info("--------------------------------------")
-        self._log.info(
+        self._log.log(
+            "--------------------------------------", refname=self.__class__.__name__)
+        self._log.log(
             f"Compare `ground truth` assessment (species) {county} {state} to RIIS "
-            f"summary")
-        self._log.info("--------------------------------------")
+            f"summary", refname=self.__class__.__name__)
+        self._log.log(
+            "--------------------------------------", refname=self.__class__.__name__)
         self._log_comparison(
             gtruth_state_speciesXassess, st_species_counts,
             f"{state} species", "RIIS summary")
@@ -399,13 +404,15 @@ if __name__ == '__main__':
     # Test data
     # ...............................................
     base_big_csv_filename = "gbif_2022-03-16_100k.csv"
+    script_name = os.path.splitext(os.path.basename(__file__))[0]
     # ...............................................
 
     # # Basename for constructing temporary files
     in_base_filename, ext = os.path.splitext(base_big_csv_filename)
     # Full path to input data
     big_csv_filename = os.path.join(BIG_DATA_PATH, base_big_csv_filename)
-    logger = get_logger(os.path.join(BIG_DATA_PATH, LOG.DIR), logname="main_test_outputs")
+    logger = Logger(
+        script_name, os.path.join(BIG_DATA_PATH, LOG.DIR), f"{script_name}".log)
 
-    record_counter = Counter(big_csv_filename, do_split=True, logger=logger)
+    record_counter = Counter(big_csv_filename, logger, do_split=True)
     record_counter.compare_counts()

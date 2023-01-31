@@ -61,7 +61,8 @@ class RIIS_Counts():
             self.invasive += other.invasive
             self.presumed_native += other.presumed_native
         else:
-            raise Exception("Cannot add group (species) counts to individual occurrence counts")
+            raise Exception(
+                "Cannot add group (species) counts to individual occurrence counts")
 
     # .............................................................................
     def add_to(self, assessment, value=1):
@@ -104,7 +105,8 @@ class RIIS_Counts():
             if self.presumed_native != other.presumed_native:
                 return False
         else:
-            raise Exception("Cannot add group (species) counts to individual occurrence counts")
+            raise Exception(
+                "Cannot add group (species) counts to individual occurrence counts")
         return True
 
     # .............................................................................
@@ -137,7 +139,8 @@ class RIIS_Counts():
         """The rounded percent introduced of total count, as a string.
 
         Returns:
-            string of the percentage of introduced count to total count, rounded to 3 places right of the decimal
+            string of the percentage of introduced count to total count, rounded to
+                3 places right of the decimal
         """
         try:
             pct_str = f"{self.percent_introduced:.3f}"
@@ -165,8 +168,8 @@ class RIIS_Counts():
         """The rounded percent invasive of total count, as a string.
 
         Returns:
-            string of the percentage of invasive count to total count, rounded to 3 places right of the decimal,
-                or "n/a" if total is 0
+            string of the percentage of invasive count to total count, rounded to
+                3 places right of the decimal, or "n/a" if total is 0
         """
         try:
             pct_str = f"{self.percent_invasive:.3f}"
@@ -194,8 +197,8 @@ class RIIS_Counts():
         """The rounded percent presumed_native of total count, as a string.
 
         Returns:
-            string of the percentage of presumed_native count to total count, rounded to 3 places right of the decimal
-                 or "n/a" if total is 0
+            string of the percentage of presumed_native count to total count, rounded
+                to 3 places right of the decimal or "n/a" if total is 0
         """
         try:
             pct_str = f"{self.percent_presumed_native:.3f}"
@@ -206,15 +209,17 @@ class RIIS_Counts():
 
 # .............................................................................
 class Aggregator():
-    """Class for summarizing GBIF data annotated with USGS Introduced and Invasive species assessments.
+    """Class for summarizing GBIF data annotated with USGS RIIS assessments.
 
     Goal:
      Finally, we will summarize the results of data processing.
-     * One set of results will include a list of “introduced” species and a list of “presumed native” species for
-       each state and county, along with counts for each of these species.
-     * The second set of results will show the summary counts of introduced species and all species,
-       introduced occurrences and all occurrences, the percentage of introduced to all species, the percentage of
-       introduced to all occurrences, all by state and county
+     * One set of results will include a list of “introduced” species and a list of
+       “presumed native” species for each state and county, along with counts for
+       each of these species.
+     * The second set of results will show the summary counts of introduced species
+       and all species, introduced occurrences and all occurrences, the percentage of
+       introduced to all species, the percentage of introduced to all occurrences,
+       all by state and county
     """
     def __init__(self, annotated_filename, logger):
         """Constructor.
@@ -294,7 +299,8 @@ class Aggregator():
         """Construct a filename for the summarized version of csvfile.
 
         Args:
-            csvfile (str): full filename used to construct an annotated filename for this data.
+            csvfile (str): full filename used to construct an annotated filename for
+                this data.
 
         Returns:
             outfname: output filename derived from the annotated GBIF DWC filename
@@ -306,7 +312,7 @@ class Aggregator():
     # ...............................................
     @classmethod
     def construct_location_summary_name(cls, datapath, state, county=None):
-        """Construct a filename for the summary file for a particular state and optional county.
+        """Construct a filename for the summary file for a state and optional county.
 
         Args:
             datapath (str): full directory path for computations and output.
@@ -343,7 +349,8 @@ class Aggregator():
         """Construct a filename for the summarized version of csvfile.
 
         Args:
-            csvfile (str): full filename used to construct an annotated filename for this data.
+            csvfile (str): full filename used to construct an annotated filename
+                for this data.
 
         Returns:
             outfname: output filename derived from the annotated GBIF DWC filename
@@ -359,7 +366,8 @@ class Aggregator():
         elif basename.startswith("county_"):
             _, state, county = basename.split("_")
         else:
-            raise Exception(f"Filename {csvfile} cannot be parsed into location elements")
+            raise Exception(
+                f"Filename {csvfile} cannot be parsed into location elements")
         return state, county
 
     # ...............................................
@@ -499,15 +507,15 @@ class Aggregator():
 
     # ...............................................
     def summarize_by_file(self, overwrite=True):
-        """Read an annotated file, summarize by species and location, write to a csvfile.
+        """Read an annotated file, summarize by species and location, write to csvfile.
 
         Args:
-            overwrite (bool): Flag indicating whether to overwrite or skip existing files.
+            overwrite (bool): Flag indicating whether to overwrite existing files.
 
         Returns:
             summary_filename: full output filename for CSV summary of annotated
                 occurrence file, with fields:
-                SPECIES_KEY, GBIF_TAXON_KEY, ASSESS_KEY, STATE_KEY, COUNTY_KEY, COUNT_KEY
+            SPECIES_KEY, GBIF_TAXON_KEY, ASSESS_KEY, STATE_KEY, COUNTY_KEY, COUNT_KEY
         """
         summary_filename = self.construct_summary_name(self._csvfile)
         # Summarize and write
@@ -521,7 +529,7 @@ class Aggregator():
     def _get_riis_species(self):
         riis_filename = os.path.join(DATA_PATH, RIIS.SPECIES_GEO_FNAME)
         nnsl = NNSL(riis_filename, logger=self._log)
-        nnsl.read_riis(read_resolved=True)
+        nnsl.read_riis()
         return nnsl
 
     # ...............................................
@@ -531,9 +539,12 @@ class Aggregator():
             # All these species are for the location of interest
             for species_key, count in species_counts.items():
                 try:
-                    gbif_taxon_key, scientific_name = self.parse_compound_key(species_key)
+                    gbif_taxon_key, scientific_name = self.parse_compound_key(
+                        species_key)
                 except ValueError:
-                    raise (f"Error in species_key {species_key}, should contain name and taxonKey")
+                    raise (
+                        f"Error in species_key {species_key}, should contain name "
+                        "and taxonKey")
 
                 try:
                     species_name = self._canonicals[species_key]
@@ -569,10 +580,12 @@ class Aggregator():
         """
         if county is None:
             location = state
-            summary_filename = self.construct_location_summary_name(self._datapath, state)
+            summary_filename = self.construct_location_summary_name(
+                self._datapath, state)
         else:
             location = self.construct_compound_key(state, county)
-            summary_filename = self.construct_location_summary_name(self._datapath, state, county=county)
+            summary_filename = self.construct_location_summary_name(
+                self._datapath, state, county=county)
 
         if state in ("AK", "HI"):
             region = state
@@ -607,7 +620,8 @@ class Aggregator():
         return summary_filename
 
     # ...............................................
-    def _summarize_region_by_riis(self, csvwriter, loc_summary_file, state, county=None):
+    def _summarize_region_by_riis(
+            self, csvwriter, loc_summary_file, state, county=None):
         # read [SPECIES_KEY, COUNT_KEY, ASSESS_KEY]
         assess = {"introduced": {}, "invasive": {}, "presumed_native": {}}
         try:
@@ -629,8 +643,8 @@ class Aggregator():
         finally:
             inf.close()
 
-        sp_counts = RIIS_Counts(is_group=True)
-        occ_counts = RIIS_Counts(is_group=False)
+        sp_counts = RIIS_Counts(self._log, is_group=True)
+        occ_counts = RIIS_Counts(self._log, is_group=False)
 
         # Count introduced/invasive
         for _species, count in assess["introduced"].items():
@@ -660,10 +674,14 @@ class Aggregator():
 
         csvwriter.writerow([
             state, county,
-            sp_counts.introduced, sp_counts.invasive, sp_counts.presumed_native, sp_counts.total,
-            sp_counts.percent_introduced_rnd, sp_counts.percent_invasive_rnd, sp_counts.percent_presumed_native_rnd,
-            occ_counts.introduced, occ_counts.invasive, occ_counts.presumed_native, occ_counts.total,
-            occ_counts.percent_introduced_rnd, occ_counts.percent_invasive_rnd, occ_counts.percent_presumed_native_rnd,
+            sp_counts.introduced, sp_counts.invasive, sp_counts.presumed_native,
+            sp_counts.total,
+            sp_counts.percent_introduced_rnd, sp_counts.percent_invasive_rnd,
+            sp_counts.percent_presumed_native_rnd,
+            occ_counts.introduced, occ_counts.invasive, occ_counts.presumed_native,
+            occ_counts.total,
+            occ_counts.percent_introduced_rnd, occ_counts.percent_invasive_rnd,
+            occ_counts.percent_presumed_native_rnd,
         ])
 
         return sp_counts, occ_counts
@@ -723,10 +741,10 @@ class Aggregator():
         except Exception as e:
             raise Exception(f"Unknown open/csv error on {assess_summary_filename}: {e}")
 
-        region_species_counts = RIIS_Counts(is_group=True)
-        region_occ_counts = RIIS_Counts(is_group=False)
-        sub_region_species_counts = RIIS_Counts(is_group=True)
-        sub_region_occ_counts = RIIS_Counts(is_group=False)
+        region_species_counts = RIIS_Counts(self._log, is_group=True)
+        region_occ_counts = RIIS_Counts(self._log, is_group=False)
+        sub_region_species_counts = RIIS_Counts(self._log, is_group=True)
+        sub_region_occ_counts = RIIS_Counts(self._log, is_group=False)
 
         try:
             # Summarize introduced/invasive/native in each location
@@ -777,7 +795,7 @@ def summarize_annotations(ann_filename, log_directory):
 
     datapath, basefname = os.path.split(ann_filename)
     refname = f"summarize_{basefname}"
-    logger = Logger(os.path.join(log_directory, f"{refname}.log"))
+    logger = Logger(refname, os.path.join(log_directory, f"{refname}.log"))
     logger.log(f"Submit {basefname} for summarizing.", refname=refname)
 
     logger.log(f"Start Time : {datetime.now()}", refname=refname)

@@ -1,6 +1,4 @@
 """Test the GBIF and ITIS taxonomic resolution provided in the US-RIIS table."""
-import os
-
 from bison.providers.riis_data import NNSL
 
 
@@ -8,15 +6,15 @@ class TestRIISTaxonomy(NNSL):
     """Class for testing input authority and species files."""
 
     # .............................................................................
-    def __init__(self, base_path, test_fname=None, logger=None):
+    def __init__(self, riis_fname, annotated_riis_fname, logger=None):
         """Constructor sets the authority and species files and headers expected for BISON-RIIS processing.
 
         Args:
-            base_path (str): base file path for project execution
-            test_fname (str): RIIS file with fewer records for testing
+            riis_fname (str): test input RIIS file with fewer records for testing
+            annotated_riis_fname (str): output file for annotated RIIS file
             logger (object): logger for writing messages to file and console
         """
-        NNSL.__init__(self, os.path.join(base_path, test_fname), logger=logger)
+        NNSL.__init__(self, riis_fname, annotated_riis_fname, logger=logger)
 
 #     # ...............................................
 #     def test_taxonomy_keys(self):
