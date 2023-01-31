@@ -1,13 +1,14 @@
 """Common file handling tools used in various BISON modules."""
 import csv
 import glob
+import logging
 import math
 from multiprocessing import cpu_count
 import os
 import subprocess
 import sys
 
-from bison.common.constants import BIG_DATA_PATH, ENCODING, EXTRA_CSV_FIELD, GBIF
+from bison.common.constants import ENCODING, EXTRA_CSV_FIELD, GBIF
 
 
 # ...............................................
@@ -371,7 +372,7 @@ def identify_chunks(big_csv_filename):
         stop = min((start + chunk_size - 1), rec_count)
         start_stop_pairs.append((start, stop))
 
-    return start_stop_pairs
+    return start_stop_pairs, rec_count, chunk_size
 
 
 # .............................................................................
@@ -438,11 +439,12 @@ def identify_chunk_files(big_csv_filename):
 
 
 # .............................................................................
-def chunk_files(big_csv_filename):
+def chunk_files(big_csv_filename, logger):
     """Split a large input csv file into multiple smaller input csv files.
 
     Args:
         big_csv_filename (str): Full path to the original large CSV file of records
+        logger (object): logger for writing messages to file and console
 
     Returns:
         chunk_filenames: a list of chunk filenames
@@ -454,9 +456,10 @@ def chunk_files(big_csv_filename):
     Note:
         Write chunk file records exactly as read, no corrections applied.
     """
+    refname = "chunk_files"
     in_base_filename, ext = os.path.splitext(big_csv_filename)
     chunk_filenames = []
-    boundary_pairs = identify_chunks(big_csv_filename)
+    boundary_pairs, rec_count, chunk_size = identify_chunks(big_csv_filename)
 
     try:
         bigf = open(big_csv_filename, 'r', newline="", encoding='utf-8')
@@ -478,8 +481,10 @@ def chunk_files(big_csv_filename):
                         chunkf.write(f"{line}")
                     except Exception as e:
                         # Log error and move on
-                        print(
-                            f"Failed on bigfile {big_csv_filename} line number {big_recno} writing to {chunk_fname}: {e}")
+                        logger.log(
+                            f"Failed on bigfile {big_csv_filename} line number "
+                            f"{big_recno} writing to {chunk_fname}: {e}",
+                            refname=refname, log_level=logging.ERROR)
                     # If bigfile still has lines, get next one
                     if line:
                         line = bigf.readline()
@@ -493,91 +498,47 @@ def chunk_files(big_csv_filename):
             finally:
                 # After got to stop, close and add filename to list
                 chunkf.close()
-                print(f"Wrote lines {start} to {stop} to {chunk_fname}")
+                logger.log(
+                    f"Wrote lines {start} to {stop} to {chunk_fname}", refname=refname)
                 chunk_filenames.append(chunk_fname)
 
     except Exception as e:
-        print(f"Failed to read bigfile {big_csv_filename}: {e}")
+        logger.log(
+            f"Failed to read bigfile {big_csv_filename}: {e}", refname=refname,
+            log_level=logging.ERROR)
         raise
     finally:
         bigf.close()
+    report = {
+        "large_filename": big_csv_filename,
+        "chunked_files": chunk_filenames,
+        "record_count": rec_count,
+        "chunk_size": chunk_size
+    }
 
-    return chunk_filenames
+    return chunk_filenames, report
 
 
 # .............................................................................
 if __name__ == "__main__":
-    import argparse
-
-    parser = argparse.ArgumentParser(description="Split")
-    parser.add_argument("cmd", type=str, default="split")
-    parser.add_argument(
-        "gbif_filename", type=str, default=GBIF.INPUT_DATA,
-        help='The full path to GBIF input species occurrence data.')
-    args = parser.parse_args()
-
-    # Args may be full path, or base filename in default path
-    gbif_filename = args.gbif_filename
-    if not os.path.exists(gbif_filename):
-        gbif_filename = os.path.join(BIG_DATA_PATH, gbif_filename)
-
-    if args.cmd != "split":
-        print("Only `split` is currently supported")
-    else:
-        boundary_pairs = identify_chunks(args.gbif_filename)
-        chunk_filenames = chunk_files(args.gbif_filename)
-        print(f"boundary_pairs = {boundary_pairs}")
-
-
-"""
-import csv
-import os
-import sys
-
-pattern = "/home/astewart/git/bison/data/gbif_2022-03-16_100k_chunk*annotated.csv"
-fname = "/home/astewart/git/bison/data/out/riis_summary.csv"
-
-line_count = None
-# Check good input file/s
-if filename_or_pattern.index("*") > 0 or filename_or_pattern.index("?") > 0:
-    files = glob.glob(filename_or_pattern)
-    if len(files) == 0:
-        raise FileNotFoundError(f"No files match the pattern {filename_or_pattern}")
-elif not os.path.exists(filename_or_pattern):
-    raise FileNotFoundError(f"File {filename_or_pattern} does not exist")
-
-# Assemble bash command
-if strlist is not None:
-    # start with grep command
-    st = strlist.pop(0)
-    cmd = f"grep {st} {filename_or_pattern} | "
-    # add additional grep commands
-    while len(strlist) > 0:
-        st = strlist.pop(0)
-        cmd += f"grep {st} | "
-    # count lines produced from greps
-    cmd += "wc -l"
-else:
-    # count all lines
-    cmd = f"wc -l {filename_or_pattern}"
-
-# Run command in a shell
-sp = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-sp_outs = sp.communicate()
-# Return has list of byte strings, which has line count and filename?
-for info in sp_outs:
-    try:
-        results = info.split(b' ')
-        tmp = results[0]
-        try:
-            line_count = int(tmp)
-            break
-        except ValueError:
-            pass
-    except Exception as e:
-        print(e)
-        pass
-if line_count is None:
-    raise Exception(f"Failed to get line count from {sp_outs}")
-return line_count
-"""
+    pass
+    # import argparse
+    #
+    # parser = argparse.ArgumentParser(description="Split")
+    # parser.add_argument("cmd", type=str, default="split")
+    # parser.add_argument(
+    #     "gbif_filename", type=str, default=GBIF.INPUT_DATA,
+    #     help='The full path to GBIF input species occurrence data.')
+    # args = parser.parse_args()
+    #
+    # # Args may be full path, or base filename in default path
+    # gbif_filename = args.gbif_filename
+    # if not os.path.exists(gbif_filename):
+    #     gbif_filename = os.path.join(BIG_DATA_PATH, gbif_filename)
+    #
+    # if args.cmd != "split":
+    #     print("Only `split` is currently supported")
+    # else:
+    #     boundary_pairs = identify_chunks(args.gbif_filename)
+    #     chunk_filenames = chunk_files(args.gbif_filename, logger)
+    #     print(f"boundary_pairs = {boundary_pairs}")

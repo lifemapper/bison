@@ -1,0 +1,5 @@
+{
+    "log_filename": "/volumes/bison/output/annotate_riis.log",
+    "report_filename": "/volumes/bison/output/annotate_riis.rpt",
+    "big_csv_filename": "/volumes/bison/big_data/gbif_2023-01-26.csv"
+}
