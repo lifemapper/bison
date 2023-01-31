@@ -582,6 +582,8 @@ class NNSL:
                         self.by_riis_id[rec.data[RIIS.SPECIES_GEO_KEY]] = rec
                         rec_count += 1
 
+                    # self._log.log(f"Updated {len(reclist)} records with {new_name}",
+                    #     refname=self.__class__.__name__)
                     if (name_count % LOG.INTERVAL) == 0:
                         self._log.log(
                             f"*** NNSL Name {name_count} ***",
