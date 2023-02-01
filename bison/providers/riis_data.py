@@ -4,7 +4,7 @@ import logging
 import os
 
 from bison.common.constants import (
-    ERR_SEPARATOR, GBIF, LINENO_FLD, LOG, NEW_GBIF_KEY_FLD, NEW_GBIF_SCINAME_FLD, RIIS)
+    ERR_SEPARATOR, GBIF, LINENO_FLD, NEW_GBIF_KEY_FLD, NEW_GBIF_SCINAME_FLD, RIIS)
 from bison.providers.gbif_api import GbifSvc
 from bison.common.util import get_csv_dict_reader, get_csv_dict_writer
 
@@ -454,7 +454,9 @@ class NNSL:
                 try:
                     status = alt["status"].lower()
                 except KeyError:
-                    print(f"Failed to get status from alternative {alt}")
+                    self._log.log(
+                        f"Failed to get status from alternative {alt}",
+                        refname=self.__class__.__name__, log_level=logging.WARNING)
                 else:
                     if status == "accepted":
                         key = alt["usageKey"]
@@ -470,19 +472,22 @@ class NNSL:
     def _get_accepted_name_key_from_match(self, gbifrec):
         name = None
         key = None
-        msg = None
         try:
             # Results from fuzzy match search (species/match?name=<name>)
             match_type = gbifrec[GBIF.MATCH_FLD]
         except KeyError:
-            print(f"Failed to get matchType from {gbifrec}")
+            self._log.log(
+                f"Failed to get matchType from {gbifrec}",
+                refname=self.__class__.__name__, log_level=logging.ERROR)
         else:
             if match_type != 'NONE':
                 try:
                     # Results from species/match?name=<name>
                     status = gbifrec["status"].lower()
                 except KeyError:
-                    print(f"Failed to get status from {gbifrec}")
+                    self._log.log(
+                        f"Failed to get status from {gbifrec}",
+                        refname=self.__class__.__name__, log_level=logging.ERROR)
                 else:
                     if status == "accepted":
                         key = gbifrec["usageKey"]
@@ -492,18 +497,19 @@ class NNSL:
                             key = gbifrec["acceptedUsageKey"]
                         except KeyError:
                             key, name = self._get_alternatives(gbifrec)
-        return key, name, msg
+        return key, name
 
     # ...............................................
     def _get_accepted_name_key_from_get(self, gbifrec):
         name = None
         key = None
-        msg = None
         try:
             # Results from species/<key>
             status = gbifrec[GBIF.STATUS_FLD].lower()
         except KeyError:
-            msg = f"Failed to get status from {gbifrec}"
+            self._log.log(
+                f"Failed to get status from {gbifrec}", refname=self.__class__.__name__,
+                log_level=logging.ERROR)
         else:
             if status == "accepted":
                 key = gbifrec["key"]
@@ -511,7 +517,7 @@ class NNSL:
             else:
                 key = gbifrec["acceptedKey"]
                 name = gbifrec["accepted"]
-        return key, name, msg
+        return key, name
 
     # ...............................................
     def _add_msg(self, msgdict, key, msg):
@@ -527,16 +533,16 @@ class NNSL:
         gbifrec = gbif_svc.query_by_name(sciname, kingdom=kingdom)
 
         # Interpret match results
-        new_key, new_name, msg = self._get_accepted_name_key_from_match(gbifrec)
+        new_key, new_name = self._get_accepted_name_key_from_match(gbifrec)
 
         if new_name is None:
             # Try again, query GBIF with the returned acceptedUsageKey (new_key)
             if new_key is not None and new_name is None:
                 gbifrec2 = gbif_svc.query_by_namekey(taxkey=new_key)
                 # Replace new key and name with results of 2nd query
-                new_key, new_name, msg = self._get_accepted_name_key_from_get(gbifrec2)
+                new_key, new_name = self._get_accepted_name_key_from_get(gbifrec2)
 
-        return new_key, new_name, msg
+        return new_key, new_name
 
     # ...............................................
     def resolve_riis_to_gbif_taxa(self, outfname, overwrite=True):
@@ -550,6 +556,9 @@ class NNSL:
         Returns:
             name_count (int): count of updated records
             rec_count (int): count of resolved species
+
+        Raises:
+            Exception: on unknown error in resolution
         """
         msgdict = {}
 
@@ -562,19 +571,23 @@ class NNSL:
         try:
             for name, reclist in self.by_taxon.items():
                 # Resolve each name, update each record (1-3) for that name
+                # Try to match, if match is not 'accepted', repeat with returned
+                # accepted keys
+                data = reclist[0].data
                 try:
-                    # Try to match, if match is not 'accepted', repeat with returned
-                    # accepted keys
-                    data = reclist[0].data
-                    new_key, new_name, msg = self._find_current_accepted_taxon(
+                    new_key, new_name = self._find_current_accepted_taxon(
                         gbif_svc, data[RIIS.SCINAME_FLD],
                         data[RIIS.KINGDOM_FLD],
                         data[RIIS.GBIF_KEY])
-                    self._add_msg(msgdict, name, msg)
+                except Exception as e:
+                    err = f"Failed to get GBIF accepted taxon for" \
+                          f" {data[RIIS.SCINAME_FLD]}, {e}"
+                    self._add_msg(msgdict, name, err)
+                    self._log.log(
+                        err, refname=self.__class__.__name__, log_level=logging.ERROR)
+                else:
                     name_count += 1
-
-                    # Supplement all records for this name with GBIF accepted key
-                    # and sciname, then write
+                    # Annotate all records for this name with GBIF accepted key/sciname
                     for rec in reclist:
                         # Update record in dictionary nnsl_by_species with name keys
                         rec.update_data(new_key, new_name)
@@ -584,17 +597,14 @@ class NNSL:
 
                     # self._log.log(f"Updated {len(reclist)} records with {new_name}",
                     #     refname=self.__class__.__name__)
-                    if (name_count % LOG.INTERVAL) == 0:
+                    if (name_count % 1000) == 0:
                         self._log.log(
                             f"*** NNSL Name {name_count} ***",
                             refname=self.__class__.__name__)
 
-                except Exception as e:
-                    self._add_msg(msgdict, name, f"Failed to read records in dict, {e}")
         except Exception as e:
             self._add_msg(msgdict, "unknown_error", f"{e}")
-
-        self.write_resolved_riis(outfname, overwrite=overwrite)
+            raise
 
         return name_count, rec_count
 
@@ -607,7 +617,10 @@ class NNSL:
             overwrite (bool): True to delete an existing updated RIIS file.
 
         Raises:
+            Exception: on attempt to write unresolved records.
             Exception: on failure to get csv writer.
+            Exception: on unknown record-write error.
+            Exception: on unknown dictionary-read error.
 
         Returns:
             count of successfully written records
@@ -642,11 +655,15 @@ class NNSL:
                     writer.writerow(rec.data)
                     rec_count += 1
                 except Exception as e:
-                    print(f"Failed to write {rec.data}, {e}")
-                    self._add_msg(msgdict, name, f"Failed to write {rec.data} ({e})")
+                    msg = f"Failed to write {rec.data}, {e}"
+                    self._log.log(
+                        msg, refname=self.__class__.__name__, log_level=logging.ERROR)
+                    self._add_msg(msgdict, name, msg)
+                    raise
 
         except Exception as e:
             self._add_msg(msgdict, "unknown_error", f"{e}")
+            raise
         finally:
             outf.close()
 
@@ -715,29 +732,36 @@ class NNSL:
 
 
 # .............................................................................
-def resolve_riis_taxa(riis_filename, annotated_riis_filename, logger):
+def resolve_riis_taxa(riis_filename, annotated_riis_filename, logger, overwrite=True):
     """Resolve and write GBIF accepted names and taxonKeys in RIIS records.
 
     Args:
         riis_filename (str): full filename for original RIIS data records.
         annotated_riis_filename (str): full filename for output RIIS data records.
         logger (object): logger for saving relevant processing messages
+        overwrite (bool): True to delete an existing updated RIIS file.
 
     Returns:
-        dictionary report of metadata/
+        dictionary report of metadata
+
+    Raises:
+        Exception: on error in NNSL.resolve_riis_to_gbif_taxa
     """
     refname = "resolve_riis_taxa"
     report = {
         refname: {
             "riis_filename": riis_filename,
-            "annotated_riis_filename": annotated_riis_filename
+            "annotated_riis_filename": annotated_riis_filename,
+            "expected_count": RIIS.SPECIES_GEO_DATA_COUNT
         }
     }
     nnsl = NNSL(riis_filename, annotated_riis_filename, logger=logger)
     # Update species data
     try:
-        nnsl.resolve_riis_to_gbif_taxa(annotated_riis_filename, overwrite=True)
-        report[refname]["riis_count"] = len(nnsl.by_riis_id)
+        name_count, rec_count = nnsl.resolve_riis_to_gbif_taxa(
+            annotated_riis_filename, overwrite=True)
+        report[refname]["riis_record_count"] = rec_count
+        report[refname]["unique_name_count"] = rec_count
         logger.log(
             f"Resolved {len(nnsl.by_riis_id)} taxa in {riis_filename}, next, write.",
             refname=refname)
@@ -746,24 +770,36 @@ def resolve_riis_taxa(riis_filename, annotated_riis_filename, logger):
         logger.log(
             f"Unexpected failure {e} in resolve_riis_taxa", refname=refname,
             log_level=logging.ERROR)
+        raise
 
+    # Debug statements for inconsistent counts
+    if len(nnsl.by_riis_id) != rec_count:
+        logger.log(
+            f"Records in NNSL {len(nnsl.by_riis_id)} != {rec_count} records read "
+            f"from {riis_filename} by NNSL", refname=refname, log_level=logging.DEBUG)
+    if len(nnsl.by_taxon) != name_count:
+        logger.log(
+            f"Taxa in NNSL {len(nnsl.by_taxon)} != {rec_count} names resolved "
+            f"from {riis_filename} by NNSL", refname=refname, log_level=logging.DEBUG)
+
+    # Write, always replace
+    try:
+        count = nnsl.write_resolved_riis(annotated_riis_filename, overwrite=overwrite)
+        report[refname]["annotated_count"] = count
+        logger.log(
+            f"Wrote {count} records to {annotated_riis_filename}.", refname=refname)
+    except Exception as e:
+        report[refname]["error"] = f"Failed to write {refname}: {e}"
+        logger.log(
+            f"Unexpected failure {e} in resolve_riis_taxa", refname=refname,
+            log_level=logging.ERROR)
     else:
-        try:
-            count = nnsl.write_resolved_riis(annotated_riis_filename, overwrite=True)
-            report[refname]["annotated_count"] = count
-            logger.log(f"Wrote {count} records to {annotated_riis_filename}.")
-        except Exception as e:
-            report[refname]["error"] = f"Failed to write {refname}: {e}"
+        if count != RIIS.SPECIES_GEO_DATA_COUNT:
             logger.log(
-                f"Unexpected failure {e} in resolve_riis_taxa", refname=refname,
+                f"Resolved {count} RIIS records, expecting " +
+                f"{RIIS.SPECIES_GEO_DATA_COUNT}", refname=refname,
                 log_level=logging.ERROR)
-        else:
-            if count != RIIS.SPECIES_GEO_DATA_COUNT:
-                report[refname]["error"] = f"Expected {count}, resolved {count} in {refname}"
-                logger.log(
-                    f"Resolved {count} RIIS records, expecting " +
-                    f"{RIIS.SPECIES_GEO_DATA_COUNT}", refname=refname,
-                    log_level=logging.ERROR)
+
     return report
 
 

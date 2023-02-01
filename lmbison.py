@@ -25,7 +25,7 @@ def split_files(gbif_filename, logger):
     Returns:
         chunk_filenames (list): full filenames for subset files.
     """
-    chunk_filenames = chunk_files(gbif_filename)
+    chunk_filenames = chunk_files(gbif_filename, logger)
     logger.info(f"{len(chunk_filenames)} chunk files created.")
     return chunk_filenames
 

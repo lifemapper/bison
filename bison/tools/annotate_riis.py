@@ -57,7 +57,8 @@ def cli():
         log_filename=args.log_filename
     )
 
-    report = resolve_riis_taxa(args.riis_filename, args.annotated_riis_filename, logger)
+    report = resolve_riis_taxa(
+        args.riis_filename, args.annotated_riis_filename, logger, overwrite=True)
 
     # If the output report was requested, write it
     if args.report_filename:
