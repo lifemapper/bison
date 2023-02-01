@@ -4,20 +4,20 @@ import os
 
 from bison.common.log import Logger
 from bison.common.util import chunk_files
-from bison.tools._config_parser import build_parser, process_arguments
+from bison.tools._config_parser import (
+    build_parser, process_arguments_from_file, IS_FILE_PARAM, HELP_PARAM)
 
-COMMAND = "annotate_riis"
 DESCRIPTION = """\
 Split a CSV file containing GBIF DwC occurrence records into smaller files. """
 # Options to be placed in a configuration file for the command
-ARGUMENTS = {
+PARAMETERS = {
     "required":
         {
             "big_csv_filename":
                 {
                     "type": str,
-                    "test_file_existence": True,
-                    "help": "Large CSV file to split into manageable chunks"
+                    IS_FILE_PARAM: True,
+                    HELP_PARAM: "Large CSV file to split into manageable chunks"
                 }
         },
     "optional":
@@ -25,11 +25,11 @@ ARGUMENTS = {
             "log_filename":
                 {
                     "type": str,
-                    "help": "Filename to write logging data."},
+                    HELP_PARAM: "Filename to write logging data."},
             "report_filename":
                 {
                     "type": str,
-                    "help": "Filename to write summary metadata."}
+                    HELP_PARAM: "Filename to write summary metadata."}
 
         }
 }
@@ -43,13 +43,10 @@ def cli():
         OSError: on failure to write to report_filename.
         IOError: on failure to write to report_filename.
     """
-    parser = build_parser(COMMAND, DESCRIPTION)
-    args = process_arguments(parser, config_arg='config_file')
     script_name = os.path.splitext(os.path.basename(__file__))[0]
-    logger = Logger(
-        script_name,
-        log_filename=args.log_filename
-    )
+    parser = build_parser(script_name, DESCRIPTION)
+    args = process_arguments_from_file(parser, PARAMETERS)
+    logger = Logger(script_name, log_filename=args.log_filename)
 
     _, report = chunk_files(args.big_csv_filename, logger)
 

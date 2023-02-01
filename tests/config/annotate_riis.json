@@ -1,6 +1,10 @@
 {
-    "log_filename": "/volumes/bison/output/annotate_riis.log",
-    "report_filename": "/volumes/bison/output/annotate_riis.rpt",
-    "riis_filename": "/volumes/bison/input/US-RIIS_MasterList.csv",
-    "annotated_riis_filename": "/volumes/bison/output/US-RIIS_MasterList_annotated.csv"
+    "# comment1": "Test configuration using very small data",
+    "# comment2": "Input, output, and config are located under the `tests` directory",
+    "# comment3": "Intended for tests run outside of the Docker environment",
+
+    "log_filename": "../output/annotate_riis.log",
+    "report_filename": "../output/annotate_riis.rpt",
+    "riis_filename": "../data/US-RIIS_MasterList_100.csv",
+    "annotated_riis_filename": "../output/US-RIIS_MasterList_100_annotated.csv"
 }

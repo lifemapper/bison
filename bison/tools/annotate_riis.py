@@ -4,14 +4,13 @@ import os
 
 from bison.common.log import Logger
 from bison.providers.riis_data import resolve_riis_taxa
-from bison.tools._config_parser import build_parser, process_arguments
+from bison.tools._config_parser import build_parser, process_arguments_from_file
 
-COMMAND = "annotate_riis"
 DESCRIPTION = """\
 Annotate a CSV file containing the USGS Registry for Introduced and Invasive
 Species (RIIS) with accepted names from GBIF. """
 # Options to be placed in a configuration file for the command
-ARGUMENTS = {
+PARAMETERS = {
     "required":
         {
             "riis_filename":
@@ -49,13 +48,10 @@ def cli():
         OSError: on failure to write to report_filename.
         IOError: on failure to write to report_filename.
     """
-    parser = build_parser(COMMAND, DESCRIPTION)
-    args = process_arguments(parser, config_arg='config_file')
     script_name = os.path.splitext(os.path.basename(__file__))[0]
-    logger = Logger(
-        script_name,
-        log_filename=args.log_filename
-    )
+    parser = build_parser(script_name, DESCRIPTION)
+    args = process_arguments_from_file(parser, PARAMETERS)
+    logger = Logger(script_name, log_filename=args.log_filename)
 
     report = resolve_riis_taxa(
         args.riis_filename, args.annotated_riis_filename, logger, overwrite=True)
