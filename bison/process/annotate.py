@@ -1,18 +1,19 @@
 """Common classes for adding USGS RIIS info to GBIF occurrences."""
 import logging
+import os
 from datetime import datetime
 from multiprocessing import Pool, cpu_count
-import os
 
-from bison.common.constants import (
-    DATA_PATH, ENCODING, GBIF, LOG, NEW_RESOLVED_COUNTY, NEW_RESOLVED_STATE,
-    NEW_RIIS_ASSESSMENT_FLD, NEW_RIIS_KEY_FLD, POINT_BUFFER_RANGE, RIIS,
-    US_CENSUS_COUNTY, US_STATES)
+from bison.common.constants import (DATA_PATH, ENCODING, GBIF, LOG,
+                                    NEW_RESOLVED_COUNTY, NEW_RESOLVED_STATE,
+                                    NEW_RIIS_ASSESSMENT_FLD, NEW_RIIS_KEY_FLD,
+                                    POINT_BUFFER_RANGE, RIIS, US_CENSUS_COUNTY,
+                                    US_STATES)
 from bison.common.log import Logger
+from bison.common.util import get_csv_dict_writer
+from bison.process.geoindex import GeoException, GeoResolver
 from bison.providers.gbif_data import DwcData
 from bison.providers.riis_data import NNSL
-from bison.process.geoindex import GeoResolver, GeoException
-from bison.common.util import get_csv_dict_writer
 
 
 # .............................................................................

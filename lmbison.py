@@ -2,16 +2,17 @@
 import csv
 import os
 
-from bison.common.constants import (
-    GBIF, DATA_PATH, ENCODING, EXTRA_CSV_FIELD, LOG, NEW_RESOLVED_COUNTY,
-    NEW_RESOLVED_STATE, POINT_BUFFER_RANGE, US_CENSUS_COUNTY)
+from bison.common.constants import (DATA_PATH, ENCODING, EXTRA_CSV_FIELD, GBIF,
+                                    LOG, NEW_RESOLVED_COUNTY,
+                                    NEW_RESOLVED_STATE, POINT_BUFFER_RANGE,
+                                    US_CENSUS_COUNTY)
 from bison.common.log import log_output
-from bison.common.util import chunk_files, delete_file, get_csv_dict_reader, identify_chunk_files
-
-from bison.process.aggregate import (Aggregator)
-from bison.process.annotate import (
-    Annotator, annotate_occurrence_file, parallel_annotate)
-from bison.process.geoindex import GeoResolver, GeoException
+from bison.common.util import (chunk_files, delete_file, get_csv_dict_reader,
+                               identify_chunk_files)
+from bison.process.aggregate import Aggregator
+from bison.process.annotate import (Annotator, annotate_occurrence_file,
+                                    parallel_annotate)
+from bison.process.geoindex import GeoException, GeoResolver
 
 
 # .............................................................................

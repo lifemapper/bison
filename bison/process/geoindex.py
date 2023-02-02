@@ -1,8 +1,9 @@
 """Class for a spatial index and tools for intersecting with a point and extracting attributes."""
 import os
+import time
+
 import ogr
 import rtree
-import time
 
 
 # .............................................................................

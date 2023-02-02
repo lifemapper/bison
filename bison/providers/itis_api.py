@@ -1,6 +1,7 @@
 """Module to query GBIF APIs and return data."""
-import requests
 import xml.etree.ElementTree as ET
+
+import requests
 
 from bison.common.constants import ITIS
 from bison.providers.api import APISvc

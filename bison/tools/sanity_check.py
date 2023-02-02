@@ -2,15 +2,17 @@
 import glob
 import os
 
-from bison.process.aggregate import Aggregator, RIIS_Counts
-from bison.providers.gbif_data import DwcData
-from bison.common.constants import (
-    ASSESS_VALUES, BIG_DATA_PATH, GBIF, NEW_RESOLVED_COUNTY, LOG,
-    INTRODUCED_OCCS, INTRODUCED_SPECIES, INVASIVE_OCCS, INVASIVE_SPECIES,
-    NATIVE_OCCS, NATIVE_SPECIES, NEW_RESOLVED_STATE, NEW_RIIS_ASSESSMENT_FLD,
-    STATE_KEY, COUNTY_KEY, ASSESS_KEY, COUNT_KEY)
+from bison.common.constants import (ASSESS_KEY, ASSESS_VALUES, BIG_DATA_PATH,
+                                    COUNT_KEY, COUNTY_KEY, GBIF,
+                                    INTRODUCED_OCCS, INTRODUCED_SPECIES,
+                                    INVASIVE_OCCS, INVASIVE_SPECIES, LOG,
+                                    NATIVE_OCCS, NATIVE_SPECIES,
+                                    NEW_RESOLVED_COUNTY, NEW_RESOLVED_STATE,
+                                    NEW_RIIS_ASSESSMENT_FLD, STATE_KEY)
 from bison.common.log import Logger
 from bison.common.util import get_csv_dict_reader
+from bison.process.aggregate import Aggregator, RIIS_Counts
+from bison.providers.gbif_data import DwcData
 
 
 # .............................................................................

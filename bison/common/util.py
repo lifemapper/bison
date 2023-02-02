@@ -3,10 +3,10 @@ import csv
 import glob
 import logging
 import math
-from multiprocessing import cpu_count
 import os
 import subprocess
 import sys
+from multiprocessing import cpu_count
 
 from bison.common.constants import ENCODING, EXTRA_CSV_FIELD, GBIF
 

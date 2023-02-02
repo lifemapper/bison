@@ -3,13 +3,15 @@ import argparse
 import json
 import os
 
+from bison.common.log import Logger
+
 CONFIG_FILE_PARAMETER = "config_file"
 IS_FILE_PARAM = "is_file"
 HELP_PARAM = "help"
 
 
 # .....................................................................................
-def build_parser(command, description):
+def _build_parser(command, description):
     """Build an argparse.ArgumentParser object for the tool.
 
     Args:
@@ -21,67 +23,29 @@ def build_parser(command, description):
     """
     parser = argparse.ArgumentParser(prog=command, description=description)
     parser.add_argument(
-        CONFIG_FILE_PARAMETER, type=str, help="Path to configuration file.")
+        f"--{CONFIG_FILE_PARAMETER}", type=str, help='Path to configuration file.')
     return parser
 
 
 # .....................................................................................
-def process_arguments_from_file(parser, parameters):
-    """Process arguments provided by configuration file.
+def _get_config_file_argument(parser):
+    """Retrieve the configuration file argument passed through a ArgumentParser.
 
     Args:
         parser (argparse.ArgumentParser): An argparse.ArgumentParser with parameters.
-        parameters (dict): Dictionary of optional and required arguments with expected
-            value, and help string.
 
     Returns:
-        argparse.Namespace: An augmented Namespace with any parameters specified in a
-            configuration file.
-
-    Raises:
-        FileNotFoundError: on non-existent config_file.
-        json.decoder.JSONDecodeError: on badly constructed JSON file
-        Exception: on missing configuration file argument.
-        Exception: on missing required parameter in configuration file.
+        config_filename: the configuration file argument passed through the command line
     """
+    config_filename = None
     args = parser.parse_args()
-
-    # Retrieve arguments from configuration file
     if hasattr(args, CONFIG_FILE_PARAMETER):
         config_filename = getattr(args, CONFIG_FILE_PARAMETER)
-        if config_filename is not None:
-            try:
-                with open(config_filename, mode='rt') as in_json:
-                    config = json.load(in_json)
-                    for k in config.keys():
-                        # Always replace existing values
-                        setattr(args, k, config[k])
-            except FileNotFoundError:
-                raise
-            except json.decoder.JSONDecodeError:
-                raise
-    else:
-        raise Exception("Failed to provide configuration file argument")
-
-    # Test that required arguments are present in configuration file
-    try:
-        req_args = parameters["required"]
-    except Exception:
-        req_args = {}
-    for key, _argdict in req_args.items():
-        try:
-            val = getattr(args, key)
-        except Exception:
-            raise Exception(f"Missing required argument {key} in {config_filename}")
-        else:
-            # Raises an exception if the value is a filename, but does not exist
-            test_if_file(val, parameters)
-
-    return args
+    return config_filename
 
 
 # .....................................................................................
-def test_if_file(val, parameters):
+def _test_if_file(val, parameters):
     """If the value is a file, test for its existence.
 
     Args:
@@ -105,17 +69,72 @@ def test_if_file(val, parameters):
 
 
 # .....................................................................................
-def test_files(*filename_filefunction):
-    """Get a logger object (or None) for the provided parameters.
+def process_arguments_from_file(config_filename, parameters):
+    """Process arguments provided by configuration file.
 
     Args:
-        filename_filefunction (str): One or more filename/filefunction tuples
+        config_filename (str): Full filename of a JSON file with parameters and values.
+        parameters (dict): Dictionary of optional and required arguments with expected
+            value, and help string.
 
     Returns:
-        A message indicating missing files.  If all exist, the message is empty string.
+        argparse.Namespace: An augmented Namespace with any parameters specified in a
+            configuration file.
+
+    Raises:
+        FileNotFoundError: on non-existent config_file.
+        json.decoder.JSONDecodeError: on badly constructed JSON file
+        Exception: on missing configuration file argument.
+        Exception: on missing required parameter in configuration file.
     """
-    err_msgs = []
-    for filename, filefunction in filename_filefunction:
-        if not os.path.exists(filename):
-            err_msgs.append(f"File {filename}, {filefunction}, does not exist.")
-    return err_msgs
+    # Retrieve arguments from configuration file
+    if config_filename is not None:
+        try:
+            with open(config_filename, mode='rt') as in_json:
+                config = json.load(in_json)
+        except FileNotFoundError:
+            raise
+        except json.decoder.JSONDecodeError:
+            raise
+
+    # Test that required arguments are present in configuration file
+    try:
+        req_args = parameters["required"]
+    except Exception:
+        req_args = {}
+    for key, _argdict in req_args.items():
+        try:
+            val = config[key]
+        except Exception:
+            raise Exception(f"Missing required argument {key} in {config_filename}")
+        else:
+            # Raises an exception if the value is a filename, but does not exist
+            _test_if_file(val, parameters)
+
+    return config
+
+
+# .....................................................................................
+def get_common_arguments(script_name, description, parameters):
+    script_name = os.path.splitext(os.path.basename(__file__))[0]
+    parser = _build_parser(script_name, description)
+    config_filename = _get_config_file_argument(parser)
+    config = process_arguments_from_file(config_filename, parameters)
+
+    try:
+        log_filename = config["log_filename"]
+        logger = Logger(script_name, log_filename=config["log_filename"])
+    except KeyError:
+        logger = None
+
+    # If the output report was requested, write it
+    try:
+        report_filename = config["report_filename"]
+    except KeyError:
+        report_filename = None
+
+    return config, logger, report_filename
+
+
+# .....................................................................................
+__all__ = ["get_common_arguments", "process_arguments_from_file"]

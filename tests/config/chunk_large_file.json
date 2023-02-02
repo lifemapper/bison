@@ -1,9 +1,0 @@
-{
-    "# comment1": "Test configuration using very small data",
-    "# comment2": "Input, output, and config are located under the `tests` directory",
-    "# comment3": "Intended for tests run outside of the Docker environment",
-
-    "log_filename": "/volumes/bison/output/annotate_riis.log",
-    "report_filename": "/volumes/bison/output/annotate_riis.rpt",
-    "big_csv_filename": "/volumes/bison/input/gbif_2023-01-26_10k.csv"
-}

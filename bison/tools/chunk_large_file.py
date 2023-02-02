@@ -4,8 +4,9 @@ import os
 
 from bison.common.log import Logger
 from bison.common.util import chunk_files
-from bison.tools._config_parser import (
-    build_parser, process_arguments_from_file, IS_FILE_PARAM, HELP_PARAM)
+from bison.tools._config_parser import (HELP_PARAM, IS_FILE_PARAM,
+                                        build_parser,
+                                        process_arguments_from_file)
 
 DESCRIPTION = """\
 Split a CSV file containing GBIF DwC occurrence records into smaller files. """

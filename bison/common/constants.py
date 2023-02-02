@@ -332,7 +332,7 @@ class RIIS:
     # Authority References Metadata.
     AUTHORITY_FNAME = "US-RIIS_AuthorityReferences"
     AUTHORITY_KEY = "Authority"
-    DATA_COUNT = 5951
+    AUTHORITY_DATA_COUNT = 5951
     AUTHORITY_HEADER = [
         "Authority",
         "associatedReferences",

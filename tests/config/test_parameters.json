@@ -1,0 +1,27 @@
+{
+  "_comment1": "Test configuration using very small data",
+  "_comment2": "Input, output, and config are mostly located under the `tests` directory",
+  "_comment3": "Some inputs are located under the main repository data directory",
+  "_comment4": "Intended for tests run outside of the Docker environment",
+  "_comment5": "Each top level key indicates the basename of a test file, with a dictionary value containing parmeters",
+  "_comment6": "Keys starting with `# comment` are comments, keys starting with `_test_` are unique for tests",.
+
+  "test_config_parser":
+  {
+    "log_filename": "../../tests/output/annotate_riis.log",
+    "report_filename": "../../tests/output/annotate_riis.rpt",
+    "big_csv_filename": "../../tests/data/gbif_2023-01-26_10k.csv"
+  },
+  "test_annotate_riis":
+  {
+    "log_filename": "../../tests/output/annotate_riis.log",
+    "report_filename": "../../tests/output/annotate_riis.rpt",
+    "_test_small_riis_filename": "../../tests/data/US-RIIS_MasterList_100.csv",
+    "_test_small_riis_record_count": 100,
+    "_test_small_name_count": 40,
+    "riis_filename": "../../data/input/US-RIIS_MasterList.csv",
+    "_test_riis_record_count": 15264,
+    "_test_name_count": 40,
+    "annotated_riis_filename": "../../tests/output/US-RIIS_MasterList_100_annotated.csv"
+  }
+}

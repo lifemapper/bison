@@ -3,10 +3,11 @@ import csv
 import logging
 import os
 
-from bison.common.constants import (
-    ERR_SEPARATOR, GBIF, LINENO_FLD, NEW_GBIF_KEY_FLD, NEW_GBIF_SCINAME_FLD, RIIS)
-from bison.providers.gbif_api import GbifSvc
+from bison.common.constants import (ERR_SEPARATOR, GBIF, LINENO_FLD,
+                                    NEW_GBIF_KEY_FLD, NEW_GBIF_SCINAME_FLD,
+                                    RIIS)
 from bison.common.util import get_csv_dict_reader, get_csv_dict_writer
+from bison.providers.gbif_api import GbifSvc
 
 
 # .............................................................................
@@ -761,7 +762,7 @@ def resolve_riis_taxa(riis_filename, annotated_riis_filename, logger, overwrite=
         name_count, rec_count = nnsl.resolve_riis_to_gbif_taxa(
             annotated_riis_filename, overwrite=True)
         report[refname]["riis_record_count"] = rec_count
-        report[refname]["unique_name_count"] = rec_count
+        report[refname]["unique_name_count"] = name_count
         logger.log(
             f"Resolved {len(nnsl.by_riis_id)} taxa in {riis_filename}, next, write.",
             refname=refname)

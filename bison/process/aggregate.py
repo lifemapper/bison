@@ -1,16 +1,18 @@
 """Common classes for adding USGS RIIS info to GBIF occurrences."""
 import csv
+import os
 from datetime import datetime
 from multiprocessing import Pool, cpu_count
-import os
 
-from bison.common.constants import (
-    AGGREGATOR_DELIMITER, ASSESS_KEY, COUNT_KEY, DATA_PATH, ENCODING, EXTRA_CSV_FIELD,
-    GBIF, LMBISON_HEADER, LOCATION_KEY, NEW_RESOLVED_COUNTY, NEW_RESOLVED_STATE,
-    OUT_DIR, RIIS, SPECIES_NAME_KEY, SPECIES_KEY, US_STATES)
+from bison.common.constants import (AGGREGATOR_DELIMITER, ASSESS_KEY,
+                                    COUNT_KEY, DATA_PATH, ENCODING,
+                                    EXTRA_CSV_FIELD, GBIF, LMBISON_HEADER,
+                                    LOCATION_KEY, NEW_RESOLVED_COUNTY,
+                                    NEW_RESOLVED_STATE, OUT_DIR, RIIS,
+                                    SPECIES_KEY, SPECIES_NAME_KEY, US_STATES)
 from bison.common.log import Logger
-from bison.common.util import (get_csv_writer, get_csv_dict_reader, ready_filename)
-
+from bison.common.util import (get_csv_dict_reader, get_csv_writer,
+                               ready_filename)
 from bison.providers.riis_data import NNSL
 
 
