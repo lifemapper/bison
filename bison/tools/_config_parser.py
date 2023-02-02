@@ -68,7 +68,7 @@ def process_arguments_from_file(parser, parameters):
         req_args = parameters["required"]
     except Exception:
         req_args = {}
-    for key, argdict in req_args.items():
+    for key, _argdict in req_args.items():
         try:
             val = getattr(args, key)
         except Exception:
@@ -91,7 +91,6 @@ def test_if_file(val, parameters):
     Raises:
         Exception: on value is a file, and does not exist
     """
-    errmsg = None
     try:
         is_file = parameters[IS_FILE_PARAM]
     except Exception:

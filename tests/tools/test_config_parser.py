@@ -1,13 +1,14 @@
 """Tests for the helper tool and dependent objects."""
-import pytest
 import os
 
-from bison.tools.annotate_riis import (
-    PARAMETERS as annotate_riis_params, DESCRIPTION as annotate_riis_desc)
-from bison.tools._config_parser import (
-    build_parser, process_arguments_from_file)
-from bison.tools.chunk_large_file import (
-    PARAMETERS as chunk_large_file_params, DESCRIPTION as chunk_large_file_desc)
+import pytest
+
+from bison.tools._config_parser import (build_parser,
+                                        process_arguments_from_file)
+from bison.tools.annotate_riis import DESCRIPTION as annotate_riis_desc
+from bison.tools.annotate_riis import PARAMETERS as annotate_riis_params
+from bison.tools.chunk_large_file import DESCRIPTION as chunk_large_file_desc
+from bison.tools.chunk_large_file import PARAMETERS as chunk_large_file_params
 
 # Also tests functions of bison.providers.riis_data.NNSL and RIISRec
 command_meta = [
@@ -25,7 +26,7 @@ class Test_config_parser:
         for _params, desc, config in command_meta:
             name = os.path.splitext(os.path.basename(config))[0]
             try:
-                parser = build_parser(name, desc)
+                build_parser(name, desc)
             except Exception as e:
                 pytest.fail(f"build_parser failed with {e}")
 
@@ -36,6 +37,6 @@ class Test_config_parser:
             name = os.path.splitext(os.path.basename(config))[0]
             parser = build_parser(name, desc)
             try:
-                args = process_arguments_from_file(parser, params)
+                process_arguments_from_file(parser, params)
             except Exception as e:
                 pytest.fail(f"process_arguments_from_file failed with {e}")
