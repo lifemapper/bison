@@ -16,11 +16,16 @@ PARAMETERS = {
                 {
                     TYPE_PARAM: str,
                     IS_FILE_PARAM: True,
-                    HELP_PARAM: "Large CSV file to split into manageable chunks"
+                    HELP_PARAM: "Large CSV file to split into manageable chunks."
                 }
         },
     "optional":
         {
+            "number_of_chunks":
+                {
+                    TYPE_PARAM: int,
+                    HELP_PARAM: "Number of subset files to create from this large file."
+                },
             "log_filename":
                 {
                     TYPE_PARAM: str,
