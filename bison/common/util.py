@@ -336,7 +336,7 @@ def count_lines(filename_or_pattern, grep_strings=None):
 
 
 # .............................................................................
-def identify_chunks(big_csv_filename):
+def identify_chunks(big_csv_filename, chunk_count=0):
     """Determine the start and stop lines in a large file that will make up the contents of smaller subsets of the file.
 
     The purpose of chunking the files is to split the large file into more manageable chunks that can be processed
@@ -344,12 +344,15 @@ def identify_chunks(big_csv_filename):
 
     Args:
         big_csv_filename (str): Full path to the original large CSV file of records
+        chunk_count (int): Number of smaller files to split large file into.  Defaults
+            to the number of available CPUs minus 2.
 
     Returns:
         start_stop_pairs: a list of tuples, containing pairs of line numbers in the original file that will be the first
             and last record of a subset chunk of the file.
     """
-    cpus2use = cpu_count() - 2
+    if chunk_count == 0:
+        chunk_count = cpu_count() - 2
     start_stop_pairs = []
 
     # in_base_filename, ext = os.path.splitext(big_csv_filename)
@@ -358,7 +361,7 @@ def identify_chunks(big_csv_filename):
         rec_count = GBIF.INPUT_RECORD_COUNT
     else:
         rec_count = count_lines(big_csv_filename) - 1
-    chunk_size = math.ceil(rec_count / cpus2use)
+    chunk_size = math.ceil(rec_count / chunk_count)
 
     start = 1
     stop = chunk_size
@@ -420,18 +423,21 @@ def parse_chunk_filename(chunk_filename):
 
 
 # .............................................................................
-def identify_chunk_files(big_csv_filename):
+def identify_chunk_files(big_csv_filename, chunk_count=0):
     """Construct filenames for smaller files subset from a large file.
 
     Args:
         big_csv_filename (str): Full path to the original large CSV file of records
+        chunk_count (int): Number of smaller files to split large file into.  Defaults
+            to the number of available CPUs minus 2.
 
     Returns:
         chunk_filenames: a list of chunk filenames
     """
     chunk_filenames = []
     in_base_filename, ext = os.path.splitext(big_csv_filename)
-    boundary_pairs = identify_chunks(big_csv_filename)
+    boundary_pairs, _rec_count, _chunk_size = identify_chunks(
+        big_csv_filename, chunk_count=chunk_count)
     for (start, stop) in boundary_pairs:
         chunk_fname = get_chunk_filename(in_base_filename, start, stop, ext)
         chunk_filenames.append(chunk_fname)
@@ -439,12 +445,14 @@ def identify_chunk_files(big_csv_filename):
 
 
 # .............................................................................
-def chunk_files(big_csv_filename, logger):
+def chunk_files(big_csv_filename, logger, chunk_count=0):
     """Split a large input csv file into multiple smaller input csv files.
 
     Args:
         big_csv_filename (str): Full path to the original large CSV file of records
         logger (object): logger for writing messages to file and console
+        chunk_count (int): Number of smaller files to split large file into.  Defaults
+            to the number of available CPUs minus 2.
 
     Returns:
         chunk_filenames: a list of chunk filenames
@@ -459,7 +467,8 @@ def chunk_files(big_csv_filename, logger):
     refname = "chunk_files"
     in_base_filename, ext = os.path.splitext(big_csv_filename)
     chunk_filenames = []
-    boundary_pairs, rec_count, chunk_size = identify_chunks(big_csv_filename)
+    boundary_pairs, rec_count, chunk_size = identify_chunks(
+        big_csv_filename, chunk_count=chunk_count)
 
     try:
         bigf = open(big_csv_filename, 'r', newline="", encoding='utf-8')
@@ -522,23 +531,3 @@ def chunk_files(big_csv_filename, logger):
 # .............................................................................
 if __name__ == "__main__":
     pass
-    # import argparse
-    #
-    # parser = argparse.ArgumentParser(description="Split")
-    # parser.add_argument("cmd", type=str, default="split")
-    # parser.add_argument(
-    #     "gbif_filename", type=str, default=GBIF.INPUT_DATA,
-    #     help='The full path to GBIF input species occurrence data.')
-    # args = parser.parse_args()
-    #
-    # # Args may be full path, or base filename in default path
-    # gbif_filename = args.gbif_filename
-    # if not os.path.exists(gbif_filename):
-    #     gbif_filename = os.path.join(BIG_DATA_PATH, gbif_filename)
-    #
-    # if args.cmd != "split":
-    #     print("Only `split` is currently supported")
-    # else:
-    #     boundary_pairs = identify_chunks(args.gbif_filename)
-    #     chunk_filenames = chunk_files(args.gbif_filename, logger)
-    #     print(f"boundary_pairs = {boundary_pairs}")
