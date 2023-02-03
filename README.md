@@ -10,6 +10,26 @@
   https://www.gbif.org/occurrence/search?country=US&has_coordinate=true&has_geospatial_issue=false&occurrence_status=present
 * Download option Darwin Core Archive (The taxonKey and scientific name in Simple CSV
   option is not always the accepted version).
+* Initial test data
+  GBIF.org (26 January 2023) GBIF Occurrence Download https://doi.org/10.15468/dl.epwzn6
+  Download Information
+  DOI: https://doi.org/10.15468/dl.epwzn6
+  Creation Date: 15:04:20 26 January 2023
+  Records included: 24309003 records from 1433 published datasets
+  Compressed data size: 12.3 GB
+  Download format: DWCA
+  Filter used:
+  {
+    "and" : [
+      "BasisOfRecord is Specimen",
+      "Continent is North America",
+      "Country is United States of America",
+      "HasCoordinate is true",
+      "HasGeospatialIssue is false",
+      "OccurrenceStatus is Present"
+    ]
+  }
+
 
 ### USGS RIIS
 
