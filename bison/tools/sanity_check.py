@@ -414,7 +414,7 @@ if __name__ == '__main__':
     # Full path to input data
     big_csv_filename = os.path.join(BIG_DATA_PATH, base_big_csv_filename)
     logger = Logger(
-        script_name, os.path.join(BIG_DATA_PATH, LOG.DIR), f"{script_name}".log)
+        script_name, os.path.join(BIG_DATA_PATH, LOG.DIR, f"{script_name}".log))
 
     record_counter = Counter(big_csv_filename, logger, do_split=True)
     record_counter.compare_counts()

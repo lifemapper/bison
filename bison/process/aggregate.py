@@ -530,7 +530,7 @@ class Aggregator():
     # ...............................................
     def _get_riis_species(self):
         riis_filename = os.path.join(DATA_PATH, RIIS.SPECIES_GEO_FNAME)
-        nnsl = NNSL(riis_filename, logger=self._log)
+        nnsl = NNSL(riis_filename, self._log)
         nnsl.read_riis()
         return nnsl
 

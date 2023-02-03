@@ -25,13 +25,15 @@ class Logger:
         self.logger = None
         self.name = logger_name
         self.filename = log_filename
-        self.log_directory = os.path.dirname(log_filename)
+        self.log_directory = None
         self.log_console = log_console
         self.log_level = log_level
 
         handlers = []
-        os.makedirs(os.path.dirname(log_filename), exist_ok=True)
-        handlers.append(logging.FileHandler(log_filename, mode="w"))
+        if self.filename is not None:
+            self.log_directory = os.path.dirname(log_filename)
+            os.makedirs(self.log_directory, exist_ok=True)
+            handlers.append(logging.FileHandler(log_filename, mode="w"))
 
         if self.log_console:
             handlers.append(logging.StreamHandler(stream=sys.stdout))

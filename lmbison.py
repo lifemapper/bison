@@ -58,7 +58,7 @@ def annotate_occurrence_files(input_filenames, logger):
                 csv_filename, logger.log_directory)
             annotated_filenames.append(annotated_dwc_fname)
 
-        # nnsl = NNSL(riis_filename, logger=logger)
+        # nnsl = NNSL(riis_filename, logger)
         # nnsl.read_riis()
         # # If this one is complete, do not re-annotate
         # outfname = Annotator.construct_annotated_name(csv_filename)

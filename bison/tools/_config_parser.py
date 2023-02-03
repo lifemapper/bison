@@ -8,6 +8,7 @@ from bison.common.log import Logger
 CONFIG_FILE_PARAMETER = "config_file"
 IS_FILE_PARAM = "is_file"
 HELP_PARAM = "help"
+TYPE_PARAM = "type"
 
 
 # .....................................................................................
@@ -116,16 +117,28 @@ def process_arguments_from_file(config_filename, parameters):
 
 # .....................................................................................
 def get_common_arguments(script_name, description, parameters):
-    script_name = os.path.splitext(os.path.basename(__file__))[0]
+    """Get configuration dictionary for a .
+
+    Args:
+        script_name (str): basename of the script being executed.
+        description (str): Help string for the script being executed.
+        parameters (dict): Dictionary of optional and required arguments with expected
+            value, and help string.
+
+    Returns:
+        config: A parameter/argument dictionary contained in the config_filename.
+        logger: logger for saving relevant processing messages
+        report_filename: optional filename for saving summary process information.
+    """
     parser = _build_parser(script_name, description)
     config_filename = _get_config_file_argument(parser)
     config = process_arguments_from_file(config_filename, parameters)
 
     try:
         log_filename = config["log_filename"]
-        logger = Logger(script_name, log_filename=config["log_filename"])
     except KeyError:
-        logger = None
+        log_filename = None
+    logger = Logger(script_name, log_filename)
 
     # If the output report was requested, write it
     try:

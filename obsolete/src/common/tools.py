@@ -213,30 +213,30 @@ def get_csv_dict_writer(datafile, delimiter, encoding, fldnames, fmode='w'):
         print('Opened file {} for dict write'.format(datafile))
     return writer, f
 
-# .............................................................................
-def get_logger(name, fname):
-    log = logging.getLogger(name)
-    log.setLevel(logging.DEBUG)
-    formatter = logging.Formatter(LOG_FORMAT, LOG_DATE_FORMAT)
-    handlers = []
-    handlers.append(RotatingFileHandler(fname, maxBytes=LOGFILE_MAX_BYTES,
-                                        backupCount=LOGFILE_BACKUP_COUNT))
-    handlers.append(logging.StreamHandler())
-    for fh in handlers:
-        fh.setLevel(logging.DEBUG)
-        fh.setFormatter(formatter)
-        log.addHandler(fh)
-    return log
-
-# ...............................................
-def rotate_logfile(log, logpath, logname=None):
-    if log is None:
-        if logname is None:
-            nm, _ = os.path.splitext(os.path.basename(__file__))
-            logname = '{}.{}'.format(nm, int(time.time()))
-        logfname = os.path.join(logpath, '{}.log'.format(logname))
-        log = get_logger(logname, logfname)
-    return log
+# # .............................................................................
+# def get_logger(name, fname):
+#     log = logging.getLogger(name)
+#     log.setLevel(logging.DEBUG)
+#     formatter = logging.Formatter(LOG_FORMAT, LOG_DATE_FORMAT)
+#     handlers = []
+#     handlers.append(RotatingFileHandler(fname, maxBytes=LOGFILE_MAX_BYTES,
+#                                         backupCount=LOGFILE_BACKUP_COUNT))
+#     handlers.append(logging.StreamHandler())
+#     for fh in handlers:
+#         fh.setLevel(logging.DEBUG)
+#         fh.setFormatter(formatter)
+#         log.addHandler(fh)
+#     return log
+#
+# # ...............................................
+# def rotate_logfile(log, logpath, logname=None):
+#     if log is None:
+#         if logname is None:
+#             nm, _ = os.path.splitext(os.path.basename(__file__))
+#             logname = '{}.{}'.format(nm, int(time.time()))
+#         logfname = os.path.join(logpath, '{}.log'.format(logname))
+#         log = get_logger(logname, logfname)
+#     return log
 
 
 # ...............................................

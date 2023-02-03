@@ -43,7 +43,7 @@ class Annotator():
         if nnsl is not None:
             self.nnsl = nnsl
         elif annotated_riis_filename is not None:
-            self.nnsl = NNSL(annotated_riis_filename, is_annotated=True, logger=logger)
+            self.nnsl = NNSL(annotated_riis_filename, logger, is_annotated=True)
             self.nnsl.read_riis()
         else:
             raise Exception("Must provide either NNSL or annotated_riis_filename")
@@ -350,7 +350,7 @@ def annotate_occurrence_file(gbif_occ_filename, log_directory):
     logger.log(f"Submit {basefname} for annotation", refname=refname)
 
     orig_riis_filename = os.path.join(DATA_PATH, RIIS.SPECIES_GEO_FNAME)
-    nnsl = NNSL(orig_riis_filename, is_annotated=False, logger=logger)
+    nnsl = NNSL(orig_riis_filename, logger, is_annotated=False)
     nnsl.read_riis()
 
     logger.log("Start Time : {}".format(datetime.now()), refname=refname)

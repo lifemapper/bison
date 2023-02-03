@@ -2,11 +2,9 @@
 import json
 import os
 
-from bison.common.log import Logger
 from bison.common.util import chunk_files
-from bison.tools._config_parser import (HELP_PARAM, IS_FILE_PARAM,
-                                        build_parser,
-                                        process_arguments_from_file)
+from bison.tools._config_parser import (HELP_PARAM, IS_FILE_PARAM, TYPE_PARAM,
+                                        get_common_arguments)
 
 DESCRIPTION = """\
 Split a CSV file containing GBIF DwC occurrence records into smaller files. """
@@ -16,7 +14,7 @@ PARAMETERS = {
         {
             "big_csv_filename":
                 {
-                    "type": str,
+                    TYPE_PARAM: str,
                     IS_FILE_PARAM: True,
                     HELP_PARAM: "Large CSV file to split into manageable chunks"
                 }
@@ -25,11 +23,11 @@ PARAMETERS = {
         {
             "log_filename":
                 {
-                    "type": str,
+                    TYPE_PARAM: str,
                     HELP_PARAM: "Filename to write logging data."},
             "report_filename":
                 {
-                    "type": str,
+                    TYPE_PARAM: str,
                     HELP_PARAM: "Filename to write summary metadata."}
 
         }
@@ -45,23 +43,22 @@ def cli():
         IOError: on failure to write to report_filename.
     """
     script_name = os.path.splitext(os.path.basename(__file__))[0]
-    parser = build_parser(script_name, DESCRIPTION)
-    args = process_arguments_from_file(parser, PARAMETERS)
-    logger = Logger(script_name, log_filename=args.log_filename)
+    config, logger, report_filename = get_common_arguments(
+        script_name, DESCRIPTION, PARAMETERS)
 
-    _, report = chunk_files(args.big_csv_filename, logger)
+    _, report = chunk_files(config["big_csv_filename"], logger)
 
     # If the output report was requested, write it
-    if args.report_filename:
+    if report_filename is not None:
         try:
-            with open(args.report_filename, mode='wt') as out_file:
+            with open(report_filename, mode='wt') as out_file:
                 json.dump(report, out_file, indent=4)
         except OSError:
             raise
         except IOError:
             raise
         logger.log(
-            f"Wrote report file to {args.report_filename}", refname=script_name)
+            f"Wrote report file to {report_filename}", refname=script_name)
 
 
 # .....................................................................................

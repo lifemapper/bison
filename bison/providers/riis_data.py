@@ -247,7 +247,7 @@ class NNSL:
     """Class for reading, writing, comparing RIIS species data records."""
 
     # ...............................................
-    def __init__(self, riis_filename, is_annotated=False, logger=None):
+    def __init__(self, riis_filename, logger, is_annotated=False):
         """Set the authority and species files and headers expected for processing.
 
         Args:
@@ -569,6 +569,8 @@ class NNSL:
         name_count = 0
         rec_count = 0
         gbif_svc = GbifSvc()
+        # TODO: does resolution replace the key in by_taxon dictionary from USGS
+        #  sciname with GBIF sciname?
         try:
             for name, reclist in self.by_taxon.items():
                 # Resolve each name, update each record (1-3) for that name
@@ -756,7 +758,7 @@ def resolve_riis_taxa(riis_filename, annotated_riis_filename, logger, overwrite=
             "expected_count": RIIS.SPECIES_GEO_DATA_COUNT
         }
     }
-    nnsl = NNSL(riis_filename, annotated_riis_filename, logger=logger)
+    nnsl = NNSL(riis_filename, logger)
     # Update species data
     try:
         name_count, rec_count = nnsl.resolve_riis_to_gbif_taxa(
