@@ -1,28 +1,39 @@
-"""Tool for annotating USGS RIIS data with accepted names from GBIF."""
+"""Tool for annotating GBIF occurrence data with USGS RIIS record annotations."""
 import json
 import os
 
-from bison.providers.riis_data import resolve_riis_taxa
+from bison.process.annotate import annotate_occurrence_file
 from bison.tools._config_parser import (HELP_PARAM, IS_FILE_PARAM, TYPE_PARAM,
                                         get_common_arguments)
 
 DESCRIPTION = """\
-Annotate a CSV file containing the USGS Registry for Introduced and Invasive
-Species (RIIS) with accepted names from GBIF. """
+        Annotate a CSV file containing GBIF Occurrence records with determinations
+        from the USGS Registry for Introduced and Invasive Species (RIIS).  Input RIIS
+        data must contain accepted names from GBIF, so records may be matched
+        on species and location. """
 # Options to be placed in a configuration file for the command
 PARAMETERS = {
     "required":
         {
-            "riis_filename":
+            "dwc_filename":
                 {
                     TYPE_PARAM: str,
                     IS_FILE_PARAM: True,
-                    HELP_PARAM: "Filename of the most current USGS RIIS Master List"
+                    HELP_PARAM: "Filename of GBIF occurrence records in CSV format"
                 },
-            "annotated_riis_filename":
+            "riis_with_gbif_filename":
                 {
                     TYPE_PARAM: str,
-                    HELP_PARAM: "Filename to write the annotated RIIS list."
+                    HELP_PARAM:
+                        "Filename of USGS RIIS records, annotated with GBIF "
+                        "accepted taxa."
+                },
+            "dwc_with_riis_filename":
+                {
+                    TYPE_PARAM: str,
+                    HELP_PARAM:
+                        "Filename to write GBIF occurrence records "
+                        "annotated with RIIS identifiers."
                 },
         },
     "optional":
@@ -42,7 +53,7 @@ PARAMETERS = {
 
 # .....................................................................................
 def cli():
-    """Command-line interface to annotate RIIS records with GBIF accepted taxon.
+    """Command-line interface to annotate GBIF occurrence data with RIIS identifiers.
 
     Raises:
         OSError: on failure to write to report_filename.
@@ -52,9 +63,9 @@ def cli():
     config, logger, report_filename = get_common_arguments(
         script_name, DESCRIPTION, PARAMETERS)
 
-    report = resolve_riis_taxa(
-        config["riis_filename"], config["annotated_riis_filename"], logger,
-        overwrite=True)
+    report = annotate_occurrence_file(
+        config["dwc_filename"], config["riis_with_gbif_filename"],
+        config["dwc_with_riis_filename"], logger)
 
     # If the output report was requested, write it
     if report_filename:
@@ -67,12 +78,3 @@ def cli():
             raise
         logger.log(
             f"Wrote report file to {report_filename}", refname=script_name)
-
-
-# .....................................................................................
-__all__ = ["cli"]
-
-
-# .....................................................................................
-if __name__ == '__main__':  # pragma: no cover
-    cli()
