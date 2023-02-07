@@ -3,8 +3,10 @@ import json
 import os
 
 from bison.common.util import chunk_files
-from bison.tools._config_parser import (HELP_PARAM, IS_FILE_PARAM, TYPE_PARAM,
-                                        get_common_arguments)
+from bison.tools._config_parser import (
+    HELP_PARAM, IS_INPUT_DIR_PARAM, IS_INPUT_FILE_PARAM, IS_OUPUT_DIR_PARAM, TYPE_PARAM,
+    get_common_arguments)
+
 
 DESCRIPTION = """\
 Split a CSV file containing GBIF DwC occurrence records into smaller files. """
@@ -12,12 +14,24 @@ Split a CSV file containing GBIF DwC occurrence records into smaller files. """
 PARAMETERS = {
     "required":
         {
+            "input_path":
+                {
+                    TYPE_PARAM: str,
+                    IS_INPUT_DIR_PARAM: True,
+                    HELP_PARAM: "Source directory containing input data."
+                },
             "big_csv_filename":
                 {
                     TYPE_PARAM: str,
-                    IS_FILE_PARAM: True,
+                    IS_INPUT_FILE_PARAM: True,
                     HELP_PARAM: "Large CSV file to split into manageable chunks."
-                }
+                },
+            "output_path":
+                {
+                    TYPE_PARAM: str,
+                    IS_OUPUT_DIR_PARAM: True,
+                    HELP_PARAM: "Destination directory for output data."
+                },
         },
     "optional":
         {
@@ -44,6 +58,8 @@ def cli():
     """Command-line interface to split a very large CSV file into smaller files.
 
     Raises:
+        Exception: on missing input file.
+        Exception: on missing output directory.
         OSError: on failure to write to report_filename.
         IOError: on failure to write to report_filename.
     """
@@ -51,7 +67,14 @@ def cli():
     config, logger, report_filename = get_common_arguments(
         script_name, DESCRIPTION, PARAMETERS)
 
-    _, report = chunk_files(config["big_csv_filename"], logger)
+    infilename = os.path.join(config["input_path"], config["big_csv_filename"])
+    output_path = config["output_path"]
+    if not os.path.exists(infilename):
+        raise Exception(f"Input file {infilename} does not exist.")
+    if not os.path.exists(output_path):
+        raise Exception(f"Output path {output_path} does not exist.")
+
+    _, report = chunk_files(infilename, output_path, logger)
 
     # If the output report was requested, write it
     if report_filename is not None:

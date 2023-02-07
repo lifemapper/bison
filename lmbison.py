@@ -58,14 +58,14 @@ def annotate_occurrence_files(input_filenames, logger):
                 csv_filename, logger.log_directory)
             annotated_filenames.append(annotated_dwc_fname)
 
-        # nnsl = NNSL(riis_filename, logger)
-        # nnsl.read_riis()
+        # riis = RIIS(riis_filename, logger)
+        # riis.read_riis()
         # # If this one is complete, do not re-annotate
         # outfname = Annotator.construct_annotated_name(csv_filename)
         # if os.path.exists(outfname):
         #     logger.info(f"Annotations exist in {outfname}, moving on.")
         # else:
-        #     ant = Annotator(csv_filename, nnsl=nnsl, logger=logger)
+        #     ant = Annotator(csv_filename, riis=riis, logger=logger)
         #     annotated_dwc_fname = ant.annotate_dwca_records()
         #     annotated_filenames.append(annotated_dwc_fname)
     return annotated_filenames

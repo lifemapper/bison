@@ -6,7 +6,9 @@ import os
 from bison.common.log import Logger
 
 CONFIG_FILE_PARAMETER = "config_file"
-IS_FILE_PARAM = "is_file"
+IS_INPUT_DIR_PARAM = "is_input_dir"
+IS_OUPUT_DIR_PARAM = "is_output_dir"
+IS_INPUT_FILE_PARAM = "is_input_file"
 HELP_PARAM = "help"
 TYPE_PARAM = "type"
 
@@ -43,30 +45,6 @@ def _get_config_file_argument(parser):
     if hasattr(args, CONFIG_FILE_PARAMETER):
         config_filename = getattr(args, CONFIG_FILE_PARAMETER)
     return config_filename
-
-
-# .....................................................................................
-def _test_if_file(val, parameters):
-    """If the value is a file, test for its existence.
-
-    Args:
-        val (str): value to test if  existence
-        parameters (str): Parameters and descriptive metadata
-
-    Raises:
-        Exception: on value is a file, and does not exist
-    """
-    try:
-        is_file = parameters[IS_FILE_PARAM]
-    except Exception:
-        pass
-    else:
-        if is_file is True and not os.path.exists(val):
-            try:
-                help_str = parameters[HELP_PARAM]
-            except Exception:
-                help_str = ""
-            raise Exception(f"File {val} does not exist: {help_str}.")
 
 
 # .....................................................................................
@@ -108,9 +86,6 @@ def process_arguments_from_file(config_filename, parameters):
             val = config[key]
         except Exception:
             raise Exception(f"Missing required argument {key} in {config_filename}")
-        else:
-            # Raises an exception if the value is a filename, but does not exist
-            _test_if_file(val, parameters)
 
     return config
 

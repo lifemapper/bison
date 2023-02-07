@@ -1,6 +1,9 @@
 """Constants for GBIF, BISON, RIIS, and processed outputs, used across modules."""
+import os.path
+
 BIG_DATA_PATH = "/home/astewart/git/bison/big_data"
 DATA_PATH = "/home/astewart/git/bison/data"
+INPUT_DIR = "input"
 OUT_DIR = "out"
 ENCODING = "utf-8"
 LINENO_FLD = "LINENO"
@@ -123,6 +126,28 @@ PCT_INTRODUCED_OCCS = "pct_introduced_all_occurrences"
 PCT_INVASIVE_OCCS = "pct_invasive_all_occurrences"
 PCT_NATIVE_OCCS = "pct_presumed_native_occurrences"
 
+# .............................................................................
+class FILE_POSTFIX:
+    GEO_RISS_ANNOTATED = "georiis"
+    CHUNK = "chunk"
+    SEP = "_"
+
+# # .............................................................................
+# class FilenameBuilder():
+#     def __init__(self, dwc_filename):
+#         input_path, fname = os.path.split(dwc_filename)
+#         self._basename, self._ext = os.path.splitext(fname)
+#         self._sep = "_"
+#
+#     def get_chunk_filename(self, start, stop):
+#         postfix = f"{FILE_POSTFIX.CHUNK}-{start}-{stop}"
+#         return f"{self._basename}{self._sep}{postfix}{self._ext}"
+#
+#
+#     def parse_filename(self, filename):
+#         parts = filename.split(self._sep)
+#         return f"{self._basename}{self._ext}"
+
 
 # .............................................................................
 class LMBISON_HEADER:
@@ -144,18 +169,31 @@ class LMBISON_HEADER:
 # .............................................................................
 class US_CENSUS_COUNTY:
     """File and fieldnames for census county boundary data, map to bison fieldnames."""
-    PATH = DATA_PATH
+    # PATH = DATA_PATH
     FILE = "cb_2020_us_county_500k.shp"
-    CENSUS_BISON_MAP = {"NAME": NEW_RESOLVED_COUNTY, "STUSPS": NEW_RESOLVED_STATE}
+    GEO_BISON_MAP = {"NAME": NEW_RESOLVED_COUNTY, "STUSPS": NEW_RESOLVED_STATE}
 
 
 # .............................................................................
 class US_CENSUS_STATE:
     """File and fieldnames for census state boundary data, map to bison fieldnames."""
-    PATH = DATA_PATH
+    # PATH = DATA_PATH
     FILE = "cb_2020_us_state_500k.shp"
-    CENSUS_BISON_MAP = {"STUSPS": NEW_RESOLVED_STATE}
+    GEO_BISON_MAP = {"STUSPS": NEW_RESOLVED_STATE}
 
+
+# .............................................................................
+class US_AIANNH:
+    """File and fieldnames for American Indian and Alaskan Native"""
+    FILE = "cb_2021_us_aiannh_500k.shp"
+    GEO_BISON_MAP = {"STUSPS": NEW_RESOLVED_STATE}
+
+
+# .............................................................................
+class US_PAD:
+    """File and fieldnames for American Indian and Alaskan Native"""
+    FILES = "cb_2021_us_aiannh_500k.shp"
+    GEO_BISON_MAP = {"STUSPS": NEW_RESOLVED_STATE}
 
 # .............................................................................
 class ITIS:
@@ -322,7 +360,7 @@ class NS:
 
 
 # .............................................................................
-class RIIS:
+class RIIS_DATA:
     """Constants for the US Register of Introduced and Invasive Species, RIIS data."""
     DATA_EXT = "csv"
     DELIMITER = ","

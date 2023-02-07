@@ -30,7 +30,7 @@ repos:
       # args: [--sp=.github/linters/.isort.cfg, --diff]
       args: [
         # vertical hanging indent mode also used in black configuration
-        "multi_line_output=3",
+#        "multi_line_output=3",
         # black expects the trailing comma
         "include_trailing_comma=true"
       ]

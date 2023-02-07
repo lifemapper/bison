@@ -1,8 +1,8 @@
 """Test the GBIF and ITIS taxonomic resolution provided in the US-RIIS table."""
-from bison.providers.riis_data import NNSL
+from bison.providers.riis_data import RIIS
 
 
-class TestRIISTaxonomy(NNSL):
+class TestRIISTaxonomy(RIIS):
     """Class for testing input authority and species files."""
 
     # .............................................................................
@@ -14,7 +14,7 @@ class TestRIISTaxonomy(NNSL):
             annotated_riis_fname (str): output file for annotated RIIS file
             logger (object): logger for writing messages to file and console
         """
-        NNSL.__init__(self, riis_fname, annotated_riis_fname, logger=logger)
+        RIIS.__init__(self, riis_fname, annotated_riis_fname, logger=logger)
 
 #     # ...............................................
 #     def test_taxonomy_keys(self):
@@ -31,10 +31,10 @@ class TestRIISTaxonomy(NNSL):
 #         """Test whether any full scientific names have more than one record for a locality."""
 #         logit(self._log, "*** test_duplicate_name_localities ***")
 #         err_msgs = []
-#         if self.nnsl_by_species is None:
+#         if self.riis_by_species is None:
 #             self.read_riis(read_resolved=False)
 #
-#         for sciname, reclist in self.nnsl_by_species.items():
+#         for sciname, reclist in self.riis_by_species.items():
 #             count = len(reclist)
 #             i = 0
 #             while i < count:
@@ -57,9 +57,9 @@ class TestRIISTaxonomy(NNSL):
 #         """Test whether any full scientific names have more than one GBIF taxonKey."""
 #         logit(self._log, "*** test_gbif_resolution_inconsistency ***")
 #         err_msgs = []
-#         if self.nnsl_by_species is None:
+#         if self.riis_by_species is None:
 #             self.read_riis(read_resolved=False)
-#         for sciname, reclist in self.nnsl_by_species.items():
+#         for sciname, reclist in self.riis_by_species.items():
 #             count = len(reclist)
 #             i = 0
 #             while i < count:
@@ -85,9 +85,9 @@ class TestRIISTaxonomy(NNSL):
 #         """Test whether any full scientific names have more than one GBIF taxonKey."""
 #         logit(self._log, "*** test_missing_taxon_authority_resolution ***")
 #         err_msgs = []
-#         if self.nnsl_by_species is None:
+#         if self.riis_by_species is None:
 #             self.read_riis(read_resolved=False)
-#         for sciname, reclist in self.nnsl_by_species.items():
+#         for sciname, reclist in self.riis_by_species.items():
 #             for rec in reclist:
 #                 auth = rec.data[RIIS_SPECIES.TAXON_AUTHORITY_FLD]
 #                 if (auth == "Accepted GBIF" and rec.data[RIIS_SPECIES.GBIF_KEY] <= 0):
@@ -113,9 +113,9 @@ class TestRIISTaxonomy(NNSL):
 #         """Test whether any full scientific names have more than one ITIS TSN."""
 #         logit(self._log, "*** test_itis_resolution_inconsistency ***")
 #         err_msgs = []
-#         if self.nnsl_by_species is None:
+#         if self.riis_by_species is None:
 #             self.read_riis(read_resolved=False)
-#         for sciname, reclist in self.nnsl_by_species.items():
+#         for sciname, reclist in self.riis_by_species.items():
 #             count = len(reclist)
 #             i = 0
 #             while i < count:
@@ -149,7 +149,7 @@ class TestRIISTaxonomy(NNSL):
 #         logit(self._log, "Resolved {} of expected {} records".format(rec_count, RIIS_SPECIES.DATA_COUNT))
 #
 #         # Find mismatches
-#         for key, reclist in self.nnsl_by_species.items():
+#         for key, reclist in self.riis_by_species.items():
 #             rec1 = reclist[0]
 #             try:
 #                 rec1.data[RIIS_SPECIES.GBIF_KEY_FLD]
@@ -182,8 +182,8 @@ class TestRIISTaxonomy(NNSL):
 #         test_fname = None
 #         if is_test:
 #             test_fname = RIIS_SPECIES.TEST_FNAME
-#         resolved_nnsl = NNSL(DATA_PATH, test_fname=test_fname)
-#         resolved_nnsl.read_riis(read_resolved=True)
+#         resolved_riis = RIIS(DATA_PATH, test_fname=test_fname)
+#         resolved_riis.read_riis(read_resolved=True)
 #
 #         orig_rec_count = 0
 #         res_rec_count = 0
@@ -192,7 +192,7 @@ class TestRIISTaxonomy(NNSL):
 #             orig_rec_count += 1
 #             # Find in resolved
 #             try:
-#                 resolved_nnsl.by_riis_id[occid]
+#                 resolved_riis.by_riis_id[occid]
 #             except KeyError:
 #                 logit(
 #                     self._log,
@@ -219,13 +219,13 @@ class TestRIISTaxonomy(NNSL):
 #         test_fname = None
 #         if is_test:
 #             test_fname = RIIS_SPECIES.TEST_FNAME
-#         resolved_nnsl = NNSL(DATA_PATH, test_fname=test_fname)
-#         resolved_nnsl.read_riis(read_resolved=True)
+#         resolved_riis = RIIS(DATA_PATH, test_fname=test_fname)
+#         resolved_riis.read_riis(read_resolved=True)
 #
 #         # Count originals
 #         for occid in self.by_riis_id.keys():
 #             try:
-#                 resolved_nnsl.by_riis_id[occid]
+#                 resolved_riis.by_riis_id[occid]
 #             except KeyError:
 #                 logit(self._log, "Missing record {}".format(occid))
 #

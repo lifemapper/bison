@@ -1,5 +1,7 @@
 {
     "log_filename": "/volumes/bison/output/chunk_large_file.log",
     "report_filename": "/volumes/bison/output/chunk_large_file.rpt",
-    "big_csv_filename": "/volumes/bison/big_data/gbif_2023-01-26.csv"
+    "input_path": "/volumes/bison/input",
+    "big_csv_filename": "gbif-2023-01-26-10k.csv",
+    "output_path": "/volumes/bison/process"
 }

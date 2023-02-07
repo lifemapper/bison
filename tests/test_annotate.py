@@ -7,7 +7,7 @@ class TestAnnotator(Annotator):
 
     # .............................................................................
     def __init__(
-            self, gbif_occ_filename, logger, annotated_riis_filename=None, nnsl=None):
+            self, gbif_occ_filename, logger, annotated_riis_filename=None, riis=None):
         """Constructor reads RIIS species file and opens a CSVReader to the GBIF data.
 
         Args:
@@ -15,10 +15,10 @@ class TestAnnotator(Annotator):
             logger (object): logger for saving relevant processing messages
             annotated_riis_filename (str): full filename of RIIS data annotated with
                 GBIF accepted taxon names.
-            nnsl (bison.common.riis.NNSL): object containing USGS RIIS data for
+            riis (bison.common.riis.RIIS): object containing USGS RIIS data for
                 annotating records
         """
-        Annotator.__init__(self, gbif_occ_filename, nnsl=nnsl, logger=logger)
+        Annotator.__init__(self, gbif_occ_filename, riis=riis, logger=logger)
 
 #     # .............................................................................
 #     def test_annotate_records(self):
@@ -41,7 +41,7 @@ class TestAnnotator(Annotator):
 #     # Test the taxonkey contents in GBIF simple CSV download file
 #     big_gbif_fname = os.path.join(BIG_DATA_PATH, GBIF.TEST_DATA)
 #     logger = get_logger(os.path.join(BIG_DATA_PATH, LOG.DIR), logname="test_annotate")
-#     nnsl_data = NNSL(DATA_PATH, logger=logger)
+#     riis_data = NNSL(DATA_PATH, logger=logger)
 #
 #     chunk_fnames = chunk_files(big_gbif_fname)
 #     for fname in chunk_fnames:

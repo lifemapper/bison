@@ -20,7 +20,9 @@ Data found:
     * from year 4, have 2020 county boundaries
     * from ArcHub https://hub.arcgis.com/datasets/715db3ed501b42fe9581caaa5c56caf9/about
   * American Indian/Alaska Native Areas/Hawaiian Home Lands (AIANNH)
-      cb_2018_us_aiannh_500k (also from Census link)
+    * https://www.census.gov/geographies/mapping-files/time-series/geo/carto-boundary-file.html
+    * 2018
+    * cb_2018_us_aiannh_500k
   * US-PAD data
     * https://www.usgs.gov/programs/gap-analysis-project/science/pad-us-data-download
     * https://www.sciencebase.gov/catalog/item/622262c8d34ee0c6b38b6bcf

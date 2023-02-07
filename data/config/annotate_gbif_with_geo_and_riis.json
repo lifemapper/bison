@@ -1,0 +1,10 @@
+{
+    "log_filename": "/volumes/bison/output/annotate_riis.log",
+    "report_filename": "/volumes/bison/output/annotate_riis.rpt",
+    "input_path": "/volumes/bison/input",
+    "dwc_filenames": ["gbif_2023-01-26_10k.csv"],
+    "riis_with_gbif_taxa_filename": "US-RIIS_MasterList_annotated.csv",
+    "geo_types": ["state_county"],
+    "output_path": "/volumes/bison/process",
+    "dwc_with_geo_and_riis_postfix": "georiis"
+}

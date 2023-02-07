@@ -8,12 +8,12 @@ from bison.common.constants import (AGGREGATOR_DELIMITER, ASSESS_KEY,
                                     COUNT_KEY, DATA_PATH, ENCODING,
                                     EXTRA_CSV_FIELD, GBIF, LMBISON_HEADER,
                                     LOCATION_KEY, NEW_RESOLVED_COUNTY,
-                                    NEW_RESOLVED_STATE, OUT_DIR, RIIS,
+                                    NEW_RESOLVED_STATE, OUT_DIR, RIIS_DATA,
                                     SPECIES_KEY, SPECIES_NAME_KEY, US_STATES)
 from bison.common.log import Logger
 from bison.common.util import (get_csv_dict_reader, get_csv_writer,
                                ready_filename)
-from bison.providers.riis_data import NNSL
+from bison.providers.riis_data import RIIS
 
 
 # .............................................................................
@@ -529,13 +529,13 @@ class Aggregator():
 
     # ...............................................
     def _get_riis_species(self):
-        riis_filename = os.path.join(DATA_PATH, RIIS.SPECIES_GEO_FNAME)
-        nnsl = NNSL(riis_filename, self._log)
-        nnsl.read_riis()
-        return nnsl
+        riis_filename = os.path.join(DATA_PATH, RIIS_DATA.SPECIES_GEO_FNAME)
+        riis = RIIS(riis_filename, self._log)
+        riis.read_riis()
+        return riis
 
     # ...............................................
-    def _examine_species_for_location(self, region, species_counts, nnsl):
+    def _examine_species_for_location(self, region, species_counts, riis):
         recs = []
         if species_counts:
             # All these species are for the location of interest
@@ -553,7 +553,7 @@ class Aggregator():
                 except KeyError:
                     raise (f"Missing species name for key {species_key}")
 
-                assessments = nnsl.get_assessments_for_gbif_taxonkey(gbif_taxon_key)
+                assessments = riis.get_assessments_for_gbif_taxonkey(gbif_taxon_key)
                 try:
                     assess = assessments[region].lower()
                 except KeyError:
@@ -563,12 +563,12 @@ class Aggregator():
         return recs
 
     # ...............................................
-    def _write_region_aggregate(self, datapath, nnsl, state, county=None):
+    def _write_region_aggregate(self, datapath, riis, state, county=None):
         """Summarize aggregated data for a location by species.
 
         Args:
             datapath (str): output path for aggregate file
-            nnsl (bison.common.riis.NNSL): Non-native species list object
+            riis (bison.common.riis.RIIS): Non-native species list object
             state (str): 2-character state code
             county (str): County name from census data.
 
@@ -610,7 +610,7 @@ class Aggregator():
                 csv_wtr.writerow(LMBISON_HEADER.REGION_FILE)
                 # Write all records found
                 records = self._examine_species_for_location(
-                    region, species_counts, nnsl)
+                    region, species_counts, riis)
                 for rec in records:
                     csv_wtr.writerow(rec)
                 self._log.info(f"Wrote region summaries to {summary_filename}")
@@ -704,15 +704,15 @@ class Aggregator():
         self._log.info("Read summarized annotations to aggregate by region")
 
         region_summary_filenames = []
-        nnsl = self._get_riis_species()
+        riis = self._get_riis_species()
 
         for state, counties in self.states.items():
-            state_agg_fname = self._write_region_aggregate(datapath, nnsl, state)
+            state_agg_fname = self._write_region_aggregate(datapath, riis, state)
             if state_agg_fname is not None:
                 region_summary_filenames.append(state_agg_fname)
             for county in counties:
                 cty_agg_fname = self._write_region_aggregate(
-                    datapath, nnsl, state, county=county)
+                    datapath, riis, state, county=county)
                 if cty_agg_fname is not None:
                     region_summary_filenames.append(cty_agg_fname)
 

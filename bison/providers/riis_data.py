@@ -5,7 +5,7 @@ import os
 
 from bison.common.constants import (ERR_SEPARATOR, GBIF, LINENO_FLD,
                                     NEW_GBIF_KEY_FLD, NEW_GBIF_SCINAME_FLD,
-                                    RIIS)
+                                    RIIS_DATA)
 from bison.common.util import get_csv_dict_reader, get_csv_dict_writer
 from bison.providers.gbif_api import GbifSvc
 
@@ -46,10 +46,10 @@ class RIISRec():
         self.data[NEW_GBIF_SCINAME_FLD] = new_gbif_name
         self.data[LINENO_FLD] = line_num
         self.name = standardize_name(
-            record[RIIS.SCINAME_FLD], record[RIIS.SCIAUTHOR_FLD])
+            record[RIIS_DATA.SCINAME_FLD], record[RIIS_DATA.SCIAUTHOR_FLD])
 
         # Set missing GBIF or ITIS key to -1
-        for fld in (RIIS.GBIF_KEY, RIIS.ITIS_KEY):
+        for fld in (RIIS_DATA.GBIF_KEY, RIIS_DATA.ITIS_KEY):
             taxon_key = record[fld]
             if not taxon_key:
                 taxon_key = -1
@@ -63,14 +63,14 @@ class RIISRec():
         # # Edit taxonomy authority to trim "Accepted "
         # prefix = 'Accepted '
         # start_idx = len(prefix)
-        # taxon_authority = record[RIIS.TAXON_AUTHORITY_FLD]
+        # taxon_authority = record[RIIS_DATA.TAXON_AUTHORITY_FLD]
         # try:
         #     is_accepted = taxon_authority.startswith(prefix)
         # except AttributeError:
         #     pass
         # else:
         #     if is_accepted:
-        #         self.data[RIIS.TAXON_AUTHORITY_FLD] = taxon_authority[start_idx:]
+        #         self.data[RIIS_DATA.TAXON_AUTHORITY_FLD] = taxon_authority[start_idx:]
 
     # ...............................................
     @property
@@ -80,7 +80,7 @@ class RIISRec():
         Returns:
             locality value
         """
-        return self.data[RIIS.LOCALITY_FLD]
+        return self.data[RIIS_DATA.LOCALITY_FLD]
 
     # ...............................................
     @property
@@ -90,7 +90,7 @@ class RIISRec():
         Returns:
             RIIS assessment value
         """
-        return self.data[RIIS.ASSESSMENT_FLD].lower()
+        return self.data[RIIS_DATA.ASSESSMENT_FLD].lower()
 
     # ...............................................
     @property
@@ -100,7 +100,7 @@ class RIISRec():
         Returns:
             RIIS occurrence_id value
         """
-        return self.data[RIIS.SPECIES_GEO_KEY]
+        return self.data[RIIS_DATA.SPECIES_GEO_KEY]
 
     # ...............................................
     @property
@@ -135,9 +135,9 @@ class RIISRec():
         Returns:
             True if self and rrec scientific name, author, and kingdom match.
         """
-        return (self.data[RIIS.SCINAME_FLD] == rrec.data[RIIS.SCINAME_FLD]
-                and self.data[RIIS.KINGDOM_FLD] == rrec.data[RIIS.KINGDOM_FLD]
-                and self.data[RIIS.SCIAUTHOR_FLD] == rrec.data[RIIS.SCIAUTHOR_FLD])
+        return (self.data[RIIS_DATA.SCINAME_FLD] == rrec.data[RIIS_DATA.SCINAME_FLD]
+                and self.data[RIIS_DATA.KINGDOM_FLD] == rrec.data[RIIS_DATA.KINGDOM_FLD]
+                and self.data[RIIS_DATA.SCIAUTHOR_FLD] == rrec.data[RIIS_DATA.SCIAUTHOR_FLD])
 
     # ...............................................
     def is_duplicate(self, rrec):
@@ -151,10 +151,10 @@ class RIISRec():
                 ITIS TSN, assessment, and location match.
         """
         return (self.is_name_match(rrec)
-                and self.data[RIIS.GBIF_KEY] == rrec.data[RIIS.GBIF_KEY]
-                and self.data[RIIS.ITIS_KEY] == rrec.data[RIIS.ITIS_KEY]
-                and self.data[RIIS.ASSESSMENT_FLD] == rrec.data[RIIS.ASSESSMENT_FLD]
-                and self.data[RIIS.LOCALITY_FLD] == rrec.data[RIIS.LOCALITY_FLD])
+                and self.data[RIIS_DATA.GBIF_KEY] == rrec.data[RIIS_DATA.GBIF_KEY]
+                and self.data[RIIS_DATA.ITIS_KEY] == rrec.data[RIIS_DATA.ITIS_KEY]
+                and self.data[RIIS_DATA.ASSESSMENT_FLD] == rrec.data[RIIS_DATA.ASSESSMENT_FLD]
+                and self.data[RIIS_DATA.LOCALITY_FLD] == rrec.data[RIIS_DATA.LOCALITY_FLD])
 
     # ...............................................
     def is_duplicate_locality(self, rrec):
@@ -167,7 +167,7 @@ class RIISRec():
             True if self and rrec scientific name, author, kingdom, and location match.
         """
         return (self.is_name_match(rrec)
-                and self.data[RIIS.LOCALITY_FLD] == rrec.data[RIIS.LOCALITY_FLD])
+                and self.data[RIIS_DATA.LOCALITY_FLD] == rrec.data[RIIS_DATA.LOCALITY_FLD])
 
     # ...............................................
     def is_assessment_locality_match(self, rrec):
@@ -179,8 +179,8 @@ class RIISRec():
         Returns:
             True if self and rrec assessment and location match.
         """
-        return (self.data[RIIS.ASSESSMENT_FLD] == rrec.data[RIIS.ASSESSMENT_FLD]
-                and self.data[RIIS.LOCALITY_FLD] == rrec.data[RIIS.LOCALITY_FLD])
+        return (self.data[RIIS_DATA.ASSESSMENT_FLD] == rrec.data[RIIS_DATA.ASSESSMENT_FLD]
+                and self.data[RIIS_DATA.LOCALITY_FLD] == rrec.data[RIIS_DATA.LOCALITY_FLD])
 
     # ...............................................
     def is_gbif_match(self, rrec):
@@ -192,7 +192,7 @@ class RIISRec():
         Returns:
             True if self and rrec GBIF key match.
         """
-        return (self.data[RIIS.GBIF_KEY] == rrec.data[RIIS.GBIF_KEY])
+        return (self.data[RIIS_DATA.GBIF_KEY] == rrec.data[RIIS_DATA.GBIF_KEY])
 
     # ...............................................
     def is_itis_match(self, rrec):
@@ -204,7 +204,7 @@ class RIISRec():
         Returns:
             True if self and rrec ITIS TSN match.
         """
-        return (self.data[RIIS.ITIS_KEY] == rrec.data[RIIS.ITIS_KEY])
+        return (self.data[RIIS_DATA.ITIS_KEY] == rrec.data[RIIS_DATA.ITIS_KEY])
 
     # ...............................................
     def consistent_gbif_resolution(self):
@@ -213,14 +213,14 @@ class RIISRec():
         Returns:
             True if self and rrec GBIF key match.
         """
-        return (self.data[RIIS.GBIF_KEY] == self.data[NEW_GBIF_KEY_FLD])
+        return (self.data[RIIS_DATA.GBIF_KEY] == self.data[NEW_GBIF_KEY_FLD])
 
     # ...............................................
     def is_taxauthority_match(self, rrec):
         """Test equality of taxon authority and authority key.
 
         Args:
-            rrec (bison.riis.RIISRec): object containing a USGS RIIS record
+            rrec (bison.riis.RIIS_DATARec): object containing a USGS RIIS record
 
         Returns:
             True if self and rrec name authority are both GBIF and GBIF keys match
@@ -228,22 +228,22 @@ class RIISRec():
         """
         # Test GBIF match
         if (
-                self.data[RIIS.TAXON_AUTHORITY_FLD] == "Accepted GBIF"
-                and rrec.data[RIIS.TAXON_AUTHORITY_FLD] == "Accepted GBIF"
-                and self.data[RIIS.GBIF_KEY] == rrec.data[RIIS.GBIF_KEY]
+                self.data[RIIS_DATA.TAXON_AUTHORITY_FLD] == "Accepted GBIF"
+                and rrec.data[RIIS_DATA.TAXON_AUTHORITY_FLD] == "Accepted GBIF"
+                and self.data[RIIS_DATA.GBIF_KEY] == rrec.data[RIIS_DATA.GBIF_KEY]
         ):
             return True
         # Test ITIS match
         else:
             return (
-                self.data[RIIS.TAXON_AUTHORITY_FLD] == "Accepted ITIS"
-                and rrec.data[RIIS.TAXON_AUTHORITY_FLD] == "Accepted ITIS"
-                and self.data[RIIS.ITIS_KEY] == rrec.data[RIIS.ITIS_KEY]
+                self.data[RIIS_DATA.TAXON_AUTHORITY_FLD] == "Accepted ITIS"
+                and rrec.data[RIIS_DATA.TAXON_AUTHORITY_FLD] == "Accepted ITIS"
+                and self.data[RIIS_DATA.ITIS_KEY] == rrec.data[RIIS_DATA.ITIS_KEY]
             )
 
 
 # .............................................................................
-class NNSL:
+class RIIS:
     """Class for reading, writing, comparing RIIS species data records."""
 
     # ...............................................
@@ -260,9 +260,6 @@ class NNSL:
         self._is_annotated = is_annotated
         self._log = logger
 
-        datapath, _ = os.path.split(riis_filename)
-        self.auth_fname = f"{os.path.join(datapath, RIIS.AUTHORITY_FNAME)}.{RIIS.DATA_EXT}"
-
         # Trimmed and updated Non-native Species List, built from RIIS
         self.by_taxon = None
         self.by_riis_id = None
@@ -275,18 +272,19 @@ class NNSL:
         Returns:
             Set of authority identifiers valid for use as foreign keys in related datasets.
         """
+        datapath, _ = os.path.split(self._riis_filename)
+        auth_fname = f"{os.path.join(datapath, RIIS_DATA.AUTHORITY_FNAME)}.{RIIS_DATA.DATA_EXT}"
         authorities = set()
-        rdr, f = get_csv_dict_reader(self.auth_fname, RIIS.DELIMITER)
-        # with open(self.auth_fname, "r", newline="") as csvfile:
-        #     rdr = csv.DictReader(
-        #         csvfile,
-        #         fieldnames=RIIS.AUTHORITY_HEADER,
-        #         delimiter=RIIS.DELIMITER,
-        #         quotechar=RIIS.QUOTECHAR,
-        #     )
+        rdr, f = get_csv_dict_reader(auth_fname, RIIS_DATA.DELIMITER)
         for row in rdr:
-            authorities.add(row[RIIS.AUTHORITY_KEY])
+            authorities.add(row[RIIS_DATA.AUTHORITY_KEY])
         return authorities
+
+
+    # ...............................................
+    # @property
+    def is_annotated(self):
+        return self._is_annotated
 
     # ...............................................
     @property
@@ -296,7 +294,7 @@ class NNSL:
         Returns:
             updated_riis_header: fieldnames for the updated file
         """
-        header = RIIS.SPECIES_GEO_HEADER.copy()
+        header = RIIS_DATA.SPECIES_GEO_HEADER.copy()
         header.append(NEW_GBIF_KEY_FLD)
         header.append(NEW_GBIF_SCINAME_FLD)
         header.append(LINENO_FLD)
@@ -335,7 +333,7 @@ class NNSL:
         assessments = {}
         riis_recs = self.get_riis_by_gbif_taxonkey(gbif_taxon_key)
         for riis in riis_recs:
-            assessments[riis.data[RIIS.LOCALITY_FLD]] = riis.data[RIIS.ASSESSMENT_FLD]
+            assessments[riis.data[RIIS_DATA.LOCALITY_FLD]] = riis.data[RIIS_DATA.ASSESSMENT_FLD]
         return assessments
 
     # ...............................................
@@ -390,14 +388,14 @@ class NNSL:
         if self._is_annotated is True:
             expected_header = self.annotated_riis_header
         else:
-            expected_header = RIIS.SPECIES_GEO_HEADER
+            expected_header = RIIS_DATA.SPECIES_GEO_HEADER
         # Clean header of non-ascii characters
         good_header = self._clean_header(self._riis_filename, expected_header)
         if good_header is None:
             raise Exception(f"Unexpected file header found in {self._riis_filename}")
 
         rdr, inf = get_csv_dict_reader(
-            self._riis_filename, RIIS.DELIMITER, fieldnames=good_header,
+            self._riis_filename, RIIS_DATA.DELIMITER, fieldnames=good_header,
             quote_none=False)
         self._log.log(
             f"Reading RIIS from {self._riis_filename}", refname=self.__class__.__name__,
@@ -434,7 +432,7 @@ class NNSL:
                         self.by_taxon[index] = [rec]
 
                     # Also index on RIIS occurrenceID
-                    self.by_riis_id[row[RIIS.SPECIES_GEO_KEY]] = rec
+                    self.by_riis_id[row[RIIS_DATA.SPECIES_GEO_KEY]] = rec
 
         except Exception:
             raise
@@ -579,12 +577,12 @@ class NNSL:
                 data = reclist[0].data
                 try:
                     new_key, new_name = self._find_current_accepted_taxon(
-                        gbif_svc, data[RIIS.SCINAME_FLD],
-                        data[RIIS.KINGDOM_FLD],
-                        data[RIIS.GBIF_KEY])
+                        gbif_svc, data[RIIS_DATA.SCINAME_FLD],
+                        data[RIIS_DATA.KINGDOM_FLD],
+                        data[RIIS_DATA.GBIF_KEY])
                 except Exception as e:
                     err = f"Failed to get GBIF accepted taxon for" \
-                          f" {data[RIIS.SCINAME_FLD]}, {e}"
+                          f" {data[RIIS_DATA.SCINAME_FLD]}, {e}"
                     self._add_msg(msgdict, name, err)
                     self._log.log(
                         err, refname=self.__class__.__name__, log_level=logging.ERROR)
@@ -592,17 +590,17 @@ class NNSL:
                     name_count += 1
                     # Annotate all records for this name with GBIF accepted key/sciname
                     for rec in reclist:
-                        # Update record in dictionary nnsl_by_species with name keys
+                        # Update record in dictionary riis_by_species with name keys
                         rec.update_data(new_key, new_name)
-                        # Update dictionary nnsl_by_id with Occid keys
-                        self.by_riis_id[rec.data[RIIS.SPECIES_GEO_KEY]] = rec
+                        # Update dictionary riis_by_id with Occid keys
+                        self.by_riis_id[rec.data[RIIS_DATA.SPECIES_GEO_KEY]] = rec
                         rec_count += 1
 
                     # self._log.log(f"Updated {len(reclist)} records with {new_name}",
                     #     refname=self.__class__.__name__)
                     if (name_count % 1000) == 0:
                         self._log.log(
-                            f"*** NNSL Name {name_count} ***",
+                            f"*** RIIS Name {name_count} ***",
                             refname=self.__class__.__name__)
 
         except Exception as e:
@@ -644,7 +642,7 @@ class NNSL:
         new_header = self.annotated_riis_header
         try:
             writer, outf = get_csv_dict_writer(
-                outfname, new_header, RIIS.DELIMITER, fmode="w", overwrite=overwrite)
+                outfname, new_header, RIIS_DATA.DELIMITER, fmode="w", overwrite=overwrite)
         except Exception:
             raise
 
@@ -706,7 +704,7 @@ class NNSL:
                 the actual header, stripped of non-ascii characters
         """
         with open(fname, "r", newline="") as csvfile:
-            rdr = csv.reader(csvfile, delimiter=RIIS.DELIMITER)
+            rdr = csv.reader(csvfile, delimiter=RIIS_DATA.DELIMITER)
             header = next(rdr)
         # Test header length
         fld_count = len(header)
@@ -748,25 +746,25 @@ def resolve_riis_taxa(riis_filename, annotated_riis_filename, logger, overwrite=
         dictionary report of metadata
 
     Raises:
-        Exception: on error in NNSL.resolve_riis_to_gbif_taxa
+        Exception: on error in RIIS.resolve_riis_to_gbif_taxa
     """
     refname = "resolve_riis_taxa"
     report = {
         refname: {
             "riis_filename": riis_filename,
             "annotated_riis_filename": annotated_riis_filename,
-            "expected_count": RIIS.SPECIES_GEO_DATA_COUNT
+            "expected_count": RIIS_DATA.SPECIES_GEO_DATA_COUNT
         }
     }
-    nnsl = NNSL(riis_filename, logger)
+    riis = RIIS(riis_filename, logger)
     # Update species data
     try:
-        name_count, rec_count = nnsl.resolve_riis_to_gbif_taxa(
+        name_count, rec_count = riis.resolve_riis_to_gbif_taxa(
             annotated_riis_filename, overwrite=True)
         report[refname]["riis_record_count"] = rec_count
         report[refname]["unique_name_count"] = name_count
         logger.log(
-            f"Resolved {len(nnsl.by_riis_id)} taxa in {riis_filename}, next, write.",
+            f"Resolved {len(riis.by_riis_id)} taxa in {riis_filename}, next, write.",
             refname=refname)
     except Exception as e:
         report[refname]["error"] = f"Failed to resolve {refname}: {e}"
@@ -776,18 +774,18 @@ def resolve_riis_taxa(riis_filename, annotated_riis_filename, logger, overwrite=
         raise
 
     # Debug statements for inconsistent counts
-    if len(nnsl.by_riis_id) != rec_count:
+    if len(riis.by_riis_id) != rec_count:
         logger.log(
-            f"Records in NNSL {len(nnsl.by_riis_id)} != {rec_count} records read "
-            f"from {riis_filename} by NNSL", refname=refname, log_level=logging.DEBUG)
-    if len(nnsl.by_taxon) != name_count:
+            f"Records in RIIS {len(riis.by_riis_id)} != {rec_count} records read "
+            f"from {riis_filename} by RIIS", refname=refname, log_level=logging.DEBUG)
+    if len(riis.by_taxon) != name_count:
         logger.log(
-            f"Taxa in NNSL {len(nnsl.by_taxon)} != {rec_count} names resolved "
-            f"from {riis_filename} by NNSL", refname=refname, log_level=logging.DEBUG)
+            f"Taxa in RIIS {len(riis.by_taxon)} != {rec_count} names resolved "
+            f"from {riis_filename} by RIIS", refname=refname, log_level=logging.DEBUG)
 
     # Write, always replace
     try:
-        count = nnsl.write_resolved_riis(annotated_riis_filename, overwrite=overwrite)
+        count = riis.write_resolved_riis(annotated_riis_filename, overwrite=overwrite)
         report[refname]["annotated_count"] = count
         logger.log(
             f"Wrote {count} records to {annotated_riis_filename}.", refname=refname)
@@ -797,10 +795,10 @@ def resolve_riis_taxa(riis_filename, annotated_riis_filename, logger, overwrite=
             f"Unexpected failure {e} in resolve_riis_taxa", refname=refname,
             log_level=logging.ERROR)
     else:
-        if count != RIIS.SPECIES_GEO_DATA_COUNT:
+        if count != RIIS_DATA.SPECIES_GEO_DATA_COUNT:
             logger.log(
                 f"Resolved {count} RIIS records, expecting " +
-                f"{RIIS.SPECIES_GEO_DATA_COUNT}", refname=refname,
+                f"{RIIS_DATA.SPECIES_GEO_DATA_COUNT}", refname=refname,
                 log_level=logging.ERROR)
 
     return report

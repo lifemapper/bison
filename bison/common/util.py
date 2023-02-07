@@ -8,7 +8,7 @@ import subprocess
 import sys
 from multiprocessing import cpu_count
 
-from bison.common.constants import ENCODING, EXTRA_CSV_FIELD, GBIF
+from bison.common.constants import ENCODING, EXTRA_CSV_FIELD, FILE_POSTFIX, GBIF
 
 
 # ...............................................
@@ -378,48 +378,95 @@ def identify_chunks(big_csv_filename, chunk_count=0):
     return start_stop_pairs, rec_count, chunk_size
 
 
-# .............................................................................
-def get_chunk_filename(in_base_filename, start, stop, ext):
-    """Create a consistent filename for chunks of a larger file.
+def get_chunk_filename(self, basename, ext, start, stop):
+    """Construct a filename for a chunk of CSV records.
 
     Args:
-        in_base_filename (str): common base filename for all chunks
-        start (int): line number in the large file that serves as the first record of the chunk file
-        stop (int): line number in the large file that serves as the last record of the chunk file
-        ext (str): file extension for the chunk file
+        basename (str): base filename of the original large CSV data.
+        ext (str): extension of the filename
+        start (int): record number in original file of first record for this data chunk.
+        stop (int): record number in original file of last record for this data chunk.
 
-    Returns:
-        chunk_filename: standardized filename for the chunk of data
+    Note:
+        File will always start with basename,
+        followed by chunk
+        followed by process step completed (if any)
     """
-    chunk_filename = f"{in_base_filename}_chunk-{start}-{stop}_raw{ext}"
-    return chunk_filename
+    postfix = f"{FILE_POSTFIX.CHUNK}-{start}-{stop}"
+    return f"{basename}{FILE_POSTFIX.SEP}{postfix}{ext}"
 
 
 # .............................................................................
-def parse_chunk_filename(chunk_filename):
-    """Create a consistent filename for chunks of a larger file.
+def parse_filename(self, filename):
+    """Parse a filename into path, basename, chunk, processing step, extension.
 
     Args:
-        chunk_filename: standardized base filename for the chunk of data
+        filename (str): A filename used in processing,
 
-    Returns:
-        in_base_filename (str): common base filename for all chunks
-        start (int): line number in the large file that serves as the first record of the chunk file
-        stop (int): line number in the large file that serves as the last record of the chunk file
-        ext (str): file extension for the chunk file
+    Note:
+        File will always start with basename,
+        followed by chunk (if chunked)
+        followed by process step completed (if any)
     """
-    idx = chunk_filename.index("_chunk")
-    in_base_filename = chunk_filename[:idx]
+    chunk = None
+    process = None
+    path, fname = os.path.split(filename)
+    basefname, ext = os.path.splitext(fname)
+    parts = basefname.split(FILE_POSTFIX.SEP)
+    # File will always start with basename
+    basename = parts.pop(0)
+    if len(parts) >= 1:
+        p = parts.pop(0)
+        # if chunk exists
+        if p.startswith(FILE_POSTFIX.CHUNK):
+            chunk = p
+        else:
+            process = p
 
-    basename, ext = os.path.splitext(chunk_filename)
-    parts = basename.split("_")
-    for i in range(len(parts)):
-        if parts[i].startswith("chunk"):
-            chunk_idx = i
-            break
-    _, start, stop = parts[chunk_idx].split("-")
+    return path, basename, ext, chunk, process
 
-    return in_base_filename, start, stop, ext
+# # .............................................................................
+# def get_chunk_filename(in_base_filename, start, stop, ext):
+#     """Create a consistent filename for chunks of a larger file.
+#
+#     Args:
+#         in_base_filename (str): common base filename for all chunks
+#         start (int): line number in the large file that serves as the first record of the chunk file
+#         stop (int): line number in the large file that serves as the last record of the chunk file
+#         ext (str): file extension for the chunk file
+#
+#     Returns:
+#         chunk_filename: standardized filename for the chunk of data
+#     """
+#     chunk_filename = f"{in_base_filename}_chunk-{start}-{stop}_raw{ext}"
+#     return chunk_filename
+#
+#
+# # .............................................................................
+# def parse_chunk_filename(chunk_filename):
+#     """Create a consistent filename for chunks of a larger file.
+#
+#     Args:
+#         chunk_filename: standardized base filename for the chunk of data
+#
+#     Returns:
+#         in_base_filename (str): common base filename for all chunks
+#         start (int): line number in the large file that serves as the first record of the chunk file
+#         stop (int): line number in the large file that serves as the last record of the chunk file
+#         ext (str): file extension for the chunk file
+#     """
+#     idx = chunk_filename.index("_chunk")
+#     in_base_filename = chunk_filename[:idx]
+#
+#     basename, ext = os.path.splitext(chunk_filename)
+#     parts = basename.split("_")
+#     for i in range(len(parts)):
+#         if parts[i].startswith("chunk"):
+#             chunk_idx = i
+#             break
+#     _, start, stop = parts[chunk_idx].split("-")
+#
+#     return in_base_filename, start, stop, ext
 
 
 # .............................................................................
@@ -445,11 +492,12 @@ def identify_chunk_files(big_csv_filename, chunk_count=0):
 
 
 # .............................................................................
-def chunk_files(big_csv_filename, logger, chunk_count=0):
+def chunk_files(big_csv_filename, output_path, logger, chunk_count=0):
     """Split a large input csv file into multiple smaller input csv files.
 
     Args:
         big_csv_filename (str): Full path to the original large CSV file of records
+        output_path (str): Destination directory for chunked files.
         logger (object): logger for writing messages to file and console
         chunk_count (int): Number of smaller files to split large file into.  Defaults
             to the number of available CPUs minus 2.
@@ -465,7 +513,8 @@ def chunk_files(big_csv_filename, logger, chunk_count=0):
         Write chunk file records exactly as read, no corrections applied.
     """
     refname = "chunk_files"
-    in_base_filename, ext = os.path.splitext(big_csv_filename)
+    inpath, base_filename = os.path.split(big_csv_filename)
+    basename, ext = os.path.splitext(base_filename)
     chunk_filenames = []
     boundary_pairs, rec_count, chunk_size = identify_chunks(
         big_csv_filename, chunk_count=chunk_count)
@@ -477,7 +526,8 @@ def chunk_files(big_csv_filename, logger, chunk_count=0):
         big_recno = 1
 
         for (start, stop) in boundary_pairs:
-            chunk_fname = get_chunk_filename(in_base_filename, start, stop, ext)
+            chunk_basefilename = get_chunk_filename(basename, start, stop, ext)
+            chunk_fname = os.path.join(output_path, chunk_basefilename)
 
             try:
                 # Start writing the smaller file

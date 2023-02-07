@@ -1,8 +1,8 @@
 """Test the structure, size, and content of input US-RIIS data files."""
-from bison.providers.riis_data import NNSL
+from bison.providers.riis_data import RIIS
 
 
-class TestRIISInput(NNSL):
+class TestRIISInput(RIIS):
     """Class for testing input authority and riis files."""
 
     # .............................................................................
@@ -13,7 +13,7 @@ class TestRIISInput(NNSL):
             basepath (str): Path to the base of the input data, used to construct full
                 filenames from basepath and relative path constants.
         """
-        NNSL.__init__(self, basepath)
+        RIIS.__init__(self, basepath)
 
 #     # .............................................................................
 #     def _check_riis_authorities(self):
