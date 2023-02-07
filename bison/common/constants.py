@@ -132,22 +132,14 @@ class FILE_POSTFIX:
     CHUNK = "chunk"
     SEP = "_"
 
-# # .............................................................................
-# class FilenameBuilder():
-#     def __init__(self, dwc_filename):
-#         input_path, fname = os.path.split(dwc_filename)
-#         self._basename, self._ext = os.path.splitext(fname)
-#         self._sep = "_"
-#
-#     def get_chunk_filename(self, start, stop):
-#         postfix = f"{FILE_POSTFIX.CHUNK}-{start}-{stop}"
-#         return f"{self._basename}{self._sep}{postfix}{self._ext}"
-#
-#
-#     def parse_filename(self, filename):
-#         parts = filename.split(self._sep)
-#         return f"{self._basename}{self._ext}"
-
+# .............................................................................
+class CONFIG_PARAM:
+    FILE = "config_file"
+    IS_INPUT_DIR = "is_input_dir"
+    IS_OUPUT_DIR = "is_output_dir"
+    IS_INPUT_FILE = "is_input_file"
+    HELP = "help"
+    TYPE = "type"
 
 # .............................................................................
 class LMBISON_HEADER:

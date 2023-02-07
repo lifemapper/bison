@@ -2,9 +2,9 @@
 import json
 import os
 
+from bison.common.constants import CONFIG_PARAM
 from bison.providers.riis_data import resolve_riis_taxa
-from bison.tools._config_parser import (HELP_PARAM, IS_FILE_PARAM, TYPE_PARAM,
-                                        get_common_arguments)
+from bison.tools._config_parser import get_common_arguments
 
 DESCRIPTION = """\
 Annotate a CSV file containing the USGS Registry for Introduced and Invasive
@@ -15,26 +15,26 @@ PARAMETERS = {
         {
             "riis_filename":
                 {
-                    TYPE_PARAM: str,
-                    IS_FILE_PARAM: True,
-                    HELP_PARAM: "Filename of the most current USGS RIIS Master List"
+                    CONFIG_PARAM.TYPE: str,
+                    CONFIG_PARAM.IS_INPUT_FILE: True,
+                    CONFIG_PARAM.HELP: "Filename of the most current USGS RIIS Master List"
                 },
             "annotated_riis_filename":
                 {
-                    TYPE_PARAM: str,
-                    HELP_PARAM: "Filename to write the annotated RIIS list."
+                    CONFIG_PARAM.TYPE: str,
+                    CONFIG_PARAM.HELP: "Filename to write the annotated RIIS list."
                 },
         },
     "optional":
         {
             "log_filename":
                 {
-                    TYPE_PARAM: str,
-                    HELP_PARAM: "Filename to write logging data."},
+                    CONFIG_PARAM.TYPE: str,
+                    CONFIG_PARAM.HELP: "Filename to write logging data."},
             "report_filename":
                 {
-                    TYPE_PARAM: str,
-                    HELP_PARAM: "Filename to write summary metadata."}
+                    CONFIG_PARAM.TYPE: str,
+                    CONFIG_PARAM.HELP: "Filename to write summary metadata."}
 
         }
 }

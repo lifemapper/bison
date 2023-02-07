@@ -2,10 +2,9 @@
 import json
 import os
 
+from bison.common.constants import CONFIG_PARAM
 from bison.process.annotate import annotate_occurrence_file
-from bison.tools._config_parser import (
-    HELP_PARAM, IS_INPUT_DIR_PARAM, IS_INPUT_FILE_PARAM, IS_OUPUT_DIR_PARAM, TYPE_PARAM,
-    get_common_arguments)
+from bison.tools._config_parser import get_common_arguments
 
 DESCRIPTION = """\
         Annotate a CSV file containing GBIF Occurrence records with determinations
@@ -18,41 +17,41 @@ PARAMETERS = {
         {
             "input_path":
                 {
-                    TYPE_PARAM: str,
-                    IS_INPUT_DIR_PARAM: True,
-                    HELP_PARAM: "Source directory containing input data."
+                    CONFIG_PARAM.TYPE: str,
+                    CONFIG_PARAM.IS_INPUT_DIR: True,
+                    CONFIG_PARAM.HELP: "Source directory containing input data."
                 },
             "dwc_filenames":
                 {
-                    TYPE_PARAM: list,
-                    IS_INPUT_FILE_PARAM: True,
-                    HELP_PARAM: "Filenames of GBIF occurrence records in CSV format"
+                    CONFIG_PARAM.TYPE: list,
+                    CONFIG_PARAM.IS_INPUT_FILE: True,
+                    CONFIG_PARAM.HELP: "Filenames of GBIF occurrence records in CSV format"
                 },
             "riis_with_gbif_taxa_filename":
                 {
-                    TYPE_PARAM: str,
-                    IS_INPUT_FILE_PARAM: True,
-                    HELP_PARAM:
+                    CONFIG_PARAM.TYPE: str,
+                    CONFIG_PARAM.IS_INPUT_FILE: True,
+                    CONFIG_PARAM.HELP:
                         "Filename of USGS RIIS records, annotated with GBIF "
                         "accepted taxa. If this file does not exist, "
                 },
             "output_path":
                 {
-                    TYPE_PARAM: str,
-                    IS_OUPUT_DIR_PARAM: True,
-                    HELP_PARAM: "Destination directory for output data."
+                    CONFIG_PARAM.TYPE: str,
+                    CONFIG_PARAM.IS_OUPUT_DIR: True,
+                    CONFIG_PARAM.HELP: "Destination directory for output data."
                 },
         },
     "optional":
         {
             "log_filename":
                 {
-                    TYPE_PARAM: str,
-                    HELP_PARAM: "Filename to write logging data."},
+                    CONFIG_PARAM.TYPE: str,
+                    CONFIG_PARAM.HELP: "Filename to write logging data."},
             "report_filename":
                 {
-                    TYPE_PARAM: str,
-                    HELP_PARAM: "Filename to write summary metadata."}
+                    CONFIG_PARAM.TYPE: str,
+                    CONFIG_PARAM.HELP: "Filename to write summary metadata."}
 
         }
 }

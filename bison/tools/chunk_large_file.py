@@ -2,10 +2,9 @@
 import json
 import os
 
+from bison.common.constants import CONFIG_PARAM
 from bison.common.util import chunk_files
-from bison.tools._config_parser import (
-    HELP_PARAM, IS_INPUT_DIR_PARAM, IS_INPUT_FILE_PARAM, IS_OUPUT_DIR_PARAM, TYPE_PARAM,
-    get_common_arguments)
+from bison.tools._config_parser import get_common_arguments
 
 
 DESCRIPTION = """\
@@ -16,38 +15,38 @@ PARAMETERS = {
         {
             "input_path":
                 {
-                    TYPE_PARAM: str,
-                    IS_INPUT_DIR_PARAM: True,
-                    HELP_PARAM: "Source directory containing input data."
+                    CONFIG_PARAM.TYPE: str,
+                    CONFIG_PARAM.IS_INPUT_DIR: True,
+                    CONFIG_PARAM.HELP: "Source directory containing input data."
                 },
             "big_csv_filename":
                 {
-                    TYPE_PARAM: str,
-                    IS_INPUT_FILE_PARAM: True,
-                    HELP_PARAM: "Large CSV file to split into manageable chunks."
+                    CONFIG_PARAM.TYPE: str,
+                    CONFIG_PARAM.IS_INPUT_FILE: True,
+                    CONFIG_PARAM.HELP: "Large CSV file to split into manageable chunks."
                 },
             "output_path":
                 {
-                    TYPE_PARAM: str,
-                    IS_OUPUT_DIR_PARAM: True,
-                    HELP_PARAM: "Destination directory for output data."
+                    CONFIG_PARAM.TYPE: str,
+                    CONFIG_PARAM.IS_OUPUT_DIR: True,
+                    CONFIG_PARAM.HELP: "Destination directory for output data."
                 },
         },
     "optional":
         {
             "number_of_chunks":
                 {
-                    TYPE_PARAM: int,
-                    HELP_PARAM: "Number of subset files to create from this large file."
+                    CONFIG_PARAM.TYPE: int,
+                    CONFIG_PARAM.HELP: "Number of subset files to create from this large file."
                 },
             "log_filename":
                 {
-                    TYPE_PARAM: str,
-                    HELP_PARAM: "Filename to write logging data."},
+                    CONFIG_PARAM.TYPE: str,
+                    CONFIG_PARAM.HELP: "Filename to write logging data."},
             "report_filename":
                 {
-                    TYPE_PARAM: str,
-                    HELP_PARAM: "Filename to write summary metadata."}
+                    CONFIG_PARAM.TYPE: str,
+                    CONFIG_PARAM.HELP: "Filename to write summary metadata."}
 
         }
 }

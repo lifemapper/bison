@@ -1,16 +1,11 @@
 """Module containing a tool for parsing a configuration file for argparse."""
 import argparse
 import json
-import os
 
+from bison.common.constants import CONFIG_PARAM
 from bison.common.log import Logger
 
-CONFIG_FILE_PARAMETER = "config_file"
-IS_INPUT_DIR_PARAM = "is_input_dir"
-IS_OUPUT_DIR_PARAM = "is_output_dir"
-IS_INPUT_FILE_PARAM = "is_input_file"
-HELP_PARAM = "help"
-TYPE_PARAM = "type"
+
 
 
 # .....................................................................................
@@ -26,7 +21,7 @@ def _build_parser(command, description):
     """
     parser = argparse.ArgumentParser(prog=command, description=description)
     parser.add_argument(
-        f"--{CONFIG_FILE_PARAMETER}", type=str, help='Path to configuration file.')
+        f"--{CONFIG_PARAM.FILE}", type=str, help='Path to configuration file.')
     return parser
 
 
@@ -42,8 +37,8 @@ def _get_config_file_argument(parser):
     """
     config_filename = None
     args = parser.parse_args()
-    if hasattr(args, CONFIG_FILE_PARAMETER):
-        config_filename = getattr(args, CONFIG_FILE_PARAMETER)
+    if hasattr(args, CONFIG_PARAM.FILE):
+        config_filename = getattr(args, CONFIG_PARAM.FILE)
     return config_filename
 
 
