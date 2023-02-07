@@ -2,10 +2,11 @@
 import glob
 import os
 
-from bison.common.constants import (
-    ASSESS_KEY, ASSESS_VALUES, BIG_DATA_PATH, COUNT_KEY, COUNTY_KEY, GBIF,
-    INTRODUCED_OCCS, INTRODUCED_SPECIES, INVASIVE_OCCS, INVASIVE_SPECIES, LOG,
-    NATIVE_OCCS, NATIVE_SPECIES, APPEND_TO_DWC, STATE_KEY)
+from bison.common.constants import (APPEND_TO_DWC, ASSESS_KEY, ASSESS_VALUES,
+                                    BIG_DATA_PATH, COUNT_KEY, COUNTY_KEY, GBIF,
+                                    INTRODUCED_OCCS, INTRODUCED_SPECIES,
+                                    INVASIVE_OCCS, INVASIVE_SPECIES, LOG,
+                                    NATIVE_OCCS, NATIVE_SPECIES, STATE_KEY)
 from bison.common.log import Logger
 from bison.common.util import get_csv_dict_reader
 from bison.process.aggregate import Aggregator, RIIS_Counts

@@ -4,9 +4,9 @@ import os
 from datetime import datetime
 from multiprocessing import Pool, cpu_count
 
-from bison.common.constants import (
-    ENCODING, GBIF, LOG, APPEND_TO_DWC, APPEND_TO_RIIS, POINT_BUFFER_RANGE,
-    US_CENSUS_COUNTY, US_STATES)
+from bison.common.constants import (APPEND_TO_DWC, APPEND_TO_RIIS, ENCODING,
+                                    GBIF, LOG, POINT_BUFFER_RANGE,
+                                    US_CENSUS_COUNTY, US_STATES)
 from bison.common.util import get_csv_dict_writer
 from bison.process.geoindex import GeoException, GeoResolver
 from bison.providers.gbif_data import DwcData

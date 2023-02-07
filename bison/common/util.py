@@ -8,8 +8,8 @@ import subprocess
 import sys
 from multiprocessing import cpu_count
 
-from bison.common.constants import (
-    DWC_PROCESS, ENCODING, EXTRA_CSV_FIELD, FILE_POSTFIX, GBIF)
+from bison.common.constants import (DWC_PROCESS, ENCODING, EXTRA_CSV_FIELD,
+                                    FILE_POSTFIX, GBIF)
 
 
 # ...............................................

@@ -1,7 +1,6 @@
 """Constants for GBIF, BISON, RIIS, and processed outputs, used across modules."""
 from enum import Enum
 
-
 BIG_DATA_PATH = "/home/astewart/git/bison/big_data"
 DATA_PATH = "/home/astewart/git/bison/data"
 INPUT_DIR = "input"
