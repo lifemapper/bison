@@ -2,13 +2,10 @@
 import glob
 import os
 
-from bison.common.constants import (ASSESS_KEY, ASSESS_VALUES, BIG_DATA_PATH,
-                                    COUNT_KEY, COUNTY_KEY, GBIF,
-                                    INTRODUCED_OCCS, INTRODUCED_SPECIES,
-                                    INVASIVE_OCCS, INVASIVE_SPECIES, LOG,
-                                    NATIVE_OCCS, NATIVE_SPECIES,
-                                    NEW_RESOLVED_COUNTY, NEW_RESOLVED_STATE,
-                                    NEW_RIIS_ASSESSMENT_FLD, STATE_KEY)
+from bison.common.constants import (
+    ASSESS_KEY, ASSESS_VALUES, BIG_DATA_PATH, COUNT_KEY, COUNTY_KEY, GBIF,
+    INTRODUCED_OCCS, INTRODUCED_SPECIES, INVASIVE_OCCS, INVASIVE_SPECIES, LOG,
+    NATIVE_OCCS, NATIVE_SPECIES, APPEND_TO_DWC, STATE_KEY)
 from bison.common.log import Logger
 from bison.common.util import get_csv_dict_reader
 from bison.process.aggregate import Aggregator, RIIS_Counts
@@ -59,11 +56,11 @@ class Counter():
             # Find the species of the first record with riis_assessment
             rec = dwcdata.get_record()
             while rec is not None:
-                if rec[NEW_RIIS_ASSESSMENT_FLD] == assessment:
+                if rec[APPEND_TO_DWC.RIIS_ASSESSMENT] == assessment:
                     accepted_spname = rec[GBIF.ACC_NAME_FLD]
                     taxkey = rec[GBIF.ACC_TAXON_FLD]
-                    county = rec[NEW_RESOLVED_COUNTY]
-                    state = rec[NEW_RESOLVED_STATE]
+                    county = rec[APPEND_TO_DWC.RESOLVED_CTY]
+                    state = rec[APPEND_TO_DWC.RESOLVED_ST]
                     print(f"Found {accepted_spname} on line {dwcdata.recno}")
                     break
                 rec = dwcdata.get_record()
@@ -106,7 +103,7 @@ class Counter():
             # Find the species of the first record with riis_assessment
             rec = dwcdata.get_record()
             while rec is not None:
-                ass = rec[NEW_RIIS_ASSESSMENT_FLD]
+                ass = rec[APPEND_TO_DWC.RIIS_ASSESSMENT]
                 try:
                     assessments[ass] += 1
                 except Exception as e:
@@ -133,11 +130,11 @@ class Counter():
                 rec = dwcdata.get_record()
                 while rec is not None:
                     if (rec[GBIF.ACC_TAXON_FLD] == taxkey
-                            and rec[NEW_RESOLVED_STATE] == state):
-                        assess = rec[NEW_RIIS_ASSESSMENT_FLD]
+                            and rec[APPEND_TO_DWC.RESOLVED_STATE] == state):
+                        assess = rec[APPEND_TO_DWC.RIIS_ASSESSMENT_FLD]
                         # Add to state count
                         state_counts.add_to(assess, value=1)
-                        if rec[NEW_RESOLVED_COUNTY] == county:
+                        if rec[APPEND_TO_DWC.RESOLVED_COUNTY] == county:
                             # Add to county count
                             cty_counts.add_to(assess, value=1)
                     rec = dwcdata.get_record()
@@ -174,14 +171,14 @@ class Counter():
                 # Find the species of the first record with riis_assessment
                 rec = dwcdata.get_record()
                 while rec is not None:
-                    assess = rec[NEW_RIIS_ASSESSMENT_FLD]
+                    assess = rec[APPEND_TO_DWC.RIIS_ASSESSMENT_FLD]
                     taxkey = rec[GBIF.ACC_TAXON_FLD]
-                    if rec[NEW_RESOLVED_STATE] == state:
+                    if rec[APPEND_TO_DWC.RESOLVED_STATE] == state:
                         # Add to occ count
                         state_occ_assessment_counts.add_to(assess, value=1)
                         # Add to set of species
                         state_species[assess].add(taxkey)
-                        if county is not None and rec[NEW_RESOLVED_COUNTY] == county:
+                        if county is not None and rec[APPEND_TO_DWC.RESOLVED_COUNTY] == county:
                             # Add to occ count
                             cty_occ_assessment_counts.add_to(assess, value=1)
                             # Add to set of species

@@ -1,5 +1,6 @@
 """Constants for GBIF, BISON, RIIS, and processed outputs, used across modules."""
-import os.path
+from enum import Enum
+
 
 BIG_DATA_PATH = "/home/astewart/git/bison/big_data"
 DATA_PATH = "/home/astewart/git/bison/data"
@@ -12,18 +13,68 @@ ERR_SEPARATOR = "------------"
 POINT_BUFFER_RANGE = [(i / 10.0) for i in range(1, 11)]
 
 # Append these to DwC data for Census state/county resolution and RIIS resolution
-NEW_RESOLVED_COUNTY = "georef_cty"
-NEW_RESOLVED_STATE = "georef_st"
-NEW_RIIS_KEY_FLD = "riis_occurrence_id"
-NEW_RIIS_ASSESSMENT_FLD = "riis_assessment"
-NEW_FILTER_FLAG = "do_summarize"
+class APPEND_TO_DWC:
+    RESOLVED_CTY = "georef_cty"
+    RESOLVED_ST = "georef_st"
+    RIIS_KEY = "riis_occurrence_id"
+    RIIS_ASSESSMENT = "riis_assessment"
+    FILTER_FLAG = "do_summarize"
 
 # Append these to RIIS data for GBIF accepted taxon resolution
-NEW_GBIF_KEY_FLD = "gbif_res_taxonkey"
-NEW_GBIF_SCINAME_FLD = "gbif_res_scientificName"
+class APPEND_TO_RIIS:
+    GBIF_KEY = "gbif_res_taxonkey"
+    GBIF_SCINAME = "gbif_res_scientificName"
 
 AGGREGATOR_DELIMITER = "__"
 EXTRA_CSV_FIELD = "rest_values"
+
+class DWC_PROCESS:
+    # CHUNK = 0
+    # ANNOTATE = 1
+    # SUMMARIZE = 2
+    # AGGREGATE = 3
+    # postfix = {
+    #     0: None,
+    #     1: "georiis",
+    #     2: "summary",
+    #     3: "aggregate"
+    # }
+    CHUNK = {"step": 0, "postfix": None}
+    ANNOTATE = {"step": 1, "postfix": "georiis"}
+    SUMMARIZE = {"step": 2, "postfix": "summary"}
+    AGGREGATE = {"step": 3, "postfix": "aggregate"}
+
+    @staticmethod
+    def process_types():
+        return (
+            DWC_PROCESS.CHUNK, DWC_PROCESS.ANNOTATE,
+            DWC_PROCESS.SUMMARIZE, DWC_PROCESS.AGGREGATE
+        )
+
+    @staticmethod
+    def get_postfix(step):
+        for pt in DWC_PROCESS.process_types():
+            if pt["step"] == step:
+                return pt["postfix"]
+        return None
+
+    @staticmethod
+    def get_step(postfix):
+        for pt in DWC_PROCESS.process_types():
+            if pt["postfix"] == postfix:
+                return pt["step"]
+        return -1
+
+    @staticmethod
+    def get_process(postfix=None, step=None):
+        for pt in DWC_PROCESS.process_types():
+            if postfix is not None and pt["postfix"] == postfix:
+                return pt
+            elif pt["step"] == step:
+                return pt
+        return None
+
+
 
 RANKS = [
     "ABERRATION", "CLASS", "COHORT", "CONVARIETY", "CULTIVAR", "CULTIVAR_GROUP",
@@ -126,11 +177,13 @@ PCT_INTRODUCED_OCCS = "pct_introduced_all_occurrences"
 PCT_INVASIVE_OCCS = "pct_invasive_all_occurrences"
 PCT_NATIVE_OCCS = "pct_presumed_native_occurrences"
 
+
 # .............................................................................
 class FILE_POSTFIX:
     GEO_RISS_ANNOTATED = "georiis"
     CHUNK = "chunk"
     SEP = "_"
+
 
 # .............................................................................
 class CONFIG_PARAM:
@@ -140,6 +193,7 @@ class CONFIG_PARAM:
     IS_INPUT_FILE = "is_input_file"
     HELP = "help"
     TYPE = "type"
+
 
 # .............................................................................
 class LMBISON_HEADER:
@@ -163,7 +217,10 @@ class US_CENSUS_COUNTY:
     """File and fieldnames for census county boundary data, map to bison fieldnames."""
     # PATH = DATA_PATH
     FILE = "cb_2020_us_county_500k.shp"
-    GEO_BISON_MAP = {"NAME": NEW_RESOLVED_COUNTY, "STUSPS": NEW_RESOLVED_STATE}
+    GEO_BISON_MAP = {
+        "NAME": APPEND_TO_DWC.RESOLVED_CTY,
+        "STUSPS": APPEND_TO_DWC.RESOLVED_ST
+    }
 
 
 # .............................................................................
@@ -171,21 +228,22 @@ class US_CENSUS_STATE:
     """File and fieldnames for census state boundary data, map to bison fieldnames."""
     # PATH = DATA_PATH
     FILE = "cb_2020_us_state_500k.shp"
-    GEO_BISON_MAP = {"STUSPS": NEW_RESOLVED_STATE}
+    GEO_BISON_MAP = {"STUSPS": APPEND_TO_DWC.RESOLVED_ST}
 
 
 # .............................................................................
 class US_AIANNH:
     """File and fieldnames for American Indian and Alaskan Native"""
     FILE = "cb_2021_us_aiannh_500k.shp"
-    GEO_BISON_MAP = {"STUSPS": NEW_RESOLVED_STATE}
+    GEO_BISON_MAP = {}
 
 
 # .............................................................................
 class US_PAD:
     """File and fieldnames for American Indian and Alaskan Native"""
     FILES = "cb_2021_us_aiannh_500k.shp"
-    GEO_BISON_MAP = {"STUSPS": NEW_RESOLVED_STATE}
+    GEO_BISON_MAP = {}
+
 
 # .............................................................................
 class ITIS:

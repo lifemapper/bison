@@ -3,6 +3,7 @@ import json
 import os
 
 from bison.common.constants import CONFIG_PARAM
+from bison.common.util import get_out_filename
 from bison.process.annotate import annotate_occurrence_file
 from bison.tools._config_parser import get_common_arguments
 
@@ -69,10 +70,17 @@ def cli():
     config, logger, report_filename = get_common_arguments(
         script_name, DESCRIPTION, PARAMETERS)
 
+    inpath = config["input_path"]
+    in_fname = config["riis_with_gbif_taxa_filename"]
+    riis_w_gbif_fname = os.path.join(inpath, in_fname)
+    out_fname = get_out_filename(in_fname)
+    os.path.join(inpath, config["dwc_with_geo_and_riis_filename"])
     # Add locality-intersections and RIIS determinations to GBIF DwC records
-    report = annotate_occurrence_file(
-        config["dwc_filename"], config["riis_with_gbif_taxa_filename"],
-        config["dwc_with_geo_and_riis_filename"], logger)
+    for dwc_basename in config["dwc_filenames"]:
+        dwc_fname = os.path.join(inpath, dwc_basename)
+
+        report = annotate_occurrence_file(
+            dwc_fname, riis_w_gbif_fname, out_fname, logger)
 
     # If the output report was requested, write it
     if report_filename:

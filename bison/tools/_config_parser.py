@@ -6,8 +6,6 @@ from bison.common.constants import CONFIG_PARAM
 from bison.common.log import Logger
 
 
-
-
 # .....................................................................................
 def _build_parser(command, description):
     """Build an argparse.ArgumentParser object for the tool.

@@ -3,9 +3,8 @@ import csv
 import logging
 import os
 
-from bison.common.constants import (ERR_SEPARATOR, GBIF, LINENO_FLD,
-                                    NEW_GBIF_KEY_FLD, NEW_GBIF_SCINAME_FLD,
-                                    RIIS_DATA)
+from bison.common.constants import (
+    ERR_SEPARATOR, GBIF, LINENO_FLD, APPEND_TO_RIIS, RIIS_DATA)
 from bison.common.util import get_csv_dict_reader, get_csv_dict_writer
 from bison.providers.gbif_api import GbifSvc
 
@@ -42,8 +41,8 @@ class RIISRec():
             ValueError: on non-integer GBIF taxonKey or non-integer ITIS TSN
         """
         self.data = record
-        self.data[NEW_GBIF_KEY_FLD] = new_gbif_key
-        self.data[NEW_GBIF_SCINAME_FLD] = new_gbif_name
+        self.data[APPEND_TO_RIIS.GBIF_KEY] = new_gbif_key
+        self.data[APPEND_TO_RIIS.GBIF_SCINAME] = new_gbif_name
         self.data[LINENO_FLD] = line_num
         self.name = standardize_name(
             record[RIIS_DATA.SCINAME_FLD], record[RIIS_DATA.SCIAUTHOR_FLD])
@@ -110,7 +109,7 @@ class RIISRec():
         Returns:
             latest resolved GBIF accepted taxon key value
         """
-        return self.data[NEW_GBIF_KEY_FLD]
+        return self.data[APPEND_TO_RIIS.GBIF_KEY]
 
     # ...............................................
     def update_data(self, gbif_key, gbif_sciname):
@@ -122,8 +121,8 @@ class RIISRec():
             gbif_sciname (str):  current GBIF accepted scientific name, in the GBIF
                 Backbone Taxonomy, for a scientific name
         """
-        self.data[NEW_GBIF_KEY_FLD] = gbif_key
-        self.data[NEW_GBIF_SCINAME_FLD] = gbif_sciname
+        self.data[APPEND_TO_RIIS.GBIF_KEY] = gbif_key
+        self.data[APPEND_TO_RIIS.GBIF_SCINAME] = gbif_sciname
 
     # ...............................................
     def is_name_match(self, rrec):
@@ -213,7 +212,7 @@ class RIISRec():
         Returns:
             True if self and rrec GBIF key match.
         """
-        return (self.data[RIIS_DATA.GBIF_KEY] == self.data[NEW_GBIF_KEY_FLD])
+        return (self.data[RIIS_DATA.GBIF_KEY] == self.data[APPEND_TO_RIIS.GBIF_KEY])
 
     # ...............................................
     def is_taxauthority_match(self, rrec):
@@ -295,8 +294,8 @@ class RIIS:
             updated_riis_header: fieldnames for the updated file
         """
         header = RIIS_DATA.SPECIES_GEO_HEADER.copy()
-        header.append(NEW_GBIF_KEY_FLD)
-        header.append(NEW_GBIF_SCINAME_FLD)
+        header.append(APPEND_TO_RIIS.GBIF_KEY)
+        header.append(APPEND_TO_RIIS.GBIF_SCINAME)
         header.append(LINENO_FLD)
         return header
 
@@ -406,8 +405,8 @@ class RIIS:
                 if lineno > 1:
                     # Read new gbif resolutions if they exist
                     if self._is_annotated is True:
-                        new_gbif_key = row[NEW_GBIF_KEY_FLD]
-                        new_gbif_name = row[NEW_GBIF_SCINAME_FLD]
+                        new_gbif_key = row[APPEND_TO_RIIS.GBIF_KEY]
+                        new_gbif_name = row[APPEND_TO_RIIS.GBIF_SCINAME]
                     else:
                         new_gbif_key = new_gbif_name = None
                     # Create record of original data and optional new data
@@ -634,7 +633,7 @@ class RIIS:
             keys = list(self.by_riis_id.keys())
             tstrec = self.by_riis_id[keys[0]]
             try:
-                tstrec.data[NEW_GBIF_KEY_FLD]
+                tstrec.data[APPEND_TO_RIIS.GBIF_KEY]
             except KeyError:
                 raise Exception(
                     "RIIS records have not been resolved to GBIF accepted taxa")

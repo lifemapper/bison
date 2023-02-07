@@ -4,12 +4,10 @@ import os
 from datetime import datetime
 from multiprocessing import Pool, cpu_count
 
-from bison.common.constants import (AGGREGATOR_DELIMITER, ASSESS_KEY,
-                                    COUNT_KEY, DATA_PATH, ENCODING,
-                                    EXTRA_CSV_FIELD, GBIF, LMBISON_HEADER,
-                                    LOCATION_KEY, NEW_RESOLVED_COUNTY,
-                                    NEW_RESOLVED_STATE, OUT_DIR, RIIS_DATA,
-                                    SPECIES_KEY, SPECIES_NAME_KEY, US_STATES)
+from bison.common.constants import (
+    AGGREGATOR_DELIMITER, ASSESS_KEY, COUNT_KEY, DATA_PATH, ENCODING, EXTRA_CSV_FIELD,
+    GBIF, LMBISON_HEADER, LOCATION_KEY, APPEND_TO_DWC, OUT_DIR, RIIS_DATA, SPECIES_KEY,
+    SPECIES_NAME_KEY, US_STATES)
 from bison.common.log import Logger
 from bison.common.util import (get_csv_dict_reader, get_csv_writer,
                                ready_filename)
@@ -427,8 +425,8 @@ class Aggregator():
         self._log.info(f"Summarizing annotations in {self._csvfile} by region")
         try:
             for rec in csv_rdr:
-                state = rec[NEW_RESOLVED_STATE]
-                county = rec[NEW_RESOLVED_COUNTY]
+                state = rec[APPEND_TO_DWC.RESOLVED_ST]
+                county = rec[APPEND_TO_DWC.RESOLVED_CNTY]
                 # If record is filtered out for any reason during annotation,
                 # state and county will be None
                 if state and county:

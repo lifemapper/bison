@@ -6,7 +6,6 @@ from bison.common.constants import CONFIG_PARAM
 from bison.common.util import chunk_files
 from bison.tools._config_parser import get_common_arguments
 
-
 DESCRIPTION = """\
 Split a CSV file containing GBIF DwC occurrence records into smaller files. """
 # Options to be placed in a configuration file for the command

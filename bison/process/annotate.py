@@ -4,11 +4,9 @@ import os
 from datetime import datetime
 from multiprocessing import Pool, cpu_count
 
-from bison.common.constants import (ENCODING, GBIF, LOG, NEW_RESOLVED_COUNTY,
-                                    NEW_RESOLVED_STATE,
-                                    NEW_RIIS_ASSESSMENT_FLD, NEW_RIIS_KEY_FLD,
-                                    POINT_BUFFER_RANGE, US_CENSUS_COUNTY,
-                                    US_STATES)
+from bison.common.constants import (
+    ENCODING, GBIF, LOG, APPEND_TO_DWC, APPEND_TO_RIIS, POINT_BUFFER_RANGE,
+    US_CENSUS_COUNTY, US_STATES)
 from bison.common.util import get_csv_dict_writer
 from bison.process.geoindex import GeoException, GeoResolver
 from bison.providers.gbif_data import DwcData
@@ -19,7 +17,7 @@ from bison.providers.riis_data import RIIS
 class Annotator():
     """Class for adding USGS RIIS info to GBIF occurrences."""
     def __init__(
-            self, gbif_occ_filename, logger, geo_types=[], riis_with_gbif_filename=None,
+            self, gbif_occ_filename, logger, geo_types=(), riis_with_gbif_filename=None,
             riis=None):
         """Constructor.
 
@@ -47,10 +45,10 @@ class Annotator():
             if self.riis.is_annotated is False:
                 if riis_with_gbif_filename is None:
                     raise Exception(
-                        f"RIIS data does not contain GBIF accepted taxa, needed for "
-                        f"annotating GBIF occurrence data with RIIS Introduced and "
-                        f"Invasive determinations.  Provide a riis_with_gbif_filename "
-                        f"output file to initiate resolution of RIIS records.")
+                        "RIIS data does not contain GBIF accepted taxa, needed for "
+                        "annotating GBIF occurrence data with RIIS Introduced and "
+                        "Invasive determinations.  Provide a riis_with_gbif_filename "
+                        "output file to initiate resolution of RIIS records.")
                 else:
                     self.riis.resolve_riis_to_gbif_taxa(
                         riis_with_gbif_filename, overwrite=True)
@@ -147,8 +145,8 @@ class Annotator():
 
         header = self._dwcdata.fieldnames
         header.extend(
-            [NEW_RIIS_KEY_FLD, NEW_RIIS_ASSESSMENT_FLD,
-             NEW_RESOLVED_COUNTY, NEW_RESOLVED_STATE])
+            [APPEND_TO_RIIS.RIIS_KEY, APPEND_TO_RIIS.RIIS_ASSESSMENT,
+             APPEND_TO_DWC.RESOLVED_CTY, APPEND_TO_DWC.RESOLVED_ST])
 
         try:
             self._csv_writer, self._outf = get_csv_dict_writer(
@@ -219,8 +217,7 @@ class Annotator():
 
         Returns:
             dwcrec: one GBIF DwC record, if it is not filtered out, values are added
-                to calculated fields: NEW_RESOLVED_COUNTY, NEW_RESOLVED_STATE,
-                NEW_RIIS_ASSESSMENT_FLD, NEW_RIIS_KEY_FLD, otherwise these fields are
+                to calculated fields: APPEND_TO_DWC, otherwise these fields are
                 None.
         """
         gbif_id = dwcrec[GBIF.ID_FLD]
@@ -254,10 +251,10 @@ class Annotator():
                 filtered_taxkeys, region)
 
         # Add county, state and RIIS assessment to record
-        dwcrec[NEW_RESOLVED_COUNTY] = county
-        dwcrec[NEW_RESOLVED_STATE] = state
-        dwcrec[NEW_RIIS_ASSESSMENT_FLD] = riis_assessment
-        dwcrec[NEW_RIIS_KEY_FLD] = riis_key
+        dwcrec[APPEND_TO_DWC.RESOLVED_CTY] = county
+        dwcrec[APPEND_TO_DWC.RESOLVED_ST] = state
+        dwcrec[APPEND_TO_DWC.RIIS_ASSESSMENT] = riis_assessment
+        dwcrec[APPEND_TO_DWC.RIIS_KEY] = riis_key
 
         return dwcrec
 
@@ -340,8 +337,8 @@ class Annotator():
                     f"Rec {self._dwcdata.recno}; intersect point {lon}, {lat}; "
                     f"OGR time {ogr_seconds}", refname=self.__class__.__name__,
                     log_level=logging.DEBUG)
-            county = fldvals[NEW_RESOLVED_COUNTY]
-            state = fldvals[NEW_RESOLVED_STATE]
+            county = fldvals[APPEND_TO_DWC.RESOLVED_CTY]
+            state = fldvals[APPEND_TO_DWC.RESOLVED_ST]
         return county, state
 
 
