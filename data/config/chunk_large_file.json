@@ -3,5 +3,6 @@
     "report_filename": "/volumes/bison/output/chunk_large_file.rpt",
     "input_path": "/volumes/bison/input",
     "big_csv_filename": "gbif-2023-01-26-10k.csv",
+    "number_of_chunks": 10,
     "output_path": "/volumes/bison/process"
 }

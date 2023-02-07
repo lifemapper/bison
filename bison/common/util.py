@@ -378,7 +378,7 @@ def identify_chunks(big_csv_filename, chunk_count=0):
     return start_stop_pairs, rec_count, chunk_size
 
 
-def get_chunk_filename(self, basename, ext, start, stop):
+def get_chunk_filename(basename, ext, start, stop):
     """Construct a filename for a chunk of CSV records.
 
     Args:
@@ -397,7 +397,7 @@ def get_chunk_filename(self, basename, ext, start, stop):
 
 
 # .............................................................................
-def parse_filename(self, filename):
+def parse_filename(filename):
     """Parse a filename into path, basename, chunk, processing step, extension.
 
     Args:
@@ -486,7 +486,7 @@ def identify_chunk_files(big_csv_filename, chunk_count=0):
     boundary_pairs, _rec_count, _chunk_size = identify_chunks(
         big_csv_filename, chunk_count=chunk_count)
     for (start, stop) in boundary_pairs:
-        chunk_fname = get_chunk_filename(in_base_filename, start, stop, ext)
+        chunk_fname = get_chunk_filename(in_base_filename, ext, start, stop)
         chunk_filenames.append(chunk_fname)
     return chunk_filenames
 
@@ -526,7 +526,7 @@ def chunk_files(big_csv_filename, output_path, logger, chunk_count=0):
         big_recno = 1
 
         for (start, stop) in boundary_pairs:
-            chunk_basefilename = get_chunk_filename(basename, start, stop, ext)
+            chunk_basefilename = get_chunk_filename(basename, ext, start, stop)
             chunk_fname = os.path.join(output_path, chunk_basefilename)
 
             try:
