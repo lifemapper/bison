@@ -28,16 +28,6 @@ AGGREGATOR_DELIMITER = "__"
 EXTRA_CSV_FIELD = "rest_values"
 
 class DWC_PROCESS:
-    # CHUNK = 0
-    # ANNOTATE = 1
-    # SUMMARIZE = 2
-    # AGGREGATE = 3
-    # postfix = {
-    #     0: None,
-    #     1: "georiis",
-    #     2: "summary",
-    #     3: "aggregate"
-    # }
     CHUNK = {"step": 0, "postfix": None}
     ANNOTATE = {"step": 1, "postfix": "georiis"}
     SUMMARIZE = {"step": 2, "postfix": "summary"}
@@ -149,34 +139,6 @@ US_STATES = {
     "Wyoming": "WY",
 }
 
-SPECIES_KEY = "species_key"
-SCIENTIFIC_NAME_KEY = "accepted_scientific_name"
-SPECIES_NAME_KEY = "species_name"
-ASSESS_KEY = "assessment"
-STATE_KEY = "state"
-COUNTY_KEY = "county"
-LOCATION_KEY = "location"
-COUNT_KEY = "count"
-
-ASSESS_VALUES = ("introduced", "invasive", "presumed_native")
-
-INTRODUCED_SPECIES = "introduced_species"
-INVASIVE_SPECIES = "invasive_species"
-NATIVE_SPECIES = "presumed_native_species"
-TOTAL_SPECIES = "all_species"
-PCT_INTRODUCED_SPECIES = "pct_introduced_all_species"
-PCT_INVASIVE_SPECIES = "pct_invasive_all_species"
-PCT_NATIVE_SPECIES = "pct_presumed_native_species"
-
-INTRODUCED_OCCS = "introduced_occurrences"
-INVASIVE_OCCS = "invasive_occurrences"
-NATIVE_OCCS = "presumed_native_occurrences"
-TOTAL_OCCS = "all_occurrences"
-PCT_INTRODUCED_OCCS = "pct_introduced_all_occurrences"
-PCT_INVASIVE_OCCS = "pct_invasive_all_occurrences"
-PCT_NATIVE_OCCS = "pct_presumed_native_occurrences"
-
-
 # .............................................................................
 class FILE_POSTFIX:
     GEO_RISS_ANNOTATED = "georiis"
@@ -195,8 +157,34 @@ class CONFIG_PARAM:
 
 
 # .............................................................................
-class LMBISON_HEADER:
+class LMBISON:
     """Headers for temporary and final output files."""
+    SPECIES_KEY = "species_key"
+    SCIENTIFIC_NAME_KEY = "accepted_scientific_name"
+    SPECIES_NAME_KEY = "species_name"
+    ASSESS_KEY = "assessment"
+    STATE_KEY = "state"
+    COUNTY_KEY = "county"
+    LOCATION_KEY = "location"
+    COUNT_KEY = "count"
+
+    INTRODUCED_SPECIES = "introduced_species"
+    INVASIVE_SPECIES = "invasive_species"
+    NATIVE_SPECIES = "presumed_native_species"
+    TOTAL_SPECIES = "all_species"
+    PCT_INTRODUCED_SPECIES = "pct_introduced_all_species"
+    PCT_INVASIVE_SPECIES = "pct_invasive_all_species"
+    PCT_NATIVE_SPECIES = "pct_presumed_native_species"
+
+    INTRODUCED_OCCS = "introduced_occurrences"
+    INVASIVE_OCCS = "invasive_occurrences"
+    NATIVE_OCCS = "presumed_native_occurrences"
+    TOTAL_OCCS = "all_occurrences"
+    PCT_INTRODUCED_OCCS = "pct_introduced_all_occurrences"
+    PCT_INVASIVE_OCCS = "pct_invasive_all_occurrences"
+    PCT_NATIVE_OCCS = "pct_presumed_native_occurrences"
+
+    ASSESS_VALUES = ("introduced", "invasive", "presumed_native")
     # temporary summary of an annotated DwC file (subset/chunk of data)
     SUMMARY_FILE = [LOCATION_KEY, SPECIES_KEY, SPECIES_NAME_KEY, COUNT_KEY]
     # output summary of region
@@ -220,15 +208,6 @@ class US_CENSUS_COUNTY:
         "NAME": APPEND_TO_DWC.RESOLVED_CTY,
         "STUSPS": APPEND_TO_DWC.RESOLVED_ST
     }
-
-
-# .............................................................................
-class US_CENSUS_STATE:
-    """File and fieldnames for census state boundary data, map to bison fieldnames."""
-    # PATH = DATA_PATH
-    FILE = "cb_2020_us_state_500k.shp"
-    GEO_BISON_MAP = {"STUSPS": APPEND_TO_DWC.RESOLVED_ST}
-
 
 # .............................................................................
 class US_AIANNH:

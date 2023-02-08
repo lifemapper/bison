@@ -3,37 +3,41 @@ import json
 import os
 
 from bison.common.constants import CONFIG_PARAM
-from bison.common.util import get_out_filename
+from bison.common.util import BisonNameOp
 from bison.process.annotate import annotate_occurrence_file
 from bison.tools._config_parser import get_common_arguments
 
 DESCRIPTION = """\
-        Annotate a CSV file containing GBIF Occurrence records with determinations
-        from the USGS Registry for Introduced and Invasive Species (RIIS).  Input RIIS
-        data must contain accepted names from GBIF, so records may be matched
-        on species and location. """
+        Annotate a CSV file containing GBIF Occurrence records with geographic areas 
+        including state and county designations from census boundaries,  
+        American Indian/Alaska Native Areas/Hawaiian Home Lands (AIANNH), and US 
+        Protected Areas (US-PAD), and determinations from the USGS Registry for 
+        Introduced and Invasive Species (RIIS).  Input RIIS data must contain accepted 
+        names from GBIF, so records may be matched on species and state. """
 # Options to be placed in a configuration file for the command
 PARAMETERS = {
     "required":
         {
-            "input_path":
-                {
-                    CONFIG_PARAM.TYPE: str,
-                    CONFIG_PARAM.IS_INPUT_DIR: True,
-                    CONFIG_PARAM.HELP: "Source directory containing input data."
-                },
+            # "input_path":
+            #     {
+            #         CONFIG_PARAM.TYPE: str,
+            #         CONFIG_PARAM.IS_INPUT_DIR: True,
+            #         CONFIG_PARAM.HELP:
+            #             "Source directory containing ancillary input data."
+            #     },
             "dwc_filenames":
                 {
                     CONFIG_PARAM.TYPE: list,
                     CONFIG_PARAM.IS_INPUT_FILE: True,
-                    CONFIG_PARAM.HELP: "Filenames of GBIF occurrence records in CSV format"
+                    CONFIG_PARAM.HELP:
+                        "Fullpath of filenames containing raw GBIF occurrence records in CSV format"
                 },
             "riis_with_gbif_taxa_filename":
                 {
                     CONFIG_PARAM.TYPE: str,
                     CONFIG_PARAM.IS_INPUT_FILE: True,
                     CONFIG_PARAM.HELP:
-                        "Filename of USGS RIIS records, annotated with GBIF "
+                        "Fullpath of filename of USGS RIIS records, annotated with GBIF "
                         "accepted taxa. If this file does not exist, "
                 },
             "output_path":
@@ -70,17 +74,16 @@ def cli():
     config, logger, report_filename = get_common_arguments(
         script_name, DESCRIPTION, PARAMETERS)
 
-    inpath = config["input_path"]
-    in_fname = config["riis_with_gbif_taxa_filename"]
-    riis_w_gbif_fname = os.path.join(inpath, in_fname)
-    out_fname = get_out_filename(in_fname)
-    os.path.join(inpath, config["dwc_with_geo_and_riis_filename"])
-    # Add locality-intersections and RIIS determinations to GBIF DwC records
-    for dwc_basename in config["dwc_filenames"]:
-        dwc_fname = os.path.join(inpath, dwc_basename)
+    # inpath = config["input_path"]
+    riis_w_gbif_fname = config["riis_with_gbif_taxa_filename"]
+    geo_path = config["input_path"]
 
+    # Add locality-intersections and RIIS determinations to GBIF DwC records
+    for dwc_fname in config["dwc_filenames"]:
+        # dwc_fname = os.path.join(inpath, dwc_basename)
+        out_fname = BisonNameOp.get_out_filename(dwc_fname, outpath=config["output_path"])
         report = annotate_occurrence_file(
-            dwc_fname, riis_w_gbif_fname, out_fname, logger)
+            dwc_fname, riis_w_gbif_fname, geo_path, out_fname, logger)
 
     # If the output report was requested, write it
     if report_filename:

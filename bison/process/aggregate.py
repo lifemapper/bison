@@ -4,11 +4,9 @@ import os
 from datetime import datetime
 from multiprocessing import Pool, cpu_count
 
-from bison.common.constants import (AGGREGATOR_DELIMITER, APPEND_TO_DWC,
-                                    ASSESS_KEY, COUNT_KEY, DATA_PATH, ENCODING,
-                                    EXTRA_CSV_FIELD, GBIF, LMBISON_HEADER,
-                                    LOCATION_KEY, OUT_DIR, RIIS_DATA,
-                                    SPECIES_KEY, SPECIES_NAME_KEY, US_STATES)
+from bison.common.constants import (
+    AGGREGATOR_DELIMITER, APPEND_TO_DWC, DATA_PATH, ENCODING, EXTRA_CSV_FIELD, GBIF,
+    LMBISON, OUT_DIR, RIIS_DATA, US_STATES)
 from bison.common.log import Logger
 from bison.common.util import (get_csv_dict_reader, get_csv_writer,
                                ready_filename)
@@ -462,7 +460,7 @@ class Aggregator():
             raise Exception(f"Failed to open summary CSV file {summary_filename}: {e}")
 
         try:
-            csv_wtr.writerow(LMBISON_HEADER.SUMMARY_FILE)
+            csv_wtr.writerow(LMBISON.SUMMARY_FILE)
             self._log.info(f"Writing region summaries to {summary_filename}")
 
             # Location keys are state and county_state
@@ -494,7 +492,7 @@ class Aggregator():
 
             try:
                 for rec in csv_rdr:
-                    species_key = rec[SPECIES_KEY]
+                    species_key = rec[LMBISON.SPECIES_KEY]
                     self._add_record_to_location_summaries(
                         rec[LOCATION_KEY], species_key, count=rec[COUNT_KEY])
                     try:
@@ -557,7 +555,7 @@ class Aggregator():
                     assess = assessments[region].lower()
                 except KeyError:
                     assess = "presumed_native"
-                # Record contents: LMBISON_HEADER.REGION_FILE
+                # Record contents: LMBISON.REGION_FILE
                 recs.append([species_key, scientific_name, species_name, count, assess])
         return recs
 
@@ -606,7 +604,7 @@ class Aggregator():
                 raise Exception(f"Unknown write error on {summary_filename}: {e}")
 
             try:
-                csv_wtr.writerow(LMBISON_HEADER.REGION_FILE)
+                csv_wtr.writerow(LMBISON.REGION_FILE)
                 # Write all records found
                 records = self._examine_species_for_location(
                     region, species_counts, riis)
@@ -635,10 +633,10 @@ class Aggregator():
         try:
             for rec in rdr:
                 try:
-                    count = int(rec[COUNT_KEY])
+                    count = int(rec[LMBISON.COUNT_KEY])
                 except ValueError:
                     raise
-                assess[rec[ASSESS_KEY]][rec[SPECIES_KEY]] = count
+                assess[rec[LMBISON.ASSESS_KEY]][rec[LMBISON.SPECIES_KEY]] = count
         except Exception as e:
             raise Exception(f"Unknown read error on {loc_summary_file}: {e}")
         finally:
@@ -738,7 +736,7 @@ class Aggregator():
         try:
             csvwtr, outf = get_csv_writer(
                 assess_summary_filename, GBIF.DWCA_DELIMITER, fmode="w", overwrite=True)
-            csvwtr.writerow(LMBISON_HEADER.GBIF_RIIS_SUMMARY_FILE)
+            csvwtr.writerow(LMBISON.GBIF_RIIS_SUMMARY_FILE)
         except Exception as e:
             raise Exception(f"Unknown open/csv error on {assess_summary_filename}: {e}")
 

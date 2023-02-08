@@ -17,12 +17,13 @@ from bison.providers.riis_data import RIIS
 class Annotator():
     """Class for adding USGS RIIS info to GBIF occurrences."""
     def __init__(
-            self, gbif_occ_filename, logger, geo_types=(), riis_with_gbif_filename=None,
+            self, gbif_occ_filename, geo_input_path, logger, riis_with_gbif_filename=None,
             riis=None):
         """Constructor.
 
         Args:
             gbif_occ_filename (str): full path of CSV occurrence file to annotate
+            geo_input_path (str): input path for geospatial files to intersect points
             logger (object): logger for saving relevant processing messages
             riis_with_gbif_filename (str): full filename of RIIS data annotated with
                 GBIF accepted taxon names.
@@ -37,6 +38,7 @@ class Annotator():
         datapath, _ = os.path.split(gbif_occ_filename)
         self._datapath = datapath
         self._csvfile = gbif_occ_filename
+        # self._geopath = geo_input_path
         self._inf = None
         self._log = logger
 
@@ -60,9 +62,9 @@ class Annotator():
                 "Must provide either RIIS with annotations or riis_with_gbif_filename")
 
         # Must georeference points to add new, consistent state and county fields
-        geofile = os.path.join(US_CENSUS_COUNTY.PATH, US_CENSUS_COUNTY.FILE)
+        geofile = os.path.join(geo_input_path, US_CENSUS_COUNTY.FILE)
         self._geo_county = GeoResolver(
-            geofile, US_CENSUS_COUNTY.CENSUS_BISON_MAP, self._log)
+            geofile, US_CENSUS_COUNTY.GEO_BISON_MAP, self._log)
 
         # Input reader
         self._dwcdata = DwcData(self._csvfile, logger=logger)
@@ -344,8 +346,8 @@ class Annotator():
 
 # .............................................................................
 def annotate_occurrence_file(
-        dwc_filename, riis_with_gbif_taxa_filename, dwc_with_geo_and_riis_filename,
-        logger):
+        dwc_filename, riis_with_gbif_taxa_filename, geo_input_path,
+        dwc_with_geo_and_riis_filename, logger):
     """Annotate GBIF records with census state and county, and RIIS key and assessment.
 
     Args:
@@ -374,8 +376,8 @@ def annotate_occurrence_file(
     logger.log("Start Time : {}".format(datetime.now()), refname=refname)
 
     ant = Annotator(
-        dwc_filename, logger, riis_with_gbif_filename=riis_with_gbif_taxa_filename)
-    process_rpt = ant.annotate_dwca_records(dwc_with_geo_and_riis_filename)
+        dwc_filename, geo_input_path, logger, riis_with_gbif_filename=riis_with_gbif_taxa_filename)
+    process_rpt = ant.annotate_dwca_records(geo_input_path, dwc_with_geo_and_riis_filename)
     report.update(process_rpt)
 
     logger.log("End Time : {}".format(datetime.now()), refname=refname)

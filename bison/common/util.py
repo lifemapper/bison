@@ -531,78 +531,91 @@ def chunk_files(big_csv_filename, output_path, logger, chunk_count=0):
     return chunk_filenames, report
 
 
-# .............................................................................
-def get_chunk_filename(basename, ext, start, stop):
-    """Construct a filename for a chunk of CSV records.
+class BisonNameOp():
 
-    Args:
-        basename (str): base filename of the original large CSV data.
-        ext (str): extension of the filename
-        start (int): record number in original file of first record for this data chunk.
-        stop (int): record number in original file of last record for this data chunk.
+    # .............................................................................
+    @staticmethod
+    def get_chunk_filename(basename, ext, start, stop):
+        """Construct a filename for a chunk of CSV records.
 
-    Note:
-        File will always start with basename,
-        followed by chunk
-        followed by process step completed (if any)
-    """
-    postfix = f"{FILE_POSTFIX.CHUNK}-{start}-{stop}"
-    return f"{basename}{FILE_POSTFIX.SEP}{postfix}{ext}"
+        Args:
+            basename (str): base filename of the original large CSV data.
+            ext (str): extension of the filename
+            start (int): record number in original file of first record for this data chunk.
+            stop (int): record number in original file of last record for this data chunk.
+
+        Note:
+            File will always start with basename,
+            followed by chunk
+            followed by process step completed (if any)
+        """
+        postfix = f"{FILE_POSTFIX.CHUNK}-{start}-{stop}"
+        return f"{basename}{FILE_POSTFIX.SEP}{postfix}{ext}"
 
 
-# .............................................................................
-def get_out_filename(in_filename, process_type=None):
-    """Construct a filename for a chunk of CSV records.
+    # .............................................................................
+    @staticmethod
+    def get_out_filename(in_filename, outpath=None, process_type=None):
+        """Construct a filename for a chunk of CSV records.
 
-    Args:
-        in_filename (str): filename (with or without path) of CSV data.
-        process_type (str): bison.common.constants.DWC_PROCESS
-        start (int): record number in original file of first record for this data chunk.
-        stop (int): record number in original file of last record for this data chunk.
+        Args:
+            in_filename (str): base filename of CSV data.
+            outpath (str): destination directory for output filename
+            process_type (str): bison.common.constants.DWC_PROCESS. If not provided this
+                will default to the step after the current step.
+            start (int): record number in original file of first record for this data chunk.
+            stop (int): record number in original file of last record for this data chunk.
 
-    Note:
-        File will always start with basename,
-        followed by chunk
-        followed by process step completed (if any)
-    """
-    path, basename, ext, chunk, postfix = parse_filename(in_filename)
-    this_step = DWC_PROCESS.get_step(postfix)
-    next_postfix = DWC_PROCESS.get_postfix(this_step + 1)
-    basename = f"{basename}{FILE_POSTFIX.SEP}{next_postfix}{ext}"
-    if path is not None:
-        return os.path.join(path, basename)
-    return basename
-
-# .............................................................................
-def parse_filename(filename):
-    """Parse a filename into path, basename, chunk, processing step, extension.
-
-    Args:
-        filename (str): A filename used in processing,
-
-    Note:
-        File will always start with basename,
-        followed by chunk (if chunked)
-        followed by process step completed (if any)
-    """
-    chunk = None
-    process = None
-    # path will be None if filename is basefilename
-    path, fname = os.path.split(filename)
-    basefname, ext = os.path.splitext(fname)
-    parts = basefname.split(FILE_POSTFIX.SEP)
-    # File will always start with basename
-    basename = parts.pop(0)
-    if len(parts) >= 1:
-        p = parts.pop(0)
-        # if chunk exists
-        if not p.startswith(FILE_POSTFIX.CHUNK):
-            process = p
+        Note:
+            File will always start with basename,
+            followed by chunk
+            followed by process step completed (if any)
+        """
+        path, basename, ext, chunk, postfix = BisonNameOp.parse_filename(in_filename)
+        if chunk is not None:
+            basename = f"{basename}{FILE_POSTFIX.SEP}{chunk}"
+        if process_type is not None:
+            next_postfix = process_type["postfix"]
         else:
-            chunk = p
-            if len(parts) >= 1:
-                process_postfix = parts.pop(0)
-    return path, basename, ext, chunk, process_postfix
+            this_step = DWC_PROCESS.get_step(postfix)
+            next_postfix = DWC_PROCESS.get_postfix(this_step + 1)
+        outbasename = f"{basename}{FILE_POSTFIX.SEP}{next_postfix}{ext}"
+        if outpath is None:
+            outpath = path
+        outfname = os.path.join(outpath, outbasename)
+        return outfname
+
+    # .............................................................................
+    @staticmethod
+    def parse_filename(filename):
+        """Parse a filename into path, basename, chunk, processing step, extension.
+
+        Args:
+            filename (str): A filename used in processing,
+
+        Note:
+            File will always start with basename,
+            followed by chunk (if chunked)
+            followed by process step completed (if any)
+        """
+        chunk = None
+        process_postfix = None
+        # path will be None if filename is basefilename
+        path, fname = os.path.split(filename)
+        basefname, ext = os.path.splitext(fname)
+        parts = basefname.split(FILE_POSTFIX.SEP)
+        # File will always start with basename
+        basename = parts.pop(0)
+        if len(parts) >= 1:
+            p = parts.pop(0)
+            # if chunk exists
+            if not p.startswith(FILE_POSTFIX.CHUNK):
+                process_postfix = p
+            else:
+                chunk = p
+                if len(parts) >= 1:
+                    process_postfix = parts.pop(0)
+        return path, basename, ext, chunk, process_postfix
 
 
 # .............................................................................

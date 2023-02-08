@@ -1,6 +1,7 @@
 """Module containing a tool for parsing a configuration file for argparse."""
 import argparse
 import json
+import os.path
 
 from bison.common.constants import CONFIG_PARAM
 from bison.common.log import Logger
@@ -71,15 +72,43 @@ def process_arguments_from_file(config_filename, parameters):
 
     # Test that required arguments are present in configuration file
     try:
-        req_args = parameters["required"]
+        params = parameters["required"]
     except Exception:
-        req_args = {}
-    for key, _argdict in req_args.items():
+        params = {}
+    for key, _paramdict in params.items():
         try:
             val = config[key]
         except Exception:
             raise Exception(f"Missing required argument {key} in {config_filename}")
 
+    try:
+        opt_args = parameters["optional"]
+    except Exception:
+        opt_args = {}
+    params.update(opt_args)
+
+    # # Test some arguments for existence
+    # for key, paramdict in params.items():
+    #     # Test existence of input directory
+    #     try:
+    #         test_in_dir = paramdict[CONFIG_PARAM.IS_INPUT_DIR]
+    #         inpath = config[key]
+    #     except KeyError:
+    #         test_in_dir = False
+    #     else:
+    #         # Test existence of input file
+    #         try:
+    #             test_file = paramdict[CONFIG_PARAM.IS_INPUT_FILE]
+    #             fname = config[key]
+    #         except KeyError:
+    #             test_file = False
+    #
+    #         if test_in_dir:
+    #             if not os.path.exists(inpath):
+    #                 raise Exception(f"Input path {inpath} does not exist")
+    #             in_fname = os.path.join(inpath, fname)
+    #             if test_file and not os.path.exists(in_fname):
+    #                 raise Exception(f"Input file {in_fname} does not exist")
     return config
 
 

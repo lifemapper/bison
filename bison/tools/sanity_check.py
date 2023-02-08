@@ -2,11 +2,8 @@
 import glob
 import os
 
-from bison.common.constants import (APPEND_TO_DWC, ASSESS_KEY, ASSESS_VALUES,
-                                    BIG_DATA_PATH, COUNT_KEY, COUNTY_KEY, GBIF,
-                                    INTRODUCED_OCCS, INTRODUCED_SPECIES,
-                                    INVASIVE_OCCS, INVASIVE_SPECIES, LOG,
-                                    NATIVE_OCCS, NATIVE_SPECIES, STATE_KEY)
+from bison.common.constants import (
+    APPEND_TO_DWC, BIG_DATA_PATH, GBIF, LMBISON, LOG)
 from bison.common.log import Logger
 from bison.common.util import get_csv_dict_reader
 from bison.process.aggregate import Aggregator, RIIS_Counts
@@ -216,17 +213,17 @@ class Counter():
         try:
             rdr, inf = get_csv_dict_reader(assess_summary_fname, GBIF.DWCA_DELIMITER)
             for rec in rdr:
-                if rec[STATE_KEY] == state:
+                if rec[LMBISON.STATE_KEY] == state:
                     # occurrence counts
-                    intro_occ = rec[INTRODUCED_OCCS]
-                    inv_occ = rec[INVASIVE_OCCS]
-                    native_occ = rec[NATIVE_OCCS]
+                    intro_occ = rec[LMBISON.INTRODUCED_OCCS]
+                    inv_occ = rec[LMBISON.INVASIVE_OCCS]
+                    native_occ = rec[LMBISON.NATIVE_OCCS]
                     # species/group counts
-                    intro_sp = rec[INTRODUCED_SPECIES]
-                    inv_sp = rec[INVASIVE_SPECIES]
-                    native_sp = rec[NATIVE_SPECIES]
+                    intro_sp = rec[LMBISON.INTRODUCED_SPECIES]
+                    inv_sp = rec[LMBISON.INVASIVE_SPECIES]
+                    native_sp = rec[LMBISON.NATIVE_SPECIES]
                     if county is None:
-                        if not rec[COUNTY_KEY]:
+                        if not rec[LMBISON.COUNTY_KEY]:
                             species_counts = RIIS_Counts(
                                 self._log, introduced=intro_sp, invasive=inv_sp,
                                 presumed_native=native_sp, is_group=True)
@@ -234,7 +231,7 @@ class Counter():
                                 self._log, introduced=intro_occ, invasive=inv_occ,
                                 presumed_native=native_occ, is_group=False)
                             break
-                    elif rec[COUNTY_KEY] == county:
+                    elif rec[LMBISON.COUNTY_KEY] == county:
                         species_counts = RIIS_Counts(
                             self._log, introduced=intro_sp, invasive=inv_sp,
                             presumed_native=native_sp, is_group=True)
