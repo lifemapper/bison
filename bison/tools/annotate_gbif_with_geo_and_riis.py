@@ -8,11 +8,11 @@ from bison.process.annotate import annotate_occurrence_file
 from bison.tools._config_parser import get_common_arguments
 
 DESCRIPTION = """\
-        Annotate a CSV file containing GBIF Occurrence records with geographic areas 
-        including state and county designations from census boundaries,  
-        American Indian/Alaska Native Areas/Hawaiian Home Lands (AIANNH), and US 
-        Protected Areas (US-PAD), and determinations from the USGS Registry for 
-        Introduced and Invasive Species (RIIS).  Input RIIS data must contain accepted 
+        Annotate a CSV file containing GBIF Occurrence records with geographic areas
+        including state and county designations from census boundaries,
+        American Indian/Alaska Native Areas/Hawaiian Home Lands (AIANNH), and US
+        Protected Areas (US-PAD), and determinations from the USGS Registry for
+        Introduced and Invasive Species (RIIS).  Input RIIS data must contain accepted
         names from GBIF, so records may be matched on species and state. """
 # Options to be placed in a configuration file for the command
 PARAMETERS = {

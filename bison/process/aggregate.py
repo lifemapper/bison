@@ -4,9 +4,9 @@ import os
 from datetime import datetime
 from multiprocessing import Pool, cpu_count
 
-from bison.common.constants import (
-    AGGREGATOR_DELIMITER, APPEND_TO_DWC, DATA_PATH, ENCODING, EXTRA_CSV_FIELD, GBIF,
-    LMBISON, OUT_DIR, RIIS_DATA, US_STATES)
+from bison.common.constants import (AGGREGATOR_DELIMITER, APPEND_TO_DWC,
+                                    DATA_PATH, ENCODING, EXTRA_CSV_FIELD, GBIF,
+                                    LMBISON, OUT_DIR, RIIS_DATA, US_STATES)
 from bison.common.log import Logger
 from bison.common.util import (get_csv_dict_reader, get_csv_writer,
                                ready_filename)

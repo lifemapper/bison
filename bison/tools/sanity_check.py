@@ -2,8 +2,8 @@
 import glob
 import os
 
-from bison.common.constants import (
-    APPEND_TO_DWC, BIG_DATA_PATH, GBIF, LMBISON, LOG)
+from bison.common.constants import (APPEND_TO_DWC, BIG_DATA_PATH, GBIF,
+                                    LMBISON, LOG)
 from bison.common.log import Logger
 from bison.common.util import get_csv_dict_reader
 from bison.process.aggregate import Aggregator, RIIS_Counts
