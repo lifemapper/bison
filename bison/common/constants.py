@@ -17,6 +17,10 @@ class APPEND_TO_DWC:
     RESOLVED_ST = "georef_st"
     RIIS_KEY = "riis_occurrence_id"
     RIIS_ASSESSMENT = "riis_assessment"
+    AIANNH_NAME = "aiannh_name"
+    AIANNH_GEOID = "aiannh_geoid"
+    PAD_NAME = "pad_unit_name"
+    PAD_MGMT = "pad_mgmt_name"
     FILTER_FLAG = "do_summarize"
 
 # Append these to RIIS data for GBIF accepted taxon resolution
@@ -202,8 +206,7 @@ class LMBISON:
 # .............................................................................
 class US_CENSUS_COUNTY:
     """File and fieldnames for census county boundary data, map to bison fieldnames."""
-    # PATH = DATA_PATH
-    FILE = "cb_2020_us_county_500k.shp"
+    FILE = "county/cb_2020_us_county_500k.shp"
     GEO_BISON_MAP = {
         "NAME": APPEND_TO_DWC.RESOLVED_CTY,
         "STUSPS": APPEND_TO_DWC.RESOLVED_ST
@@ -211,16 +214,26 @@ class US_CENSUS_COUNTY:
 
 # .............................................................................
 class US_AIANNH:
-    """File and fieldnames for American Indian and Alaskan Native"""
-    FILE = "cb_2021_us_aiannh_500k.shp"
-    GEO_BISON_MAP = {}
+    """Relative filename and fieldnames for AIANNH
+
+    Notes:
+        American Indian/Alaska Native Areas/Hawaiian Home Lands
+    """
+    FILE = "aiannh/cb_2021_us_aiannh_500k.shp"
+    GEO_BISON_MAP = {
+        "NAMELSAD": APPEND_TO_DWC.AIANNH_NAME,
+        "GEOID": APPEND_TO_DWC.AIANNH_GEOID
+    }
 
 
 # .............................................................................
 class US_PAD:
-    """File and fieldnames for American Indian and Alaskan Native"""
-    FILES = "cb_2021_us_aiannh_500k.shp"
-    GEO_BISON_MAP = {}
+    """Relative filenames and fieldnames for US Protected Areas Database"""
+    FILES = [(1, "PADUS3_0_Region_1_SHP/PADUS3_0Designation_Region1.shp")],
+    GEO_BISON_MAP = {
+        "Unit_Nm":APPEND_TO_DWC.PAD_NAME,
+        "d_Mang_Nam": APPEND_TO_DWC.PAD_MGMT
+    }
 
 
 # .............................................................................

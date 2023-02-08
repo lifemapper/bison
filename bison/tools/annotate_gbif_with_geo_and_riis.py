@@ -18,13 +18,13 @@ DESCRIPTION = """\
 PARAMETERS = {
     "required":
         {
-            # "input_path":
-            #     {
-            #         CONFIG_PARAM.TYPE: str,
-            #         CONFIG_PARAM.IS_INPUT_DIR: True,
-            #         CONFIG_PARAM.HELP:
-            #             "Source directory containing ancillary input data."
-            #     },
+            "geoinput_path":
+                {
+                    CONFIG_PARAM.TYPE: str,
+                    CONFIG_PARAM.IS_INPUT_DIR: True,
+                    CONFIG_PARAM.HELP:
+                        "Source directory containing geospatial input data."
+                },
             "dwc_filenames":
                 {
                     CONFIG_PARAM.TYPE: list,
@@ -74,9 +74,8 @@ def cli():
     config, logger, report_filename = get_common_arguments(
         script_name, DESCRIPTION, PARAMETERS)
 
-    # inpath = config["input_path"]
     riis_w_gbif_fname = config["riis_with_gbif_taxa_filename"]
-    geo_path = config["input_path"]
+    geo_path = config["geoinput_path"]
 
     # Add locality-intersections and RIIS determinations to GBIF DwC records
     for dwc_fname in config["dwc_filenames"]:

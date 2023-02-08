@@ -4,9 +4,9 @@ import os
 from datetime import datetime
 from multiprocessing import Pool, cpu_count
 
-from bison.common.constants import (APPEND_TO_DWC, APPEND_TO_RIIS, ENCODING,
-                                    GBIF, LOG, POINT_BUFFER_RANGE,
-                                    US_CENSUS_COUNTY, US_STATES)
+from bison.common.constants import (
+    APPEND_TO_DWC, APPEND_TO_RIIS, ENCODING, GBIF, LOG, POINT_BUFFER_RANGE,
+    US_CENSUS_COUNTY, US_AIANNH, US_PAD, US_STATES)
 from bison.common.util import get_csv_dict_writer
 from bison.process.geoindex import GeoException, GeoResolver
 from bison.providers.gbif_data import DwcData
@@ -34,6 +34,16 @@ class Annotator():
             Exception: on RIIS without annotations provided, and no
                 annotated_riis_filename for writing an annotated RIIS file.
             Exception: on neither annotated_riis_filename nor RIIS provided
+
+        Notes:
+            constructor creates spatial indices for the geospatial files for
+                geographic areas of interest.
+            geographic areas are in bison.common.constants variables and include:
+                state and county from census boundaries in US_CENSUS_COUNTY
+                region names from American Indian/Alaska Native Areas/Hawaiian Home Lands
+                    in US_AIANNH
+                protected areas from the Protected areas Database in US_PAD
+            US-RIIS determinations are calculated from the species/state combination.
         """
         datapath, _ = os.path.split(gbif_occ_filename)
         self._datapath = datapath
@@ -41,6 +51,7 @@ class Annotator():
         # self._geopath = geo_input_path
         self._inf = None
         self._log = logger
+        self._geo_resolvers = []
 
         if riis is not None:
             self.riis = riis
@@ -62,9 +73,22 @@ class Annotator():
                 "Must provide either RIIS with annotations or riis_with_gbif_filename")
 
         # Must georeference points to add new, consistent state and county fields
-        geofile = os.path.join(geo_input_path, US_CENSUS_COUNTY.FILE)
-        self._geo_county = GeoResolver(
-            geofile, US_CENSUS_COUNTY.GEO_BISON_MAP, self._log)
+        # for RIIS resolution
+
+        state_filename = os.path.join(geo_input_path, US_CENSUS_COUNTY.FILE)
+        self._geo_resolvers.append(
+            GeoResolver(state_filename, US_CENSUS_COUNTY.GEO_BISON_MAP, self._log))
+
+        # Georeference points to add Native lands fields
+        aianhh_filename = os.path.join(geo_input_path, US_AIANNH.FILE)
+        self._geo_resolvers.append(
+            GeoResolver(aianhh_filename, US_AIANNH.GEO_BISON_MAP, self._log))
+
+        # Must georeference points to add new, consistent state and county fields
+        for region, fn in US_PAD.FILES:
+            pad_filename = os.path.join(geo_input_path, fn)
+            self._geo_resolvers.append(
+                GeoResolver(pad_filename, US_PAD.GEO_BISON_MAP, self._log))
 
         # Input reader
         self._dwcdata = DwcData(self._csvfile, logger=logger)
@@ -348,7 +372,7 @@ class Annotator():
 def annotate_occurrence_file(
         dwc_filename, riis_with_gbif_taxa_filename, geo_input_path,
         dwc_with_geo_and_riis_filename, logger):
-    """Annotate GBIF records with census state and county, and RIIS key and assessment.
+    """Annotate GBIF records with geographic areas, and RIIS key and assessment.
 
     Args:
         dwc_filename (str): full filename containing GBIF data for annotation.

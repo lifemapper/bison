@@ -1,7 +1,7 @@
 {
     "log_filename": "/volumes/bison/output/annotate_riis.log",
     "report_filename": "/volumes/bison/output/annotate_riis.rpt",
-    "input_path": "/volumes/bison/input",
+    "geoinput_path": "/volumes/bison/big_data",
     "dwc_filenames": ["/volumes/bison/process/gbif-2023-01-26-10k_chunk-1-556.csv"],
     "IGNORE_dwc_filenames": [
         "gbif-2023-01-26-10k_chunk-1113-1668.csv",
