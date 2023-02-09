@@ -80,7 +80,8 @@ def cli():
     # Add locality-intersections and RIIS determinations to GBIF DwC records
     for dwc_fname in config["dwc_filenames"]:
         # dwc_fname = os.path.join(inpath, dwc_basename)
-        out_fname = BisonNameOp.get_out_filename(dwc_fname, outpath=config["output_path"])
+        out_fname = BisonNameOp.get_out_filename(
+            dwc_fname, outpath=config["output_path"])
         report = annotate_occurrence_file(
             dwc_fname, riis_w_gbif_fname, geo_path, out_fname, logger)
 

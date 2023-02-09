@@ -21,6 +21,9 @@ class APPEND_TO_DWC:
     AIANNH_GEOID = "aiannh_geoid"
     PAD_NAME = "pad_unit_name"
     PAD_MGMT = "pad_mgmt_name"
+    PAD_GAP_STATUS = "GAP_Sts"
+    PAD_GAP_STATUS_DESC = "d_GAP_Sts"
+    DOI_REGION = "doi_region"
     FILTER_FLAG = "do_summarize"
 
 # Append these to RIIS data for GBIF accepted taxon resolution
@@ -206,7 +209,7 @@ class LMBISON:
 # .............................................................................
 class US_CENSUS_COUNTY:
     """File and fieldnames for census county boundary data, map to bison fieldnames."""
-    FILE = "county/cb_2020_us_county_500k.shp"
+    FILE = "census/cb_2020_us_county_500k.shp"
     GEO_BISON_MAP = {
         "NAME": APPEND_TO_DWC.RESOLVED_CTY,
         "STUSPS": APPEND_TO_DWC.RESOLVED_ST
@@ -214,12 +217,12 @@ class US_CENSUS_COUNTY:
 
 # .............................................................................
 class US_AIANNH:
-    """Relative filename and fieldnames for AIANNH
+    """Relative filename and fieldname map for AIANNH.
 
     Notes:
         American Indian/Alaska Native Areas/Hawaiian Home Lands
     """
-    FILE = "aiannh/cb_2021_us_aiannh_500k.shp"
+    FILE = "census/cb_2021_us_aiannh_500k.shp"
     GEO_BISON_MAP = {
         "NAMELSAD": APPEND_TO_DWC.AIANNH_NAME,
         "GEOID": APPEND_TO_DWC.AIANNH_GEOID
@@ -228,12 +231,23 @@ class US_AIANNH:
 
 # .............................................................................
 class US_PAD:
-    """Relative filenames and fieldnames for US Protected Areas Database"""
-    FILES = [(1, "PADUS3_0_Region_1_SHP/PADUS3_0Designation_Region1.shp")],
+    """Relative region/filename and fieldname map for US Protected Areas Database."""
+    FILES = [(1, "PADUS3_0_Region_1_SHP/PADUS3_0Combined_Region1.shp")],
     GEO_BISON_MAP = {
         "Unit_Nm":APPEND_TO_DWC.PAD_NAME,
-        "d_Mang_Nam": APPEND_TO_DWC.PAD_MGMT
+        "d_Mang_Nam": APPEND_TO_DWC.PAD_MGMT,
+        "GAP_Sts": APPEND_TO_DWC.GAP_STATUS,
+        "d_GAP_Sts": APPEND_TO_DWC.GAP_STATUS_DESC
     }
+
+# .............................................................................
+class US_DOI:
+    """Relative filename of Dept of Interior Regions, used for organizing PAD data."""
+    FILE = "DOI_12_Unified_Regions_20180801.shp"
+    GEO_BISON_MAP = {
+        "REG_NUM": APPEND_TO_DWC.DOI_REGION
+    }
+
 
 
 # .............................................................................

@@ -51,7 +51,7 @@ class Annotator():
         # self._geopath = geo_input_path
         self._inf = None
         self._log = logger
-        self._geo_resolvers = []
+        self._geo_pads = []
 
         if riis is not None:
             self.riis = riis
@@ -75,19 +75,24 @@ class Annotator():
         # Must georeference points to add new, consistent state and county fields
         # for RIIS resolution
 
-        state_filename = os.path.join(geo_input_path, US_CENSUS_COUNTY.FILE)
-        self._geo_resolvers.append(
-            GeoResolver(state_filename, US_CENSUS_COUNTY.GEO_BISON_MAP, self._log))
+        county_filename = os.path.join(geo_input_path, US_CENSUS_COUNTY.FILE)
+        self._geo_county = GeoResolver(
+            county_filename, US_CENSUS_COUNTY.GEO_BISON_MAP, self._log)
 
         # Georeference points to add Native lands fields
         aianhh_filename = os.path.join(geo_input_path, US_AIANNH.FILE)
-        self._geo_resolvers.append(
-            GeoResolver(aianhh_filename, US_AIANNH.GEO_BISON_MAP, self._log))
+        self._geo_aianhh = GeoResolver(
+            aianhh_filename, US_AIANNH.GEO_BISON_MAP, self._log)
+
+        # Georeference points to DOI region (for PAD DOI region index)
+        aianhh_filename = os.path.join(geo_input_path, US_AIANNH.FILE)
+        self._geo_aianhh = GeoResolver(
+            aianhh_filename, US_AIANNH.GEO_BISON_MAP, self._log)
 
         # Must georeference points to add new, consistent state and county fields
         for region, fn in US_PAD.FILES:
             pad_filename = os.path.join(geo_input_path, fn)
-            self._geo_resolvers.append(
+            self._geo_pads.append(
                 GeoResolver(pad_filename, US_PAD.GEO_BISON_MAP, self._log))
 
         # Input reader
@@ -251,7 +256,7 @@ class Annotator():
             self._log.info(
                 f"*** Record number {self._dwcdata.recno}, gbifID: {gbif_id} ***")
 
-        # Leave these fields None if the record is filtered out
+        # Leave these fields None if the record is filtered out (rank above species)
         county = state = riis_assessment = riis_key = None
         filtered_taxkeys = self._filter_find_taxon_keys(dwcrec)
 
@@ -366,6 +371,28 @@ class Annotator():
             county = fldvals[APPEND_TO_DWC.RESOLVED_CTY]
             state = fldvals[APPEND_TO_DWC.RESOLVED_ST]
         return county, state
+
+
+# ...............................................
+def _find_intersecting_polygon_attributes(self, lon, lat, buffer_vals):
+    county = state = None
+    if None not in (lon, lat):
+        # Intersect coordinates with county boundaries for state and county values
+        try:
+            fldvals, ogr_seconds = self._geo_county.find_enclosing_polygon(
+                lon, lat, buffer_vals=buffer_vals)
+        except ValueError:
+            raise
+        except GeoException:
+            raise
+        if ogr_seconds > 0.75:
+            self._log.log(
+                f"Rec {self._dwcdata.recno}; intersect point {lon}, {lat}; "
+                f"OGR time {ogr_seconds}", refname=self.__class__.__name__,
+                log_level=logging.DEBUG)
+        county = fldvals[APPEND_TO_DWC.RESOLVED_CTY]
+        state = fldvals[APPEND_TO_DWC.RESOLVED_ST]
+    return county, state
 
 
 # .............................................................................

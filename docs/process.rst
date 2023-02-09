@@ -14,18 +14,19 @@ Proposal specifies:
   * US Federal Protected Areas (US‐PAD)
 
 Data found:
-  * https://www.census.gov/geographies/mapping-files/time-series/geo/carto-boundary-file.html
-    * 2018 County boundaries
-  * Other  county options:
-    * from year 4, have 2020 county boundaries
-    * from ArcHub https://hub.arcgis.com/datasets/715db3ed501b42fe9581caaa5c56caf9/about
-  * American Indian/Alaska Native Areas/Hawaiian Home Lands (AIANNH)
-    * https://www.census.gov/geographies/mapping-files/time-series/geo/carto-boundary-file.html
-    * 2018
-    * cb_2018_us_aiannh_500k
+  * Census, Cartographic Boundary Files, 2021
+    * https://www.census.gov/geographies/mapping-files/time-series/geo/cartographic-boundary.html
+      Cartographic Boundary Files by Geography
+        * **American Indian/Alaska Native Areas/Hawaiian Home Lands**, 1:500,000,
+          cb_2021_us_aiannh_500k.zip
+        * **Counties**, 1:500,000, cb_2021_us_aiannh_500k.zip
+          * Other  county options:
+            * from year 4, have 2020 county boundaries
+            * from ArcHub
+              https://hub.arcgis.com/datasets/715db3ed501b42fe9581caaa5c56caf9/about
   * US-PAD data
     * https://www.usgs.gov/programs/gap-analysis-project/science/pad-us-data-download
-    * https://www.sciencebase.gov/catalog/item/622262c8d34ee0c6b38b6bcf
+    * Metadata: https://www.sciencebase.gov/catalog/item/622262c8d34ee0c6b38b6bcf
     * Citation:
         U.S. Geological Survey (USGS) Gap Analysis Project (GAP), 2022,
         Protected Areas Database of the United States (PAD-US) 3.0:
