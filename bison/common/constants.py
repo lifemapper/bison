@@ -260,8 +260,11 @@ class US_AIANNH:
 
 # .............................................................................
 class US_PAD:
-    """Relative region/filename and fieldname map for US Protected Areas Database."""
-    FILES = [(1, "PADUS3_0_Region_1_SHP/PADUS3_0Combined_Region1.shp")],
+    """Region/relative filename and fieldname map for US Protected Areas Database."""
+    FILES = [
+        ("1", "PADUS3_0_Region_1_SHP/PADUS3_0Combined_Region1.shp"),
+        ("6", "PADUS3_0_Region_6_SHP/PADUS3_0Combined_Region6.shp")
+    ]
     GEO_BISON_MAP = {
         "Unit_Nm":APPEND_TO_DWC.PAD_NAME,
         "d_Mang_Nam": APPEND_TO_DWC.PAD_MGMT,

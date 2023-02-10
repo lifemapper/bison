@@ -1,5 +1,5 @@
 """Common classes for adding USGS RIIS info to GBIF occurrences."""
-import logging
+from logging import DEBUG, ERROR
 import os
 from datetime import datetime
 # from multiprocessing import Pool, cpu_count
@@ -8,7 +8,7 @@ from bison.common.constants import (
     APPEND_TO_DWC, APPEND_TO_RIIS, ENCODING, GBIF, LOG, POINT_BUFFER_RANGE,
     US_AIANNH, US_CENSUS_COUNTY, US_DOI, US_PAD, US_STATES)
 from bison.common.util import get_csv_dict_writer
-from bison.process.geoindex import GeoException, GeoResolver
+from bison.process.geoindex import GeoResolver
 from bison.providers.gbif_data import DwcData
 from bison.providers.riis_data import RIIS
 
@@ -17,18 +17,20 @@ from bison.providers.riis_data import RIIS
 class Annotator():
     """Class for adding USGS RIIS info to GBIF occurrences."""
     def __init__(
-            self, gbif_occ_filename, geo_input_path, logger, riis_with_gbif_filename=None,
-            riis=None):
+            self, geo_input_path, logger, riis_with_gbif_filename=None, riis=None,
+            gbif_occ_filename=None, output_occ_filename=None):
         """Constructor.
 
         Args:
-            gbif_occ_filename (str): full path of CSV occurrence file to annotate
             geo_input_path (str): input path for geospatial files to intersect points
             logger (object): logger for saving relevant processing messages
             riis_with_gbif_filename (str): full filename of RIIS data annotated with
                 GBIF accepted taxon names.
             riis (bison.common.riis.RIIS): object containing USGS RIIS data for
                 annotating records
+            gbif_occ_filename (str): full path of CSV occurrence file to annotate
+            output_occ_filename (str): destination directory and filename to write
+                annotated CSV file.
 
         Raises:
             Exception: on RIIS without annotations provided, and no
@@ -45,13 +47,12 @@ class Annotator():
                 protected areas from the Protected areas Database in US_PAD
             US-RIIS determinations are calculated from the species/state combination.
         """
-        datapath, _ = os.path.split(gbif_occ_filename)
-        self._datapath = datapath
-        self._csvfile = gbif_occ_filename
-        # self._geopath = geo_input_path
-        self._inf = None
         self._log = logger
-        self._geo_pads = {}
+        self._datapath = None
+        self._dwcdata = None
+        self._csv_writer = None
+        self.initialize_input_output_occurrences(
+            gbif_occ_filename, output_occ_filename)
 
         if riis is not None:
             self.riis = riis
@@ -72,32 +73,27 @@ class Annotator():
             raise Exception(
                 "Must provide either RIIS with annotations or riis_with_gbif_filename")
 
-        # Must georeference points to add new, consistent state and county fields
-        # for RIIS resolution
+        # Geospatial index for consistent state and county values
         county_filename = os.path.join(geo_input_path, US_CENSUS_COUNTY.FILE)
         self._geo_county = GeoResolver(
             county_filename, US_CENSUS_COUNTY.GEO_BISON_MAP, self._log)
 
-        # Georeference points to add Native lands fields
+        # Geospatial index for Native lands values
         aianhh_filename = os.path.join(geo_input_path, US_AIANNH.FILE)
         self._geo_aianhh = GeoResolver(
             aianhh_filename, US_AIANNH.GEO_BISON_MAP, self._log)
 
-        # Georeference points to DOI region (for PAD DOI region index)
+        # Geospatial index for DOI region (to get correct PAD DOI file)
         doi_filename = os.path.join(geo_input_path, US_DOI.FILE)
         self._geo_doi = GeoResolver(
             doi_filename, US_DOI.GEO_BISON_MAP, self._log)
 
-        # Must georeference points to add new, consistent state and county fields
+        # Geospatial indices for each DOI region for PAD values
+        self._geo_pads = {}
         for region, pad_fn in US_PAD.FILES:
             pad_filename = os.path.join(geo_input_path, pad_fn)
-            self._geo_pads[1] = GeoResolver(
+            self._geo_pads[region] = GeoResolver(
                 pad_filename, US_PAD.GEO_BISON_MAP, self._log)
-
-        # Input reader
-        self._dwcdata = DwcData(self._csvfile, logger=logger)
-        # Output writer
-        self._csv_writer = None
 
         self._conus_states = []
         for k, v in US_STATES.items():
@@ -109,91 +105,60 @@ class Annotator():
         self.rank_filtered_records = 0
 
     # ...............................................
-    @classmethod
-    def construct_annotated_name(cls, csvfile):
-        """Construct a full filename for the annotated version of csvfile.
-
-        Args:
-            csvfile (str): full filename used to construct an annotated filename
-                for this data.
-
-        Returns:
-            outfname: output filename derived from the input GBIF DWC filename
-        """
-        pth, basefilename = os.path.split(csvfile)
-        basename, ext = os.path.splitext(basefilename)
-        try:
-            rawidx = basename.index("_raw")
-            basename = basename[:rawidx]
-        except ValueError:
-            pass
-        newbasefilename = f"{basename}_annotated{ext}"
-        outfname = os.path.join(pth, newbasefilename)
-        return outfname
-
-    # ...............................................
-    @classmethod
-    def construct_annotated_pattern(cls, csvfile):
-        """Construct a full filename pattern matching the annotated file(s) of csvfile.
-
-        Args:
-            csvfile (str): full filename used to construct an annotated filename
-                for this data.
-
-        Returns:
-            outfname: output filename derived from the input GBIF DWC filename
-        """
-        pth, basefilename = os.path.split(csvfile)
-        basename, ext = os.path.splitext(basefilename)
-        try:
-            rawidx = basename.index("_raw")
-            basename = basename[:rawidx]
-        except ValueError:
-            pass
-        newbasefilename = f"{basename}_annotated{ext}"
-        outfname = os.path.join(pth, newbasefilename)
-        return outfname
-
-    # ...............................................
-    def _open_input_output(self, dwc_with_riis_filename):
-        """Open the DwcData for reading and the csv_writer for writing.
+    def initialize_input_output_occurrences(
+            self, gbif_occ_filename, output_occ_filename):
+        """Initialize and open required input and output files of occurrence records.
 
         Also reads the first record and writes the header.
 
         Args:
-            dwc_with_riis_filename: full filename of the output file
+            gbif_occ_filename:
+            output_occ_filename:
 
         Raises:
             Exception: on failure to open the DwcData csvreader.
             Exception: on failure to open the csv_writer.
         """
-        # outfname = self.construct_annotated_name(self._csvfile)
-        try:
-            self._dwcdata.open()
-        except Exception:
-            raise
+        self.close()
+        if gbif_occ_filename is not None:
+            if not os.path.exists(gbif_occ_filename):
+                raise Exception(f"Missing input occurrence data {gbif_occ_filename}")
+            if output_occ_filename is None:
+                raise Exception(
+                    "Must provide an output filename to write annotated input "
+                    f"data in {gbif_occ_filename}")
 
-        header = self._dwcdata.fieldnames
-        for fld in APPEND_TO_DWC.annotation_fields():
-            header.append(fld)
-        # header.extend(
-        #     [APPEND_TO_RIIS.RIIS_KEY, APPEND_TO_RIIS.RIIS_ASSESSMENT,
-        #      APPEND_TO_DWC.RESOLVED_CTY, APPEND_TO_DWC.RESOLVED_ST])
+            self._datapath, _ = os.path.split(gbif_occ_filename)
+            self._csvfile = gbif_occ_filename
+            self._output_csvfile = output_occ_filename
+            # Input reader
+            self._dwcdata = DwcData(self._csvfile, logger=self._log)
+            try:
+                self._dwcdata.open()
+            except Exception:
+                raise
 
-        try:
-            self._csv_writer, self._outf = get_csv_dict_writer(
-                dwc_with_riis_filename, header, GBIF.DWCA_DELIMITER, fmode="w", encoding=ENCODING,
-                overwrite=True)
-        except Exception:
-            raise Exception(f"Failed to open file or csv_writer for {dwc_with_riis_filename}")
+            header = self._dwcdata.fieldnames
+            for fld in APPEND_TO_DWC.annotation_fields():
+                header.append(fld)
+            try:
+                self._csv_writer, self._outf = get_csv_dict_writer(
+                    self._output_csvfile, header, GBIF.DWCA_DELIMITER, fmode="w",
+                    encoding=ENCODING, overwrite=True)
+            except Exception:
+                raise Exception(
+                    f"Failed to open file or csv_writer for {self._output_csvfile}")
 
     # ...............................................
     def close(self):
         """Close input datafiles and output file."""
-        self._dwcdata.close()
+        self._csv_writer = None
+        try:
+            self._dwcdata.close()
+        except AttributeError:
+            pass
         try:
             self._outf.close()
-            self._csv_writer = None
         except AttributeError:
             pass
 
@@ -205,7 +170,7 @@ class Annotator():
         Returns:
             :type bool, True if a file is open, False if not
         """
-        if ((self._inf is not None and not self._inf.closed)
+        if ((self._dwcdata is not None and not self._dwcdata.closed)
                 or (self._outf is not None and not self._outf.closed)):
             return True
         return False
@@ -241,7 +206,7 @@ class Annotator():
         return taxkeys
 
     # ...............................................
-    def annotate_one_record(self, dwcrec):
+    def _annotate_one_record(self, dwcrec):
         """Append fields to GBIF record, then write to file.
 
         Args:
@@ -258,7 +223,6 @@ class Annotator():
                 f"*** Record number {self._dwcdata.recno}, gbifID: {gbif_id} ***")
 
         # Leave these fields None if the record is filtered out (rank above species)
-        county = state = riis_assessment = riis_key = None
         filtered_taxkeys = self._filter_find_taxon_keys(dwcrec)
 
         # Only append additional values to records that pass the filter tests.
@@ -266,16 +230,21 @@ class Annotator():
             lon = dwcrec[GBIF.LON_FLD]
             lat = dwcrec[GBIF.LAT_FLD]
 
-            for georesolver in (self._geo_county, self._geo_aianhh, self._geo_doi):
-                # Find enclosing region
+            for georesolver, buffers in (
+                    (self._geo_county, POINT_BUFFER_RANGE),
+                    (self._geo_aianhh, ()),
+                    (self._geo_doi, ())
+            ):
+                # Find enclosing region and its attributes
                 try:
                     fldvals = georesolver.find_enclosing_polygon_attributes(
-                        lon, lat, POINT_BUFFER_RANGE)
+                        lon, lat, buffer_vals=buffers)
                 except ValueError as e:
                     self._log.error(f"Record gbifID: {gbif_id}: {e}")
-                # Add fields
-                for fld, val in fldvals.items():
-                    dwcrec[fld] = val
+                else:
+                    # Add values to record
+                    for fld, val in fldvals.items():
+                        dwcrec[fld] = val
 
             # Find RIIS region from resolved state
             state = dwcrec[APPEND_TO_DWC.RESOLVED_ST]
@@ -292,16 +261,21 @@ class Annotator():
 
             # Find PAD area from PAD data for the DOI region
             doi_region = dwcrec[APPEND_TO_DWC.DOI_REGION]
-            pad_resolver = self._geo_pads[doi_region]
-            # Find enclosing region
             try:
-                fldvals = pad_resolver.find_enclosing_polygon_attributes(
-                    lon, lat, POINT_BUFFER_RANGE)
-            except ValueError as e:
-                self._log.error(f"Record gbifID: {gbif_id}: {e}")
-            # Add fields
-            for fld, val in fldvals.items():
-                dwcrec[fld] = val
+                pad_resolver = self._geo_pads[doi_region]
+            except KeyError:
+                self._log.log(f"No PAD datafile exists for DOI region {doi_region}")
+            else:
+                # Find enclosing PAD if exists, and its attributes
+                try:
+                    fldvals = pad_resolver.find_enclosing_polygon_attributes(
+                        lon, lat, buffer_vals=POINT_BUFFER_RANGE)
+                except ValueError as e:
+                    self._log.error(f"Record gbifID: {gbif_id}: {e}")
+                else:
+                    # Add values to record
+                    for fld, val in fldvals.items():
+                        dwcrec[fld] = val
 
         return dwcrec
 
@@ -325,184 +299,79 @@ class Annotator():
             "dwc_with_geo_and_riis_filename": dwc_with_geo_and_riis_filename,
             "record_failed_gbifids": []
         }
+        # try:
+        #     # Open the original DwC data file for read, annotated file for write.
+        #     self._open_input_output(dwc_with_geo_and_riis_filename)
+        # except Exception:
+        #     raise
+        # else:
+        self._log.log(
+            f"Annotating {self._csvfile} to create {dwc_with_geo_and_riis_filename}",
+            refname=self.__class__.__name__)
         try:
-            # Open the original DwC data file for read, annotated file for write.
-            self._open_input_output(dwc_with_geo_and_riis_filename)
-        except Exception:
-            raise
-        else:
-            self._log.log(
-                f"Annotating {self._csvfile} to create {dwc_with_geo_and_riis_filename}",
-                refname=self.__class__.__name__)
-            try:
-                # iterate over DwC records
+            # iterate over DwC records
+            dwcrec = self._dwcdata.get_record()
+            while dwcrec is not None:
+                # Annotate
+                dwcrec_ann = self._annotate_one_record(dwcrec)
+                # Write
+                try:
+                    self._csv_writer.writerow(dwcrec_ann)
+                except Exception as e:
+                    self._log.log(
+                        f"Error {e} record, gbifID {dwcrec[GBIF.ID_FLD]}",
+                        refname=self.__class__.__name__, log_level=ERROR)
+                    report["record_failed_gbifids"].append(dwcrec[GBIF.ID_FLD])
+                # Get next
                 dwcrec = self._dwcdata.get_record()
-                while dwcrec is not None:
-                    # Annotate
-                    dwcrec_ann = self.annotate_one_record(dwcrec)
-                    # Write
-                    try:
-                        self._csv_writer.writerow(dwcrec_ann)
-                    except ValueError as e:
-                        self._log.log(
-                            f"ValueError {e} on record, gbifID {dwcrec[GBIF.ID_FLD]}",
-                            refname=self.__class__.__name__, log_level=logging.ERROR)
-                        report["record_failed_gbifids"].append(dwcrec[GBIF.ID_FLD])
-                    except Exception as e:
-                        self._log.log(
-                            f"Unknown error {e} record, gbifID {dwcrec[GBIF.ID_FLD]}",
-                            refname=self.__class__.__name__, log_level=logging.ERROR)
-                        report["record_failed_gbifids"].append(dwcrec[GBIF.ID_FLD])
-                    # Get next
-                    dwcrec = self._dwcdata.get_record()
-            except Exception as e:
-                raise Exception(
-                    f"Unexpected error {e} reading {self._dwcdata.input_file} or "
-                    + f"writing {dwc_with_geo_and_riis_filename}")
+        except Exception as e:
+            raise Exception(
+                f"Unexpected error {e} reading {self._dwcdata.input_file} or "
+                + f"writing {dwc_with_geo_and_riis_filename}")
 
-        report["bad_ranks_filtered"] = self.bad_ranks
+        report["bad_ranks_filtered"] = list(self.bad_ranks)
         report["records_filtered_by_rank"] = self.rank_filtered_records
         self._log.log(
             f"Annotate records filtered out {self.rank_filtered_records} " +
             f"records with {self.bad_ranks} ranks", refname=self.__class__.__name__)
         return report
 
-    # ...............................................
-    def _find_county_riis_region(self, gbif_id, lon, lat, buffer_vals):
-        riis_region = None
-        fldvals = {}
-        try:
-            fldvals = self._geo_county.find_enclosing_polygon_attributes(
-                lon, lat, buffer_vals)
-        except ValueError as e:
-            self._log.error(f"Record gbifID: {gbif_id}: {e}")
 
-        if fldvals:
-            state = fldvals[APPEND_TO_DWC.RESOLVED_ST]
-            riis_region = "L48"
-            if state in ("AK", "HI"):
-                riis_region = state
-        return fldvals, riis_region
-
-    # ...............................................
-    def _find_native_lands(self, gbif_id, lon, lat, buffer_vals):
-        fldvals = {}
-        try:
-            fldvals = self._geo_aianhh.find_enclosing_polygon_attributes(
-                lon, lat, buffer_vals)
-        except ValueError as e:
-            self._log.error(f"Record gbifID: {gbif_id}: {e}")
-
-        return fldvals
-
-
-    # ...............................................
-    def _find_doi_region(self, gbif_id, lon, lat, buffer_vals):
-        fldvals = {}
-        try:
-            fldvals = self._geo_doi.find_enclosing_polygon_attributes(
-                lon, lat, buffer_vals)
-        except ValueError as e:
-            self._log.error(f"Record gbifID: {gbif_id}: {e}")
-        return fldvals
-
-
-# # ...............................................
-# def _find_intersecting_polygon_attributes(self, lon, lat, buffer_vals):
-#     fldvals = {}
-#     if None not in (lon, lat):
-#         # Intersect coordinates with county boundaries for state and county values
-#         try:
-#             fldvals, ogr_seconds = self._geo_county.find_enclosing_polygon(
-#                 lon, lat, buffer_vals=buffer_vals)
-#         except ValueError:
-#             raise
-#         except GeoException:
-#             raise
-#         if ogr_seconds > 0.75:
-#             self._log.log(
-#                 f"Rec {self._dwcdata.recno}; intersect point {lon}, {lat}; "
-#                 f"OGR time {ogr_seconds}", refname=self.__class__.__name__,
-#                 log_level=logging.DEBUG)
-#     return fldvals
-
-
-# .............................................................................
-def annotate_occurrence_file(
-        dwc_filename, riis_with_gbif_taxa_filename, geo_input_path,
-        dwc_with_geo_and_riis_filename, logger):
-    """Annotate GBIF records with geographic areas, and RIIS key and assessment.
-
-    Args:
-        dwc_filename (str): full filename containing GBIF data for annotation.
-        riis_with_gbif_taxa_filename (str): filename containing RIIS data annotated with GBIF
-            accepted taxon name and ID.
-        dwc_with_geo_and_riis_filename: fullpath to GBIF data annotated with state, county,
-            RIIS assessment, and RIIS key.
-        logger (object): logger for saving relevant processing messages
-
-    Returns:
-        report (dict): dictionary of metadata about the data and process.
-
-    Raises:
-        FileNotFoundError: on missing input file
-    """
-    refname = "annotate_occurrence_file"
-    if not os.path.exists(dwc_filename):
-        raise FileNotFoundError(dwc_filename)
-    report = {
-        "riis_with_gbif_taxa_filename": riis_with_gbif_taxa_filename,
-    }
-
-    datapath, basefname = os.path.split(dwc_filename)
-    logger.log(f"Submit {basefname} for annotation", refname=refname)
-    logger.log("Start Time : {}".format(datetime.now()), refname=refname)
-
-    ant = Annotator(
-        dwc_filename, geo_input_path, logger,
-        riis_with_gbif_filename=riis_with_gbif_taxa_filename)
-    process_rpt = ant.annotate_dwca_records(dwc_with_geo_and_riis_filename)
-    report.update(process_rpt)
-
-    logger.log("End Time : {}".format(datetime.now()), refname=refname)
-    return report
-
-
-# .............................................................................
-def parallel_annotate(input_filenames, main_logger):
-    """Main method for parallel execution of DwC annotation script.
-
-    Args:
-        input_filenames (list): list of full filenames containing GBIF data for
-            annotation.
-        main_logger (logger): logger for the process that calls this function,
-            initiating subprocesses
-
-    Returns:
-        annotated_dwc_fnames (list): list of full output filenames
-    """
-    refname = "parallel_annotate"
-    inputs = []
-    # Process only needed files
-    for in_csv in input_filenames:
-        out_csv = Annotator.construct_annotated_name(in_csv)
-        if os.path.exists(out_csv):
-            main_logger.log(
-                f"Annotations exist in {out_csv}, moving on.", refname=refname)
-        else:
-            inputs.append((in_csv, main_logger.log_directory))
-
-    main_logger.log(
-        "Parallel Annotation Start Time : {}".format(datetime.now()), refname=refname)
-    # Do not use all CPUs
-    pool = Pool(cpu_count() - 2)
-    # Map input files asynchronously onto function
-    # map_result = pool.map_async(annotate_occurrence_file, inputs)
-    map_result = pool.starmap_async(annotate_occurrence_file, inputs)
-    # Wait for results
-    map_result.wait()
-    annotated_dwc_fnames = map_result.get()
-    main_logger.log(
-        "Parallel Annotation End Time : {}".format(datetime.now()), refname=refname)
-
-    return annotated_dwc_fnames
+# # .............................................................................
+# def parallel_annotate(input_filenames, main_logger):
+#     """Main method for parallel execution of DwC annotation script.
+#
+#     Args:
+#         input_filenames (list): list of full filenames containing GBIF data for
+#             annotation.
+#         main_logger (logger): logger for the process that calls this function,
+#             initiating subprocesses
+#
+#     Returns:
+#         annotated_dwc_fnames (list): list of full output filenames
+#     """
+#     refname = "parallel_annotate"
+#     inputs = []
+#     # Process only needed files
+#     for in_csv in input_filenames:
+#         out_csv = Annotator.construct_annotated_name(in_csv)
+#         if os.path.exists(out_csv):
+#             main_logger.log(
+#                 f"Annotations exist in {out_csv}, moving on.", refname=refname)
+#         else:
+#             inputs.append((in_csv, main_logger.log_directory))
+#
+#     main_logger.log(
+#         "Parallel Annotation Start Time : {}".format(datetime.now()), refname=refname)
+#     # Do not use all CPUs
+#     pool = Pool(cpu_count() - 2)
+#     # Map input files asynchronously onto function
+#     # map_result = pool.map_async(annotate_occurrence_file, inputs)
+#     map_result = pool.starmap_async(annotate_occurrence_file, inputs)
+#     # Wait for results
+#     map_result.wait()
+#     annotated_dwc_fnames = map_result.get()
+#     main_logger.log(
+#         "Parallel Annotation End Time : {}".format(datetime.now()), refname=refname)
+#
+#     return annotated_dwc_fnames
