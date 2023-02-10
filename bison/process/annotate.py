@@ -2,11 +2,11 @@
 import logging
 import os
 from datetime import datetime
-from multiprocessing import Pool, cpu_count
+# from multiprocessing import Pool, cpu_count
 
 from bison.common.constants import (
     APPEND_TO_DWC, APPEND_TO_RIIS, ENCODING, GBIF, LOG, POINT_BUFFER_RANGE,
-    US_CENSUS_COUNTY, US_AIANNH, US_PAD, US_STATES)
+    US_AIANNH, US_CENSUS_COUNTY, US_DOI, US_PAD, US_STATES)
 from bison.common.util import get_csv_dict_writer
 from bison.process.geoindex import GeoException, GeoResolver
 from bison.providers.gbif_data import DwcData
@@ -51,7 +51,7 @@ class Annotator():
         # self._geopath = geo_input_path
         self._inf = None
         self._log = logger
-        self._geo_pads = []
+        self._geo_pads = {}
 
         if riis is not None:
             self.riis = riis
@@ -74,7 +74,6 @@ class Annotator():
 
         # Must georeference points to add new, consistent state and county fields
         # for RIIS resolution
-
         county_filename = os.path.join(geo_input_path, US_CENSUS_COUNTY.FILE)
         self._geo_county = GeoResolver(
             county_filename, US_CENSUS_COUNTY.GEO_BISON_MAP, self._log)
@@ -85,15 +84,15 @@ class Annotator():
             aianhh_filename, US_AIANNH.GEO_BISON_MAP, self._log)
 
         # Georeference points to DOI region (for PAD DOI region index)
-        aianhh_filename = os.path.join(geo_input_path, US_AIANNH.FILE)
-        self._geo_aianhh = GeoResolver(
-            aianhh_filename, US_AIANNH.GEO_BISON_MAP, self._log)
+        doi_filename = os.path.join(geo_input_path, US_DOI.FILE)
+        self._geo_doi = GeoResolver(
+            doi_filename, US_DOI.GEO_BISON_MAP, self._log)
 
         # Must georeference points to add new, consistent state and county fields
-        for region, fn in US_PAD.FILES:
-            pad_filename = os.path.join(geo_input_path, fn)
-            self._geo_pads.append(
-                GeoResolver(pad_filename, US_PAD.GEO_BISON_MAP, self._log))
+        for region, pad_fn in US_PAD.FILES:
+            pad_filename = os.path.join(geo_input_path, pad_fn)
+            self._geo_pads[1] = GeoResolver(
+                pad_filename, US_PAD.GEO_BISON_MAP, self._log)
 
         # Input reader
         self._dwcdata = DwcData(self._csvfile, logger=logger)
@@ -175,9 +174,11 @@ class Annotator():
             raise
 
         header = self._dwcdata.fieldnames
-        header.extend(
-            [APPEND_TO_RIIS.RIIS_KEY, APPEND_TO_RIIS.RIIS_ASSESSMENT,
-             APPEND_TO_DWC.RESOLVED_CTY, APPEND_TO_DWC.RESOLVED_ST])
+        for fld in APPEND_TO_DWC.annotation_fields():
+            header.append(fld)
+        # header.extend(
+        #     [APPEND_TO_RIIS.RIIS_KEY, APPEND_TO_RIIS.RIIS_ASSESSMENT,
+        #      APPEND_TO_DWC.RESOLVED_CTY, APPEND_TO_DWC.RESOLVED_ST])
 
         try:
             self._csv_writer, self._outf = get_csv_dict_writer(
@@ -262,30 +263,45 @@ class Annotator():
 
         # Only append additional values to records that pass the filter tests.
         if filtered_taxkeys:
-            try:
-                # Find county and state for these coords
-                county, state = self._find_county_state(
-                    dwcrec[GBIF.LON_FLD], dwcrec[GBIF.LAT_FLD],
-                    buffer_vals=POINT_BUFFER_RANGE)
-            except ValueError as e:
-                self._log.error(f"Record gbifID: {gbif_id}: {e}")
-            except GeoException as e:
-                self._log.error(f"Record gbifID: {gbif_id}: {e}")
+            lon = dwcrec[GBIF.LON_FLD]
+            lat = dwcrec[GBIF.LAT_FLD]
 
-            region = "L48"
+            for georesolver in (self._geo_county, self._geo_aianhh, self._geo_doi):
+                # Find enclosing region
+                try:
+                    fldvals = georesolver.find_enclosing_polygon_attributes(
+                        lon, lat, POINT_BUFFER_RANGE)
+                except ValueError as e:
+                    self._log.error(f"Record gbifID: {gbif_id}: {e}")
+                # Add fields
+                for fld, val in fldvals.items():
+                    dwcrec[fld] = val
+
+            # Find RIIS region from resolved state
+            state = dwcrec[APPEND_TO_DWC.RESOLVED_ST]
+            riis_region = "L48"
             if state in ("AK", "HI"):
-                region = state
+                riis_region = state
 
             # Find any RIIS records for these acceptedTaxonKeys and region.
             (riis_assessment,
              riis_key) = self.riis.get_assessment_for_gbif_taxonkeys_region(
-                filtered_taxkeys, region)
+                filtered_taxkeys, riis_region)
+            dwcrec[APPEND_TO_DWC.RIIS_ASSESSMENT] = riis_assessment
+            dwcrec[APPEND_TO_DWC.RIIS_KEY] = riis_key
 
-        # Add county, state and RIIS assessment to record
-        dwcrec[APPEND_TO_DWC.RESOLVED_CTY] = county
-        dwcrec[APPEND_TO_DWC.RESOLVED_ST] = state
-        dwcrec[APPEND_TO_DWC.RIIS_ASSESSMENT] = riis_assessment
-        dwcrec[APPEND_TO_DWC.RIIS_KEY] = riis_key
+            # Find PAD area from PAD data for the DOI region
+            doi_region = dwcrec[APPEND_TO_DWC.DOI_REGION]
+            pad_resolver = self._geo_pads[doi_region]
+            # Find enclosing region
+            try:
+                fldvals = pad_resolver.find_enclosing_polygon_attributes(
+                    lon, lat, POINT_BUFFER_RANGE)
+            except ValueError as e:
+                self._log.error(f"Record gbifID: {gbif_id}: {e}")
+            # Add fields
+            for fld, val in fldvals.items():
+                dwcrec[fld] = val
 
         return dwcrec
 
@@ -352,47 +368,63 @@ class Annotator():
         return report
 
     # ...............................................
-    def _find_county_state(self, lon, lat, buffer_vals):
-        county = state = None
-        if None not in (lon, lat):
-            # Intersect coordinates with county boundaries for state and county values
-            try:
-                fldvals, ogr_seconds = self._geo_county.find_enclosing_polygon(
-                    lon, lat, buffer_vals=buffer_vals)
-            except ValueError:
-                raise
-            except GeoException:
-                raise
-            if ogr_seconds > 0.75:
-                self._log.log(
-                    f"Rec {self._dwcdata.recno}; intersect point {lon}, {lat}; "
-                    f"OGR time {ogr_seconds}", refname=self.__class__.__name__,
-                    log_level=logging.DEBUG)
-            county = fldvals[APPEND_TO_DWC.RESOLVED_CTY]
-            state = fldvals[APPEND_TO_DWC.RESOLVED_ST]
-        return county, state
-
-
-# ...............................................
-def _find_intersecting_polygon_attributes(self, lon, lat, buffer_vals):
-    county = state = None
-    if None not in (lon, lat):
-        # Intersect coordinates with county boundaries for state and county values
+    def _find_county_riis_region(self, gbif_id, lon, lat, buffer_vals):
+        riis_region = None
+        fldvals = {}
         try:
-            fldvals, ogr_seconds = self._geo_county.find_enclosing_polygon(
-                lon, lat, buffer_vals=buffer_vals)
-        except ValueError:
-            raise
-        except GeoException:
-            raise
-        if ogr_seconds > 0.75:
-            self._log.log(
-                f"Rec {self._dwcdata.recno}; intersect point {lon}, {lat}; "
-                f"OGR time {ogr_seconds}", refname=self.__class__.__name__,
-                log_level=logging.DEBUG)
-        county = fldvals[APPEND_TO_DWC.RESOLVED_CTY]
-        state = fldvals[APPEND_TO_DWC.RESOLVED_ST]
-    return county, state
+            fldvals = self._geo_county.find_enclosing_polygon_attributes(
+                lon, lat, buffer_vals)
+        except ValueError as e:
+            self._log.error(f"Record gbifID: {gbif_id}: {e}")
+
+        if fldvals:
+            state = fldvals[APPEND_TO_DWC.RESOLVED_ST]
+            riis_region = "L48"
+            if state in ("AK", "HI"):
+                riis_region = state
+        return fldvals, riis_region
+
+    # ...............................................
+    def _find_native_lands(self, gbif_id, lon, lat, buffer_vals):
+        fldvals = {}
+        try:
+            fldvals = self._geo_aianhh.find_enclosing_polygon_attributes(
+                lon, lat, buffer_vals)
+        except ValueError as e:
+            self._log.error(f"Record gbifID: {gbif_id}: {e}")
+
+        return fldvals
+
+
+    # ...............................................
+    def _find_doi_region(self, gbif_id, lon, lat, buffer_vals):
+        fldvals = {}
+        try:
+            fldvals = self._geo_doi.find_enclosing_polygon_attributes(
+                lon, lat, buffer_vals)
+        except ValueError as e:
+            self._log.error(f"Record gbifID: {gbif_id}: {e}")
+        return fldvals
+
+
+# # ...............................................
+# def _find_intersecting_polygon_attributes(self, lon, lat, buffer_vals):
+#     fldvals = {}
+#     if None not in (lon, lat):
+#         # Intersect coordinates with county boundaries for state and county values
+#         try:
+#             fldvals, ogr_seconds = self._geo_county.find_enclosing_polygon(
+#                 lon, lat, buffer_vals=buffer_vals)
+#         except ValueError:
+#             raise
+#         except GeoException:
+#             raise
+#         if ogr_seconds > 0.75:
+#             self._log.log(
+#                 f"Rec {self._dwcdata.recno}; intersect point {lon}, {lat}; "
+#                 f"OGR time {ogr_seconds}", refname=self.__class__.__name__,
+#                 log_level=logging.DEBUG)
+#     return fldvals
 
 
 # .............................................................................
@@ -427,8 +459,9 @@ def annotate_occurrence_file(
     logger.log("Start Time : {}".format(datetime.now()), refname=refname)
 
     ant = Annotator(
-        dwc_filename, geo_input_path, logger, riis_with_gbif_filename=riis_with_gbif_taxa_filename)
-    process_rpt = ant.annotate_dwca_records(geo_input_path, dwc_with_geo_and_riis_filename)
+        dwc_filename, geo_input_path, logger,
+        riis_with_gbif_filename=riis_with_gbif_taxa_filename)
+    process_rpt = ant.annotate_dwca_records(dwc_with_geo_and_riis_filename)
     report.update(process_rpt)
 
     logger.log("End Time : {}".format(datetime.now()), refname=refname)

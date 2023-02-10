@@ -11,20 +11,20 @@ ERR_SEPARATOR = "------------"
 # Geospatial data for intersecting with points to identify state and county for points
 POINT_BUFFER_RANGE = [(i / 10.0) for i in range(1, 11)]
 
-# Append these to DwC data for Census state/county resolution and RIIS resolution
-class APPEND_TO_DWC:
-    RESOLVED_CTY = "georef_cty"
-    RESOLVED_ST = "georef_st"
-    RIIS_KEY = "riis_occurrence_id"
-    RIIS_ASSESSMENT = "riis_assessment"
-    AIANNH_NAME = "aiannh_name"
-    AIANNH_GEOID = "aiannh_geoid"
-    PAD_NAME = "pad_unit_name"
-    PAD_MGMT = "pad_mgmt_name"
-    PAD_GAP_STATUS = "GAP_Sts"
-    PAD_GAP_STATUS_DESC = "d_GAP_Sts"
-    DOI_REGION = "doi_region"
-    FILTER_FLAG = "do_summarize"
+# # Append these to DwC data for Census state/county resolution and RIIS resolution
+# class APPEND_TO_DWC:
+#     RESOLVED_CTY = "georef_cty"
+#     RESOLVED_ST = "georef_st"
+#     RIIS_KEY = "riis_occurrence_id"
+#     RIIS_ASSESSMENT = "riis_assessment"
+#     AIANNH_NAME = "aiannh_name"
+#     AIANNH_GEOID = "aiannh_geoid"
+#     PAD_NAME = "pad_unit_name"
+#     PAD_MGMT = "pad_mgmt_name"
+#     PAD_GAP_STATUS = "GAP_Sts"
+#     PAD_GAP_STATUS_DESC = "d_GAP_Sts"
+#     DOI_REGION = "doi_region"
+#     FILTER_FLAG = "do_summarize"
 
 # Append these to RIIS data for GBIF accepted taxon resolution
 class APPEND_TO_RIIS:
@@ -207,13 +207,42 @@ class LMBISON:
 
 
 # .............................................................................
+# Append these to DwC data for Census state/county resolution and RIIS resolution
+class APPEND_TO_DWC:
+    RESOLVED_CTY = "georef_cty"
+    RESOLVED_ST = "georef_st"
+    RIIS_KEY = "riis_occurrence_id"
+    RIIS_ASSESSMENT = "riis_assessment"
+    AIANNH_NAME = "aiannh_name"
+    AIANNH_GEOID = "aiannh_geoid"
+    PAD_NAME = "pad_unit_name"
+    PAD_MGMT = "pad_mgmt_name"
+    PAD_GAP_STATUS = "GAP_Sts"
+    PAD_GAP_STATUS_DESC = "d_GAP_Sts"
+    DOI_REGION = "doi_region"
+    FILTER_FLAG = "do_summarize"
+
+    @staticmethod
+    def annotation_fields():
+        return (
+            APPEND_TO_DWC.RESOLVED_CTY, APPEND_TO_DWC.RESOLVED_ST,
+            APPEND_TO_DWC.RIIS_KEY, APPEND_TO_DWC.RIIS_ASSESSMENT,
+            APPEND_TO_DWC.AIANNH_GEOID, APPEND_TO_DWC.AIANNH_NAME,
+            APPEND_TO_DWC.PAD_NAME, APPEND_TO_DWC.PAD_MGMT, APPEND_TO_DWC.PAD_GAP_STATUS,
+            APPEND_TO_DWC.PAD_GAP_STATUS_DESC,
+            APPEND_TO_DWC.DOI_REGION, APPEND_TO_DWC.FILTER_FLAG
+        )
+
+
+# .............................................................................
 class US_CENSUS_COUNTY:
     """File and fieldnames for census county boundary data, map to bison fieldnames."""
-    FILE = "census/cb_2020_us_county_500k.shp"
+    FILE = "census/cb_2021_us_county_500k.shp"
     GEO_BISON_MAP = {
         "NAME": APPEND_TO_DWC.RESOLVED_CTY,
         "STUSPS": APPEND_TO_DWC.RESOLVED_ST
     }
+
 
 # .............................................................................
 class US_AIANNH:
@@ -236,8 +265,8 @@ class US_PAD:
     GEO_BISON_MAP = {
         "Unit_Nm":APPEND_TO_DWC.PAD_NAME,
         "d_Mang_Nam": APPEND_TO_DWC.PAD_MGMT,
-        "GAP_Sts": APPEND_TO_DWC.GAP_STATUS,
-        "d_GAP_Sts": APPEND_TO_DWC.GAP_STATUS_DESC
+        "GAP_Sts": APPEND_TO_DWC.PAD_GAP_STATUS,
+        "d_GAP_Sts": APPEND_TO_DWC.PAD_GAP_STATUS_DESC
     }
 
 # .............................................................................

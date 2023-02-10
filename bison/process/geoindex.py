@@ -1,8 +1,8 @@
 """Class for a spatial index and tools for intersecting with a point and extracting attributes."""
+from logging import DEBUG
+import ogr
 import os
 import time
-
-import ogr
 import rtree
 
 
@@ -215,7 +215,7 @@ class GeoResolver(object):
         return fldvals
 
     # ...............................................
-    def find_enclosing_polygon(self, lon, lat, buffer_vals=None):
+    def find_enclosing_polygon_attributes(self, lon, lat, buffer_vals=None):
         """Return attributes of polygon enclosing these coordinates.
 
         Args:
@@ -231,6 +231,7 @@ class GeoResolver(object):
         Raises:
             ValueError: on non-numeric coordinate
         """
+        fldvals = {}
         try:
             lon = float(lon)
             lat = float(lat)
@@ -245,16 +246,22 @@ class GeoResolver(object):
         # buffer if necessary
         try:
             fldvals = self._intersect_and_buffer(pt, buffer_vals)
+        except ValueError:
+            raise
         except GeoException as e:
             self._log.error(f"No polygon found: {e}")
-            fldvals = {}
             for fn in self.bison_spatial_fields:
                 fldvals[fn] = None
 
         # Elapsed time
         ogr_seconds = time.time()-start
+        if ogr_seconds > 0.75:
+            self._log.log(
+                f"Rec {self._dwcdata.recno}; intersect point {lon}, {lat}; "
+                f"OGR time {ogr_seconds}", refname=self.__class__.__name__,
+                log_level=DEBUG)
 
-        return fldvals, ogr_seconds
+        return fldvals
 
 
 # .............................................................................
