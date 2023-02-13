@@ -1,8 +1,9 @@
 """Class for a spatial index and tools for intersecting with a point and extracting attributes."""
-from logging import DEBUG
-import ogr
 import os
 import time
+from logging import DEBUG
+
+import ogr
 import rtree
 
 
@@ -36,6 +37,11 @@ class GeoResolver(object):
     # ...............................................
     @property
     def filename(self):
+        """Filename of input geospatial data.
+
+        Returns:
+            Input filename
+        """
         return os.path.basename(self._spatial_filename)
 
     # ...............................................
@@ -77,7 +83,8 @@ class GeoResolver(object):
                 for name, idx in fld_indexes:
                     sp_feats[fid][name] = feat.GetFieldAsString(idx)
             except Exception as e:
-                self._log.log(f"Warning, unable to add FID {fid} for {self.filename}")
+                self._log.log(
+                    f"Warning, unable to add FID {fid} for {self.filename}: {e}")
         return sp_index, sp_feats, bison_fldnames
 
     # ...............................................
@@ -265,9 +272,8 @@ class GeoResolver(object):
         ogr_seconds = time.time()-start
         if ogr_seconds > 0.75:
             self._log.log(
-                f"Rec {self._dwcdata.recno}; intersect point {lon}, {lat}; "
-                f"OGR time {ogr_seconds}", refname=self.__class__.__name__,
-                log_level=DEBUG)
+                f"Intersect point {lon}, {lat}; OGR time {ogr_seconds}",
+                refname=self.__class__.__name__, log_level=DEBUG)
 
         return fldvals
 

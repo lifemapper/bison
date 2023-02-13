@@ -425,7 +425,7 @@ class Aggregator():
         try:
             for rec in csv_rdr:
                 state = rec[APPEND_TO_DWC.RESOLVED_ST]
-                county = rec[APPEND_TO_DWC.RESOLVED_CNTY]
+                county = rec[APPEND_TO_DWC.RESOLVED_CTY]
                 # If record is filtered out for any reason during annotation,
                 # state and county will be None
                 if state and county:
@@ -494,11 +494,12 @@ class Aggregator():
                 for rec in csv_rdr:
                     species_key = rec[LMBISON.SPECIES_KEY]
                     self._add_record_to_location_summaries(
-                        rec[LOCATION_KEY], species_key, count=rec[COUNT_KEY])
+                        rec[LMBISON.LOCATION_KEY], species_key,
+                        count=rec[LMBISON.COUNT_KEY])
                     try:
                         self._canonicals[species_key]
                     except KeyError:
-                        self._canonicals[species_key] = rec[SPECIES_NAME_KEY]
+                        self._canonicals[species_key] = rec[LMBISON.SPECIES_NAME_KEY]
             except Exception as e:
                 raise Exception(f"Failed to read {sum_fname}: {e}")
             finally:
@@ -840,3 +841,10 @@ def parallel_summarize(annotated_filenames, main_logger):
     main_logger.log(f"Parallel Summarize End Time : {datetime.now()}", refname=refname)
 
     return summary_filenames
+
+
+# .............................................................................
+__all__ = [
+    "parallel_summarize",
+    "summarize_annotations"
+]

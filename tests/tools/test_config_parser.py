@@ -4,8 +4,10 @@ import os
 import pytest
 
 from bison.tools._config_parser import process_arguments_from_file
-from bison.tools.annotate_riis import DESCRIPTION as annotate_riis_desc
-from bison.tools.annotate_riis import PARAMETERS as annotate_riis_params
+from bison.tools.annotate_riis_with_gbif_taxa import \
+    DESCRIPTION as annotate_riis_desc
+from bison.tools.annotate_riis_with_gbif_taxa import \
+    PARAMETERS as annotate_riis_params
 from bison.tools.chunk_large_file import DESCRIPTION as chunk_large_file_desc
 from bison.tools.chunk_large_file import PARAMETERS as chunk_large_file_params
 from tests.tools.test_setup import get_test_parameters

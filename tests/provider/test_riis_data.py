@@ -1,19 +1,24 @@
 """Test the structure, size, and content of input US-RIIS data files."""
+import os
+
+from bison.common.log import Logger
 from bison.providers.riis_data import RIIS
+from tests.tools.test_setup import get_test_parameters
+
+script_name = os.path.splitext(os.path.basename(__file__))[0]
 
 
 class TestRIISInput(RIIS):
     """Class for testing input authority and riis files."""
 
-    # .............................................................................
-    def __init__(self, basepath):
-        """Constructor sets the authority and riis files and headers expected for BISON-RIIS processing.
-
-        Args:
-            basepath (str): Path to the base of the input data, used to construct full
-                filenames from basepath and relative path constants.
-        """
-        RIIS.__init__(self, basepath)
+    # .....................................
+    def test_read_riis(self):
+        """Test reading an original RIIS file by checking counts."""
+        fn_args = get_test_parameters(script_name)
+        logger = Logger(script_name, None)
+        riis = RIIS(fn_args["riis_filename"], logger, is_annotated=False)
+        # Read original species data
+        riis.read_riis()
 
 #     # .............................................................................
 #     def _check_riis_authorities(self):

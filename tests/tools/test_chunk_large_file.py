@@ -27,7 +27,7 @@ class Test_chunk_large_file:
         #     fn_args["_test_small_number_of_chunks"])
         expected_chunk_size = math.ceil(
             fn_args["_test_small_record_count"]
-            /  fn_args["_test_small_number_of_chunks"])
+            / fn_args["_test_small_number_of_chunks"])
 
         assert len(boundary_pairs) == fn_args["_test_small_number_of_chunks"]
         assert rec_count == fn_args["_test_small_record_count"]
@@ -47,11 +47,11 @@ class Test_chunk_large_file:
         fn_args = get_test_parameters(script_name)
         logger = Logger(script_name, None)
         chunk_filenames, _report = chunk_files(
-            fn_args["_test_small_csv_filename"], logger,
-            chunk_count=fn_args["_test_small_number_of_chunks"])
+            fn_args["_test_small_csv_filename"], fn_args["_test_small_csv_filename"],
+            logger, chunk_count=fn_args["_test_small_number_of_chunks"])
         expected_chunk_size = math.ceil(
             fn_args["_test_small_record_count"]
-            /  fn_args["_test_small_number_of_chunks"])
+            / fn_args["_test_small_number_of_chunks"])
         file_count = len(chunk_filenames)
         assert (file_count == fn_args["_test_small_number_of_chunks"])
         # The last file may be a smaller size than all the others
@@ -66,7 +66,6 @@ class Test_chunk_large_file:
         assert(
             fullsize_chunk_count == file_count - 1
             or fullsize_chunk_count == file_count)
-
 
     # .....................................
     def test_identify_chunk_files(self):

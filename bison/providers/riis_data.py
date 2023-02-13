@@ -279,7 +279,6 @@ class RIIS:
             authorities.add(row[RIIS_DATA.AUTHORITY_KEY])
         return authorities
 
-
     # ...............................................
     # @property
     def is_annotated(self):
@@ -804,6 +803,7 @@ def resolve_riis_taxa(riis_filename, annotated_riis_filename, logger, overwrite=
 
 
 # .............................................................................
-if __name__ == "__main__":
-    # Test number of rows and columns in authority and species files
-    pass
+__all__ = [
+    "standardize_name",
+    "resolve_riis_taxa"
+]
