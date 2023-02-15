@@ -118,8 +118,3 @@ class APISvc(object):
                 else:
                     val = ""
         return val
-
-
-# ...............................................
-if __name__ == "__main__":
-    pass

@@ -1,8 +1,9 @@
 """Class for a spatial index and tools for intersecting with a point and extracting attributes."""
 import os
 import time
+from logging import DEBUG
 
-import ogr
+from osgeo import ogr
 import rtree
 
 
@@ -24,7 +25,7 @@ class GeoResolver(object):
         """
         # full_spatial_fname = os.path.join(DATA_PATH, spatial_fname)
         if not os.path.exists(full_spatial_fname):
-            raise FileNotFoundError
+            raise FileNotFoundError(f"{full_spatial_fname}")
         self._log = logger
         self._spatial_filename = full_spatial_fname
         self._spatial_fields = spatial_fields
@@ -32,6 +33,16 @@ class GeoResolver(object):
         self.spatial_feats = None
         self.bison_spatial_fields = None
         self._initialize_geospatial_data()
+
+    # ...............................................
+    @property
+    def filename(self):
+        """Filename of input geospatial data.
+
+        Returns:
+            Input filename
+        """
+        return os.path.basename(self._spatial_filename)
 
     # ...............................................
     def _initialize_geospatial_data(self):
@@ -61,15 +72,19 @@ class GeoResolver(object):
         sp_index = rtree.index.Index(interleaved=False)
         sp_feats = {}
         for fid in range(0, lyr.GetFeatureCount()):
-            feat = lyr.GetFeature(fid)
-            geom = feat.geometry()
-            # OGR returns xmin, xmax, ymin, ymax
-            xmin, xmax, ymin, ymax = geom.GetEnvelope()
-            # Rtree takes xmin, xmax, ymin, ymax IFF interleaved = False
-            sp_index.insert(fid, (xmin, xmax, ymin, ymax))
-            sp_feats[fid] = {'feature': feat, 'geom': geom}
-            for name, idx in fld_indexes:
-                sp_feats[fid][name] = feat.GetFieldAsString(idx)
+            try:
+                feat = lyr.GetFeature(fid)
+                geom = feat.geometry()
+                # OGR returns xmin, xmax, ymin, ymax
+                xmin, xmax, ymin, ymax = geom.GetEnvelope()
+                # Rtree takes xmin, xmax, ymin, ymax IFF interleaved = False
+                sp_index.insert(fid, (xmin, xmax, ymin, ymax))
+                sp_feats[fid] = {'feature': feat, 'geom': geom}
+                for name, idx in fld_indexes:
+                    sp_feats[fid][name] = feat.GetFieldAsString(idx)
+            except Exception as e:
+                self._log.log(
+                    f"Warning, unable to add FID {fid} for {self.filename}: {e}")
         return sp_index, sp_feats, bison_fldnames
 
     # ...............................................
@@ -215,7 +230,7 @@ class GeoResolver(object):
         return fldvals
 
     # ...............................................
-    def find_enclosing_polygon(self, lon, lat, buffer_vals=None):
+    def find_enclosing_polygon_attributes(self, lon, lat, buffer_vals=()):
         """Return attributes of polygon enclosing these coordinates.
 
         Args:
@@ -231,6 +246,7 @@ class GeoResolver(object):
         Raises:
             ValueError: on non-numeric coordinate
         """
+        fldvals = {}
         try:
             lon = float(lon)
             lat = float(lat)
@@ -245,16 +261,21 @@ class GeoResolver(object):
         # buffer if necessary
         try:
             fldvals = self._intersect_and_buffer(pt, buffer_vals)
+        except ValueError:
+            raise
         except GeoException as e:
             self._log.error(f"No polygon found: {e}")
-            fldvals = {}
             for fn in self.bison_spatial_fields:
                 fldvals[fn] = None
 
         # Elapsed time
         ogr_seconds = time.time()-start
+        if ogr_seconds > 0.75:
+            self._log.log(
+                f"Intersect point {lon}, {lat}; OGR time {ogr_seconds}",
+                refname=self.__class__.__name__, log_level=DEBUG)
 
-        return fldvals, ogr_seconds
+        return fldvals
 
 
 # .............................................................................

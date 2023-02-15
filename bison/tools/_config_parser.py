@@ -1,7 +1,6 @@
 """Module containing a tool for parsing a configuration file for argparse."""
 import argparse
 import json
-import os.path
 
 from bison.common.constants import CONFIG_PARAM
 from bison.common.log import Logger
@@ -77,7 +76,7 @@ def process_arguments_from_file(config_filename, parameters):
         params = {}
     for key, _paramdict in params.items():
         try:
-            val = config[key]
+            _ = config[key]
         except Exception:
             raise Exception(f"Missing required argument {key} in {config_filename}")
 
@@ -135,7 +134,7 @@ def get_common_arguments(script_name, description, parameters):
         log_filename = config["log_filename"]
     except KeyError:
         log_filename = None
-    logger = Logger(script_name, log_filename)
+    logger = Logger(script_name, log_filename=log_filename)
 
     # If the output report was requested, write it
     try:

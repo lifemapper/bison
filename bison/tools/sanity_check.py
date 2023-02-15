@@ -44,7 +44,8 @@ class Counter():
             self._datapath, f"{base_pattern}*annotated_summary{ext}")
 
     # .............................................................................
-    def _get_random_species(self, annotated_occ_filename, assessment=ASSESS_VALUES[1]):
+    def _get_random_species(
+            self, annotated_occ_filename, assessment=LMBISON.ASSESS_VALUES[1]):
         # Get one species name, county, state with riis_assessment from annotated file
         accepted_spname = None
         dwcdata = DwcData(annotated_occ_filename, self._log)
@@ -91,7 +92,7 @@ class Counter():
         # Get one species name and county-state with riis_assessment from annotated
         # occurrences file.  Filtered records are retained, but have assessment = ""
         assessments = {"": 0}
-        for val in ASSESS_VALUES:
+        for val in LMBISON.ASSESS_VALUES:
             assessments[val] = 0
 
         dwcdata = DwcData(annotated_occ_filename, logger)
@@ -128,11 +129,11 @@ class Counter():
                 rec = dwcdata.get_record()
                 while rec is not None:
                     if (rec[GBIF.ACC_TAXON_FLD] == taxkey
-                            and rec[APPEND_TO_DWC.RESOLVED_STATE] == state):
-                        assess = rec[APPEND_TO_DWC.RIIS_ASSESSMENT_FLD]
+                            and rec[APPEND_TO_DWC.RESOLVED_ST] == state):
+                        assess = rec[APPEND_TO_DWC.RIIS_ASSESSMENT]
                         # Add to state count
                         state_counts.add_to(assess, value=1)
-                        if rec[APPEND_TO_DWC.RESOLVED_COUNTY] == county:
+                        if rec[APPEND_TO_DWC.RESOLVED_CTY] == county:
                             # Add to county count
                             cty_counts.add_to(assess, value=1)
                     rec = dwcdata.get_record()
@@ -157,7 +158,7 @@ class Counter():
         # Track species for each assessment in county and state
         cty_species = {}
         state_species = {}
-        for ass in ASSESS_VALUES:
+        for ass in LMBISON.ASSESS_VALUES:
             cty_species[ass] = set()
             state_species[ass] = set()
 
@@ -169,14 +170,14 @@ class Counter():
                 # Find the species of the first record with riis_assessment
                 rec = dwcdata.get_record()
                 while rec is not None:
-                    assess = rec[APPEND_TO_DWC.RIIS_ASSESSMENT_FLD]
+                    assess = rec[APPEND_TO_DWC.RIIS_ASSESSMENT]
                     taxkey = rec[GBIF.ACC_TAXON_FLD]
-                    if rec[APPEND_TO_DWC.RESOLVED_STATE] == state:
+                    if rec[APPEND_TO_DWC.RESOLVED_ST] == state:
                         # Add to occ count
                         state_occ_assessment_counts.add_to(assess, value=1)
                         # Add to set of species
                         state_species[assess].add(taxkey)
-                        if county is not None and rec[APPEND_TO_DWC.RESOLVED_COUNTY] == county:
+                        if county is not None and rec[APPEND_TO_DWC.RESOLVED_CTY] == county:
                             # Add to occ count
                             cty_occ_assessment_counts.add_to(assess, value=1)
                             # Add to set of species
@@ -258,8 +259,8 @@ class Counter():
         try:
             for rec in rdr:
                 if rec[GBIF.ACC_NAME_FLD] == acc_species_name:
-                    rass = rec[ASSESS_KEY]
-                    count = int(rec[COUNT_KEY])
+                    rass = rec[LMBISON.ASSESS_KEY]
+                    count = int(rec[LMBISON.COUNT_KEY])
                     if rass == "introduced":
                         loc_occ_counts.introduced = count
                     elif rass == "invasive":
@@ -409,7 +410,8 @@ if __name__ == '__main__':
     # Full path to input data
     big_csv_filename = os.path.join(BIG_DATA_PATH, base_big_csv_filename)
     logger = Logger(
-        script_name, os.path.join(BIG_DATA_PATH, LOG.DIR, f"{script_name}".log))
+        script_name,
+        log_filename=os.path.join(BIG_DATA_PATH, LOG.DIR, f"{script_name}".log))
 
     record_counter = Counter(big_csv_filename, logger, do_split=True)
     record_counter.compare_counts()

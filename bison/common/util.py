@@ -6,10 +6,8 @@ import math
 import os
 import subprocess
 import sys
-from multiprocessing import cpu_count
 
-from bison.common.constants import (DWC_PROCESS, ENCODING, EXTRA_CSV_FIELD,
-                                    FILE_POSTFIX, GBIF)
+from bison.common.constants import DWC_PROCESS, ENCODING, EXTRA_CSV_FIELD, GBIF
 
 
 # ...............................................
@@ -165,7 +163,9 @@ def get_csv_dict_writer(csvfile, header, delimiter, fmode="w", encoding=ENCODING
 
 
 # .............................................................................
-def get_csv_dict_reader(csvfile, delimiter, fieldnames=None, encoding=ENCODING, quote_none=False, restkey=EXTRA_CSV_FIELD):
+def get_csv_dict_reader(
+        csvfile, delimiter, fieldnames=None, encoding=ENCODING, quote_none=False,
+        restkey=EXTRA_CSV_FIELD):
     """Create a CSV dictionary reader from a file with the first line containing fieldnames.
 
     Args:
@@ -353,7 +353,7 @@ def identify_chunks(big_csv_filename, chunk_count=0):
             and last record of a subset chunk of the file.
     """
     if chunk_count == 0:
-        chunk_count = cpu_count() - 2
+        chunk_count = available_cpu_count() - 2
     start_stop_pairs = []
 
     # in_base_filename, ext = os.path.splitext(big_csv_filename)
@@ -378,49 +378,6 @@ def identify_chunks(big_csv_filename, chunk_count=0):
 
     return start_stop_pairs, rec_count, chunk_size
 
-# # .............................................................................
-# def get_chunk_filename(in_base_filename, start, stop, ext):
-#     """Create a consistent filename for chunks of a larger file.
-#
-#     Args:
-#         in_base_filename (str): common base filename for all chunks
-#         start (int): line number in the large file that serves as the first record of the chunk file
-#         stop (int): line number in the large file that serves as the last record of the chunk file
-#         ext (str): file extension for the chunk file
-#
-#     Returns:
-#         chunk_filename: standardized filename for the chunk of data
-#     """
-#     chunk_filename = f"{in_base_filename}_chunk-{start}-{stop}_raw{ext}"
-#     return chunk_filename
-#
-#
-# # .............................................................................
-# def parse_chunk_filename(chunk_filename):
-#     """Create a consistent filename for chunks of a larger file.
-#
-#     Args:
-#         chunk_filename: standardized base filename for the chunk of data
-#
-#     Returns:
-#         in_base_filename (str): common base filename for all chunks
-#         start (int): line number in the large file that serves as the first record of the chunk file
-#         stop (int): line number in the large file that serves as the last record of the chunk file
-#         ext (str): file extension for the chunk file
-#     """
-#     idx = chunk_filename.index("_chunk")
-#     in_base_filename = chunk_filename[:idx]
-#
-#     basename, ext = os.path.splitext(chunk_filename)
-#     parts = basename.split("_")
-#     for i in range(len(parts)):
-#         if parts[i].startswith("chunk"):
-#             chunk_idx = i
-#             break
-#     _, start, stop = parts[chunk_idx].split("-")
-#
-#     return in_base_filename, start, stop, ext
-
 
 # .............................................................................
 def identify_chunk_files(big_csv_filename, chunk_count=0):
@@ -439,7 +396,7 @@ def identify_chunk_files(big_csv_filename, chunk_count=0):
     boundary_pairs, _rec_count, _chunk_size = identify_chunks(
         big_csv_filename, chunk_count=chunk_count)
     for (start, stop) in boundary_pairs:
-        chunk_fname = get_chunk_filename(in_base_filename, ext, start, stop)
+        chunk_fname = BisonNameOp.get_chunk_filename(in_base_filename, ext, start, stop)
         chunk_filenames.append(chunk_fname)
     return chunk_filenames
 
@@ -479,7 +436,8 @@ def chunk_files(big_csv_filename, output_path, logger, chunk_count=0):
         big_recno = 1
 
         for (start, stop) in boundary_pairs:
-            chunk_basefilename = get_chunk_filename(basename, ext, start, stop)
+            chunk_basefilename = BisonNameOp.get_chunk_filename(
+                basename, ext, start, stop)
             chunk_fname = os.path.join(output_path, chunk_basefilename)
 
             try:
@@ -531,9 +489,9 @@ def chunk_files(big_csv_filename, output_path, logger, chunk_count=0):
     return chunk_filenames, report
 
 
+# .............................................................................
 class BisonNameOp():
 
-    # .............................................................................
     @staticmethod
     def get_chunk_filename(basename, ext, start, stop):
         """Construct a filename for a chunk of CSV records.
@@ -541,48 +499,52 @@ class BisonNameOp():
         Args:
             basename (str): base filename of the original large CSV data.
             ext (str): extension of the filename
-            start (int): record number in original file of first record for this data chunk.
-            stop (int): record number in original file of last record for this data chunk.
+            start (int): record number in original file of first record for data chunk.
+            stop (int): record number in original file of last record for data chunk.
+
+        Returns:
+            str: base filename for the subset file.
 
         Note:
             File will always start with basename,
             followed by chunk
             followed by process step completed (if any)
         """
-        postfix = f"{FILE_POSTFIX.CHUNK}-{start}-{stop}"
-        return f"{basename}{FILE_POSTFIX.SEP}{postfix}{ext}"
-
+        postfix = f"{DWC_PROCESS.CHUNK['prefix']}-{start}-{stop}"
+        return f"{basename}{DWC_PROCESS.SEP}{postfix}{ext}"
 
     # .............................................................................
     @staticmethod
-    def get_out_filename(in_filename, outpath=None, process_type=None):
-        """Construct a filename for a chunk of CSV records.
+    def get_out_filename(in_filename, outpath=None):
+        """Construct output filename for the next processing step of the given file.
 
         Args:
-            in_filename (str): base filename of CSV data.
+            in_filename (str): base or full filename of CSV data.
             outpath (str): destination directory for output filename
-            process_type (str): bison.common.constants.DWC_PROCESS. If not provided this
-                will default to the step after the current step.
-            start (int): record number in original file of first record for this data chunk.
-            stop (int): record number in original file of last record for this data chunk.
+
+        Returns:
+            out_fname: base or full filename of output file, given the input filename.
+                If the input filename reflects the final processing step, the method
+                returns None
 
         Note:
-            File will always start with basename,
-            followed by chunk
-            followed by process step completed (if any)
+            The input filename is parsed for process step, and the output filename will
+            be constructed for the next step.
+
+            File will always start with basename, followed by chunk,
+                followed by process step completed (if any)
         """
+        outfname = None
         path, basename, ext, chunk, postfix = BisonNameOp.parse_filename(in_filename)
         if chunk is not None:
-            basename = f"{basename}{FILE_POSTFIX.SEP}{chunk}"
-        if process_type is not None:
-            next_postfix = process_type["postfix"]
-        else:
-            this_step = DWC_PROCESS.get_step(postfix)
-            next_postfix = DWC_PROCESS.get_postfix(this_step + 1)
-        outbasename = f"{basename}{FILE_POSTFIX.SEP}{next_postfix}{ext}"
-        if outpath is None:
-            outpath = path
-        outfname = os.path.join(outpath, outbasename)
+            basename = f"{basename}{DWC_PROCESS.SEP}{chunk}"
+        this_step = DWC_PROCESS.get_step(postfix)
+        next_postfix = DWC_PROCESS.get_postfix(this_step + 1)
+        if next_postfix is not None:
+            outbasename = f"{basename}{DWC_PROCESS.SEP}{next_postfix}{ext}"
+            if outpath is None:
+                outpath = path
+            outfname = os.path.join(outpath, outbasename)
         return outfname
 
     # .............................................................................
@@ -591,7 +553,16 @@ class BisonNameOp():
         """Parse a filename into path, basename, chunk, processing step, extension.
 
         Args:
-            filename (str): A filename used in processing,
+            filename (str): A filename used in processing
+
+        Returns:
+            path: file path of the filename, if included
+            basename: basename of the filename
+            ext: extension of the filename
+            chunk: the chunk string, chunk-<start>-<stop>, where start and stop indicate
+                the record (line+1) numbers in the original datafile.
+            process_postfix: the postfix of the file, indicating which stage of
+                processing has been completed.
 
         Note:
             File will always start with basename,
@@ -603,13 +574,13 @@ class BisonNameOp():
         # path will be None if filename is basefilename
         path, fname = os.path.split(filename)
         basefname, ext = os.path.splitext(fname)
-        parts = basefname.split(FILE_POSTFIX.SEP)
+        parts = basefname.split(DWC_PROCESS.SEP)
         # File will always start with basename
         basename = parts.pop(0)
         if len(parts) >= 1:
             p = parts.pop(0)
             # if chunk exists
-            if not p.startswith(FILE_POSTFIX.CHUNK):
+            if not p.startswith(DWC_PROCESS.CHUNK["prefix"]):
                 process_postfix = p
             else:
                 chunk = p
@@ -619,5 +590,70 @@ class BisonNameOp():
 
 
 # .............................................................................
-if __name__ == "__main__":
-    pass
+def available_cpu_count():
+    """Number of available virtual or physical CPUs on this system.
+
+    Returns:
+        int for the number of CPUs available
+
+    Raises:
+        Exception: on failure of all CPU count queries.
+
+    Notes:
+        code from https://stackoverflow.com/questions/1006289
+    """
+    # Python 2.6+
+    try:
+        import multiprocessing
+        return multiprocessing.cpu_count()
+    except (ImportError, NotImplementedError):
+        pass
+
+    # https://github.com/giampaolo/psutil
+    try:
+        import psutil
+        return psutil.cpu_count()   # psutil.NUM_CPUS on old versions
+    except (ImportError, AttributeError):
+        pass
+
+    # POSIX
+    try:
+        res = int(os.sysconf('SC_NPROCESSORS_ONLN'))
+        if res > 0:
+            return res
+    except (AttributeError, ValueError):
+        pass
+
+    # Windows
+    try:
+        res = int(os.environ['NUMBER_OF_PROCESSORS'])
+        if res > 0:
+            return res
+    except (KeyError, ValueError):
+        pass
+
+    # Linux
+    try:
+        res = open('/proc/cpuinfo').read().count('processor\t:')
+        if res > 0:
+            return res
+    except IOError:
+        pass
+
+    raise Exception('Can not determine number of CPUs on this system')
+
+
+# .............................................................................
+__all__ = [
+    "available_cpu_count",
+    "chunk_files",
+    "count_lines",
+    "delete_file",
+    "get_csv_dict_reader",
+    "get_csv_dict_writer",
+    "get_csv_writer",
+    "get_fieldnames",
+    "identify_chunk_files",
+    "identify_chunks",
+    "ready_filename"
+]

@@ -27,13 +27,7 @@ repos:
     rev: 5.10.1
     hooks:
     - id: isort
-      # args: [--sp=.github/linters/.isort.cfg, --diff]
-      args: [
-        # vertical hanging indent mode also used in black configuration
-#        "multi_line_output=3",
-        # black expects the trailing comma
-        "include_trailing_comma=true"
-      ]
+      args: [--sp=.github/linters/.isort.cfg, --diff]
       additional_dependencies:
         - toml
 

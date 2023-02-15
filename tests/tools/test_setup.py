@@ -1,7 +1,7 @@
 """Read test parameters from test JSON configuration file, indexed by script_name."""
 import json
 
-test_config_file = "../config/test_parameters.json"
+test_config_file = "/volumes/bison/tests/config/test_parameters.json"
 
 
 # .............................................................................

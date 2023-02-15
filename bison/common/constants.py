@@ -1,6 +1,4 @@
 """Constants for GBIF, BISON, RIIS, and processed outputs, used across modules."""
-from enum import Enum
-
 BIG_DATA_PATH = "/home/astewart/git/bison/big_data"
 DATA_PATH = "/home/astewart/git/bison/data"
 INPUT_DIR = "input"
@@ -11,65 +9,8 @@ ERR_SEPARATOR = "------------"
 # Geospatial data for intersecting with points to identify state and county for points
 POINT_BUFFER_RANGE = [(i / 10.0) for i in range(1, 11)]
 
-# Append these to DwC data for Census state/county resolution and RIIS resolution
-class APPEND_TO_DWC:
-    RESOLVED_CTY = "georef_cty"
-    RESOLVED_ST = "georef_st"
-    RIIS_KEY = "riis_occurrence_id"
-    RIIS_ASSESSMENT = "riis_assessment"
-    AIANNH_NAME = "aiannh_name"
-    AIANNH_GEOID = "aiannh_geoid"
-    PAD_NAME = "pad_unit_name"
-    PAD_MGMT = "pad_mgmt_name"
-    PAD_GAP_STATUS = "GAP_Sts"
-    PAD_GAP_STATUS_DESC = "d_GAP_Sts"
-    DOI_REGION = "doi_region"
-    FILTER_FLAG = "do_summarize"
-
-# Append these to RIIS data for GBIF accepted taxon resolution
-class APPEND_TO_RIIS:
-    GBIF_KEY = "gbif_res_taxonkey"
-    GBIF_SCINAME = "gbif_res_scientificName"
-
 AGGREGATOR_DELIMITER = "__"
 EXTRA_CSV_FIELD = "rest_values"
-
-class DWC_PROCESS:
-    CHUNK = {"step": 0, "postfix": None}
-    ANNOTATE = {"step": 1, "postfix": "georiis"}
-    SUMMARIZE = {"step": 2, "postfix": "summary"}
-    AGGREGATE = {"step": 3, "postfix": "aggregate"}
-
-    @staticmethod
-    def process_types():
-        return (
-            DWC_PROCESS.CHUNK, DWC_PROCESS.ANNOTATE,
-            DWC_PROCESS.SUMMARIZE, DWC_PROCESS.AGGREGATE
-        )
-
-    @staticmethod
-    def get_postfix(step):
-        for pt in DWC_PROCESS.process_types():
-            if pt["step"] == step:
-                return pt["postfix"]
-        return None
-
-    @staticmethod
-    def get_step(postfix):
-        for pt in DWC_PROCESS.process_types():
-            if pt["postfix"] == postfix:
-                return pt["step"]
-        return -1
-
-    @staticmethod
-    def get_process(postfix=None, step=None):
-        for pt in DWC_PROCESS.process_types():
-            if postfix is not None and pt["postfix"] == postfix:
-                return pt
-            elif pt["step"] == step:
-                return pt
-        return None
-
 
 
 RANKS = [
@@ -146,15 +87,82 @@ US_STATES = {
     "Wyoming": "WY",
 }
 
+
 # .............................................................................
-class FILE_POSTFIX:
-    GEO_RISS_ANNOTATED = "georiis"
-    CHUNK = "chunk"
+class DWC_PROCESS:
+    """Process steps and associated filename postfixes indicating completion."""
+    CHUNK = {"step": 0, "postfix": None, "prefix": "chunk"}
+    ANNOTATE = {"step": 1, "postfix": "georiis"}
+    SUMMARIZE = {"step": 2, "postfix": "summary"}
+    AGGREGATE = {"step": 3, "postfix": "aggregate"}
     SEP = "_"
+
+    @staticmethod
+    def process_types():
+        """Return all DWC Process types.
+
+        Returns:
+            List of all DWC_Process types.
+        """
+        return (
+            DWC_PROCESS.CHUNK, DWC_PROCESS.ANNOTATE,
+            DWC_PROCESS.SUMMARIZE, DWC_PROCESS.AGGREGATE
+        )
+
+    @staticmethod
+    def get_postfix(step):
+        """For a given step number, return the postfix.
+
+        Args:
+            step (int): Numerical stage of processing completed.
+
+        Returns:
+            String for filename postfix for the given step.
+        """
+        for pt in DWC_PROCESS.process_types():
+            if pt["step"] == step:
+                return pt["postfix"]
+        return None
+
+    @staticmethod
+    def get_step(postfix):
+        """For a given postfix, return the step number.
+
+        Args:
+            postfix (str): String appended to the end of a filename (before the
+                extension) to indicate the stage of processing completed.
+
+        Returns:
+            Integer for step corresponding to the given filename postfix.
+        """
+        for pt in DWC_PROCESS.process_types():
+            if pt["postfix"] == postfix:
+                return pt["step"]
+        return -1
+
+    @staticmethod
+    def get_process(postfix=None, step=None):
+        """For a given postfix or step number, return the DWC_PROCESS object.
+
+        Args:
+            postfix (str): String appended to the end of a filename (before the
+                extension) to indicate the stage of processing completed.
+            step (int): Numerical stage of processing completed.
+
+        Returns:
+            DWC_Process type for the given filename postfix or step.
+        """
+        for pt in DWC_PROCESS.process_types():
+            if postfix is not None and pt["postfix"] == postfix:
+                return pt
+            elif pt["step"] == step:
+                return pt
+        return None
 
 
 # .............................................................................
 class CONFIG_PARAM:
+    """Parameter keys for CLI tool configuration files."""
     FILE = "config_file"
     IS_INPUT_DIR = "is_input_dir"
     IS_OUPUT_DIR = "is_output_dir"
@@ -206,14 +214,57 @@ class LMBISON:
         PCT_INTRODUCED_OCCS, PCT_INVASIVE_OCCS, PCT_NATIVE_OCCS]
 
 
+# Append these to RIIS data for GBIF accepted taxon resolution
+# .............................................................................
+class APPEND_TO_RIIS:
+    """New fields to add to RIIS records for GBIF accepted taxa and key values."""
+    GBIF_KEY = "gbif_res_taxonkey"
+    GBIF_SCINAME = "gbif_res_scientificName"
+
+
+# .............................................................................
+class APPEND_TO_DWC:
+    """New fields to add to DwC data for geospatial and RIIS attributes."""
+    RESOLVED_CTY = "georef_cty"
+    RESOLVED_ST = "georef_st"
+    RIIS_KEY = "riis_occurrence_id"
+    RIIS_ASSESSMENT = "riis_assessment"
+    AIANNH_NAME = "aiannh_name"
+    AIANNH_GEOID = "aiannh_geoid"
+    PAD_NAME = "pad_unit_name"
+    PAD_MGMT = "pad_mgmt_name"
+    PAD_GAP_STATUS = "GAP_Sts"
+    PAD_GAP_STATUS_DESC = "d_GAP_Sts"
+    DOI_REGION = "doi_region"
+    # FILTER_FLAG = "do_summarize"
+
+    @staticmethod
+    def annotation_fields():
+        """All fields added to DwC records for analysis by geospatial region.
+
+        Returns:
+            list of all the fields to be added to the annotated Dwc occurrence file.
+        """
+        return (
+            APPEND_TO_DWC.RESOLVED_CTY, APPEND_TO_DWC.RESOLVED_ST,
+            APPEND_TO_DWC.RIIS_KEY, APPEND_TO_DWC.RIIS_ASSESSMENT,
+            APPEND_TO_DWC.AIANNH_GEOID, APPEND_TO_DWC.AIANNH_NAME,
+            APPEND_TO_DWC.PAD_NAME, APPEND_TO_DWC.PAD_MGMT,
+            APPEND_TO_DWC.PAD_GAP_STATUS, APPEND_TO_DWC.PAD_GAP_STATUS_DESC,
+            APPEND_TO_DWC.DOI_REGION,
+            # APPEND_TO_DWC.FILTER_FLAG
+        )
+
+
 # .............................................................................
 class US_CENSUS_COUNTY:
     """File and fieldnames for census county boundary data, map to bison fieldnames."""
-    FILE = "census/cb_2020_us_county_500k.shp"
+    FILE = "census/cb_2021_us_county_500k.shp"
     GEO_BISON_MAP = {
         "NAME": APPEND_TO_DWC.RESOLVED_CTY,
         "STUSPS": APPEND_TO_DWC.RESOLVED_ST
     }
+
 
 # .............................................................................
 class US_AIANNH:
@@ -231,23 +282,26 @@ class US_AIANNH:
 
 # .............................................................................
 class US_PAD:
-    """Relative region/filename and fieldname map for US Protected Areas Database."""
-    FILES = [(1, "PADUS3_0_Region_1_SHP/PADUS3_0Combined_Region1.shp")],
+    """Region/relative filename and fieldname map for US Protected Areas Database."""
+    FILES = [
+        ("1", "PADUS3_0_Region_1_SHP/PADUS3_0Combined_Region1.shp"),
+        ("6", "PADUS3_0_Region_6_SHP/PADUS3_0Combined_Region6.shp")
+    ]
     GEO_BISON_MAP = {
-        "Unit_Nm":APPEND_TO_DWC.PAD_NAME,
+        "Unit_Nm": APPEND_TO_DWC.PAD_NAME,
         "d_Mang_Nam": APPEND_TO_DWC.PAD_MGMT,
-        "GAP_Sts": APPEND_TO_DWC.GAP_STATUS,
-        "d_GAP_Sts": APPEND_TO_DWC.GAP_STATUS_DESC
+        "GAP_Sts": APPEND_TO_DWC.PAD_GAP_STATUS,
+        "d_GAP_Sts": APPEND_TO_DWC.PAD_GAP_STATUS_DESC
     }
+
 
 # .............................................................................
 class US_DOI:
-    """Relative filename of Dept of Interior Regions, used for organizing PAD data."""
+    """Relative filename and fieldname map for of Dept of Interior Regions."""
     FILE = "DOI_12_Unified_Regions_20180801.shp"
     GEO_BISON_MAP = {
         "REG_NUM": APPEND_TO_DWC.DOI_REGION
     }
-
 
 
 # .............................................................................
@@ -384,17 +438,19 @@ class GBIF:
         return GBIF.URL + "/species/match"
 
 
+# .............................................................................
 class LOG:
     """Constants for logging across the project."""
     DIR = "log"
     INTERVAL = 1000000
-    FORMAT = ' '.join([
-        "%(asctime)s",
-        "%(funcName)s",
-        "line",
-        "%(lineno)d",
-        "%(levelname)-8s",
-        "%(message)s"])
+    # FORMAT = " ".join([
+    #     "%(asctime)s",
+    #     "%(funcName)s",
+    #     "line",
+    #     "%(lineno)d",
+    #     "%(levelname)-8s",
+    #     "%(message)s"])
+    FORMAT = " ".join(["%(asctime)s", "%(levelname)-8s", "%(message)s"])
     DATE_FORMAT = '%d %b %Y %H:%M'
     FILE_MAX_BYTES = 52000000
     FILE_BACKUP_COUNT = 5
@@ -403,7 +459,6 @@ class LOG:
 # .............................................................................
 class NS:
     """Biodiversity Informatics Community namespaces."""
-
     tdwg = "http://rs.tdwg.org/dwc/text/"
     gbif = "http://rs.gbif.org/terms/1.0/"
     eml = "eml://ecoinformatics.org/eml-2.1.1"
