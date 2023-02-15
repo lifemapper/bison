@@ -107,7 +107,6 @@ def annotate_occurrence_files(
 
         # Add locality-intersections and RIIS determinations to GBIF DwC records
         process_rpt = ant.annotate_dwca_records(dwc_fname, out_fname)
-
         report["dwc_inputs"].append(process_rpt)
         logger.log(f"End Time : {datetime.now()}", refname=script_name)
 

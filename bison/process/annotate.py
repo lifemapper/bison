@@ -105,8 +105,7 @@ class Annotator():
         self.rank_filtered_records = 0
 
     # ...............................................
-    def initialize_occurrences_io(
-            self, gbif_occ_filename, output_occ_filename):
+    def initialize_occurrences_io(self, gbif_occ_filename, output_occ_filename):
         """Initialize and open required input and output files of occurrence records.
 
         Also reads the first record and writes the header.

@@ -1,0 +1,49 @@
+{
+  "_comment1": "Test configuration using very small data",
+  "_comment2": "Input, output, and config are mostly located under the `tests` directory",
+  "_comment3": "Some inputs are located under the main repository data directory",
+  "_comment4": "Intended for tests run outside of the Docker environment",
+  "_comment5": "Each top level key indicates the basename of a test file, with a dictionary value containing parmeters",
+  "_comment6": "Keys starting with `# comment` are comments, keys starting with `_test_` are unique for tests",
+
+  "test_config_parser":
+  {
+    "log_filename": "/volumes/bison/tests/output/test_config_parser.log",
+    "report_filename": "/volumes/bison/tests/output/test_config_parser.rpt",
+    "big_csv_filename": "/volumes/bison/tests/input/gbif_2023-01-26_10k.csv"
+  },
+  "test_annotate_riis":
+  {
+    "log_filename": "/volumes/bison/tests/output/test_annotate_riis.log",
+    "report_filename": "/volumes/bison/tests/output/test_annotate_riis.rpt",
+    "riis_filename": "/volumes/bison/input/US-RIIS_MasterList_2021.csv",
+    "_test_small_riis_filename": "/volumes/bison/tests/input/US-RIIS_MasterList_2021_100.csv",
+    "_test_small_annotated_riis_filename": "/volumes/bison/tests/output/US-RIIS_MasterList_2021_100_annotated.csv",
+    "_test_small_riis_record_count": 100,
+    "_test_small_riis_name_count": 100,
+    "_test_riis_record_count": 15264,
+    "_test_riis_name_count": 12981
+  },
+  "test_chunk_large_file":
+  {
+    "log_filename": "/volumes/bison/tests/output/test_chunk_large_file.log",
+    "report_filename": "/volumes/bison/tests/output/test_chunk_large_file.rpt",
+    "input_path": "/volumes/bison/big_data",
+    "output_path":  "/volumes/bison/tests/output",
+    "big_csv_filename": "/volumes/bison/tests/input/gbif_2023-01-26_10k.csv",
+    "number_of_chunks": 10,
+    "_test_record_count": 10000,
+    "_test_input_path": "/volumes/bison/tests/input",
+    "_test_output_path":  "/volumes/bison/tests/output",
+    "_test_small_number_of_chunks": 10
+  },
+  "test_riis_data":
+  {
+    "log_filename": "/volumes/bison/tests/output/test_riis_data.log",
+    "report_filename": "/volumes/bison/tests/output/test_riis_data.rpt",
+    "riis_filename": "/volumes/bison/input/US-RIIS_MasterList_2021.csv",
+    "_test_riis_record_count": 15264,
+    "_test_riis_name_count": 12981,
+    "_test_annotated_riis_filename": "/volumes/bison/input/US-RIIS_MasterList_annotated.csv"
+  }
+}
