@@ -63,8 +63,13 @@ class Test_config_parser:
             valid_keys.extend(opt_keys)
 
             for key in config.keys():
-                if not key.startswith("_comment") and not key.startswith("_test_"):
+                if (
+                        not key.startswith("_comment") and
+                        not key.startswith("_test_") and
+                        not key.startswith("_ignore")
+                ):
                     if key not in valid_keys:
+                        print(f"Key {key} is not present in tool definition")
                         pytest.fail()
     #
     # # .....................................

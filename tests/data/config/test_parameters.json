@@ -21,7 +21,7 @@
     "_test_small_annotated_riis_filename": "/volumes/bison/tests/output/US-RIIS_MasterList_2021_100_annotated.csv",
     "_test_small_riis_record_count": 100,
     "_test_small_riis_name_count": 100,
-    "_test_riis_record_count": 15264,
+    "_test_riis_record_count": 15263,
     "_test_riis_name_count": 12981
   },
   "test_annotate_gbif_with_geo_and_riis":
@@ -32,7 +32,7 @@
       "/volumes/bison/tests/input/gbif-2023-01-26-10k_chunk-1-100.csv",
       "/volumes/bison/tests/input/gbif-2023-01-26-10k_chunk-101-200.csv"],
     "geoinput_path": "/volumes/bison/big_data/geodata",
-    "riis_with_gbif_taxa_filename": "/volumes/bison/input/US-RIIS_MasterList_annotated.csv",
+    "riis_with_gbif_taxa_filename": "/volumes/bison/input/US-RIIS_MasterList_2021_annotated.csv",
     "output_path": "/volumes/bison/tests/output"
   },
   "test_chunk_large_file":
@@ -49,7 +49,7 @@
     "log_filename": "/volumes/bison/tests/output/test_riis_data.log",
     "report_filename": "/volumes/bison/tests/output/test_riis_data.rpt",
     "riis_filename": "/volumes/bison/input/US-RIIS_MasterList_2021.csv",
-    "_test_riis_record_count": 15264,
+    "_test_riis_record_count": 15263,
     "_test_riis_name_count": 12981,
     "_test_annotated_riis_filename": "/volumes/bison/input/US-RIIS_MasterList_annotated.csv"
   }

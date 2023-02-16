@@ -285,7 +285,17 @@ class US_PAD:
     """Region/relative filename and fieldname map for US Protected Areas Database."""
     FILES = [
         ("1", "PADUS3_0_Region_1_SHP/PADUS3_0Combined_Region1.shp"),
-        ("6", "PADUS3_0_Region_6_SHP/PADUS3_0Combined_Region6.shp")
+        ("2", "PADUS3_0_Region_2_SHP/PADUS3_0Combined_Region2.shp"),
+        ("3", "PADUS3_0_Region_3_SHP/PADUS3_0Combined_Region3.shp"),
+        ("4", "PADUS3_0_Region_4_SHP/PADUS3_0Combined_Region4.shp"),
+        ("5", "PADUS3_0_Region_5_SHP/PADUS3_0Combined_Region5.shp"),
+        ("6", "PADUS3_0_Region_6_SHP/PADUS3_0Combined_Region6.shp"),
+        ("7", "PADUS3_0_Region_7_SHP/PADUS3_0Combined_Region7.shp"),
+        ("8", "PADUS3_0_Region_8_SHP/PADUS3_0Combined_Region8.shp"),
+        ("9", "PADUS3_0_Region_9_SHP/PADUS3_0Combined_Region9.shp"),
+        ("10", "PADUS3_0_Region_10_SHP/PADUS3_0Combined_Region10.shp"),
+        ("11", "PADUS3_0_Region_11_SHP/PADUS3_0Combined_Region11.shp"),
+        ("12", "PADUS3_0_Region_12_SHP/PADUS3_0Combined_Region12.shp"),
     ]
     GEO_BISON_MAP = {
         "Unit_Nm": APPEND_TO_DWC.PAD_NAME,

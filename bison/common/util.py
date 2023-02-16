@@ -380,6 +380,40 @@ def identify_chunks(big_csv_filename, chunk_count=0):
 
 
 # .............................................................................
+def get_fields_from_header(csvfile, delimiter=GBIF.DWCA_DELIMITER, encoding="utf-8"):
+    """Find fields in a header in a delimited text file.
+
+    Args:
+        csvfile (str): comma/tab-delimited file with header
+
+    Returns:
+        list: of strings indicating fieldnames
+
+    Raises:
+        FileNotFoundError: file does not exist
+        Exception: unknown read error
+    """
+    fields = []
+    try:
+        _check_existence(csvfile)
+    except FileNotFoundError:
+        raise
+
+    # Open file and read first line
+    try:
+        f = open(csvfile, "r", newline="", encoding=encoding)
+        line = f.readline()
+        line.strip()
+        fields = line.split(delimiter)
+    except Exception:
+        raise
+    finally:
+        f.close()
+
+    return fields
+
+
+# .............................................................................
 def identify_chunk_files(big_csv_filename, chunk_count=0):
     """Construct filenames for smaller files subset from a large file.
 

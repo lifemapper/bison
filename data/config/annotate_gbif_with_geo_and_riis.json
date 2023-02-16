@@ -6,25 +6,6 @@
         "/volumes/bison/process/gbif-2023-01-26-10k_chunk-1-556.csv",
         "/volumes/bison/process/gbif-2023-01-26-10k_chunk-1113-1668.csv"
     ],
-    "IGNORE_dwc_filenames": [
-        "gbif-2023-01-26-10k_chunk-1113-1668.csv",
-        "gbif-2023-01-26-10k_chunk-3337-3892.csv",
-        "gbif-2023-01-26-10k_chunk-557-1112.csv",
-        "gbif-2023-01-26-10k_chunk-8341-8896.csv",
-        "gbif-2023-01-26-10k_chunk-1-556.csv",
-        "gbif-2023-01-26-10k_chunk-3893-4448.csv",
-        "gbif-2023-01-26-10k_chunk-6117-6672.csv",
-        "gbif-2023-01-26-10k_chunk-8897-9452.csv",
-        "gbif-2023-01-26-10k_chunk-1669-2224.csv",
-        "gbif-2023-01-26-10k_chunk-4449-5004.csv",
-        "gbif-2023-01-26-10k_chunk-6673-7228.csv",
-        "gbif-2023-01-26-10k_chunk-9453-10000.csv",
-        "gbif-2023-01-26-10k_chunk-2225-2780.csv",
-        "gbif-2023-01-26-10k_chunk-5005-5560.csv",
-        "gbif-2023-01-26-10k_chunk-7229-7784.csv",
-        "gbif-2023-01-26-10k_chunk-2781-3336.csv",
-        "gbif-2023-01-26-10k_chunk-5561-6116.csv",
-        "gbif-2023-01-26-10k_chunk-7785-8340.csv"],
     "riis_with_gbif_taxa_filename": "/volumes/bison/input/US-RIIS_MasterList_annotated.csv",
     "output_path": "/volumes/bison/process"
 }

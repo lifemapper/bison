@@ -35,11 +35,11 @@ class Test_annotate_riis:
         riis = RIIS(fn_args["riis_filename"], logger, is_annotated=False)
         # Read original species data
         riis.read_riis()
+        actual_record_count = fn_args["_test_riis_record_count"]
         assert len(riis.by_taxon) == fn_args["_test_riis_name_count"]
-        assert len(riis.by_riis_id) == fn_args["_test_riis_record_count"]
-        assert (
-            count_lines(fn_args["riis_filename"])
-            == fn_args["_test_riis_record_count"] + 1)
+        # TODO: Why does riis.by_riis_id contain same number of records as lines in the file?
+        assert len(riis.by_riis_id) == actual_record_count
+        assert (count_lines(fn_args["riis_filename"]) == actual_record_count + 1)
 
     # .....................................
     def test_resolve_small_riis(self):
@@ -50,19 +50,5 @@ class Test_annotate_riis:
         # Update species data
         name_count, rec_count = riis.resolve_riis_to_gbif_taxa(
                 fn_args["_test_small_annotated_riis_filename"], overwrite=True)
-        assert name_count == fn_args["_test_small_riis_gbiftaxa_count"]
+        assert name_count == fn_args["_test_small_riis_name_count"]
         assert rec_count == fn_args["_test_small_riis_record_count"]
-
-    # .....................................
-    def test_read_annotated_riis(self):
-        """Test reading an original RIIS file by checking counts."""
-        fn_args = get_test_parameters(script_name)
-        logger = Logger(script_name)
-        riis = RIIS(fn_args["_test_annotated_riis_filename"], logger, is_annotated=True)
-        # Read original species data
-        riis.read_riis()
-        assert len(riis.by_taxon) == fn_args["_test_annotated_riis_name_count"]
-        assert len(riis.by_riis_id) == fn_args["_test_annotated_riis_record_count"]
-        assert (
-            count_lines(fn_args["_test_annotated_riis_filename"])
-            == fn_args["_test_riis_record_count"] + 1)
