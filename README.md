@@ -59,6 +59,83 @@ values from the geometry nearest to the point.
 
 ## Develop and Test
 
+### Data layout
+
+* For local setup and testing, create directories to mimic the volumes created by the Dockerfile. 
+* Create a local /volumes/bison directory.  Everything contained in this
+  directory will be a symlink to the repository or to the large data directory discussed next.
+* Identify a directory with plenty of space, and create directories to contain large data files:
+  * big_data
+  * big_data/geodata
+  * output
+  * process
+  * Example below with large data directory /mnt/sata8/bison/2023
+    
+```shell
+astewart@murderbot:/mnt/sata8/bison/2023$ ll
+...
+drwxrwxr-x 3 astewart astewart 4096 Feb 15 12:07 big_data/
+drwxrwxr-x 2 astewart astewart 4096 Feb 16 09:12 output/
+drwxrwxr-x 2 astewart astewart 4096 Feb 16 09:13 process/
+
+```
+
+* In the big_data directory, place the gbif occurrence file
+
+```shell
+astewart@badenov:/tank/bison/2023$ ll big_data/
+...
+-rw-rw-r--  1 astewart astewart 40303076775 Jan 26 15:22 gbif_2023-01-26.csv
+drwxrwxr-x 16 astewart astewart        4096 Feb  8 15:04 geodata/
+
+```
+
+* In the big_data/geodata directory, place all geospatial data files.  All data within this directory will be 
+  referenced by relative filenames
+
+```shell
+astewart@badenov:/tank/bison/2023$ ll big_data/geodata/
+...
+drwxrwxr-x  2 astewart astewart  4096 Feb  8 13:34 aiannh/
+drwxrwxr-x  2 astewart astewart  4096 Feb  8 15:05 county/
+drwxrwxr-x  2 astewart astewart  4096 Feb  8 13:14 PADUS3_0_Region_10_SHP/
+drwxrwxr-x  2 astewart astewart  4096 Feb  8 13:15 PADUS3_0_Region_11_SHP/
+drwxrwxr-x  2 astewart astewart  4096 Feb  8 13:15 PADUS3_0_Region_12_SHP/
+drwxrwxr-x  2 astewart astewart  4096 Feb  8 13:19 PADUS3_0_Region_1_SHP/
+drwxrwxr-x  2 astewart astewart  4096 Feb  8 13:34 PADUS3_0_Region_2_SHP/
+drwxrwxr-x  2 astewart astewart  4096 Feb  8 13:14 PADUS3_0_Region_3_SHP/
+drwxrwxr-x  2 astewart astewart  4096 Feb  8 13:14 PADUS3_0_Region_4_SHP/
+drwxrwxr-x  2 astewart astewart  4096 Feb  8 13:15 PADUS3_0_Region_5_SHP/
+drwxrwxr-x  2 astewart astewart  4096 Feb  8 13:15 PADUS3_0_Region_6_SHP/
+drwxrwxr-x  2 astewart astewart  4096 Feb  8 13:15 PADUS3_0_Region_7_SHP/
+drwxrwxr-x  2 astewart astewart  4096 Feb  8 13:15 PADUS3_0_Region_8_SHP/
+drwxrwxr-x  2 astewart astewart  4096 Feb  8 13:15 PADUS3_0_Region_9_SHP/
+```
+
+* In the /volumes/bison directory create symbolic links to the large directory:
+  * big_data
+  * process
+  * output
+  
+* and to the local repository 
+  * config (bison/data/config)
+  * input (bison/data/input)
+  * tests (bison/tests/data)
+
+* for the following results:
+
+```shell
+astewart@murderbot:/volumes/bison$ ll
+...
+lrwxrwxrwx 1 astewart astewart   30 Feb 16 09:48 big_data -> /mnt/sata8/bison/2023/big_data/
+lrwxrwxrwx 1 astewart astewart   28 Feb 16 09:28 output -> /mnt/sata8/bison/2023/output/
+lrwxrwxrwx 1 astewart astewart   29 Feb 16 09:28 process -> /mnt/sata8/bison/2023/process/
+
+lrwxrwxrwx 1 astewart astewart   36 Feb 15 12:13 config -> /home/astewart/git/bison/data/config/
+lrwxrwxrwx 1 astewart astewart   35 Feb 15 12:34 input -> /home/astewart/git/bison/data/input/
+lrwxrwxrwx 1 astewart astewart   35 Feb 15 12:16 tests -> /home/astewart/git/bison/tests/data/
+```
+
 ### Pre-commit
 
 * Instructions in [.pre-commit-config.yaml](.pre-commit-config.yaml)
