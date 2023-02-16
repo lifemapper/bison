@@ -12,12 +12,6 @@ Split a CSV file containing GBIF DwC occurrence records into smaller files. """
 PARAMETERS = {
     "required":
         {
-            "input_path":
-                {
-                    CONFIG_PARAM.TYPE: str,
-                    CONFIG_PARAM.IS_INPUT_DIR: True,
-                    CONFIG_PARAM.HELP: "Source directory containing input data."
-                },
             "big_csv_filename":
                 {
                     CONFIG_PARAM.TYPE: str,
@@ -65,7 +59,7 @@ def cli():
     config, logger, report_filename = get_common_arguments(
         script_name, DESCRIPTION, PARAMETERS)
 
-    infilename = os.path.join(config["input_path"], config["big_csv_filename"])
+    infilename = config["big_csv_filename"]
     output_path = config["output_path"]
     if not os.path.exists(infilename):
         raise Exception(f"Input file {infilename} does not exist.")

@@ -16,16 +16,26 @@ from bison.tools.chunk_large_file import DESCRIPTION as chunk_large_file_desc
 from bison.tools.chunk_large_file import PARAMETERS as chunk_large_file_params
 from tests.tools.test_setup import get_test_parameters
 
+config_path = "/volumes/bison/config/"
 command_meta = [
-    (annotate_riis_params, annotate_riis_desc,
-     "../data/config/annotate_riis_with_gbif_taxa.json",
-     get_test_parameters("test_annotate_riis_with_gbif_taxa")),
-    (annotate_gbif_params, annotate_gbif_desc,
-     "../data/config/annotate_gbif_with_geo_and_riis.json",
-     get_test_parameters("test_annotate_gbif_with_geo_and_riis")),
-    (chunk_large_file_params, chunk_large_file_desc,
-     "../data/config/chunk_large_file.json",
-     get_test_parameters("test_config_parser"))
+    (
+        annotate_riis_params,
+        annotate_riis_desc,
+        "annotate_riis_with_gbif_taxa.json",
+        get_test_parameters("test_annotate_riis_with_gbif_taxa")
+    ),
+    (
+        annotate_gbif_params,
+        annotate_gbif_desc,
+        "annotate_gbif_with_geo_and_riis.json",
+        get_test_parameters("test_annotate_gbif_with_geo_and_riis")
+    ),
+    (
+        chunk_large_file_params,
+        chunk_large_file_desc,
+        "chunk_large_file.json",
+        get_test_parameters("test_chunk_large_file")
+    )
 ]
 
 script_name = os.path.splitext(os.path.basename(__file__))[0]
@@ -38,6 +48,7 @@ class Test_config_parser:
     def test_process_arguments_from_file(self):
         """Test the configuration files for all CLI tools."""
         for params, _desc, config_file, _test_values in command_meta:
+            config_file = os.path.join(config_path, config_file)
             # This returns exception if missing required parameter
             config = process_arguments_from_file(config_file, params)
             # Test all parameters

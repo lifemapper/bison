@@ -20,41 +20,43 @@ class Test_chunk_large_file:
         fn_args = get_test_parameters(script_name)
 
         boundary_pairs, rec_count, chunk_size = identify_chunks(
-            fn_args["_test_small_csv_filename"],
-            chunk_count=fn_args["_test_small_number_of_chunks"])
+            fn_args["big_csv_filename"],
+            chunk_count=fn_args["number_of_chunks"])
         # quotient, remainder = divmod(
         #     fn_args["_test_small_record_count"],
         #     fn_args["_test_small_number_of_chunks"])
         expected_chunk_size = math.ceil(
-            fn_args["_test_small_record_count"]
-            / fn_args["_test_small_number_of_chunks"])
+            fn_args["_test_record_count"]
+            / fn_args["number_of_chunks"])
 
-        assert len(boundary_pairs) == fn_args["_test_small_number_of_chunks"]
-        assert rec_count == fn_args["_test_small_record_count"]
+        assert len(boundary_pairs) == fn_args["number_of_chunks"]
+        assert rec_count == fn_args["_test_record_count"]
         assert chunk_size == expected_chunk_size
 
     # .....................................
     def test_count_lines(self):
         """Test reading an original RIIS file by checking counts."""
         fn_args = get_test_parameters(script_name)
-        line_count = count_lines(fn_args["_test_small_csv_filename"])
+        line_count = count_lines(fn_args["big_csv_filename"])
         # record_count = line_count - 1 (header)
-        assert (line_count - 1 == fn_args["_test_small_record_count"])
+        assert (line_count - 1 == fn_args["_test_record_count"])
 
     # .....................................
     def test_chunk_files(self):
         """Test chunking a large file into smaller files."""
         fn_args = get_test_parameters(script_name)
         logger = Logger(script_name)
+
         chunk_filenames, _report = chunk_files(
-            fn_args["_test_small_csv_filename"], fn_args["_test_small_csv_filename"],
-            logger, chunk_count=fn_args["_test_small_number_of_chunks"])
-        expected_chunk_size = math.ceil(
-            fn_args["_test_small_record_count"]
-            / fn_args["_test_small_number_of_chunks"])
+            fn_args["big_csv_filename"], fn_args["output_path"],
+            logger, chunk_count=fn_args["number_of_chunks"])
+
         file_count = len(chunk_filenames)
         assert (file_count == fn_args["_test_small_number_of_chunks"])
+
         # The last file may be a smaller size than all the others
+        expected_chunk_size = math.ceil(
+            fn_args["_test_record_count"] / fn_args["number_of_chunks"])
         name_linecount = []
         for fn in chunk_filenames:
             line_count = count_lines(fn)
@@ -72,7 +74,6 @@ class Test_chunk_large_file:
         """Test identifying subset filenames created from chunking a large file."""
         fn_args = get_test_parameters(script_name)
         chunk_filenames = identify_chunk_files(
-            fn_args["_test_small_csv_filename"],
-            chunk_count=fn_args["_test_small_number_of_chunks"])
+            fn_args["big_csv_filename"], chunk_count=fn_args["number_of_chunks"])
 
         assert (len(chunk_filenames) == fn_args["_test_small_number_of_chunks"])
