@@ -430,7 +430,10 @@ class RIIS:
                         self.by_taxon[index] = [rec]
 
                     # Also index on RIIS occurrenceID
-                    self.by_riis_id[row[RIIS_DATA.SPECIES_GEO_KEY]] = rec
+                    riis_id = row[RIIS_DATA.SPECIES_GEO_KEY]
+                    self.by_riis_id[riis_id] = rec
+
+            print(f"Finished at linenum {lineno} with {len(self.by_riis_id)} unique records")
 
         except Exception:
             raise

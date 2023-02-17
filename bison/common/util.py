@@ -285,6 +285,25 @@ def _parse_wc_output(subproc_output):
 
 
 # .............................................................................
+def _parse_cat_output(subproc_output):
+    # Return has list of byte-strings, the first contains one or more output lines, the last byte-string is empty.
+    # Multiple matching files will produce multiple lines, with total on the last line
+    output = subproc_output[0]
+    lines = output.split(b"\n")
+    line_of_interest = lines[0]
+    if line_of_interest is None:
+        raise Exception(f"Failed to get line with results from {subproc_output}")
+    elts = line_of_interest.strip().split(b"\t")
+    # Count is first element in line
+    tmp = elts[0]
+    try:
+        line_count = int(tmp)
+    except ValueError:
+        raise Exception(f"First element on results line {line_of_interest} is not an integer")
+    return line_count
+
+
+# .............................................................................
 def count_lines(filename_or_pattern, grep_strings=None):
     """Find total number of lines in a file.
 
@@ -332,6 +351,41 @@ def count_lines(filename_or_pattern, grep_strings=None):
 
     # Retrieve the total count
     line_count = _parse_wc_output(sp_outs)
+
+    return line_count
+
+
+# .............................................................................
+def count_lines_with_cat(filename_or_pattern):
+    """Find total number of lines in a file.
+
+    Args:
+        filename_or_pattern (str): filepath, with or without wildcards, to count lines for
+
+    Returns:
+        line_count (int): number of lines in the file
+
+    Raises:
+        FileNotFoundError: file pattern matches no files
+        FileNotFoundError: file does not exist
+
+    Assumptions:
+        Existence of the command line tool "cat".
+        Existence of the command line tool "tail"
+    """
+    line_count = None
+    try:
+        _check_existence(filename_or_pattern)
+    except FileNotFoundError:
+        raise
+    cmd = f"cat -n {filename_or_pattern} | tail -n1"
+
+    # Run command in a shell
+    sp = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    sp_outs = sp.communicate()
+
+    # Retrieve the total count
+    line_count = _parse_cat_output(sp_outs)
 
     return line_count
 
@@ -385,6 +439,8 @@ def get_fields_from_header(csvfile, delimiter=GBIF.DWCA_DELIMITER, encoding="utf
 
     Args:
         csvfile (str): comma/tab-delimited file with header
+        delimiter (str): single character delimiter between fields
+        encoding (str): encoding of the file
 
     Returns:
         list: of strings indicating fieldnames
@@ -403,7 +459,7 @@ def get_fields_from_header(csvfile, delimiter=GBIF.DWCA_DELIMITER, encoding="utf
     try:
         f = open(csvfile, "r", newline="", encoding=encoding)
         line = f.readline()
-        line.strip()
+        line = line.strip()
         fields = line.split(delimiter)
     except Exception:
         raise

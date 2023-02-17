@@ -2,7 +2,7 @@
 import os
 
 from bison.common.log import Logger
-from bison.common.util import count_lines
+from bison.common.util import count_lines_with_cat
 from bison.providers.riis_data import RIIS
 from tests.tools.test_setup import get_test_parameters
 
@@ -21,11 +21,10 @@ class Test_annotate_riis:
         riis = RIIS(fn_args["_test_small_riis_filename"], logger, is_annotated=False)
         # Read original species data
         riis.read_riis()
+        actual_line_count = count_lines_with_cat(fn_args["_test_small_riis_filename"])
         assert len(riis.by_taxon) == fn_args["_test_small_riis_name_count"]
         assert len(riis.by_riis_id) == fn_args["_test_small_riis_record_count"]
-        assert (
-            count_lines(fn_args["_test_small_riis_filename"])
-            == fn_args["_test_small_riis_record_count"] + 1)
+        assert (actual_line_count == fn_args["_test_small_riis_record_count"] + 1)
 
     # .....................................
     def test_read_original_riis(self):
@@ -36,10 +35,11 @@ class Test_annotate_riis:
         # Read original species data
         riis.read_riis()
         actual_record_count = fn_args["_test_riis_record_count"]
+        actual_line_count = count_lines_with_cat(fn_args["riis_filename"])
         assert len(riis.by_taxon) == fn_args["_test_riis_name_count"]
         # TODO: Why does riis.by_riis_id contain same number of records as lines in the file?
         assert len(riis.by_riis_id) == actual_record_count
-        assert (count_lines(fn_args["riis_filename"]) == actual_record_count + 1)
+        assert (actual_line_count == actual_record_count + 1)
 
     # .....................................
     def test_resolve_small_riis(self):

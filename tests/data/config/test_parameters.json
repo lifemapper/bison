@@ -21,7 +21,7 @@
     "_test_small_annotated_riis_filename": "/volumes/bison/tests/output/US-RIIS_MasterList_2021_100_annotated.csv",
     "_test_small_riis_record_count": 100,
     "_test_small_riis_name_count": 100,
-    "_test_riis_record_count": 15263,
+    "_test_riis_record_count": 15264,
     "_test_riis_name_count": 12981
   },
   "test_annotate_gbif_with_geo_and_riis":

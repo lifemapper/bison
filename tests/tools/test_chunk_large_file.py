@@ -22,9 +22,6 @@ class Test_chunk_large_file:
         boundary_pairs, rec_count, chunk_size = identify_chunks(
             fn_args["big_csv_filename"],
             chunk_count=fn_args["number_of_chunks"])
-        # quotient, remainder = divmod(
-        #     fn_args["_test_small_record_count"],
-        #     fn_args["_test_small_number_of_chunks"])
         expected_chunk_size = math.ceil(
             fn_args["_test_record_count"]
             / fn_args["number_of_chunks"])

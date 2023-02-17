@@ -61,7 +61,7 @@ values from the geometry nearest to the point.
 
 ### Data layout
 
-* For local setup and testing, create directories to mimic the volumes created by the Dockerfile. 
+* For local setup and testing, create directories to mimic the volumes created by the Dockerfile.
 * Create a local /volumes/bison directory.  Everything contained in this
   directory will be a symlink to the repository or to the large data directory discussed next.
 * Identify a directory with plenty of space, and create directories to contain large data files:
@@ -70,7 +70,7 @@ values from the geometry nearest to the point.
   * output
   * process
   * Example below with large data directory /mnt/sata8/bison/2023
-    
+
 ```shell
 astewart@murderbot:/mnt/sata8/bison/2023$ ll
 ...
@@ -90,7 +90,7 @@ drwxrwxr-x 16 astewart astewart        4096 Feb  8 15:04 geodata/
 
 ```
 
-* In the big_data/geodata directory, place all geospatial data files.  All data within this directory will be 
+* In the big_data/geodata directory, place all geospatial data files.  All data within this directory will be
   referenced by relative filenames
 
 ```shell
@@ -116,8 +116,8 @@ drwxrwxr-x  2 astewart astewart  4096 Feb  8 13:15 PADUS3_0_Region_9_SHP/
   * big_data
   * process
   * output
-  
-* and to the local repository 
+
+* and to the local repository
   * config (bison/data/config)
   * input (bison/data/input)
   * tests (bison/tests/data)
