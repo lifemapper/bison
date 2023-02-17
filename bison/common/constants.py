@@ -239,6 +239,25 @@ class APPEND_TO_DWC:
     # FILTER_FLAG = "do_summarize"
 
     @staticmethod
+    def region_fields():
+        """Fields containing a region. to summarize RIIS status of occurrence records.
+
+        Returns:
+            list of all fields used to summarize RIIS determination of records.
+        """
+        return (
+            APPEND_TO_DWC.RESOLVED_CTY, APPEND_TO_DWC.RESOLVED_ST,
+            # APPEND_TO_DWC.AIANNH_GEOID,
+            APPEND_TO_DWC.AIANNH_NAME,
+            APPEND_TO_DWC.PAD_NAME,
+            # APPEND_TO_DWC.PAD_MGMT,
+            # APPEND_TO_DWC.PAD_GAP_STATUS,
+            # APPEND_TO_DWC.PAD_GAP_STATUS_DESC,
+            # APPEND_TO_DWC.DOI_REGION,
+            # APPEND_TO_DWC.FILTER_FLAG
+        )
+
+    @staticmethod
     def annotation_fields():
         """All fields added to DwC records for analysis by geospatial region.
 

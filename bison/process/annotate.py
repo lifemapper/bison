@@ -5,13 +5,11 @@ import os
 from datetime import datetime
 from logging import ERROR
 
-from bison.common.constants import (APPEND_TO_DWC, ENCODING, GBIF, LOG,
-                                    POINT_BUFFER_RANGE, US_AIANNH,
-                                    US_CENSUS_COUNTY, US_DOI, US_PAD,
-                                    US_STATES)
+from bison.common.constants import (
+    APPEND_TO_DWC, ENCODING, GBIF, LOG, POINT_BUFFER_RANGE, US_AIANNH,
+    US_CENSUS_COUNTY, US_DOI, US_PAD, US_STATES)
 from bison.common.log import Logger
-from bison.common.util import (BisonNameOp, available_cpu_count,
-                               get_csv_dict_writer)
+from bison.common.util import (available_cpu_count, BisonNameOp, get_csv_dict_writer)
 from bison.process.geoindex import GeoResolver
 from bison.providers.gbif_data import DwcData
 from bison.providers.riis_data import RIIS
@@ -113,7 +111,7 @@ class Annotator():
         Args:
             gbif_occ_filename (str): full filename input DwC occurrence file.
             output_occ_filename (str): destination full filename for the output
-                annotated occurrence file.
+                annotated occurrence records.
 
         Raises:
             Exception: on failure to open the DwcData csvreader.

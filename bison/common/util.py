@@ -91,12 +91,13 @@ def ready_filename(fullfilename, overwrite=True):
 
 
 # .............................................................................
-def get_csv_writer(datafile, delimiter, fmode="w", overwrite=True):
+def get_csv_writer(datafile, delimiter, header=None, fmode="w", overwrite=True):
     """Create a CSV writer.
 
     Args:
         datafile: output CSV file for writing
         delimiter: field separator
+        header: list of fieldnames to be written as the first line
         fmode: Write ('w') or append ('a')
         overwrite (bool): True to delete an existing file before write
 
@@ -116,6 +117,8 @@ def get_csv_writer(datafile, delimiter, fmode="w", overwrite=True):
         try:
             f = open(datafile, fmode, newline="", encoding=ENCODING)
             writer = csv.writer(f, delimiter=delimiter, quoting=csv.QUOTE_MINIMAL)
+            if header is not None:
+                writer.writerow(header)
         except Exception as e:
             raise e
     else:
