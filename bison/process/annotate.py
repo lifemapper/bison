@@ -6,8 +6,7 @@ from datetime import datetime
 from logging import ERROR
 
 from bison.common.constants import (
-    APPEND_TO_DWC, ENCODING, GBIF, LOG, POINT_BUFFER_RANGE, US_AIANNH,
-    US_CENSUS_COUNTY, US_DOI, US_PAD, US_STATES)
+    APPEND_TO_DWC, ENCODING, GBIF, LOG, REGION)
 from bison.common.log import Logger
 from bison.common.util import (available_cpu_count, BisonNameOp, get_csv_dict_writer)
 from bison.process.geoindex import GeoResolver
@@ -39,10 +38,10 @@ class Annotator():
             constructor creates spatial indices for the geospatial files for
                 geographic areas of interest.
             geographic areas are in bison.common.constants variables and include:
-                state and county from census boundaries in US_CENSUS_COUNTY
-                region names from American Indian/Alaska Native Areas/Hawaiian Home Lands
-                    in US_AIANNH
-                protected areas from the Protected areas Database in US_PAD
+                * state and county from census boundaries in US_CENSUS_COUNTY
+                * region names from American Indian/Alaska Native Areas/Hawaiian Home
+                    Lands in US_AIANNH
+                * protected areas from the Protected areas Database in US_PAD
             US-RIIS determinations are calculated from the species/state combination.
         """
         self._log = logger
@@ -58,9 +57,7 @@ class Annotator():
                 if riis_with_gbif_filename is None:
                     raise Exception(
                         "RIIS data does not contain GBIF accepted taxa, needed for "
-                        "annotating GBIF occurrence data with RIIS Introduced and "
-                        "Invasive determinations.  Provide a riis_with_gbif_filename "
-                        "output file to initiate resolution of RIIS records.")
+                        "annotating GBIF occurrence data.")
                 else:
                     self.riis.resolve_riis_to_gbif_taxa(
                         riis_with_gbif_filename, overwrite=True)
@@ -71,34 +68,24 @@ class Annotator():
             raise Exception(
                 "Must provide either RIIS with annotations or riis_with_gbif_filename")
 
-        # Geospatial index for consistent state and county values
-        county_filename = os.path.join(geo_input_path, US_CENSUS_COUNTY.FILE)
-        self._geo_county = GeoResolver(
-            county_filename, US_CENSUS_COUNTY.GEO_BISON_MAP, self._log)
+        # Geospatial indexes for regional attributes to add to records
+        self._geo_fulls = []
+        for region in REGION.full_region():
+            fn = os.path.join(geo_input_path, region["file"])
+            self._geo_fulls.append(GeoResolver(
+                fn, region["map"], self._log, is_disjoint=region["is_disjoint"],
+                buffer_vals=region["buffer"]))
 
-        # Geospatial index for Native lands values
-        aianhh_filename = os.path.join(geo_input_path, US_AIANNH.FILE)
-        self._geo_aianhh = GeoResolver(
-            aianhh_filename, US_AIANNH.GEO_BISON_MAP, self._log)
+        # Geospatial indexes for subset regions of a whole, all with same
+        # attributes to add
+        self._geo_partials = {}
+        region = REGION.combine_to_region()
+        for filter_val, rel_fn in region["files"]:
+            fn = os.path.join(geo_input_path, rel_fn)
+            self._geo_partials[filter_val] = GeoResolver(
+                fn, region["map"], self._log, is_disjoint=region["is_disjoint"],
+                buffer_vals=region["buffer"])
 
-        # Geospatial index for DOI region (to get correct PAD DOI file)
-        doi_filename = os.path.join(geo_input_path, US_DOI.FILE)
-        self._geo_doi = GeoResolver(
-            doi_filename, US_DOI.GEO_BISON_MAP, self._log)
-
-        # Geospatial indices for each DOI region for PAD values
-        self._geo_pads = {}
-        for region, pad_fn in US_PAD.FILES:
-            pad_filename = os.path.join(geo_input_path, pad_fn)
-            self._geo_pads[region] = GeoResolver(
-                pad_filename, US_PAD.GEO_BISON_MAP, self._log)
-
-        self._conus_states = []
-        for k, v in US_STATES.items():
-            if k not in ("Alaska", "Hawaii"):
-                self._conus_states.extend([k, v])
-        self._all_states = self._conus_states.copy()
-        self._all_states.extend(["Alaska", "Hawaii", "AK", "HI"])
         self.bad_ranks = set()
         self.rank_filtered_records = 0
 
@@ -203,6 +190,81 @@ class Annotator():
 
         return taxkeys
 
+    # # ...............................................
+    # def old_annotate_one_record(self, dwcrec):
+    #     """Append fields to GBIF record, then write to file.
+    #
+    #     Args:
+    #         dwcrec: one original GBIF DwC record
+    #
+    #     Returns:
+    #         dwcrec: one GBIF DwC record, if it is not filtered out, values are added
+    #             to calculated fields: APPEND_TO_DWC, otherwise these fields are
+    #             None.
+    #     """
+    #     gbif_id = dwcrec[GBIF.ID_FLD]
+    #     if (self._dwcdata.recno % LOG.INTERVAL) == 0:
+    #         self._log.log(
+    #             f"*** Record number {self._dwcdata.recno}, gbifID: {gbif_id} ***",
+    #             refname=self.__class__.__name__)
+    #
+    #     # Leave these fields None if the record is filtered out (rank above species)
+    #     filtered_taxkeys = self._filter_find_taxon_keys(dwcrec)
+    #
+    #     # Only append additional values to records that pass the filter tests.
+    #     if filtered_taxkeys:
+    #         lon = dwcrec[GBIF.LON_FLD]
+    #         lat = dwcrec[GBIF.LAT_FLD]
+    #
+    #         for georesolver, buffers in (
+    #                 (self._geo_county, POINT_BUFFER_RANGE),
+    #                 (self._geo_aianhh, ()),
+    #                 (self._geo_doi, ())
+    #         ):
+    #             # Find enclosing region and its attributes
+    #             try:
+    #                 fldvals = georesolver.find_enclosing_polygon_attributes(lon, lat)
+    #             except ValueError as e:
+    #                 self._log.log(
+    #                     f"Record gbifID: {gbif_id}: {e}",
+    #                     refname=self.__class__.__name__, log_level=logging.ERROR)
+    #             else:
+    #                 # Add values to record
+    #                 for fld, val in fldvals.items():
+    #                     dwcrec[fld] = val
+    #
+    #         # Find RIIS region from resolved state
+    #         state = dwcrec[APPEND_TO_DWC.RESOLVED_ST]
+    #         riis_region = "L48"
+    #         if state in ("AK", "HI"):
+    #             riis_region = state
+    #
+    #         # Find any RIIS records for these acceptedTaxonKeys and region.
+    #         (riis_assessment,
+    #          riis_key) = self.riis.get_assessment_for_gbif_taxonkeys_region(
+    #             filtered_taxkeys, riis_region)
+    #         dwcrec[APPEND_TO_DWC.RIIS_ASSESSMENT] = riis_assessment
+    #         dwcrec[APPEND_TO_DWC.RIIS_KEY] = riis_key
+    #
+    #         # Find PAD area from PAD data for the DOI region
+    #         doi_region = dwcrec[APPEND_TO_DWC.DOI_REGION]
+    #         try:
+    #             pad_resolver = self._geo_pads[doi_region]
+    #         except KeyError:
+    #             self._log.log(f"No PAD datafile exists for DOI region {doi_region}")
+    #         else:
+    #             # Find enclosing PAD if exists, and its attributes
+    #             try:
+    #                 fldvals = pad_resolver.find_enclosing_polygon_attributes(lon, lat)
+    #             except ValueError as e:
+    #                 self._log.error(f"Record gbifID: {gbif_id}: {e}")
+    #             else:
+    #                 # Add values to record
+    #                 for fld, val in fldvals.items():
+    #                     dwcrec[fld] = val
+    #
+    #     return dwcrec
+
     # ...............................................
     def _annotate_one_record(self, dwcrec):
         """Append fields to GBIF record, then write to file.
@@ -229,15 +291,10 @@ class Annotator():
             lon = dwcrec[GBIF.LON_FLD]
             lat = dwcrec[GBIF.LAT_FLD]
 
-            for georesolver, buffers in (
-                    (self._geo_county, POINT_BUFFER_RANGE),
-                    (self._geo_aianhh, ()),
-                    (self._geo_doi, ())
-            ):
+            for georesolver in self._geo_fulls:
                 # Find enclosing region and its attributes
                 try:
-                    fldvals = georesolver.find_enclosing_polygon_attributes(
-                        lon, lat, buffer_vals=buffers)
+                    fldvals = georesolver.find_enclosing_polygon_attributes(lon, lat)
                 except ValueError as e:
                     self._log.log(
                         f"Record gbifID: {gbif_id}: {e}",
@@ -260,17 +317,17 @@ class Annotator():
             dwcrec[APPEND_TO_DWC.RIIS_ASSESSMENT] = riis_assessment
             dwcrec[APPEND_TO_DWC.RIIS_KEY] = riis_key
 
-            # Find PAD area from PAD data for the DOI region
-            doi_region = dwcrec[APPEND_TO_DWC.DOI_REGION]
+            # Find subset area from partial data indicated by the filter index
+            filter_field = REGION.combine_to_region()["filter_field"]
+            filter = dwcrec[filter_field]
             try:
-                pad_resolver = self._geo_pads[doi_region]
+                sub_resolver = self._geo_partials[filter]
             except KeyError:
-                self._log.log(f"No PAD datafile exists for DOI region {doi_region}")
+                self._log.log(f"No datafile exists for partial region {filter}")
             else:
                 # Find enclosing PAD if exists, and its attributes
                 try:
-                    fldvals = pad_resolver.find_enclosing_polygon_attributes(
-                        lon, lat, buffer_vals=POINT_BUFFER_RANGE)
+                    fldvals = sub_resolver.find_enclosing_polygon_attributes(lon, lat)
                 except ValueError as e:
                     self._log.error(f"Record gbifID: {gbif_id}: {e}")
                 else:

@@ -10,7 +10,9 @@ import rtree
 # .............................................................................
 class GeoResolver(object):
     """Object for intersecting coordinates with a polygon shapefile."""
-    def __init__(self, full_spatial_fname, spatial_fields, logger):
+    def __init__(
+            self, full_spatial_fname, spatial_fields, logger, is_disjoint=True,
+            buffer_vals=()):
         """Construct a geospatial index to intersect with a set of coordinates.
 
         Args:
@@ -19,6 +21,10 @@ class GeoResolver(object):
                 polygon attributes of interest and values that are new fields for
                 the intersected points.
             logger (object): logger for saving relevant processing messages
+            is_disjoint (bool): True indicates the spatial features are disjoint;
+                False indicates contiguous features.
+            buffer_vals (list of floats): range of values to use for buffering the
+                point if no intersection is found.
 
         Raises:
             FileNotFoundError: if spatial_fname does not exist on the file system
@@ -29,6 +35,8 @@ class GeoResolver(object):
         self._log = logger
         self._spatial_filename = full_spatial_fname
         self._spatial_fields = spatial_fields
+        self._is_disjoint = is_disjoint
+        self._buffer_vals = buffer_vals
         self.spatial_index = None
         self.spatial_feats = None
         self.bison_spatial_fields = None
@@ -117,54 +125,55 @@ class GeoResolver(object):
         return best_fid
 
     # ...............................................
-    def _intersect_with_spatial_index(self, pt, buffer_vals):
+    def _intersect_with_spatial_index(self, pt):
         """Find FIDs of features in spatial index whose envelopes intersect with point.
 
         Args:
-            pt (ogr point): point to find close polygons from the spatial index
-            buffer_vals (list of floats): range of values to use for buffering the
-                point if no intersection is found.
+            pt (ogr point): point to find enclosing polygon from the spatial index
 
         Returns:
             intersect_fids (list of integers): feature IDs of geometries whose
                 envelopes intersect with the original or buffered  point.
+
+        Note:
+            Points should always intersect with a feature in contiguous spatial
+                datasets, so check for nearest polygon, or buffer the point, to find a
+                feature.  Only some points will intersect with a feature in disjoint
+                spatial datasets, so do not buffer or check for nearest.
         """
         # First, find intersecting features from spatial index
         intersect_fids = list(self.spatial_index.intersection(pt.GetEnvelope()))
-        # Second, try nearest feature in spatial index
-        if not intersect_fids:
+        # For contiguous spatial datasets, keep trying
+        if not intersect_fids and self._is_disjoint is False:
+            # Second, find nearest feature in spatial index
             intersect_fids = list(self.spatial_index.nearest(pt.GetEnvelope()))
-            # Third, try buffer point and find intersection
             if not intersect_fids:
-                self._log.info("Must buffer point to intersect with spatial index!")
-                if buffer_vals is not None:
-                    geom = pt
-                    for buffer in buffer_vals:
-                        geom = geom.Buffer(buffer)
-                        # Intersect buffered point with spatial index
-                        intersect_fids = list(
-                            self.spatial_index.intersection(geom.GetEnvelope()))
-                        if intersect_fids:
-                            break
-                    if not intersect_fids:
-                        self._log.error(f"Failed to intersect point buffered to "
-                                        f"{buffer} dd with spatial index")
-                    else:
-                        self._log.info(
-                            f"Intersected point buffered {buffer} dd returned "
-                            f"{len(intersect_fids)} features")
+                self._log.info("Buffer to intersect with contiguous spatial index")
+                # Third, try increasingly large buffers to find intersection
+                for buffer in self._buffer_vals:
+                    geom = pt.Buffer(buffer)
+                    # Intersect buffered point with spatial index
+                    intersect_fids = list(
+                        self.spatial_index.intersection(geom.GetEnvelope()))
+                    if intersect_fids:
+                        break
+                if not intersect_fids:
+                    self._log.error(
+                        f"Failed to intersect spatial index with {buffer} dd buffer")
+                else:
+                    self._log.info(
+                        f"Intersected {len(intersect_fids)} features in spatial index "
+                        f"with {buffer} dd buffer.")
         return intersect_fids
 
     # ...............................................
-    def _intersect_with_polygons(self, pt, intersect_fids, buffer_vals):
+    def _intersect_with_polygons(self, pt, intersect_fids):
         """Intersect a point with polygons to find which feature contains/is closest to.
 
         Args:
             pt (ogr point): point to find close polygons from the spatial index
             intersect_fids (list of integers): feature IDs of geometries whose
                 envelopes intersect with the point.
-            buffer_vals (list of floats): range of values to use for buffering the
-                point if no intersection is found.
 
         Returns:
             fid (int): feature ID of geometry that intersects (or is closest to) point.
@@ -174,31 +183,28 @@ class GeoResolver(object):
         if fid is None:
             # Buffer may be unnecessary
             self._log.info("Must buffer point to find best feature!")
-            if buffer_vals is not None:
-                geom = pt
-                # Try increasingly large buffer, (0.1 dd ~= 11.1 km, 1 dd ~= 111 km)
-                for buffer in buffer_vals:
-                    geom = geom.Buffer(buffer)
-                    fid = self._get_first_best_feature(geom, intersect_fids)
-                    if fid is not None:
-                        break
+            geom = pt
+            # Try increasingly large buffer, (0.1 dd ~= 11.1 km, 1 dd ~= 111 km)
+            for buffer in self._buffer_vals:
+                geom = geom.Buffer(buffer)
+                fid = self._get_first_best_feature(geom, intersect_fids)
                 if fid is not None:
-                    self._log.info(
-                        f"Found best feature {fid} using buffer {buffer} dd")
-                else:
-                    self._log.info(
-                        f"Failed to intersect point using buffer {buffer} dd")
+                    break
+            if fid is not None:
+                self._log.info(
+                    f"Found best feature {fid} using buffer {buffer} dd")
+            else:
+                self._log.info(
+                    f"Failed to intersect point using buffer {buffer} dd")
         return fid
 
     # ...............................................
-    def _intersect_and_buffer(self, pt, buffer_vals):
+    def _find_intersecting_feature_values(self, pt):
         """Intersect a point with spatial index, then intersect with returned features.
 
         Args:
             pt (ogr point): point to find intersecting or closest polygon from the
                 spatial data
-            buffer_vals (list of floats): range of values to use for buffering the
-                point if no intersection is found.
 
         Returns:
             fldvals (dict): dictionary of fieldnames and values from the intersecting
@@ -212,32 +218,30 @@ class GeoResolver(object):
         """
         fldvals = {}
         # Intersect with spatial index to get ID (fid) of intersecting features
-        intersect_fids = self._intersect_with_spatial_index(pt, buffer_vals)
+        intersect_fids = self._intersect_with_spatial_index(pt)
         if not intersect_fids:
-            raise GeoException(
-                "Failed to intersect or find nearest polygon with spatial index")
+            if self._is_disjoint is False:
+                raise GeoException("Failed to find polygon in contiguous spatial index")
+        else:
+            # Pull attributes of interest from intersecting feature
+            fid = self._intersect_with_polygons(pt, intersect_fids)
+            if fid is None:
+                raise GeoException(
+                    f"Failed to intersect with any of {len(intersect_fids)} features")
 
-        # Pull attributes of interest from intersecting feature
-        fid = self._intersect_with_polygons(pt, intersect_fids, buffer_vals)
-        if fid is None:
-            raise GeoException(
-                f"Failed to intersect point with any of {len(intersect_fids)} features")
-
-        # Retrieve values from intersecting polygon
-        for fn in self.bison_spatial_fields:
-            fldvals[fn] = self.spatial_feats[fid][fn]
+            # Retrieve values from intersecting polygon
+            for fn in self.bison_spatial_fields:
+                fldvals[fn] = self.spatial_feats[fid][fn]
 
         return fldvals
 
     # ...............................................
-    def find_enclosing_polygon_attributes(self, lon, lat, buffer_vals=()):
+    def find_enclosing_polygon_attributes(self, lon, lat):
         """Return attributes of polygon enclosing these coordinates.
 
         Args:
             lon (str or double): longitude value
             lat (str or double): latitude value
-            buffer_vals (list of floats): optional list of values for buffering point
-                to find intersecting or closest polygon
 
         Returns:
             fldvals (dict): of fieldnames and values
@@ -260,7 +264,7 @@ class GeoResolver(object):
         # Intersect with spatial index to get ID (fid) of intersecting features,
         # buffer if necessary
         try:
-            fldvals = self._intersect_and_buffer(pt, buffer_vals)
+            fldvals = self._find_intersecting_feature_values(pt)
         except ValueError:
             raise
         except GeoException as e:

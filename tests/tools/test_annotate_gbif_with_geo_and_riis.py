@@ -23,8 +23,8 @@ class Test_annotate_gbif:
         ant = Annotator(
             fn_args["geoinput_path"], logger,
             riis_with_gbif_filename=fn_args["riis_with_gbif_taxa_filename"])
-        spatial_idxs = [ant._geo_county, ant._geo_aianhh, ant._geo_doi]
-        spatial_idxs.extend(ant._geo_pads.values())
+        spatial_idxs = ant._geo_fulls
+        spatial_idxs.extend(ant._geo_partials.values())
 
         for geo_spidx in spatial_idxs:
             assert(isinstance(geo_spidx.spatial_index, rtree_index))

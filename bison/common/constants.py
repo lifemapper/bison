@@ -7,7 +7,8 @@ ENCODING = "utf-8"
 LINENO_FLD = "LINENO"
 ERR_SEPARATOR = "------------"
 # Geospatial data for intersecting with points to identify state and county for points
-POINT_BUFFER_RANGE = [(i / 10.0) for i in range(1, 11)]
+COARSE_BUFFER_RANGE = [(i / 10.0) for i in range(1, 11)]
+FINE_BUFFER_RANGE = [(i / 20.0) for i in range(1, 3)]
 
 AGGREGATOR_DELIMITER = "__"
 EXTRA_CSV_FIELD = "rest_values"
@@ -275,62 +276,125 @@ class APPEND_TO_DWC:
         )
 
 
-# .............................................................................
-class US_CENSUS_COUNTY:
-    """File and fieldnames for census county boundary data, map to bison fieldnames."""
-    FILE = "census/cb_2021_us_county_500k.shp"
-    GEO_BISON_MAP = {
-        "NAME": APPEND_TO_DWC.RESOLVED_CTY,
-        "STUSPS": APPEND_TO_DWC.RESOLVED_ST
+class REGION:
+    COUNTY = {
+        "file": "census/cb_2021_us_county_500k.shp",
+        "buffer": COARSE_BUFFER_RANGE,
+        "is_disjoint": False,
+        "summary": [
+            ("county", [APPEND_TO_DWC.RESOLVED_ST, APPEND_TO_DWC.RESOLVED_CTY]),
+            ("state", APPEND_TO_DWC.RESOLVED_ST)
+        ],
+        "map": {
+            "NAME": APPEND_TO_DWC.RESOLVED_CTY,
+            "STUSPS": APPEND_TO_DWC.RESOLVED_ST
+        }
     }
-
-
-# .............................................................................
-class US_AIANNH:
-    """Relative filename and fieldname map for AIANNH.
-
-    Notes:
-        American Indian/Alaska Native Areas/Hawaiian Home Lands
-    """
-    FILE = "census/cb_2021_us_aiannh_500k.shp"
-    GEO_BISON_MAP = {
-        "NAMELSAD": APPEND_TO_DWC.AIANNH_NAME,
-        "GEOID": APPEND_TO_DWC.AIANNH_GEOID
+    AIANNH = {
+        "file": "census/cb_2021_us_aiannh_500k.shp",
+        "buffer": (),
+        "is_disjoint": True,
+        "summary": [("aiannh", APPEND_TO_DWC.AIANNH_NAME)],
+        "map": {
+            "NAMELSAD": APPEND_TO_DWC.AIANNH_NAME,
+            "GEOID": APPEND_TO_DWC.AIANNH_GEOID
+        }
     }
-
-
-# .............................................................................
-class US_PAD:
-    """Region/relative filename and fieldname map for US Protected Areas Database."""
-    FILES = [
-        ("1", "PADUS3_0_Region_1_SHP/PADUS3_0Combined_Region1.shp"),
-        ("2", "PADUS3_0_Region_2_SHP/PADUS3_0Combined_Region2.shp"),
-        ("3", "PADUS3_0_Region_3_SHP/PADUS3_0Combined_Region3.shp"),
-        ("4", "PADUS3_0_Region_4_SHP/PADUS3_0Combined_Region4.shp"),
-        ("5", "PADUS3_0_Region_5_SHP/PADUS3_0Combined_Region5.shp"),
-        ("6", "PADUS3_0_Region_6_SHP/PADUS3_0Combined_Region6.shp"),
-        ("7", "PADUS3_0_Region_7_SHP/PADUS3_0Combined_Region7.shp"),
-        ("8", "PADUS3_0_Region_8_SHP/PADUS3_0Combined_Region8.shp"),
-        ("9", "PADUS3_0_Region_9_SHP/PADUS3_0Combined_Region9.shp"),
-        ("10", "PADUS3_0_Region_10_SHP/PADUS3_0Combined_Region10.shp"),
-        ("11", "PADUS3_0_Region_11_SHP/PADUS3_0Combined_Region11.shp"),
-        ("12", "PADUS3_0_Region_12_SHP/PADUS3_0Combined_Region12.shp"),
-    ]
-    GEO_BISON_MAP = {
-        "Unit_Nm": APPEND_TO_DWC.PAD_NAME,
-        "d_Mang_Nam": APPEND_TO_DWC.PAD_MGMT,
-        "GAP_Sts": APPEND_TO_DWC.PAD_GAP_STATUS,
-        "d_GAP_Sts": APPEND_TO_DWC.PAD_GAP_STATUS_DESC
+    DOI = {
+        "file": "DOI_12_Unified_Regions_20180801.shp",
+        "buffer": COARSE_BUFFER_RANGE,
+        "is_disjoint": False,
+        "summary": [],
+        "map": {"REG_NUM": APPEND_TO_DWC.DOI_REGION}
     }
+    PAD = {
+        "files": [
+            ("1", "PADUS3_0_Region_1_SHP/PADUS3_0Combined_Region1.shp"),
+            ("2", "PADUS3_0_Region_2_SHP/PADUS3_0Combined_Region2.shp"),
+            ("3", "PADUS3_0_Region_3_SHP/PADUS3_0Combined_Region3.shp"),
+            ("4", "PADUS3_0_Region_4_SHP/PADUS3_0Combined_Region4.shp"),
+            ("5", "PADUS3_0_Region_5_SHP/PADUS3_0Combined_Region5.shp"),
+            ("6", "PADUS3_0_Region_6_SHP/PADUS3_0Combined_Region6.shp"),
+            ("7", "PADUS3_0_Region_7_SHP/PADUS3_0Combined_Region7.shp"),
+            ("8", "PADUS3_0_Region_8_SHP/PADUS3_0Combined_Region8.shp"),
+            ("9", "PADUS3_0_Region_9_SHP/PADUS3_0Combined_Region9.shp"),
+            ("10", "PADUS3_0_Region_10_SHP/PADUS3_0Combined_Region10.shp"),
+            ("11", "PADUS3_0_Region_11_SHP/PADUS3_0Combined_Region11.shp"),
+            ("12", "PADUS3_0_Region_12_SHP/PADUS3_0Combined_Region12.shp")],
+        "buffer": (),
+        "is_disjoint": True,
+        "filter_field": APPEND_TO_DWC.DOI_REGION,
+        # file prefix, field name
+        "summary": [("pad", APPEND_TO_DWC.PAD_NAME)],
+        "map": {
+            "Unit_Nm": APPEND_TO_DWC.PAD_NAME,
+            "d_Mang_Nam": APPEND_TO_DWC.PAD_MGMT,
+            "GAP_Sts": APPEND_TO_DWC.PAD_GAP_STATUS,
+            "d_GAP_Sts": APPEND_TO_DWC.PAD_GAP_STATUS_DESC
+            }
+        }
 
+    @staticmethod
+    def summary_fields():
+        """Return fields to summarize data on, and the prefix for the summary filename.
 
-# .............................................................................
-class US_DOI:
-    """Relative filename and fieldname map for of Dept of Interior Regions."""
-    FILE = "DOI_12_Unified_Regions_20180801.shp"
-    GEO_BISON_MAP = {
-        "REG_NUM": APPEND_TO_DWC.DOI_REGION
-    }
+        Returns:
+            Dictionary of field and prefix as keys/values.
+        """
+        summarize_by_fields = {}
+        for reg in REGION.for_summary():
+            for prefix, flds in reg["summary"]:
+                summarize_by_fields[prefix] = flds
+
+    @staticmethod
+    def for_resolve():
+        """Return all REGION types to use to annotate records.
+
+        Returns:
+            List of all REGION types.
+
+        Note: the
+        """
+        return (REGION.COUNTY, REGION.AIANNH, REGION.DOI, REGION.PAD)
+
+    @staticmethod
+    def full_region():
+        """Return all REGION types that cover the entire US.
+
+        Returns:
+            List of all REGION types that enclose the entire region.
+        """
+        return (REGION.COUNTY, REGION.AIANNH, REGION.DOI)
+
+    @staticmethod
+    def filter_with():
+        """Return the REGION types that narrows down the combine_to_region dataset.
+
+        Returns:
+            List of all REGION types that together enclose the entire region.
+        """
+        return REGION.DOI
+
+    @staticmethod
+    def combine_to_region():
+        """Return all REGION types that, when joined together, cover the entire US.
+
+        Returns:
+            List of all REGION types that together enclose the entire region.
+
+        Note:
+            After resolving to the filter_with,
+        """
+        return REGION.PAD
+
+    @staticmethod
+    def for_summary():
+        """Return all REGION types to be summarized.
+
+        Returns:
+            List of all REGION types that together enclose the entire region.
+        """
+        return (REGION.COUNTY, REGION.AIANNH, REGION.PAD)
 
 
 # .............................................................................

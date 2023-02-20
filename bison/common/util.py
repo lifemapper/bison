@@ -628,7 +628,8 @@ class BisonNameOp():
                 followed by process step completed (if any)
         """
         outfname = None
-        path, basename, ext, chunk, postfix = BisonNameOp.parse_filename(in_filename)
+        path, basename, ext, chunk, postfix = BisonNameOp.parse_process_filename(
+            in_filename)
         if chunk is not None:
             basename = f"{basename}{DWC_PROCESS.SEP}{chunk}"
         this_step = DWC_PROCESS.get_step(postfix)
@@ -642,7 +643,7 @@ class BisonNameOp():
 
     # .............................................................................
     @staticmethod
-    def parse_filename(filename):
+    def parse_process_filename(filename):
         """Parse a filename into path, basename, chunk, processing step, extension.
 
         Args:
@@ -680,6 +681,64 @@ class BisonNameOp():
                 if len(parts) >= 1:
                     process_postfix = parts.pop(0)
         return path, basename, ext, chunk, process_postfix
+
+    # ...............................................
+    @staticmethod
+    def construct_location_summary_name(outpath, region, prefix):
+        """Construct a filename for the summary file for a region.
+
+        Args:
+            outpath (str): full directory path for computations and output.
+            region (str): region name
+            prefix (str): file prefix indicating region type
+
+        Returns:
+            outfname: output filename derived from the state and county
+        """
+        basename = f"{prefix}_{region}.csv"
+        outfname = os.path.join(outpath, basename)
+        return outfname
+
+    # ...............................................
+    @staticmethod
+    def construct_assessment_summary_name(outpath):
+        """Construct a filename for the RIIS assessment summary file.
+
+        Args:
+            outpath (str): full directory path for computations and output.
+
+        Returns:
+            outfname: output filename
+        """
+        outfname = os.path.join(outpath, "riis_summary.csv")
+        return outfname
+
+    # ...............................................
+    @staticmethod
+    def parse_location_summary_name(csvfile):
+        """Construct a filename for the summarized version of csvfile.
+
+        Args:
+            csvfile (str): full filename used to construct an annotated filename
+                for this data.
+
+        Returns:
+            outfname: output filename derived from the annotated GBIF DWC filename
+
+        Raises:
+            Exception: on filename does not start with "state_" or "county_"
+        """
+        county = None
+        _, basefilename = os.path.split(csvfile)
+        basename, ext = os.path.splitext(basefilename)
+        if basename.startswith("state_"):
+            _, state = basename.split("_")
+        elif basename.startswith("county_"):
+            _, state, county = basename.split("_")
+        else:
+            raise Exception(
+                f"Filename {csvfile} cannot be parsed into location elements")
+        return state, county
 
 
 # .............................................................................
