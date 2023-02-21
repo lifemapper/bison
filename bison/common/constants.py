@@ -111,33 +111,42 @@ class DWC_PROCESS:
         )
 
     @staticmethod
-    def get_postfix(step):
-        """For a given step number, return the postfix.
+    def get_postfix(step_or_process):
+        """For a given step number or DWC_PROCESS, return the postfix.
 
         Args:
-            step (int): Numerical stage of processing completed.
+            step_or_process (int): Numerical stage of processing completed
+                or DWC_PROCESS.
 
         Returns:
             String for filename postfix for the given step.
         """
         for pt in DWC_PROCESS.process_types():
-            if pt["step"] == step:
+            if ((isinstance(step_or_process, int) and pt["postfix"] == step_or_process)
+                    or
+                    (isinstance(step_or_process, DWC_PROCESS)
+                     and pt == step_or_process)):
                 return pt["postfix"]
         return None
 
     @staticmethod
-    def get_step(postfix):
-        """For a given postfix, return the step number.
+    def get_step(postfix_or_process):
+        """For a given postfix or DWC_PROCESS, return the step number.
 
         Args:
-            postfix (str): String appended to the end of a filename (before the
-                extension) to indicate the stage of processing completed.
+            postfix_or_process (str or DWC_PROCESS): String appended to the end of a
+                filename (before the extension) to indicate the stage of processing
+                completed, or DWC_PROCESS.
 
         Returns:
             Integer for step corresponding to the given filename postfix.
         """
         for pt in DWC_PROCESS.process_types():
-            if pt["postfix"] == postfix:
+            if ((isinstance(postfix_or_process, str)
+                 and pt["postfix"] == postfix_or_process)
+                    or
+                (isinstance(postfix_or_process, DWC_PROCESS)
+                 and pt == postfix_or_process)):
                 return pt["step"]
         return -1
 
@@ -156,7 +165,7 @@ class DWC_PROCESS:
         for pt in DWC_PROCESS.process_types():
             if postfix is not None and pt["postfix"] == postfix:
                 return pt
-            elif pt["step"] == step:
+            elif step is not None and pt["step"] == step:
                 return pt
         return None
 
@@ -181,8 +190,13 @@ class LMBISON:
     ASSESS_KEY = "assessment"
     STATE_KEY = "state"
     COUNTY_KEY = "county"
+    LOCATION_TYPE_KEY = "location_type"
     LOCATION_KEY = "location"
     COUNT_KEY = "count"
+
+    INTRODUCED_VALUE = "introduced"
+    INVASIVE_VALUE = "invasive"
+    NATIVE_VALUE = "presumed_native"
 
     INTRODUCED_SPECIES = "introduced_species"
     INVASIVE_SPECIES = "invasive_species"
@@ -200,19 +214,52 @@ class LMBISON:
     PCT_INVASIVE_OCCS = "pct_invasive_all_occurrences"
     PCT_NATIVE_OCCS = "pct_presumed_native_occurrences"
 
-    ASSESS_VALUES = ("introduced", "invasive", "presumed_native")
-    # temporary summary of an annotated DwC file (subset/chunk of data)
-    SUMMARY_FILE = [LOCATION_KEY, SPECIES_KEY, SPECIES_NAME_KEY, COUNT_KEY]
-    # output summary of region
-    REGION_FILE = [
-        SPECIES_KEY, SCIENTIFIC_NAME_KEY, SPECIES_NAME_KEY, COUNT_KEY, ASSESS_KEY]
-    # output summary of all data
-    GBIF_RIIS_SUMMARY_FILE = [
-        STATE_KEY, COUNTY_KEY,
-        INTRODUCED_SPECIES, INVASIVE_SPECIES, NATIVE_SPECIES, TOTAL_SPECIES,
-        PCT_INTRODUCED_SPECIES, PCT_INVASIVE_SPECIES, PCT_NATIVE_SPECIES,
-        INTRODUCED_OCCS, INVASIVE_OCCS, NATIVE_OCCS, TOTAL_OCCS,
-        PCT_INTRODUCED_OCCS, PCT_INVASIVE_OCCS, PCT_NATIVE_OCCS]
+    @staticmethod
+    def assess_values():
+        """Value in annotated GBIF records indicating the RIIS determination.
+
+        Returns:
+            list of all values used to assign RIIS determination to records.
+        """
+        return (LMBISON.INTRODUCED_VALUE, LMBISON.INVASIVE_VALUE, LMBISON.NATIVE_VALUE)
+
+    @staticmethod
+    def summary_header_temp():
+        """Header in temporary file summarizing the contents of an annotated Dwc file.
+
+        Returns:
+            list of all fieldnames used in temporary summary file.
+        """
+        return (
+            LMBISON.LOCATION_TYPE_KEY, LMBISON.LOCATION_KEY, LMBISON.SPECIES_KEY,
+            LMBISON.SPECIES_NAME_KEY, LMBISON.COUNT_KEY)
+
+    @staticmethod
+    def region_summary_header():
+        """Header in output file summarizing a region.
+
+        Returns:
+            list of all fieldnames used in region summary file.
+        """
+        return (
+            LMBISON.SPECIES_KEY, LMBISON.SCIENTIFIC_NAME_KEY, LMBISON.SPECIES_NAME_KEY,
+            LMBISON.COUNT_KEY, LMBISON.ASSESS_KEY
+        )
+
+    @staticmethod
+    def all_summary_header():
+        """Header in output file summarizing all data.
+
+        Returns:
+            list of all fieldnames used in the composite summary file.
+        """
+        return (
+            LMBISON.STATE_KEY, LMBISON.COUNTY_KEY, LMBISON.INTRODUCED_SPECIES,
+            LMBISON.INVASIVE_SPECIES, LMBISON.NATIVE_SPECIES, LMBISON.TOTAL_SPECIES,
+            LMBISON.PCT_INTRODUCED_SPECIES, LMBISON.PCT_INVASIVE_SPECIES,
+            LMBISON.PCT_NATIVE_SPECIES, LMBISON.INTRODUCED_OCCS, LMBISON.INVASIVE_OCCS,
+            LMBISON.NATIVE_OCCS, LMBISON.TOTAL_OCCS, LMBISON.PCT_INTRODUCED_OCCS,
+            LMBISON.PCT_INVASIVE_OCCS, LMBISON.PCT_NATIVE_OCCS)
 
 
 # Append these to RIIS data for GBIF accepted taxon resolution
@@ -277,6 +324,7 @@ class APPEND_TO_DWC:
 
 
 class REGION:
+    """Geospatial regions to add to DwC data and summarize with RIIS determinations."""
     COUNTY = {
         "file": "census/cb_2021_us_county_500k.shp",
         "buffer": COARSE_BUFFER_RANGE,
@@ -345,6 +393,7 @@ class REGION:
         for reg in REGION.for_summary():
             for prefix, flds in reg["summary"]:
                 summarize_by_fields[prefix] = flds
+        return summarize_by_fields
 
     @staticmethod
     def for_resolve():

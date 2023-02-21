@@ -7,7 +7,9 @@ import os
 import subprocess
 import sys
 
-from bison.common.constants import DWC_PROCESS, ENCODING, EXTRA_CSV_FIELD, GBIF
+from bison.common.constants import (
+    APPEND_TO_DWC, DWC_PROCESS, ENCODING, EXTRA_CSV_FIELD, GBIF, LMBISON)
+from bison.providers.gbif_data import DwcData
 
 
 # ...............................................
@@ -211,30 +213,6 @@ def get_csv_dict_reader(
 
 
 # .............................................................................
-def get_fieldnames(filename, delimiter):
-    """Find fieldnames from the first line of a CSV file.
-
-    Args:
-         filename (str): Full filename for a CSV file with a header.
-         delimiter (str): Delimiter between fields in file records.
-
-    Returns:
-         header (list): list of fieldnames in the first line of the file
-    """
-    header = None
-    try:
-        f = open(filename, 'r', newline="", encoding='utf-8')
-        header = f.readline()
-        tmpflds = header.split(delimiter)
-        fieldnames = [fld.strip() for fld in tmpflds]
-    except Exception as e:
-        print('Failed to read first line of {}: {}'.format(filename, e))
-    finally:
-        f.close()
-    return fieldnames
-
-
-# .............................................................................
 def _check_existence(filename_or_pattern):
     is_pattern = True
     # Wildcards?
@@ -394,46 +372,57 @@ def count_lines_with_cat(filename_or_pattern):
 
 
 # .............................................................................
-def identify_chunks(big_csv_filename, chunk_count=0):
-    """Determine the start and stop lines in a large file that will make up the contents of smaller subsets of the file.
-
-    The purpose of chunking the files is to split the large file into more manageable chunks that can be processed
-     concurrently by the CPUs on the local machine.
-
-    Args:
-        big_csv_filename (str): Full path to the original large CSV file of records
-        chunk_count (int): Number of smaller files to split large file into.  Defaults
-            to the number of available CPUs minus 2.
+def available_cpu_count():
+    """Number of available virtual or physical CPUs on this system.
 
     Returns:
-        start_stop_pairs: a list of tuples, containing pairs of line numbers in the original file that will be the first
-            and last record of a subset chunk of the file.
+        int for the number of CPUs available
+
+    Raises:
+        Exception: on failure of all CPU count queries.
+
+    Notes:
+        code from https://stackoverflow.com/questions/1006289
     """
-    if chunk_count == 0:
-        chunk_count = available_cpu_count() - 2
-    start_stop_pairs = []
+    # Python 2.6+
+    try:
+        import multiprocessing
+        return multiprocessing.cpu_count()
+    except (ImportError, NotImplementedError):
+        pass
 
-    # in_base_filename, ext = os.path.splitext(big_csv_filename)
-    if big_csv_filename.endswith(GBIF.INPUT_DATA):
-        # shortcut
-        rec_count = GBIF.INPUT_RECORD_COUNT
-    else:
-        rec_count = count_lines(big_csv_filename) - 1
-    chunk_size = math.ceil(rec_count / chunk_count)
+    # https://github.com/giampaolo/psutil
+    try:
+        import psutil
+        return psutil.cpu_count()   # psutil.NUM_CPUS on old versions
+    except (ImportError, AttributeError):
+        pass
 
-    start = 1
-    stop = chunk_size
-    start_stop_pairs.append((start, stop))
+    # POSIX
+    try:
+        res = int(os.sysconf('SC_NPROCESSORS_ONLN'))
+        if res > 0:
+            return res
+    except (AttributeError, ValueError):
+        pass
 
-    while stop < rec_count:
-        # chunk_filename = f"{in_base_filename}_chunk-{start}-{stop}{ext}"
+    # Windows
+    try:
+        res = int(os.environ['NUMBER_OF_PROCESSORS'])
+        if res > 0:
+            return res
+    except (KeyError, ValueError):
+        pass
 
-        # Advance for next chunk
-        start = stop + 1
-        stop = min((start + chunk_size - 1), rec_count)
-        start_stop_pairs.append((start, stop))
+    # Linux
+    try:
+        res = open('/proc/cpuinfo').read().count('processor\t:')
+        if res > 0:
+            return res
+    except IOError:
+        pass
 
-    return start_stop_pairs, rec_count, chunk_size
+    raise Exception('Can not determine number of CPUs on this system')
 
 
 # .............................................................................
@@ -473,113 +462,158 @@ def get_fields_from_header(csvfile, delimiter=GBIF.DWCA_DELIMITER, encoding="utf
 
 
 # .............................................................................
-def identify_chunk_files(big_csv_filename, chunk_count=0):
-    """Construct filenames for smaller files subset from a large file.
+class Chunker():
+    @classmethod
+    def identify_chunks(cls, big_csv_filename, chunk_count=0):
+        """Determine the start and stop lines in a large file that will make up the contents of smaller subsets of the file.
 
-    Args:
-        big_csv_filename (str): Full path to the original large CSV file of records
-        chunk_count (int): Number of smaller files to split large file into.  Defaults
-            to the number of available CPUs minus 2.
+        The purpose of chunking the files is to split the large file into more manageable chunks that can be processed
+         concurrently by the CPUs on the local machine.
 
-    Returns:
-        chunk_filenames: a list of chunk filenames
-    """
-    chunk_filenames = []
-    in_base_filename, ext = os.path.splitext(big_csv_filename)
-    boundary_pairs, _rec_count, _chunk_size = identify_chunks(
-        big_csv_filename, chunk_count=chunk_count)
-    for (start, stop) in boundary_pairs:
-        chunk_fname = BisonNameOp.get_chunk_filename(in_base_filename, ext, start, stop)
-        chunk_filenames.append(chunk_fname)
-    return chunk_filenames
+        Args:
+            big_csv_filename (str): Full path to the original large CSV file of records
+            chunk_count (int): Number of smaller files to split large file into.  Defaults
+                to the number of available CPUs minus 2.
 
+        Returns:
+            start_stop_pairs: a list of tuples, containing pairs of line numbers in the original file that will be the first
+                and last record of a subset chunk of the file.
+        """
+        if chunk_count == 0:
+            chunk_count = available_cpu_count() - 2
+        start_stop_pairs = []
 
-# .............................................................................
-def chunk_files(big_csv_filename, output_path, logger, chunk_count=0):
-    """Split a large input csv file into multiple smaller input csv files.
+        # in_base_filename, ext = os.path.splitext(big_csv_filename)
+        if big_csv_filename.endswith(GBIF.INPUT_DATA):
+            # shortcut
+            rec_count = GBIF.INPUT_RECORD_COUNT
+        else:
+            rec_count = count_lines(big_csv_filename) - 1
+        chunk_size = math.ceil(rec_count / chunk_count)
 
-    Args:
-        big_csv_filename (str): Full path to the original large CSV file of records
-        output_path (str): Destination directory for chunked files.
-        logger (object): logger for writing messages to file and console
-        chunk_count (int): Number of smaller files to split large file into.  Defaults
-            to the number of available CPUs minus 2.
+        start = 1
+        stop = chunk_size
+        start_stop_pairs.append((start, stop))
 
-    Returns:
-        chunk_filenames: a list of chunk filenames
+        while stop < rec_count:
+            # chunk_filename = f"{in_base_filename}_chunk-{start}-{stop}{ext}"
 
-    Raises:
-        Exception: on failure to open or write to a chunk file
-        Exception: on failure to open or read the big_csv_filename
+            # Advance for next chunk
+            start = stop + 1
+            stop = min((start + chunk_size - 1), rec_count)
+            start_stop_pairs.append((start, stop))
 
-    Note:
-        Write chunk file records exactly as read, no corrections applied.
-    """
-    refname = "chunk_files"
-    inpath, base_filename = os.path.split(big_csv_filename)
-    basename, ext = os.path.splitext(base_filename)
-    chunk_filenames = []
-    boundary_pairs, rec_count, chunk_size = identify_chunks(
-        big_csv_filename, chunk_count=chunk_count)
+        return start_stop_pairs, rec_count, chunk_size
 
-    try:
-        bigf = open(big_csv_filename, 'r', newline="", encoding='utf-8')
-        header = bigf.readline()
-        line = bigf.readline()
-        big_recno = 1
+    # .............................................................................
+    @classmethod
+    def identify_chunk_files(cls, big_csv_filename, chunk_count=0):
+        """Construct filenames for smaller files subset from a large file.
 
+        Args:
+            big_csv_filename (str): Full path to the original large CSV file of records
+            chunk_count (int): Number of smaller files to split large file into.  Defaults
+                to the number of available CPUs minus 2.
+
+        Returns:
+            chunk_filenames: a list of chunk filenames
+        """
+        chunk_filenames = []
+        in_base_filename, ext = os.path.splitext(big_csv_filename)
+        boundary_pairs, _rec_count, _chunk_size = cls.identify_chunks(
+            big_csv_filename, chunk_count=chunk_count)
         for (start, stop) in boundary_pairs:
-            chunk_basefilename = BisonNameOp.get_chunk_filename(
-                basename, ext, start, stop)
-            chunk_fname = os.path.join(output_path, chunk_basefilename)
+            chunk_fname = BisonNameOp.get_chunk_filename(in_base_filename, ext, start, stop)
+            chunk_filenames.append(chunk_fname)
+        return chunk_filenames
 
-            try:
-                # Start writing the smaller file
-                chunkf = open(chunk_fname, 'w', newline="", encoding='utf-8')
-                chunkf.write('{}'.format(header))
+    # .............................................................................
+    @classmethod
+    def chunk_files(cls, big_csv_filename, output_path, logger, chunk_count=0):
+        """Split a large input csv file into multiple smaller input csv files.
 
-                while big_recno <= stop and line:
-                    try:
-                        # Write last line to chunk file
-                        chunkf.write(f"{line}")
-                    except Exception as e:
-                        # Log error and move on
-                        logger.log(
-                            f"Failed on bigfile {big_csv_filename} line number "
-                            f"{big_recno} writing to {chunk_fname}: {e}",
-                            refname=refname, log_level=logging.ERROR)
-                    # If bigfile still has lines, get next one
-                    if line:
-                        line = bigf.readline()
-                        big_recno += 1
-                    else:
-                        big_recno = stop + 1
+        Args:
+            big_csv_filename (str): Full path to the original large CSV file of records
+            output_path (str): Destination directory for chunked files.
+            logger (object): logger for writing messages to file and console
+            chunk_count (int): Number of smaller files to split large file into.  Defaults
+                to the number of available CPUs minus 2.
 
-            except Exception as e:
-                print(f"Failed opening or writing to {chunk_fname}: {e}")
-                raise
-            finally:
-                # After got to stop, close and add filename to list
-                chunkf.close()
-                logger.log(
-                    f"Wrote lines {start} to {stop} to {chunk_fname}", refname=refname)
-                chunk_filenames.append(chunk_fname)
+        Returns:
+            chunk_filenames: a list of chunk filenames
 
-    except Exception as e:
-        logger.log(
-            f"Failed to read bigfile {big_csv_filename}: {e}", refname=refname,
-            log_level=logging.ERROR)
-        raise
-    finally:
-        bigf.close()
-    report = {
-        "large_filename": big_csv_filename,
-        "chunked_files": chunk_filenames,
-        "record_count": rec_count,
-        "chunk_size": chunk_size
-    }
+        Raises:
+            Exception: on failure to open or write to a chunk file
+            Exception: on failure to open or read the big_csv_filename
 
-    return chunk_filenames, report
+        Note:
+            Write chunk file records exactly as read, no corrections applied.
+        """
+        refname = "chunk_files"
+        inpath, base_filename = os.path.split(big_csv_filename)
+        basename, ext = os.path.splitext(base_filename)
+        chunk_filenames = []
+        boundary_pairs, rec_count, chunk_size = cls.identify_chunks(
+            big_csv_filename, chunk_count=chunk_count)
+
+        try:
+            bigf = open(big_csv_filename, 'r', newline="", encoding='utf-8')
+            header = bigf.readline()
+            line = bigf.readline()
+            big_recno = 1
+
+            for (start, stop) in boundary_pairs:
+                chunk_basefilename = BisonNameOp.get_chunk_filename(
+                    basename, ext, start, stop)
+                chunk_fname = os.path.join(output_path, chunk_basefilename)
+
+                try:
+                    # Start writing the smaller file
+                    chunkf = open(chunk_fname, 'w', newline="", encoding='utf-8')
+                    chunkf.write('{}'.format(header))
+
+                    while big_recno <= stop and line:
+                        try:
+                            # Write last line to chunk file
+                            chunkf.write(f"{line}")
+                        except Exception as e:
+                            # Log error and move on
+                            logger.log(
+                                f"Failed on bigfile {big_csv_filename} line number "
+                                f"{big_recno} writing to {chunk_fname}: {e}",
+                                refname=refname, log_level=logging.ERROR)
+                        # If bigfile still has lines, get next one
+                        if line:
+                            line = bigf.readline()
+                            big_recno += 1
+                        else:
+                            big_recno = stop + 1
+
+                except Exception as e:
+                    print(f"Failed opening or writing to {chunk_fname}: {e}")
+                    raise
+                finally:
+                    # After got to stop, close and add filename to list
+                    chunkf.close()
+                    logger.log(
+                        f"Wrote lines {start} to {stop} to {chunk_fname}", refname=refname)
+                    chunk_filenames.append(chunk_fname)
+
+        except Exception as e:
+            logger.log(
+                f"Failed to read bigfile {big_csv_filename}: {e}", refname=refname,
+                log_level=logging.ERROR)
+            raise
+        finally:
+            bigf.close()
+        report = {
+            "large_filename": big_csv_filename,
+            "chunked_files": chunk_filenames,
+            "record_count": rec_count,
+            "chunk_size": chunk_size
+        }
+
+        return chunk_filenames, report
 
 
 # .............................................................................
@@ -608,17 +642,22 @@ class BisonNameOp():
 
     # .............................................................................
     @staticmethod
-    def get_out_filename(in_filename, outpath=None):
+    def get_out_process_filename(in_filename, outpath=None, step_or_process=None):
         """Construct output filename for the next processing step of the given file.
 
         Args:
             in_filename (str): base or full filename of CSV data.
             outpath (str): destination directory for output filename
+            step_or_process (int or lmbison.common.constants.DWC_PROCESS):
+                stage of processing completed on the output file.
 
         Returns:
             out_fname: base or full filename of output file, given the input filename.
                 If the input filename reflects the final processing step, the method
                 returns None
+
+        Raises:
+            Exception: on illegal step or final process as input filename
 
         Note:
             The input filename is parsed for process step, and the output filename will
@@ -632,10 +671,17 @@ class BisonNameOp():
             in_filename)
         if chunk is not None:
             basename = f"{basename}{DWC_PROCESS.SEP}{chunk}"
-        this_step = DWC_PROCESS.get_step(postfix)
-        next_postfix = DWC_PROCESS.get_postfix(this_step + 1)
-        if next_postfix is not None:
-            outbasename = f"{basename}{DWC_PROCESS.SEP}{next_postfix}{ext}"
+        # If step is not provided, get the step after that of the input file.
+        if step_or_process is None:
+            step_or_process = DWC_PROCESS.get_step(postfix) + 1
+        new_postfix = DWC_PROCESS.get_postfix(step_or_process)
+        if new_postfix is None:
+            raise Exception(
+                f"No next step for {in_filename} or processing step for "
+                f"{step_or_process}")
+        else:
+            outbasename = f"{basename}{DWC_PROCESS.SEP}{new_postfix}{ext}"
+            # If outpath is not provided, use the same path as the input file.
             if outpath is None:
                 outpath = path
             outfname = os.path.join(outpath, outbasename)
@@ -684,7 +730,7 @@ class BisonNameOp():
 
     # ...............................................
     @staticmethod
-    def construct_location_summary_name(outpath, region, prefix):
+    def construct_location_summary_name(outpath, prefix, region):
         """Construct a filename for the summary file for a region.
 
         Args:
@@ -742,70 +788,358 @@ class BisonNameOp():
 
 
 # .............................................................................
-def available_cpu_count():
-    """Number of available virtual or physical CPUs on this system.
+class Counter():
+    """Class for comparing counts for a RIIS assessment."""
+    def __init__(self, logger):
+        """Constructor.
 
-    Returns:
-        int for the number of CPUs available
+        Args:
+            logger (object): logger for saving relevant processing messages
+        """
+        self._log = logger
 
-    Raises:
-        Exception: on failure of all CPU count queries.
+    # .............................................................................
+    def _get_random_species(
+            self, annotated_occ_filename, assessment=LMBISON.INVASIVE_VALUE):
+        # Get one species name, county, state with riis_assessment from annotated file
+        accepted_spname = None
+        dwcdata = DwcData(annotated_occ_filename, self._log)
+        try:
+            dwcdata.open()
 
-    Notes:
-        code from https://stackoverflow.com/questions/1006289
-    """
-    # Python 2.6+
-    try:
-        import multiprocessing
-        return multiprocessing.cpu_count()
-    except (ImportError, NotImplementedError):
-        pass
+            # Find the species of the first record with riis_assessment
+            rec = dwcdata.get_record()
+            while rec is not None:
+                if rec[APPEND_TO_DWC.RIIS_ASSESSMENT] == assessment:
+                    accepted_spname = rec[GBIF.ACC_NAME_FLD]
+                    taxkey = rec[GBIF.ACC_TAXON_FLD]
+                    county = rec[APPEND_TO_DWC.RESOLVED_CTY]
+                    state = rec[APPEND_TO_DWC.RESOLVED_ST]
+                    print(f"Found {accepted_spname} on line {dwcdata.recno}")
+                    break
+                rec = dwcdata.get_record()
+        except Exception as e:
+            raise Exception(f"Unknown exception {e} on file {annotated_occ_filename}")
+        finally:
+            dwcdata.close()
 
-    # https://github.com/giampaolo/psutil
-    try:
-        import psutil
-        return psutil.cpu_count()   # psutil.NUM_CPUS on old versions
-    except (ImportError, AttributeError):
-        pass
+        if accepted_spname is None:
+            raise Exception(f"No {assessment} records in {annotated_occ_filename}")
 
-    # POSIX
-    try:
-        res = int(os.sysconf('SC_NPROCESSORS_ONLN'))
-        if res > 0:
-            return res
-    except (AttributeError, ValueError):
-        pass
+        return accepted_spname, taxkey, county, state
 
-    # Windows
-    try:
-        res = int(os.environ['NUMBER_OF_PROCESSORS'])
-        if res > 0:
-            return res
-    except (KeyError, ValueError):
-        pass
+    # .............................................................................
+    @classmethod
+    def count_assessments(cls, annotated_occ_filename, logger):
+        """Count records for each of the valid assessments in a file.
 
-    # Linux
-    try:
-        res = open('/proc/cpuinfo').read().count('processor\t:')
-        if res > 0:
-            return res
-    except IOError:
-        pass
+        Args:
+            annotated_occ_filename (str): full filename of annotated file to summarize.
+            logger (object): logger for saving relevant processing messages
 
-    raise Exception('Can not determine number of CPUs on this system')
+        Returns:
+            assessments (dict): dictionary with keys for each valid assessment type,
+                and total record count for each.
+
+        Raises:
+            Exception: on unknown open or read error.
+        """
+        # Get one species name and county-state with riis_assessment from annotated
+        # occurrences file.  Filtered records are retained, but have assessment = ""
+        assessments = {"": 0}
+        for val in LMBISON.assess_values():
+            assessments[val] = 0
+
+        dwcdata = DwcData(annotated_occ_filename, logger)
+        try:
+            dwcdata.open()
+
+            # Find the species of the first record with riis_assessment
+            rec = dwcdata.get_record()
+            while rec is not None:
+                ass = rec[APPEND_TO_DWC.RIIS_ASSESSMENT]
+                try:
+                    assessments[ass] += 1
+                except Exception as e:
+                    print(f"Here is e {e}")
+                rec = dwcdata.get_record()
+        except Exception as e:
+            raise Exception(f"Unknown exception {e} on file {annotated_occ_filename}")
+        finally:
+            dwcdata.close()
+
+        return assessments
+    #
+    # # .............................................................................
+    # def _count_annotated_records_for_species(self, spname, taxkey, state, county):
+    #     annotated_filenames = glob.glob(self.annotated_filename_pattern)
+    #     state_counts = RIIS_Counts(is_group=False, logger=self._log)
+    #     cty_counts = RIIS_Counts(is_group=False, logger=self._log)
+    #     for fn in annotated_filenames:
+    #         try:
+    #             dwcdata = DwcData(fn, self._log)
+    #             dwcdata.open()
+    #
+    #             # Find the species of the first record with riis_assessment
+    #             rec = dwcdata.get_record()
+    #             while rec is not None:
+    #                 if (rec[GBIF.ACC_TAXON_FLD] == taxkey
+    #                         and rec[APPEND_TO_DWC.RESOLVED_ST] == state):
+    #                     assess = rec[APPEND_TO_DWC.RIIS_ASSESSMENT]
+    #                     # Add to state count
+    #                     state_counts.add_to(assess, value=1)
+    #                     if rec[APPEND_TO_DWC.RESOLVED_CTY] == county:
+    #                         # Add to county count
+    #                         cty_counts.add_to(assess, value=1)
+    #                 rec = dwcdata.get_record()
+    #         except Exception as e:
+    #             raise Exception(f"Unknown exception {e} on file {fn}")
+    #         finally:
+    #             dwcdata.close()
+    #             dwcdata = None
+    #
+    #     self._log.log(
+    #         f"Counted occurrences of {spname} in {state} and {county} in "
+    #         f"{len(annotated_filenames)} annotated files",
+    #         refname=self.__class__.__name__)
+    #
+    #     return state_counts, cty_counts
+    #
+    # # .............................................................................
+    # def _count_annotated_records_for_assessments(self, state, county):
+    #     annotated_filenames = glob.glob(self.annotated_filename_pattern)
+    #     state_occ_assessment_counts = RIIS_Counts(self._log, is_group=False)
+    #     cty_occ_assessment_counts = RIIS_Counts(self._log, is_group=False)
+    #     # Track species for each assessment in county and state
+    #     cty_species = {}
+    #     state_species = {}
+    #     for ass in LMBISON.ASSESS_VALUES:
+    #         cty_species[ass] = set()
+    #         state_species[ass] = set()
+    #
+    #     for fn in annotated_filenames:
+    #         try:
+    #             dwcdata = DwcData(fn, self._log)
+    #             dwcdata.open()
+    #
+    #             # Find the species of the first record with riis_assessment
+    #             rec = dwcdata.get_record()
+    #             while rec is not None:
+    #                 assess = rec[APPEND_TO_DWC.RIIS_ASSESSMENT]
+    #                 taxkey = rec[GBIF.ACC_TAXON_FLD]
+    #                 if rec[APPEND_TO_DWC.RESOLVED_ST] == state:
+    #                     # Add to occ count
+    #                     state_occ_assessment_counts.add_to(assess, value=1)
+    #                     # Add to set of species
+    #                     state_species[assess].add(taxkey)
+    #                     if county is not None and rec[APPEND_TO_DWC.RESOLVED_CTY] == county:
+    #                         # Add to occ count
+    #                         cty_occ_assessment_counts.add_to(assess, value=1)
+    #                         # Add to set of species
+    #                         cty_species[assess].add(taxkey)
+    #
+    #                 rec = dwcdata.get_record()
+    #         except Exception as e:
+    #             raise Exception(f"Unknown exception {e} on file {fn}")
+    #         finally:
+    #             dwcdata.close()
+    #             dwcdata = None
+    #
+    #     state_species_counts = RIIS_Counts(
+    #         self._log, introduced=len(state_species["introduced"]),
+    #         invasive=len(state_species["invasive"]),
+    #         presumed_native=len(state_species["presumed_native"]),
+    #         is_group=True)
+    #     cty_species_counts = RIIS_Counts(
+    #         self._log, introduced=len(cty_species["introduced"]),
+    #         invasive=len(cty_species["invasive"]),
+    #         presumed_native=len(cty_species["presumed_native"]),
+    #         is_group=True)
+    #
+    #     self._log.log(
+    #         f"Counted species for assessments in {state} and {county} in "
+    #         f"{len(annotated_filenames)} annotated files", refname=self.__class__.__name__)
+    #
+    #     return state_occ_assessment_counts, cty_occ_assessment_counts, state_species_counts, cty_species_counts
+    #
+    # # .............................................................................
+    # def _get_assess_summary(self, state, county=None, is_group=False):
+    #     species_counts = occ_counts = None
+    #     assess_summary_fname = BisonNameOp.construct_assessment_summary_name(self._datapath)
+    #     try:
+    #         rdr, inf = get_csv_dict_reader(assess_summary_fname, GBIF.DWCA_DELIMITER)
+    #         for rec in rdr:
+    #             if rec[LMBISON.STATE_KEY] == state:
+    #                 # occurrence counts
+    #                 intro_occ = rec[LMBISON.INTRODUCED_OCCS]
+    #                 inv_occ = rec[LMBISON.INVASIVE_OCCS]
+    #                 native_occ = rec[LMBISON.NATIVE_OCCS]
+    #                 # species/group counts
+    #                 intro_sp = rec[LMBISON.INTRODUCED_SPECIES]
+    #                 inv_sp = rec[LMBISON.INVASIVE_SPECIES]
+    #                 native_sp = rec[LMBISON.NATIVE_SPECIES]
+    #                 if county is None:
+    #                     if not rec[LMBISON.COUNTY_KEY]:
+    #                         species_counts = RIIS_Counts(
+    #                             self._log, introduced=intro_sp, invasive=inv_sp,
+    #                             presumed_native=native_sp, is_group=True)
+    #                         occ_counts = RIIS_Counts(
+    #                             self._log, introduced=intro_occ, invasive=inv_occ,
+    #                             presumed_native=native_occ, is_group=False)
+    #                         break
+    #                 elif rec[LMBISON.COUNTY_KEY] == county:
+    #                     species_counts = RIIS_Counts(
+    #                         self._log, introduced=intro_sp, invasive=inv_sp,
+    #                         presumed_native=native_sp, is_group=True)
+    #                     occ_counts = RIIS_Counts(
+    #                         self._log, introduced=intro_occ, invasive=inv_occ,
+    #                         presumed_native=native_occ, is_group=False)
+    #                     break
+    #     except Exception as e:
+    #         raise Exception(
+    #             f"Unexpected error {e} in opening or reading {assess_summary_fname}")
+    #     return (species_counts, occ_counts)
+    #
+    # # .............................................................................
+    # def _get_region_count(self, acc_species_name, state, county=None):
+    #     region_summary_fname = Aggregator.construct_location_summary_name(
+    #         self._datapath, state, county=county)
+    #     # Get counts for all assessments of species_key in this region summary file
+    #     loc_occ_counts = RIIS_Counts(self._log, is_group=False)
+    #     try:
+    #         rdr, inf = get_csv_dict_reader(region_summary_fname, GBIF.DWCA_DELIMITER)
+    #     except Exception as e:
+    #         raise Exception(f"Unexpected open error {e} in {region_summary_fname}")
+    #
+    #     try:
+    #         for rec in rdr:
+    #             if rec[GBIF.ACC_NAME_FLD] == acc_species_name:
+    #                 rass = rec[LMBISON.ASSESS_KEY]
+    #                 count = int(rec[LMBISON.COUNT_KEY])
+    #                 if rass == "introduced":
+    #                     loc_occ_counts.introduced = count
+    #                 elif rass == "invasive":
+    #                     loc_occ_counts.invasive = count
+    #                 elif rass == "presumed_native":
+    #                     loc_occ_counts.presumed_native = count
+    #                 else:
+    #                     raise Exception(f"Unknown record field {rass}.")
+    #                 break
+    #     except Exception as e:
+    #         raise Exception(f"Unexpected read error {e} in {region_summary_fname}")
+    #     finally:
+    #         inf.close()
+    #
+    #     self._log.log(
+    #         f"Read occurrence summary for {acc_species_name} in "
+    #         f"{region_summary_fname} summary file", refname=self.__class__.__name__)
+    #
+    #     return loc_occ_counts
+    #
+    # # .............................................................................
+    # def _log_comparison(self, truth_counts, summary_counts, compare_type, source):
+    #     self._log.log(
+    #         f"Compare annotation counts to {source} ({compare_type}) introduced, "
+    #         f"invasive, presumed_native: ", refname=self.__class__.__name__)
+    #     self._log.log(
+    #         f"    {truth_counts.introduced}, {truth_counts.invasive}, "
+    #         f"{truth_counts.presumed_native}", refname=self.__class__.__name__)
+    #     self._log.log(
+    #         f"    {summary_counts.introduced}, {summary_counts.invasive}, "
+    #         f"{summary_counts.presumed_native}", refname=self.__class__.__name__)
+    #     if truth_counts.equals(summary_counts):
+    #         self._log.log("Success!", refname=self.__class__.__name__)
+    #     else:
+    #         self._log.log(
+    #             "FAIL! Annotations do not match summaries",
+    #             refname=self.__class__.__name__)
+    #     self._log.log("", refname=self.__class__.__name__)
+    #
+    # # .............................................................................
+    # def compare_counts(self):
+    #     """Compare matching annotated records against the counts in summary files."""
+    #     # Get an invasive species occurrence from one annotated file
+    #     filenames = glob.glob(self.annotated_filename_pattern)
+    #     midx = int(len(filenames) / 2)
+    #     acc_species_name, taxkey, county, state = self._get_random_species(
+    #         filenames[midx], "invasive")
+    #
+    #     self._log.log(
+    #         "--------------------------------------", refname=self.__class__.__name__)
+    #     self._log.log(
+    #         f"Compare `ground truth` occurrences of '{acc_species_name}' in "
+    #         f"{county} {state} to region summaries", refname=self.__class__.__name__)
+    #     self._log.log(
+    #         "--------------------------------------", refname=self.__class__.__name__)
+    #
+    #     # Ground truth: Count matching lines for species and region in annotated records
+    #     gtruth_state_occXspecies, gtruth_county_occXspecies = \
+    #         self._count_annotated_records_for_species(
+    #             acc_species_name, taxkey, state, county)
+    #
+    #     # Counts from state and county summary files
+    #     state_loc_occ_counts = self._get_region_count(
+    #         acc_species_name, state, county=None)
+    #     county_loc_occ_counts = self._get_region_count(
+    #         acc_species_name, state, county=county)
+    #
+    #     # Compare
+    #     self._log_comparison(
+    #         gtruth_state_occXspecies, state_loc_occ_counts,
+    #         f"{state} {acc_species_name} occurrence", f"{state} summary")
+    #     self._log_comparison(
+    #         gtruth_county_occXspecies, county_loc_occ_counts,
+    #         f"{county} {acc_species_name} occurrence", f"{county} summary")
+    #
+    #     self._log.log(
+    #         "--------------------------------------", refname=self.__class__.__name__)
+    #     self._log.log(
+    #         f"Compare `ground truth` assessment (occurrences) {county} {state} to " +
+    #         "RIIS summary", refname=self.__class__.__name__)
+    #     self._log.log(
+    #         "--------------------------------------", refname=self.__class__.__name__)
+    #
+    #     # Ground truth: Count matching lines for assessment and region in annotated recs
+    #     (gtruth_state_occXassess, gtruth_cty_occXassess, gtruth_state_speciesXassess,
+    #         gtruth_cty_speciesXassess) = self._count_annotated_records_for_assessments(
+    #         state, county)
+    #
+    #     # Counts from RIIS assessment summary
+    #     (st_species_counts, st_occ_counts) = self._get_assess_summary(state)
+    #     (cty_species_counts, cty_occ_counts) = self._get_assess_summary(
+    #         state, county=county)
+    #
+    #     # Compare
+    #     self._log_comparison(
+    #         gtruth_state_occXassess, st_occ_counts,
+    #         f"{state} occurrence", "RIIS summary")
+    #     self._log_comparison(
+    #         gtruth_cty_occXassess, cty_occ_counts,
+    #         f"{county} occurrence", "RIIS summary")
+    #
+    #     # Compare species counts
+    #     self._log.log(
+    #         "--------------------------------------", refname=self.__class__.__name__)
+    #     self._log.log(
+    #         f"Compare `ground truth` assessment (species) {county} {state} to RIIS "
+    #         f"summary", refname=self.__class__.__name__)
+    #     self._log.log(
+    #         "--------------------------------------", refname=self.__class__.__name__)
+    #     self._log_comparison(
+    #         gtruth_state_speciesXassess, st_species_counts,
+    #         f"{state} species", "RIIS summary")
+    #     self._log_comparison(
+    #         gtruth_cty_speciesXassess, cty_species_counts,
+    #         f"{county} species", "RIIS summary")
 
 
 # .............................................................................
 __all__ = [
     "available_cpu_count",
-    "chunk_files",
     "count_lines",
     "delete_file",
     "get_csv_dict_reader",
     "get_csv_dict_writer",
     "get_csv_writer",
-    "get_fieldnames",
-    "identify_chunk_files",
-    "identify_chunks",
     "ready_filename"
 ]

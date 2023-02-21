@@ -5,8 +5,8 @@ from datetime import datetime
 import multiprocessing
 
 from bison.common.constants import (
-    AGGREGATOR_DELIMITER, APPEND_TO_DWC, DATA_PATH, ENCODING, EXTRA_CSV_FIELD, GBIF,
-    LMBISON, OUT_DIR, REGION, RIIS_DATA, US_STATES)
+    AGGREGATOR_DELIMITER, APPEND_TO_DWC, DATA_PATH, DWC_PROCESS, ENCODING,
+    EXTRA_CSV_FIELD, GBIF, LMBISON, OUT_DIR, REGION, RIIS_DATA, US_STATES)
 from bison.common.log import Logger
 from bison.common.util import (
     available_cpu_count, BisonNameOp, get_csv_dict_reader, get_csv_writer,
@@ -304,7 +304,7 @@ class Aggregator():
             try:
                 self._csv_writer, self._outf = get_csv_writer(
                     output_summary_filename, GBIF.DWCA_DELIMITER,
-                    header=LMBISON.SUMMARY_FILE, fmode="w")
+                    header=LMBISON.summary_header_temp(), fmode="w")
             except Exception as e:
                 raise Exception(
                     f"Failed to open summary CSV file {output_summary_filename}: {e}")
@@ -545,7 +545,7 @@ class Aggregator():
         report = {}
         for prefix in self._locations.keys():
             loc_count = sp_count = occ_count = 0
-            for __loc, spcount_dict in self._location[prefix].items():
+            for __loc, spcount_dict in self._locations[prefix].items():
                 loc_count += 1
                 for __sp, count in spcount_dict.items():
                     occ_count += count
@@ -559,9 +559,9 @@ class Aggregator():
     # ...............................................
     def _write_raw_region_summary(self):
         # Write summary of annotated records,
-        #       with LOCATION_KEY, SPECIES_KEY, SPECIES_NAME, COUNT_KEY
+        #       with LOCATION_PREFIX, LOCATION_KEY, SPECIES_KEY, SPECIES_NAME, COUNT_KEY
         try:
-            self._csv_writer.writerow(LMBISON.SUMMARY_FILE)
+            self._csv_writer.writerow(LMBISON.summary_header_temp())
             self._log.info(f"Writing region summaries to {self._csv_writer.file}")
 
             # Location keys are state and county_state
@@ -595,8 +595,8 @@ class Aggregator():
                 for rec in csv_rdr:
                     species_key = rec[LMBISON.SPECIES_KEY]
                     self._add_record_to_location_summaries(
-                        rec[LMBISON.LOCATION_KEY], species_key,
-                        count=rec[LMBISON.COUNT_KEY])
+                        rec[LMBISON.LOCATION_TYPE_KEY], rec[LMBISON.LOCATION_KEY],
+                        species_key, count=rec[LMBISON.COUNT_KEY])
                     try:
                         self._canonicals[species_key]
                     except KeyError:
@@ -608,12 +608,13 @@ class Aggregator():
 
     # ...............................................
     def summarize_by_region(
-            self, annotated_filename, output_summary_filename, overwrite=True):
+            self, annotated_filename, tmp_output_summary_filename, overwrite=True):
         """Read an annotated file, summarize by species and location, write to csvfile.
 
         Args:
             annotated_filename (str): full filename input annotated DwC occurrence file.
-            output_occ_filename (str): destination full filename for the summary.
+            tmp_output_summary_filename (str): destination full filename for the
+                unorganized summary by locations.
             overwrite (bool): Flag indicating whether to overwrite existing files.
 
         Returns:
@@ -625,14 +626,14 @@ class Aggregator():
                 SPECIES_KEY, GBIF_TAXON_KEY, ASSESS_KEY, STATE_KEY, COUNTY_KEY, COUNT_KEY
         """
         self.initialize_summary_io(
-            annotated_filename, output_summary_filename, overwrite=overwrite)
+            annotated_filename, tmp_output_summary_filename, overwrite=overwrite)
         # Summarize and write
         report = self._summarize_annotations_by_region()
         self._write_raw_region_summary()
 
         self._log.info(
-            f"Summarized species by region from {annotated_filename} to "
-            f"{output_summary_filename}")
+            f"Summarized species by all regions from {annotated_filename} to "
+            f"{tmp_output_summary_filename}")
         return report
 
     # ...............................................
@@ -643,7 +644,7 @@ class Aggregator():
         return riis
 
     # ...............................................
-    def _examine_species_for_location(self, location, species_counts, riis):
+    def _examine_species_for_location(self, riis_region, species_counts, riis):
         recs = []
         if species_counts:
             # All these species are for the location of interest
@@ -663,22 +664,74 @@ class Aggregator():
 
                 assessments = riis.get_assessments_for_gbif_taxonkey(gbif_taxon_key)
                 try:
-                    assess = assessments[location].lower()
+                    assess = assessments[riis_region].lower()
                 except KeyError:
                     assess = "presumed_native"
-                # Record contents: LMBISON.REGION_FILE
+                # Record contents: LMBISON.region_summary_header()
                 recs.append([species_key, scientific_name, species_name, count, assess])
         return recs
 
+    # ...............................................
+    def _write_region_aggregate(self, outpath, riis, region_type, region_value):
+        """Summarize aggregated data for a location by species.
+
+        Args:
+            outpath (str): output path for aggregate file
+            riis (bison.common.riis.RIIS): Non-native species list object
+            region_type (str): Type of region for file prefix
+            region_value (str): region name
+
+        Returns:
+            summary_filename: output file
+
+        Raises:
+            Exception: on unexpected write error
+
+        [species_key, species_name, count, assessment]
+        """
+        summary_filename = BisonNameOp.construct_location_summary_name(
+            outpath, region_type, region_value)
+
+        try:
+            species_counts = self._locations[region_value]
+        except KeyError:
+            self._log.warn(f"No species occurrences found for {summary_filename}")
+            summary_filename = None
+        else:
+            try:
+                csv_wtr, outf = get_csv_writer(
+                    summary_filename, GBIF.DWCA_DELIMITER,
+                    header=LMBISON.region_summary_header(), fmode="w")
+            except Exception as e:
+                raise Exception(f"Unknown write error on {summary_filename}: {e}")
+
+            if region_type == "state" and region_value in ("AK", "HI"):
+                riis_region = region_value
+            else:
+                riis_region = "L48"
+            try:
+                # Write all records found
+                records = self._examine_species_for_location(
+                    riis_region, species_counts, riis)
+                for rec in records:
+                    csv_wtr.writerow(rec)
+                self._log.info(f"Wrote region summaries to {summary_filename}")
+            except Exception as e:
+                raise Exception(f"Unknown write error on {summary_filename}: {e}")
+            finally:
+                outf.close()
+
+        return summary_filename
+
     # # ...............................................
-    # def _write_region_aggregate(self, outpath, riis, region_type, region_value):
+    # def _write_region_aggregate_old(self, datapath, riis, state, county=None):
     #     """Summarize aggregated data for a location by species.
     #
     #     Args:
-    #         outpath (str): output path for aggregate file
+    #         datapath (str): output path for aggregate file
     #         riis (bison.common.riis.RIIS): Non-native species list object
-    #         region_type (str): Type of region for file prefix
-    #         region (str): region name
+    #         state (str): 2-character state code
+    #         county (str): County name from census data.
     #
     #     Returns:
     #         summary_filename: output file
@@ -688,24 +741,30 @@ class Aggregator():
     #
     #     [species_key, species_name, count, assessment]
     #     """
-    #     summary_filename = BisonNameOp.construct_location_summary_name(
-    #         outpath, region_type, region_value)
-    #
-    #     if region_type == "state" and region_value in ("AK", "HI"):
-    #         riis_region = region_value
+    #     if county is None:
+    #         location = state
+    #         summary_filename = BisonNameOp.construct_location_summary_name(
+    #             self._datapath, state)
     #     else:
-    #         riis_region = "L48"
+    #         location = self.construct_compound_key(state, county)
+    #         summary_filename = BisonNameOp.construct_location_summary_name(
+    #             self._datapath, state, county=county)
+    #
+    #     if state in ("AK", "HI"):
+    #         region = state
+    #     else:
+    #         region = "L48"
     #
     #     try:
-    #         species_counts = self._locations[region_value]
+    #         species_counts = self._locations[location]
     #     except KeyError:
     #         self._log.warn(f"No species occurrences found for {summary_filename}")
     #         summary_filename = None
     #     else:
     #         try:
     #             csv_wtr, outf = get_csv_writer(
-    #                 summary_filename, GBIF.DWCA_DELIMITER, header=LMBISON.REGION_FILE,
-    #                 fmode="w")
+    #                 summary_filename, GBIF.DWCA_DELIMITER,
+    #                 header=LMBISON.region_summary_header(), fmode="w")
     #         except Exception as e:
     #             raise Exception(f"Unknown write error on {summary_filename}: {e}")
     #
@@ -722,65 +781,6 @@ class Aggregator():
     #             outf.close()
     #
     #     return summary_filename
-
-    # ...............................................
-    def _write_region_aggregate_old(self, datapath, riis, state, county=None):
-        """Summarize aggregated data for a location by species.
-
-        Args:
-            datapath (str): output path for aggregate file
-            riis (bison.common.riis.RIIS): Non-native species list object
-            state (str): 2-character state code
-            county (str): County name from census data.
-
-        Returns:
-            summary_filename: output file
-
-        Raises:
-            Exception: on unexpected write error
-
-        [species_key, species_name, count, assessment]
-        """
-        if county is None:
-            location = state
-            summary_filename = self.construct_location_summary_name(
-                self._datapath, state)
-        else:
-            location = self.construct_compound_key(state, county)
-            summary_filename = self.construct_location_summary_name(
-                self._datapath, state, county=county)
-
-        if state in ("AK", "HI"):
-            region = state
-        else:
-            region = "L48"
-
-        try:
-            species_counts = self._locations[location]
-        except KeyError:
-            self._log.warn(f"No species occurrences found for {summary_filename}")
-            summary_filename = None
-        else:
-            try:
-                csv_wtr, outf = get_csv_writer(
-                    summary_filename, GBIF.DWCA_DELIMITER, header=LMBISON.REGION_FILE,
-                    fmode="w")
-            except Exception as e:
-                raise Exception(f"Unknown write error on {summary_filename}: {e}")
-
-            try:
-                # Write all records found
-                records = self._examine_species_for_location(
-                    region, species_counts, riis)
-                for rec in records:
-                    csv_wtr.writerow(rec)
-                self._log.info(f"Wrote region summaries to {summary_filename}")
-            except Exception as e:
-                raise Exception(f"Unknown write error on {summary_filename}: {e}")
-            finally:
-                outf.close()
-
-        return summary_filename
 
     # ...............................................
     def _summarize_region_by_riis(
@@ -903,7 +903,7 @@ class Aggregator():
     #     try:
     #         csvwtr, outf = get_csv_writer(
     #             assess_summary_filename, GBIF.DWCA_DELIMITER,
-    #             header=LMBISON.GBIF_RIIS_SUMMARY_FILE, fmode="w", overwrite=True)
+    #             header=LMBISON.all_summary_header(), fmode="w", overwrite=True)
     #     except Exception as e:
     #         raise Exception(f"Unknown open/csv error on {assess_summary_filename}: {e}")
     #
@@ -967,7 +967,8 @@ def summarize_annotations(annotated_filename, output_path, log_path):
 
     logger.log(f"Start Time : {datetime.now()}", refname=refname)
     agg = Aggregator(logger)
-    summary_filename = BisonNameOp.get_out_filename(annotated_filename, outpath=output_path)
+    summary_filename = BisonNameOp.get_out_process_filename(
+        annotated_filename, outpath=output_path, step_or_process=DWC_PROCESS.AGGREGATE)
 
     # Do not overwrite existing summary
     agg.summarize_by_region(annotated_filename, summary_filename, overwrite=False)

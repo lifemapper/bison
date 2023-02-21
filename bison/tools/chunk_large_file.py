@@ -3,7 +3,7 @@ import json
 import os
 
 from bison.common.constants import CONFIG_PARAM
-from bison.common.util import chunk_files
+from bison.common.util import Chunker
 from bison.tools._config_parser import get_common_arguments
 
 DESCRIPTION = """\
@@ -66,7 +66,7 @@ def cli():
     if not os.path.exists(output_path):
         raise Exception(f"Output path {output_path} does not exist.")
 
-    _, report = chunk_files(infilename, output_path, logger)
+    _, report = Chunker.chunk_files(infilename, output_path, logger)
 
     # If the output report was requested, write it
     if report_filename is not None:

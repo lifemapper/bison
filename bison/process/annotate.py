@@ -6,7 +6,7 @@ from datetime import datetime
 from logging import ERROR
 
 from bison.common.constants import (
-    APPEND_TO_DWC, ENCODING, GBIF, LOG, REGION)
+    APPEND_TO_DWC, DWC_PROCESS, ENCODING, GBIF, LOG, REGION)
 from bison.common.log import Logger
 from bison.common.util import (available_cpu_count, BisonNameOp, get_csv_dict_writer)
 from bison.process.geoindex import GeoResolver
@@ -430,7 +430,8 @@ def annotate_occurrence_file(
     ant = Annotator(
         geo_path, logger, riis_with_gbif_filename=riis_with_gbif_filename)
 
-    out_fname = BisonNameOp.get_out_filename(dwc_filename, outpath=output_path)
+    out_fname = BisonNameOp.get_out_process_filename(
+        dwc_filename, outpath=output_path, step_or_process=DWC_PROCESS.ANNOTATE)
     report = ant.annotate_dwca_records(dwc_filename, out_fname)
 
     logger.log(
@@ -465,7 +466,8 @@ def parallel_annotate(
 
     # Process only needed files
     for dwc_fname in dwc_filenames:
-        out_fname = BisonNameOp.get_out_filename(dwc_fname, outpath=output_path)
+        out_fname = BisonNameOp.get_out_process_filename(
+            dwc_fname, outpath=output_path, step_or_process=DWC_PROCESS.ANNOTATE)
         if os.path.exists(out_fname):
             main_logger.log(
                 f"Annotations exist in {out_fname}, moving on.", refname=refname)
