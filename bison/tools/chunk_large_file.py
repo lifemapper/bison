@@ -66,7 +66,8 @@ def cli():
     if not os.path.exists(output_path):
         raise Exception(f"Output path {output_path} does not exist.")
 
-    _, report = Chunker.chunk_files(infilename, output_path, logger)
+    _, report = Chunker.chunk_files(
+        infilename, output_path, logger, chunk_count=config["number_of_chunks"])
 
     # If the output report was requested, write it
     if report_filename is not None:

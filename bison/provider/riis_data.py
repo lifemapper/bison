@@ -6,7 +6,7 @@ import os
 from bison.common.constants import (APPEND_TO_RIIS, ERR_SEPARATOR, GBIF,
                                     LINENO_FLD, RIIS_DATA)
 from bison.common.util import get_csv_dict_reader, get_csv_dict_writer
-from bison.providers.gbif_api import GbifSvc
+from bison.provider.gbif_api import GbifSvc
 
 
 # .............................................................................

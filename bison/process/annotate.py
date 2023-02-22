@@ -10,8 +10,8 @@ from bison.common.constants import (
 from bison.common.log import Logger
 from bison.common.util import (available_cpu_count, BisonNameOp, get_csv_dict_writer)
 from bison.process.geoindex import GeoResolver
-from bison.providers.gbif_data import DwcData
-from bison.providers.riis_data import RIIS
+from bison.provider.gbif_data import DwcData
+from bison.provider.riis_data import RIIS
 
 
 # .............................................................................

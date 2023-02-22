@@ -20,7 +20,7 @@ DESCRIPTION = """\
 PARAMETERS = {
     "required":
         {
-            "annotated_dwc_filenames":
+            "summary_filenames":
                 {
                     CONFIG_PARAM.TYPE: list,
                     CONFIG_PARAM.IS_INPUT_FILE: True,
@@ -104,8 +104,9 @@ def cli():
     config, logger, report_filename = get_common_arguments(
         script_name, DESCRIPTION, PARAMETERS)
 
+    outfilename = BisonNameOp.get_combined_summary_name
     report = summarize_occurrence_annotations(
-        config["annotated_dwc_filenames"], config["output_path"], logger)
+        config["summary_filenames"], config["output_path"], logger)
 
     # If the output report was requested, write it
     if report_filename:

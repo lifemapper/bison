@@ -2,7 +2,7 @@
 import os
 
 from bison.common.log import Logger
-from bison.providers.riis_data import RIIS
+from bison.provider.riis_data import RIIS
 from tests.tools.test_setup import get_test_parameters
 
 script_name = os.path.splitext(os.path.basename(__file__))[0]

@@ -92,10 +92,11 @@ US_STATES = {
 # .............................................................................
 class DWC_PROCESS:
     """Process steps and associated filename postfixes indicating completion."""
-    CHUNK = {"step": 0, "postfix": None, "prefix": "chunk"}
+    CHUNK = {"step": 0, "postfix": "raw", "prefix": "chunk"}
     ANNOTATE = {"step": 1, "postfix": "georiis"}
     SUMMARIZE = {"step": 2, "postfix": "summary"}
-    AGGREGATE = {"step": 3, "postfix": "aggregate"}
+    COMBINE =  {"step": 3, "postfix": "combine"}
+    AGGREGATE = {"step": 4, "postfix": "aggregate"}
     SEP = "_"
 
     @staticmethod
@@ -107,8 +108,18 @@ class DWC_PROCESS:
         """
         return (
             DWC_PROCESS.CHUNK, DWC_PROCESS.ANNOTATE,
-            DWC_PROCESS.SUMMARIZE, DWC_PROCESS.AGGREGATE
+            DWC_PROCESS.SUMMARIZE, DWC_PROCESS.COMBINE, DWC_PROCESS.AGGREGATE
         )
+
+    @staticmethod
+    def _is_instance(obj):
+        try:
+            keys = obj.keys()
+        except Exception:
+            is_dwc_proc = False
+        else:
+            is_dwc_proc = ("step" in keys and "postfix" in keys)
+        return is_dwc_proc
 
     @staticmethod
     def get_postfix(step_or_process):
@@ -121,11 +132,10 @@ class DWC_PROCESS:
         Returns:
             String for filename postfix for the given step.
         """
+        is_dp_obj = DWC_PROCESS._is_instance(step_or_process)
         for pt in DWC_PROCESS.process_types():
             if ((isinstance(step_or_process, int) and pt["postfix"] == step_or_process)
-                    or
-                    (isinstance(step_or_process, DWC_PROCESS)
-                     and pt == step_or_process)):
+                or is_dp_obj and pt == step_or_process):
                 return pt["postfix"]
         return None
 
@@ -141,12 +151,11 @@ class DWC_PROCESS:
         Returns:
             Integer for step corresponding to the given filename postfix.
         """
+        is_dp_obj = DWC_PROCESS._is_instance(postfix_or_process)
         for pt in DWC_PROCESS.process_types():
-            if ((isinstance(postfix_or_process, str)
-                 and pt["postfix"] == postfix_or_process)
-                    or
-                (isinstance(postfix_or_process, DWC_PROCESS)
-                 and pt == postfix_or_process)):
+            if ((isinstance(postfix_or_process, str) and
+                 pt["postfix"] == postfix_or_process)
+                    or is_dp_obj and pt == postfix_or_process):
                 return pt["step"]
         return -1
 
@@ -330,7 +339,7 @@ class REGION:
         "buffer": COARSE_BUFFER_RANGE,
         "is_disjoint": False,
         "summary": [
-            ("county", [APPEND_TO_DWC.RESOLVED_ST, APPEND_TO_DWC.RESOLVED_CTY]),
+            ("county", (APPEND_TO_DWC.RESOLVED_ST, APPEND_TO_DWC.RESOLVED_CTY)),
             ("state", APPEND_TO_DWC.RESOLVED_ST)
         ],
         "map": {
@@ -390,9 +399,15 @@ class REGION:
             Dictionary of field and prefix as keys/values.
         """
         summarize_by_fields = {}
-        for reg in REGION.for_summary():
+        regions = REGION.for_summary()
+        for reg in regions:
             for prefix, flds in reg["summary"]:
-                summarize_by_fields[prefix] = flds
+                if isinstance(flds, str):
+                    summarize_by_fields[prefix] = flds
+                elif isinstance(flds, tuple) and len(flds) == 2:
+                    summarize_by_fields[prefix] = flds
+                else:
+                    raise Exception(f"Bad metadata for {prefix} summary fields")
         return summarize_by_fields
 
     @staticmethod

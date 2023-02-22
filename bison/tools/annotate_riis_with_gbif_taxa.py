@@ -3,7 +3,8 @@ import json
 import os
 
 from bison.common.constants import CONFIG_PARAM
-from bison.providers.riis_data import resolve_riis_taxa
+from bison.common.util import BisonNameOp
+from bison.provider.riis_data import resolve_riis_taxa
 from bison.tools._config_parser import get_common_arguments
 
 DESCRIPTION = """\
@@ -17,12 +18,14 @@ PARAMETERS = {
                 {
                     CONFIG_PARAM.TYPE: str,
                     CONFIG_PARAM.IS_INPUT_FILE: True,
-                    CONFIG_PARAM.HELP: "Filename of the most current USGS RIIS Master List"
+                    CONFIG_PARAM.HELP:
+                        "Filename of the most current USGS RIIS Master List"
                 },
-            "annotated_riis_filename":
+            "outpath":
                 {
                     CONFIG_PARAM.TYPE: str,
-                    CONFIG_PARAM.HELP: "Filename to write the annotated RIIS list."
+                    CONFIG_PARAM.HELP:
+                        "Destination directory for the output annotated RIIS list."
                 },
         },
     "optional":
@@ -51,10 +54,11 @@ def cli():
     script_name = os.path.splitext(os.path.basename(__file__))[0]
     config, logger, report_filename = get_common_arguments(
         script_name, DESCRIPTION, PARAMETERS)
+    annotated_riis_filename = BisonNameOp.get_annotated_riis_filename(
+        config["riis_filename"], outpath=config["outpath"])
 
     report = resolve_riis_taxa(
-        config["riis_filename"], config["annotated_riis_filename"], logger,
-        overwrite=True)
+        config["riis_filename"], annotated_riis_filename, logger, overwrite=True)
 
     # If the output report was requested, write it
     if report_filename:
