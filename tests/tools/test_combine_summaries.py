@@ -12,11 +12,11 @@ script_name = os.path.splitext(os.path.basename(__file__))[0]
 
 
 # .............................................................................
-class Test_annotate_gbif:
+class Test_combine_summaries:
     """Test the CLI tool and dependencies that annotate RIIS data with GBIF taxa."""
 
     # .....................................
-    def test_ant_init(self):
+    def test_combine_summaries(self):
         """Test reading an original RIIS file by checking counts."""
         fn_args = get_test_parameters(script_name)
         logger = Logger(script_name)

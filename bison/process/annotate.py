@@ -287,7 +287,10 @@ class Annotator():
         filtered_taxkeys = self._filter_find_taxon_keys(dwcrec)
 
         # Only append additional values to records that pass the filter tests.
-        if filtered_taxkeys:
+        if not filtered_taxkeys:
+            dwcrec[APPEND_TO_DWC.FILTER_FLAG] = True
+        else:
+            dwcrec[APPEND_TO_DWC.FILTER_FLAG] = False
             lon = dwcrec[GBIF.LON_FLD]
             lat = dwcrec[GBIF.LAT_FLD]
 

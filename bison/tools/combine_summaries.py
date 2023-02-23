@@ -1,4 +1,4 @@
-"""Tool to add locations and RIIS identifiers to GBIF occurrence records."""
+"""Tool to summarize summaries of occ records by geographic area and RIIS assessment."""
 import json
 import os
 from datetime import datetime
@@ -32,7 +32,7 @@ PARAMETERS = {
                 {
                     CONFIG_PARAM.TYPE: str,
                     CONFIG_PARAM.IS_OUPUT_DIR: True,
-                    CONFIG_PARAM.HELP: "Destination directory for output data."
+                    CONFIG_PARAM.HELP: "Destination directory for output file."
                 },
         },
     "optional":
@@ -51,13 +51,13 @@ PARAMETERS = {
 
 
 # .............................................................................
-def summarize_occurrence_annotations(
-        annotated_dwc_filenames, output_path, logger):
-    """Annotate GBIF records with geographic areas, and RIIS key and assessment.
+def summarize_annotation_summaries(
+        summary_filenames, out_filename, logger):
+    """Summarize summaries of GBIF records by geographic area and RIIS assessment.
 
     Args:
-        annotated_dwc_filenames (list): full filenames containing annotated GBIF data.
-        output_path: destination directory for output files of annotated records
+        summary_filenames (list): full filenames containing annotated GBIF data.
+        out_filename: destination file for summary of all summary files.
         logger (object): logger for saving relevant processing messages
 
     Returns:
@@ -68,25 +68,15 @@ def summarize_occurrence_annotations(
         FileNotFoundError: on missing DWC input file(s).
     """
     report = {
-        "annotated_dwc_inputs": [],
+        "summary_filenames": [],
     }
-    for ann_fname in annotated_dwc_filenames:
-        if not os.path.exists(ann_fname):
-            raise FileNotFoundError(f"Missing input DWC occurrence file {ann_fname}.")
+    for sum_fname in summary_filenames:
+        if not os.path.exists(sum_fname):
+            raise FileNotFoundError(f"Missing input summary file {sum_fname}.")
 
     agg = Aggregator(logger)
-    for ann_fname in annotated_dwc_filenames:
-        output_summary_fname = BisonNameOp.get_out_process_filename(
-            ann_fname, outpath=output_path, step_or_process=DWC_PROCESS.SUMMARIZE)
-
-        logger.log(
-            f"Start Time: {datetime.now()}: Submit {ann_fname} for aggregation "
-            f"to {output_summary_fname}", refname=script_name)
-
-        # Add locality-intersections and RIIS determinations to GBIF DwC records
-        process_rpt = agg.summarize_by_location(ann_fname, output_summary_fname)
-        report["annotated_dwc_inputs"].append(process_rpt)
-        logger.log(f"End Time : {datetime.now()}", refname=script_name)
+    report = agg.summarize_summaries(summary_filenames, out_filename)
+    logger.log(f"End Time : {datetime.now()}", refname=script_name)
 
     return report
 
@@ -104,9 +94,11 @@ def cli():
     config, logger, report_filename = get_common_arguments(
         script_name, DESCRIPTION, PARAMETERS)
 
-    outfilename = BisonNameOp.get_combined_summary_name
-    report = summarize_occurrence_annotations(
-        config["summary_filenames"], config["output_path"], logger)
+    outfilename = BisonNameOp.get_combined_summary_name(
+        config["summary_filenames"][0], config["output_path"]
+    )
+    report = summarize_annotation_summaries(
+        config["summary_filenames"], outfilename, logger)
 
     # If the output report was requested, write it
     if report_filename:

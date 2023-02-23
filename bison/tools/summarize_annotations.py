@@ -1,4 +1,4 @@
-"""Tool to add locations and RIIS identifiers to GBIF occurrence records."""
+"""Tool to summarize annotated GBIF records by geographic area and RIIS assessment."""
 import json
 import os
 from datetime import datetime
@@ -53,7 +53,7 @@ PARAMETERS = {
 # .............................................................................
 def summarize_occurrence_annotations(
         annotated_dwc_filenames, output_path, logger):
-    """Annotate GBIF records with geographic areas, and RIIS key and assessment.
+    """Summarize annotated GBIF records by geographic area and RIIS assessment.
 
     Args:
         annotated_dwc_filenames (list): full filenames containing annotated GBIF data.

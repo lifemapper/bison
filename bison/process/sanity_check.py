@@ -1,7 +1,11 @@
 """Common classes for adding USGS RIIS info to GBIF occurrences."""
+import logging
+
 from bison.common.constants import (
-    APPEND_TO_DWC, GBIF, LMBISON)
+    APPEND_TO_DWC, GBIF, LMBISON, REGION)
+from bison.common.util import get_csv_dict_reader
 from bison.provider.gbif_data import DwcData
+
 
 # .............................................................................
 class Counter():
@@ -60,9 +64,9 @@ class Counter():
         Raises:
             Exception: on unknown open or read error.
         """
-        # Get one species name and county-state with riis_assessment from annotated
-        # occurrences file.  Filtered records are retained, but have assessment = ""
-        assessments = {"": 0}
+        # Count each record for every assessment from annotated occurrences file.
+        # Filtered records are retained, but have assessment = ""
+        assessments = {LMBISON.FILTERED_VALUE: 0}
         for val in LMBISON.assess_values():
             assessments[val] = 0
 
@@ -74,10 +78,10 @@ class Counter():
             rec = dwcdata.get_record()
             while rec is not None:
                 ass = rec[APPEND_TO_DWC.RIIS_ASSESSMENT]
-                try:
+                if not ass:
+                    assessments[LMBISON.FILTERED_VALUE] += 1
+                else:
                     assessments[ass] += 1
-                except Exception as e:
-                    print(f"Here is e {e}")
                 rec = dwcdata.get_record()
         except Exception as e:
             raise Exception(f"Unknown exception {e} on file {annotated_occ_filename}")
@@ -85,7 +89,119 @@ class Counter():
             dwcdata.close()
 
         return assessments
-    #
+
+    # .............................................................................
+    @classmethod
+    def compare_location_species_counts(cls, summary_filenames, combined_summary_filename, logger):
+        """Count records for each of the valid assessments in a file.
+
+        Args:
+            annotated_occ_filename (str): full filename of annotated file to summarize.
+            logger (object): logger for saving relevant processing messages
+
+        Returns:
+            assessments (dict): dictionary with keys for each valid assessment type,
+                and total record count for each.
+
+        Raises:
+            Exception: on unknown open or read error.
+        """
+        # Count each record for every assessment from annotated occurrences file.
+        # Filtered records are retained, but have assessment = ""
+        report = {}
+        inconsistencies = []
+        sum_locations = {}
+        sum_species_keys = {}
+        for prefix in REGION.summary_fields().keys():
+            sum_locations[prefix] = {}
+
+        for sum_fname in summary_filenames:
+            sum_locations, sum_species_keys = cls.count_locations_species(
+                sum_fname, locations=sum_locations, species_keys=sum_species_keys)
+
+        cmb_locations, cmb_species_keys = cls.count_locations_species(
+            combined_summary_filename)
+
+        region_disjoint = REGION.region_disjoint()
+        for prefix in REGION.summary_fields().keys():
+            is_disjoint = region_disjoint[prefix]
+            # Check number of unique locations for each prefix (type of location)
+            sum_location_num = len(sum_locations[prefix])
+            cmb_location_num = len(cmb_locations[prefix])
+            if sum_location_num != cmb_location_num:
+                msg = (
+                    f"{prefix} unique locations {sum_location_num} in input summary "
+                    f"files != unique locations {cmb_location_num} in combined file "
+                    f"{combined_summary_filename}")
+                logger.log(msg, refname=cls.__name, log_level=logging.ERROR)
+                inconsistencies.append(msg)
+
+            # Check number of occurrences for each prefix (type of location)
+            # Contiguous location types should contain all records in the dataset,
+            #   except for filtered records.
+            cmb_counts = cmb_locations[prefix]
+            sum_prefix_occ_total
+            for loc, count in sum_locations[prefix].items():
+                try:
+                    ok = (count == sum_locations[prefix][loc])
+                except KeyError:
+                    ok = False
+
+
+
+    # .............................................................................
+    @classmethod
+    def count_locations_species(cls, summary_filename, locations=None, species_keys=None):
+        """Get count of records for each of the valid location and type in a file.
+
+        Args:
+            summary_filename (str): full filename of summary file to total records.
+            locations (dict): pre-existing dictionary of location types, with dictionary
+                of locations and their counts
+            species_keys (dict): pre-existing set of species keys and counts
+
+        Returns:
+            assessments (dict): dictionary with keys for each valid assessment type,
+                and total record count for each.
+
+        Raises:
+            Exception: on unknown open or read error.
+        """
+        # Count each record for every assessment from annotated occurrences file.
+        # Filtered records are retained, but have assessment = ""
+        if locations is None:
+            locations = {}
+            for prefix in REGION.summary_fields().keys():
+                locations[prefix] = {}
+        if species_keys is None:
+            species_keys = {}
+
+        try:
+            csv_rdr, inf = get_csv_dict_reader(summary_filename, GBIF.DWCA_DELIMITER)
+        except Exception as e:
+            raise Exception(f"Failed to open {summary_filename}: {e}")
+
+        try:
+            for rec in csv_rdr:
+                # Count points in each location, ignore species
+                prefix = rec[LMBISON.LOCATION_TYPE_KEY]
+                location = rec[LMBISON.LOCATION_KEY]
+                count = rec[LMBISON.COUNT_KEY]
+                try:
+                    locations[prefix][location] += count
+                except KeyError:
+                    locations[prefix][location] = count
+
+                # Count unique species keys
+                species_keys.add(rec[LMBISON.SPECIES_KEY])
+        except Exception as e:
+            raise Exception(f"Failed to read {summary_filename}: {e}")
+        finally:
+            inf.close()
+            csv_rdr = None
+
+        return locations, species_keys
+
     # # .............................................................................
     # def _count_annotated_records_for_species(self, spname, taxkey, state, county):
     #     annotated_filenames = glob.glob(self.annotated_filename_pattern)
@@ -347,4 +463,3 @@ class Counter():
     #     self._log_comparison(
     #         gtruth_cty_speciesXassess, cty_species_counts,
     #         f"{county} species", "RIIS summary")
-

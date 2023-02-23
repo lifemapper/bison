@@ -2,7 +2,7 @@
 import os
 
 from bison.common.constants import CONFIG_PARAM
-from bison.common.util import Counter
+from bison.process.sanity_check import Counter
 from bison.tools._config_parser import get_common_arguments
 
 DESCRIPTION = """\
@@ -11,17 +11,17 @@ Count summary occurrences from all aggregated summaries and compare to known cou
 PARAMETERS = {
     "required":
         {
-            "annotated_occ_filename":
+            "summary_filenames":
                 {
                     CONFIG_PARAM.TYPE: str,
                     CONFIG_PARAM.IS_INPUT_FILE: True,
-                    CONFIG_PARAM.HELP: "Large CSV file to split into manageable chunks."
+                    CONFIG_PARAM.HELP: "CSV files containing annotation summaries."
                 },
-            "output_path":
+            "combined_summary_filename":
                 {
                     CONFIG_PARAM.TYPE: str,
-                    CONFIG_PARAM.IS_OUPUT_DIR: True,
-                    CONFIG_PARAM.HELP: "Destination directory for output data."
+                    CONFIG_PARAM.IS_INPUT_FILE: True,
+                    CONFIG_PARAM.HELP: "CSV file summarizing all annotation summaries."
                 },
         },
     "optional":
@@ -50,6 +50,17 @@ def cli():
     script_name = os.path.splitext(os.path.basename(__file__))[0]
     config, logger, report_filename = get_common_arguments(
         script_name, DESCRIPTION, PARAMETERS)
+
+    sum_filenames = config["summary_filenames"]
+    first_summaries = {}
+    for fname in sum_filenames:
+        assessments = Counter.count_assessments(fname, logger)
+        for key, val in assessments.items():
+            try:
+                first_summaries[key] += val
+            except KeyError:
+                first_summaries[key] = val
+
 
     infilename = config["annotated_occ_filename"]
     output_path = config["output_path"]

@@ -239,10 +239,9 @@ class Aggregator():
         self._states = {}
         self._init_states()
 
-        # {county_or_state: {species: count, ... } ...  }
-        self._locations = {}
-        # {species_key: species_name,  ... }
-        self._canonicals = {}
+        # Reset summaries by location (self._locations)
+        #   and species name lookup (self._canonicals)
+        self._init_summaries()
 
     # ...............................................
     def close(self):
@@ -272,7 +271,7 @@ class Aggregator():
         return False
 
     # ...............................................
-    def initialize_summary_io(
+    def _initialize_summary_io(
             self, annotated_filename, output_summary_filename, overwrite=True):
         """Initialize and open required input and output files of occurrence records.
 
@@ -289,10 +288,8 @@ class Aggregator():
             Exception: on failure to open output file.
         """
         self.close()
-        # Reset location summary
-        self._locations = {}
-        # Reset name lookup
-        self._canonicals = {}
+        # Reset summaries by location and species name lookup
+        self._init_summaries()
         if not os.path.exists(annotated_filename):
             raise FileNotFoundError(f"File {annotated_filename} does not exist")
         if output_summary_filename is None:
@@ -313,6 +310,30 @@ class Aggregator():
             except Exception as e:
                 raise Exception(
                     f"Failed to open summary CSV file {output_summary_filename}: {e}")
+
+    # ...............................................
+    def _initialize_combine_summaries_io(self, combined_summary_filename):
+        """Initialize, open, and write header of output file for summary of summaries.
+
+        Args:
+            combined_summary_filename (str): destination full filename for the summary.
+
+        Raises:
+            Exception: on failure to open output file.
+        """
+        # Close input and output IO
+        self.close()
+        # Reset summaries by location and species name lookup
+        self._init_summaries()
+
+        if ready_filename(combined_summary_filename, overwrite=True):
+            try:
+                self._csv_writer, self._outf = get_csv_writer(
+                    combined_summary_filename, GBIF.DWCA_DELIMITER,
+                    header=LMBISON.summary_header_temp(), fmode="w")
+            except Exception as e:
+                raise Exception(
+                    f"Failed to open summary CSV file {combined_summary_filename}: {e}")
 
     # ...............................................
     def _init_states(self):
@@ -373,12 +394,28 @@ class Aggregator():
             self._canonicals[species_key] = species_name
 
     # ...............................................
-    def _add_record_to_location_summaries(self, prefix, location, species_key, count=1):
-        # locations = {region_type: {species: count,  ... }, ... }
+    def _add_record_to_location_summaries(
+            self, prefix, is_disjoint, location, species_key, count=1):
+        # locations = {prefix: {location: {species_key: count,  ... },
+        #                       location: {species_key: count,  ...},
+        #                       ... },
+        #              ...
+        #              "filtered": {"N/A": {"N/A": count},
+        #               ... }
         try:
             count = int(count)
         except ValueError:
             raise ValueError(f"Species count {count} must be an integer")
+
+        # Point cannot be summarized for regions it does not intersect with
+        if not location:
+            if is_disjoint:
+                # Point cannot be summarized for regions it does not intersect with
+                return
+            else:
+                # Point must intersect with contiguous regions
+                raise ValueError(
+                    f"Record must have a value for contiguous region {prefix}")
         # Add to summary of unique locations
         try:
             # Is location present?
@@ -411,13 +448,20 @@ class Aggregator():
                             refname=self.__class__.__name__, log_level=logging.ERROR)
 
     # ...............................................
-    def _summarize_annotations_by_region(self):
-        # Summarize records by RIIS determination and census, AIANNH, PAD regions.
-        # Reset summary
+    def _init_summaries(self):
+        # Reset species name lookup
+        self._canonicals = {}
+        # Reset location summary, populate with geography type
         self._locations = {}
-        summarize_by_fields = REGION.summary_fields()
-        for prefix in summarize_by_fields.keys():
+        for prefix in REGION.summary_fields().keys():
             self._locations[prefix] = {}
+
+    # ...............................................
+    def _summarize_annotations_by_region(self):
+        # Reset summaries by location and species name lookup
+        self._init_summaries()
+        region_disjoint = REGION.region_disjoint()
+        filtered_count = 0
 
         self._log.log(
             f"Summarizing annotations in {self._annotated_dwc_filename} by region",
@@ -425,8 +469,11 @@ class Aggregator():
         try:
             for rec in self._csv_reader:
                 # State can be assigned to all records, empty if record is filtered out
-                if rec[APPEND_TO_DWC.RESOLVED_ST]:
-
+                if rec[APPEND_TO_DWC.FILTER_FLAG] == "True":
+                    filtered_count += 1
+                    self._add_record_to_location_summaries(
+                        LMBISON.FILTERED_HEADING, False, "na", "na")
+                else:
                     # Use combo key-name to track species
                     species_key = self._get_compound_key(
                         rec[GBIF.ACC_TAXON_FLD], rec[GBIF.ACC_NAME_FLD])
@@ -434,7 +481,8 @@ class Aggregator():
                     self._save_key_canonical(species_key, rec[GBIF.SPECIES_NAME_FLD])
 
                     # regions to summarize
-                    for prefix, fld in summarize_by_fields.items():
+                    for prefix, fld in REGION.summary_fields().items():
+                        is_disjoint = region_disjoint[prefix]
                         if isinstance(fld, str):
                             location = rec[fld]
                         elif isinstance(fld, tuple) and len(fld) == 2:
@@ -443,7 +491,7 @@ class Aggregator():
                             raise Exception(f"Bad summary fields {fld}")
 
                         self._add_record_to_location_summaries(
-                            prefix, location, species_key)
+                            prefix, is_disjoint, location, species_key)
 
         except csv.Error as ce:
             self._log.log(
@@ -480,7 +528,6 @@ class Aggregator():
         # Write summary of annotated records,
         #       with LOCATION_PREFIX, LOCATION_KEY, SPECIES_KEY, SPECIES_NAME, COUNT_KEY
         try:
-            self._csv_writer.writerow(LMBISON.summary_header_temp())
             self._log.log(
                 f"Writing region summaries to {self._outf.name}",
                 refname=self.__class__.__name__)
@@ -491,7 +538,7 @@ class Aggregator():
                 for location, sp_info in loc_info.items():
                     for species_key, count in sp_info.items():
                         species_name = self._canonicals[species_key]
-                        row = [location, species_key, species_name, count]
+                        row = [location_type, location, species_key, species_name, count]
                         self._csv_writer.writerow(row)
         except Exception as e:
             raise Exception(f"Failed to write to file {self._outf.name}, ({e})")
@@ -508,10 +555,8 @@ class Aggregator():
         Raises:
             Exception: on failure to open or read a file.
         """
-        # Reset location summary
-        self._locations = {}
-        # Reset name lookup
-        self._canonicals = {}
+        # Reset location summary and species name lookup
+        self._init_summaries()
         # Add summaries from each summary
         for sum_fname in summary_filename_list:
             try:
@@ -521,21 +566,24 @@ class Aggregator():
 
             try:
                 for rec in csv_rdr:
-                    species_key = rec[LMBISON.SPECIES_KEY]
+                    spkey = rec[LMBISON.SPECIES_KEY]
+                    # is_disjoint = False to bypass for previously summarized data
                     self._add_record_to_location_summaries(
-                        rec[LMBISON.LOCATION_TYPE_KEY], rec[LMBISON.LOCATION_KEY],
-                        species_key, count=rec[LMBISON.COUNT_KEY])
+                        rec[LMBISON.LOCATION_TYPE_KEY], False, rec[LMBISON.LOCATION_KEY],
+                        rec[LMBISON.SPECIES_KEY], count=rec[LMBISON.COUNT_KEY])
+
+                    # Fill species name lookup
                     try:
-                        self._canonicals[species_key]
+                        _ = self._canonicals[spkey]
                     except KeyError:
-                        self._canonicals[species_key] = rec[LMBISON.SPECIES_NAME_KEY]
+                        self._canonicals[spkey] = rec[LMBISON.SPECIES_NAME_KEY]
             except Exception as e:
                 raise Exception(f"Failed to read {sum_fname}: {e}")
             finally:
                 inf.close()
 
     # ...............................................
-    def summarize_summaries(self, summary_filename_list):
+    def summarize_summaries(self, summary_filename_list, out_filename):
         """Read summary files and combine summaries in self._locations.
 
         Args:
@@ -544,9 +592,10 @@ class Aggregator():
         Raises:
             Exception: on failure to open or read a file.
         """
+        self._initialize_combine_summaries_io(out_filename)
         self._read_location_summaries(summary_filename_list)
         self._write_raw_region_summary()
-
+        self.close()
 
     # ...............................................
     def summarize_by_location(
@@ -567,7 +616,7 @@ class Aggregator():
             summary file contains records like:
                 SPECIES_KEY, GBIF_TAXON_KEY, ASSESS_KEY, STATE_KEY, COUNTY_KEY, COUNT_KEY
         """
-        self.initialize_summary_io(
+        self._initialize_summary_io(
             annotated_filename, tmp_output_summary_filename, overwrite=overwrite)
         # Summarize and write
         file_report = self._summarize_annotations_by_region()
@@ -815,7 +864,8 @@ class Aggregator():
     #         region_summary_filenames (list): full filenames by region, of summaries of
     #             counts and percentages of species in that region.
     #     """
-    #     self._locations = {}
+    #     # Reset location summary and species name lookup
+    #     self._init_summaries()
     #     datapath, _ = os.path.split(summary_filename_list[0])
     #     self.read_location_aggregates(summary_filename_list)
     #     self._log.log("Read summarized annotations to aggregate by region")
@@ -851,7 +901,8 @@ class Aggregator():
     #     Raises:
     #         Exception: on unexpected open or write error
     #     """
-    #     self._locations = {}
+    #     # Reset location summary and species name lookup
+    #     self._init_summaries()
     #     assess_summary_filename = BisonNameOp.get_assessment_summary_name(self._datapath)
     #
     #     try:

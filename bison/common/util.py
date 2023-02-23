@@ -745,7 +745,6 @@ class BisonNameOp():
                     process_postfix = parts.pop(0)
         return path, basename, ext, chunk, process_postfix
 
-
     # ...............................................
     @classmethod
     def get_raw_summary_name(cls, csvfile):

@@ -95,7 +95,7 @@ class DWC_PROCESS:
     CHUNK = {"step": 0, "postfix": "raw", "prefix": "chunk"}
     ANNOTATE = {"step": 1, "postfix": "georiis"}
     SUMMARIZE = {"step": 2, "postfix": "summary"}
-    COMBINE =  {"step": 3, "postfix": "combine"}
+    COMBINE = {"step": 3, "postfix": "combine"}
     AGGREGATE = {"step": 4, "postfix": "aggregate"}
     SEP = "_"
 
@@ -135,7 +135,7 @@ class DWC_PROCESS:
         is_dp_obj = DWC_PROCESS._is_instance(step_or_process)
         for pt in DWC_PROCESS.process_types():
             if ((isinstance(step_or_process, int) and pt["postfix"] == step_or_process)
-                or is_dp_obj and pt == step_or_process):
+                    or is_dp_obj and pt == step_or_process):
                 return pt["postfix"]
         return None
 
@@ -206,6 +206,7 @@ class LMBISON:
     INTRODUCED_VALUE = "introduced"
     INVASIVE_VALUE = "invasive"
     NATIVE_VALUE = "presumed_native"
+    FILTERED_HEADING = "filtered_out"
 
     INTRODUCED_SPECIES = "introduced_species"
     INVASIVE_SPECIES = "invasive_species"
@@ -293,6 +294,7 @@ class APPEND_TO_DWC:
     PAD_GAP_STATUS = "GAP_Sts"
     PAD_GAP_STATUS_DESC = "d_GAP_Sts"
     DOI_REGION = "doi_region"
+    FILTER_FLAG = "filter_out"
     # FILTER_FLAG = "do_summarize"
 
     @staticmethod
@@ -327,8 +329,7 @@ class APPEND_TO_DWC:
             APPEND_TO_DWC.AIANNH_GEOID, APPEND_TO_DWC.AIANNH_NAME,
             APPEND_TO_DWC.PAD_NAME, APPEND_TO_DWC.PAD_MGMT,
             APPEND_TO_DWC.PAD_GAP_STATUS, APPEND_TO_DWC.PAD_GAP_STATUS_DESC,
-            APPEND_TO_DWC.DOI_REGION,
-            # APPEND_TO_DWC.FILTER_FLAG
+            APPEND_TO_DWC.DOI_REGION, APPEND_TO_DWC.FILTER_FLAG
         )
 
 
@@ -408,7 +409,22 @@ class REGION:
                     summarize_by_fields[prefix] = flds
                 else:
                     raise Exception(f"Bad metadata for {prefix} summary fields")
+            summarize_by_fields[LMBISON.FILTERED_HEADING] = APPEND_TO_DWC.FILTER_FLAG
         return summarize_by_fields
+
+    @staticmethod
+    def region_disjoint():
+        """Return fields to summarize data on, and the prefix for the summary filename.
+
+        Returns:
+            Dictionary of field and prefix as keys/values.
+        """
+        region_disjoint = {}
+        regions = REGION.for_summary()
+        for reg in regions:
+            for prefix, _ in reg["summary"]:
+                region_disjoint[prefix] = reg["is_disjoint"]
+        return region_disjoint
 
     @staticmethod
     def for_resolve():
