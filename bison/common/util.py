@@ -628,7 +628,7 @@ class BisonNameOp():
                 to the same path as the input file if not provided.
 
         Returns:
-            str: full filename for the output file.
+            out_filename: full filename for the output file.
         """
         basename, ext = os.path.splitext(os.path.split(input_riis_filename)[1])
         out_filename = os.path.join(outpath, f"{basename}_annotated.csv")
@@ -767,9 +767,9 @@ class BisonNameOp():
         """Construct a filename for the summarized version of annotated csvfile.
 
         Args:
-            csvfile (str): full filename used to construct an annotated filename for
-                this data. This file may be one of a set of input files, if the input
-                data was split, this file will combine it and remove chunk designation.
+            csvfile (str): full filename of one subset summary file (of one or more) for
+                this data.
+            outpath (str): full directory path for output filename.
 
         Returns:
             outfname: output filename derived from the summarized GBIF DWC filename
@@ -786,61 +786,65 @@ class BisonNameOp():
 
     # ...............................................
     @staticmethod
-    def get_location_summary_name(outpath, prefix, location):
+    def get_location_summary_name(outpath, region, location):
         """Construct a filename for the summary file for a region.
 
         Args:
-            outpath (str): full directory path for computations and output.
+            outpath (str): full directory path for output filename.
             region (str): region name
-            prefix (str): file prefix indicating region type
+            location (str): file prefix indicating region type
 
         Returns:
             outfname: output filename derived from the state and county
         """
-        basename = f"{prefix}_{location}.csv"
+        basename = f"{region}_{location}.csv"
         outfname = os.path.join(outpath, basename)
         return outfname
 
     # ...............................................
     @staticmethod
-    def get_assessment_summary_name(outpath, basename):
+    def get_assessment_summary_name(csvfile, outpath):
         """Construct a filename for the RIIS assessment summary file.
 
         Args:
-            outpath (str): full directory path for computations and output.
+            csvfile (str): full filename of one subset summary file (of one or more) for
+                this data.
+            outpath (str): full directory path for output filename.
 
         Returns:
             outfname: output filename
         """
-        outfname = os.path.join(outpath, "riis_summary.csv")
+        _path, basename, ext, _chunk, _postfix = BisonNameOp.parse_process_filename(
+            csvfile)
+        outfname = os.path.join(outpath, f"{basename}_riis_summary{ext}")
         return outfname
 
-    # ...............................................
-    @staticmethod
-    def parse_location_summary_name(csvfile):
-        """Construct a filename for the summarized version of csvfile.
-
-        Args:
-            csvfile (str): full filename used to construct an annotated filename
-                for this data.
-
-        Returns:
-            outfname: output filename derived from the annotated GBIF DWC filename
-
-        Raises:
-            Exception: on filename does not start with "state_" or "county_"
-        """
-        county = None
-        _, basefilename = os.path.split(csvfile)
-        basename, ext = os.path.splitext(basefilename)
-        if basename.startswith("state_"):
-            _, state = basename.split("_")
-        elif basename.startswith("county_"):
-            _, state, county = basename.split("_")
-        else:
-            raise Exception(
-                f"Filename {csvfile} cannot be parsed into location elements")
-        return state, county
+    # # ...............................................
+    # @staticmethod
+    # def parse_location_summary_name(csvfile):
+    #     """Construct a filename for the summarized version of csvfile.
+    #
+    #     Args:
+    #         csvfile (str): full filename used to construct an annotated filename
+    #             for this data.
+    #
+    #     Returns:
+    #         outfname: output filename derived from the annotated GBIF DWC filename
+    #
+    #     Raises:
+    #         Exception: on filename does not start with "state_" or "county_"
+    #     """
+    #     county = None
+    #     _, basefilename = os.path.split(csvfile)
+    #     basename, ext = os.path.splitext(basefilename)
+    #     if basename.startswith("state_"):
+    #         _, state = basename.split("_")
+    #     elif basename.startswith("county_"):
+    #         _, state, county = basename.split("_")
+    #     else:
+    #         raise Exception(
+    #             f"Filename {csvfile} cannot be parsed into location elements")
+    #     return state, county
 
 
 # .............................................................................

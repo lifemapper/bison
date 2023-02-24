@@ -1,4 +1,5 @@
 """Main script to execute all elements of the summarize-GBIF BISON workflow."""
+import json
 import os
 
 from bison.common.constants import CONFIG_PARAM
@@ -44,45 +45,28 @@ def cli():
     """Command-line interface to split a very large CSV file into smaller files.
 
     Raises:
-        Exception: on missing input file.
-        Exception: on missing output directory.
+        OSError: on failure to write to report_filename.
+        IOError: on failure to write to report_filename.
     """
     script_name = os.path.splitext(os.path.basename(__file__))[0]
     config, logger, report_filename = get_common_arguments(
         script_name, DESCRIPTION, PARAMETERS)
 
-    sum_filenames = config["summary_filenames"]
-    first_summaries = {}
-    for fname in sum_filenames:
-        assessments = Counter.count_assessments(fname, logger)
-        for key, val in assessments.items():
-            try:
-                first_summaries[key] += val
-            except KeyError:
-                first_summaries[key] = val
+    report = Counter.compare_location_species_counts(
+        config["summary_filenames"], config["combined_summary_filename"], logger)
 
-
-    infilename = config["annotated_occ_filename"]
-    output_path = config["output_path"]
-    if not os.path.exists(infilename):
-        raise Exception(f"Input file {infilename} does not exist.")
-    if not os.path.exists(output_path):
-        raise Exception(f"Output path {output_path} does not exist.")
-
-    assessments = Counter.count_assessments(infilename, logger)
-    print(assessments)
-
-    # # If the output report was requested, write it
-    # if report_filename is not None:
-    #     try:
-    #         with open(report_filename, mode='wt') as out_file:
-    #             json.dump(report, out_file, indent=4)
-    #     except OSError:
-    #         raise
-    #     except IOError:
-    #         raise
-    #     logger.log(
-    #         f"Wrote report file to {report_filename}", refname=script_name)
+    # If the output report was requested, write it
+    report_filename = config["report_filename"]
+    if report_filename is not None:
+        try:
+            with open(report_filename, mode='wt') as out_file:
+                json.dump(report, out_file, indent=4)
+        except OSError:
+            raise
+        except IOError:
+            raise
+        logger.log(
+            f"Wrote report file to {report_filename}", refname=script_name)
 
 
 # .....................................................................................

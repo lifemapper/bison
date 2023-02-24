@@ -203,10 +203,11 @@ class LMBISON:
     LOCATION_KEY = "location"
     COUNT_KEY = "count"
 
+    NOT_APPLICABLE = "na"
     INTRODUCED_VALUE = "introduced"
     INVASIVE_VALUE = "invasive"
     NATIVE_VALUE = "presumed_native"
-    FILTERED_HEADING = "filtered_out"
+    SUMMARY_FILTER_HEADING = "filtered"
 
     INTRODUCED_SPECIES = "introduced_species"
     INVASIVE_SPECIES = "invasive_species"
@@ -398,6 +399,10 @@ class REGION:
 
         Returns:
             Dictionary of field and prefix as keys/values.
+
+        Raises:
+            Exception: on unexpected field for region type:
+                Expects a single fieldname, or tuple of 2 fieldnames for concatenation.
         """
         summarize_by_fields = {}
         regions = REGION.for_summary()
@@ -409,7 +414,7 @@ class REGION:
                     summarize_by_fields[prefix] = flds
                 else:
                     raise Exception(f"Bad metadata for {prefix} summary fields")
-            summarize_by_fields[LMBISON.FILTERED_HEADING] = APPEND_TO_DWC.FILTER_FLAG
+            summarize_by_fields[LMBISON.SUMMARY_FILTER_HEADING] = APPEND_TO_DWC.FILTER_FLAG
         return summarize_by_fields
 
     @staticmethod
@@ -424,6 +429,7 @@ class REGION:
         for reg in regions:
             for prefix, _ in reg["summary"]:
                 region_disjoint[prefix] = reg["is_disjoint"]
+        region_disjoint[LMBISON.SUMMARY_FILTER_HEADING] = False
         return region_disjoint
 
     @staticmethod

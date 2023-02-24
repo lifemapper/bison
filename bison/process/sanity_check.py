@@ -66,7 +66,7 @@ class Counter():
         """
         # Count each record for every assessment from annotated occurrences file.
         # Filtered records are retained, but have assessment = ""
-        assessments = {LMBISON.FILTERED_VALUE: 0}
+        assessments = {LMBISON.SUMMARY_FILTER_HEADING: 0}
         for val in LMBISON.assess_values():
             assessments[val] = 0
 
@@ -79,7 +79,7 @@ class Counter():
             while rec is not None:
                 ass = rec[APPEND_TO_DWC.RIIS_ASSESSMENT]
                 if not ass:
-                    assessments[LMBISON.FILTERED_VALUE] += 1
+                    assessments[LMBISON.SUMMARY_FILTER_HEADING] += 1
                 else:
                     assessments[ass] += 1
                 rec = dwcdata.get_record()
@@ -92,24 +92,24 @@ class Counter():
 
     # .............................................................................
     @classmethod
-    def compare_location_species_counts(cls, summary_filenames, combined_summary_filename, logger):
+    def compare_location_species_counts(
+            cls, summary_filenames, combined_summary_filename, logger):
         """Count records for each of the valid assessments in a file.
 
         Args:
-            annotated_occ_filename (str): full filename of annotated file to summarize.
+            summary_filenames (list): full filename of summary files to compare with
+                combined summary file.
+            combined_summary_filename (str): full filename of combined summaries.
             logger (object): logger for saving relevant processing messages
 
         Returns:
-            assessments (dict): dictionary with keys for each valid assessment type,
-                and total record count for each.
-
-        Raises:
-            Exception: on unknown open or read error.
+            report (dict): dictionary with summaries of count comparisons and lists of
+                .error types.
         """
         # Count each record for every assessment from annotated occurrences file.
         # Filtered records are retained, but have assessment = ""
         report = {}
-        inconsistencies = []
+
         sum_locations = {}
         sum_species_keys = {}
         for prefix in REGION.summary_fields().keys():
@@ -122,32 +122,58 @@ class Counter():
         cmb_locations, cmb_species_keys = cls.count_locations_species(
             combined_summary_filename)
 
-        region_disjoint = REGION.region_disjoint()
+        unique_loc_key = "Unique locations: Subset <> combined"
+        unique_loc_count_errs = []
         for prefix in REGION.summary_fields().keys():
-            is_disjoint = region_disjoint[prefix]
+            report[prefix] = {}
+            inconsistencies = {}
+            counts = {}
             # Check number of unique locations for each prefix (type of location)
             sum_location_num = len(sum_locations[prefix])
             cmb_location_num = len(cmb_locations[prefix])
-            if sum_location_num != cmb_location_num:
+            if sum_location_num == cmb_location_num:
+                counts["unique locations"] = sum_location_num
+            else:
                 msg = (
-                    f"{prefix} unique locations {sum_location_num} in input summary "
-                    f"files != unique locations {cmb_location_num} in combined file "
-                    f"{combined_summary_filename}")
-                logger.log(msg, refname=cls.__name, log_level=logging.ERROR)
-                inconsistencies.append(msg)
+                    f"{prefix}: {sum_location_num} <> {cmb_location_num}")
+                logger.log(
+                    f"{unique_loc_key}: {msg}", refname=cls.__name__, log_level=logging.ERROR)
+                unique_loc_count_errs.append(msg)
+                inconsistencies[unique_loc_key] = unique_loc_count_errs
 
             # Check number of occurrences for each prefix (type of location)
             # Contiguous location types should contain all records in the dataset,
             #   except for filtered records.
-            cmb_counts = cmb_locations[prefix]
-            sum_prefix_occ_total
+            missing_key = "Missing from combined summary"
+            unequal_key = "Subset summaries <> combined summary"
+            missing_errs = []
+            unequal_errs = []
             for loc, count in sum_locations[prefix].items():
+                sum_msg = (f"Subset summaries {prefix}/{loc}/{count}")
                 try:
-                    ok = (count == sum_locations[prefix][loc])
+                    ok = (count == cmb_locations[prefix][loc])
                 except KeyError:
-                    ok = False
+                    logger.log(
+                        f"{missing_key}: {sum_msg}", refname=cls.__name__,
+                        log_level=logging.ERROR)
+                    missing_errs.append(sum_msg)
+                else:
+                    if ok:
+                        counts[loc] = count
+                    else:
+                        cmb_msg = (f"Combined {prefix}/{loc}/{count}")
+                        logger.log(f"{unequal_key}: {sum_msg} {cmb_msg}")
+                        unequal_errs.append(f"{sum_msg} {cmb_msg}")
+            if missing_errs:
+                inconsistencies[missing_key] = missing_errs
+            if unequal_errs:
+                inconsistencies[unequal_key] = unequal_errs
+            if inconsistencies:
+                report[prefix]["inconsistencies"] = inconsistencies
+            if counts:
+                report[prefix]["good_counts"] = counts
 
-
+        return report
 
     # .............................................................................
     @classmethod
@@ -183,17 +209,22 @@ class Counter():
 
         try:
             for rec in csv_rdr:
-                # Count points in each location, ignore species
                 prefix = rec[LMBISON.LOCATION_TYPE_KEY]
                 location = rec[LMBISON.LOCATION_KEY]
-                count = rec[LMBISON.COUNT_KEY]
+                count = int(rec[LMBISON.COUNT_KEY])
+                spkey = rec[LMBISON.SPECIES_KEY]
+                # Count points in each location, ignore species
                 try:
                     locations[prefix][location] += count
                 except KeyError:
                     locations[prefix][location] = count
 
-                # Count unique species keys
-                species_keys.add(rec[LMBISON.SPECIES_KEY])
+                # Count occurrences of unique species keys
+                try:
+                    species_keys[spkey] += count
+                except KeyError:
+                    species_keys[spkey] = count
+
         except Exception as e:
             raise Exception(f"Failed to read {summary_filename}: {e}")
         finally:

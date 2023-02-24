@@ -3,7 +3,7 @@ import json
 import os
 from datetime import datetime
 
-from bison.common.constants import CONFIG_PARAM, DWC_PROCESS
+from bison.common.constants import CONFIG_PARAM
 from bison.common.util import BisonNameOp
 from bison.process.aggregate import Aggregator
 from bison.tools._config_parser import get_common_arguments
