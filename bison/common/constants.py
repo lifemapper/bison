@@ -193,7 +193,7 @@ class CONFIG_PARAM:
 # .............................................................................
 class LMBISON:
     """Headers for temporary and final output files."""
-    SPECIES_KEY = "species_key"
+    RR_SPECIES_KEY = "riisregion_specieskey"
     SCIENTIFIC_NAME_KEY = "accepted_scientific_name"
     SPECIES_NAME_KEY = "species_name"
     ASSESS_KEY = "assessment"
@@ -242,8 +242,8 @@ class LMBISON:
             list of all fieldnames used in temporary summary file.
         """
         return (
-            LMBISON.LOCATION_TYPE_KEY, LMBISON.LOCATION_KEY, LMBISON.SPECIES_KEY,
-            LMBISON.SPECIES_NAME_KEY, LMBISON.COUNT_KEY)
+            LMBISON.LOCATION_TYPE_KEY, LMBISON.LOCATION_KEY, LMBISON.RR_SPECIES_KEY,
+            LMBISON.SCIENTIFIC_NAME_KEY, LMBISON.SPECIES_NAME_KEY, LMBISON.COUNT_KEY)
 
     @staticmethod
     def region_summary_header():
@@ -253,7 +253,7 @@ class LMBISON:
             list of all fieldnames used in region summary file.
         """
         return (
-            LMBISON.SPECIES_KEY, LMBISON.SCIENTIFIC_NAME_KEY, LMBISON.SPECIES_NAME_KEY,
+            LMBISON.RR_SPECIES_KEY, LMBISON.SCIENTIFIC_NAME_KEY, LMBISON.SPECIES_NAME_KEY,
             LMBISON.COUNT_KEY, LMBISON.ASSESS_KEY
         )
 

@@ -3,9 +3,10 @@ import csv
 import logging
 import os
 
-from bison.common.constants import (APPEND_TO_RIIS, ERR_SEPARATOR, GBIF,
-                                    LINENO_FLD, RIIS_DATA)
-from bison.common.util import get_csv_dict_reader, get_csv_dict_writer
+from bison.common.constants import (
+    APPEND_TO_RIIS, ERR_SEPARATOR, GBIF, LINENO_FLD, RIIS_DATA)
+from bison.common.util import (
+    get_csv_dict_reader, get_csv_dict_writer, get_fields_from_header)
 from bison.provider.gbif_api import GbifSvc
 
 
@@ -246,7 +247,7 @@ class RIIS:
     """Class for reading, writing, comparing RIIS species data records."""
 
     # ...............................................
-    def __init__(self, riis_filename, logger, is_annotated=False):
+    def __init__(self, riis_filename, logger):
         """Set the authority and species files and headers expected for processing.
 
         Args:
@@ -256,7 +257,11 @@ class RIIS:
             logger (object): logger for writing messages to file and console
         """
         self._riis_filename = riis_filename
-        self._is_annotated = is_annotated
+        header_flds = get_fields_from_header(riis_filename, delimiter=RIIS_DATA.DELIMITER)
+        if APPEND_TO_RIIS.GBIF_KEY in header_flds:
+            self._is_annotated = True
+        else:
+            self._is_annotated = False
         self._log = logger
 
         # Trimmed and updated Non-native Species List, built from RIIS
@@ -712,7 +717,7 @@ class RIIS:
         if fld_count != len(expected_header):
             self._log.log(
                 ERR_SEPARATOR, refname=self.__class__.__name__, log_level=logging.ERROR)
-            self._log.error(
+            self._log.log(
                 f"[Error] Header has {fld_count} fields, != {len(expected_header)} " +
                 "expected", refname=self.__class__.__name__, log_level=logging.ERROR)
 

@@ -50,37 +50,6 @@ PARAMETERS = {
 }
 
 
-# .............................................................................
-def summarize_annotation_summaries(
-        summary_filenames, out_filename, logger):
-    """Summarize summaries of GBIF records by geographic area and RIIS assessment.
-
-    Args:
-        summary_filenames (list): full filenames containing annotated GBIF data.
-        out_filename: destination file for summary of all summary files.
-        logger (object): logger for saving relevant processing messages
-
-    Returns:
-        report (dict): dictionary of metadata about the data and process.
-
-    Raises:
-        FileNotFoundError: on missing annotated RIIS file
-        FileNotFoundError: on missing DWC input file(s).
-    """
-    report = {
-        "summary_filenames": [],
-    }
-    for sum_fname in summary_filenames:
-        if not os.path.exists(sum_fname):
-            raise FileNotFoundError(f"Missing input summary file {sum_fname}.")
-
-    agg = Aggregator(logger)
-    report = agg.summarize_summaries(summary_filenames, out_filename)
-    logger.log(f"End Time : {datetime.now()}", refname=script_name)
-
-    return report
-
-
 # .....................................................................................
 def cli():
     """CLI to add locations and RIIS identifiers to GBIF occurrence records.
@@ -94,11 +63,21 @@ def cli():
     config, logger, report_filename = get_common_arguments(
         script_name, DESCRIPTION, PARAMETERS)
 
-    outfilename = BisonNameOp.get_combined_summary_name(
-        config["summary_filenames"][0], config["output_path"]
+    summary_filenames = config["summary_filenames"]
+    for sum_fname in summary_filenames:
+        if not os.path.exists(sum_fname):
+            raise FileNotFoundError(f"Missing input summary file {sum_fname}.")
+
+    out_filename = BisonNameOp.get_combined_summary_name(
+        summary_filenames[0], config["output_path"]
     )
-    report = summarize_annotation_summaries(
-        config["summary_filenames"], outfilename, logger)
+    # report = summarize_annotation_summaries(
+    #     config["summary_filenames"], outfilename, logger)
+
+    logger.log(f"Start Time : {datetime.now()}", refname=script_name)
+    agg = Aggregator(logger)
+    report = agg.summarize_summaries(summary_filenames, out_filename)
+    logger.log(f"End Time : {datetime.now()}", refname=script_name)
 
     # If the output report was requested, write it
     if report_filename:

@@ -62,7 +62,7 @@ class Annotator():
                     self.riis.resolve_riis_to_gbif_taxa(
                         riis_with_gbif_filename, overwrite=True)
         elif riis_with_gbif_filename is not None:
-            self.riis = RIIS(riis_with_gbif_filename, logger, is_annotated=True)
+            self.riis = RIIS(riis_with_gbif_filename, logger)
             self.riis.read_riis()
         else:
             raise Exception(
@@ -86,9 +86,6 @@ class Annotator():
                 fn, region["map"], self._log, is_disjoint=region["is_disjoint"],
                 buffer_vals=region["buffer"])
 
-        self.bad_ranks = set()
-        self.rank_filtered_records = 0
-
     # ...............................................
     def initialize_occurrences_io(self, gbif_occ_filename, output_occ_filename):
         """Initialize and open required input and output files of occurrence records.
@@ -103,6 +100,12 @@ class Annotator():
         Raises:
             Exception: on failure to open the DwcData csvreader.
             Exception: on failure to open the csv_writer.
+
+        Note:
+            Initializes or resets member attributes for new data:
+              file-related: _csvfile, _datapath, _csv_writer, _outf
+              dwc data reader: _dwcdata
+              reporting data: bad_ranks, rank_filtered_records
         """
         self.close()
         if gbif_occ_filename is not None:
@@ -113,6 +116,11 @@ class Annotator():
                     "Must provide an output filename to write annotated input "
                     f"data in {gbif_occ_filename}")
 
+            # Reset reporting attributes
+            self.bad_ranks = set()
+            self.rank_filtered_records = 0
+
+            # Reset file attributes for new data
             self._datapath, _ = os.path.split(gbif_occ_filename)
             self._csvfile = gbif_occ_filename
             self._output_csvfile = output_occ_filename

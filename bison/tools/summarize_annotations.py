@@ -84,7 +84,8 @@ def summarize_occurrence_annotations(
             f"to {output_summary_fname}", refname=script_name)
 
         # Add locality-intersections and RIIS determinations to GBIF DwC records
-        process_rpt = agg.summarize_by_location(ann_fname, output_summary_fname)
+        process_rpt = agg.summarize_annotated_recs_by_location(
+            ann_fname, output_summary_fname, overwrite=True)
         report["annotated_dwc_inputs"].append(process_rpt)
         logger.log(f"End Time : {datetime.now()}", refname=script_name)
 

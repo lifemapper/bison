@@ -1,9 +1,10 @@
 """Main script to execute all elements of the summarize-GBIF BISON workflow."""
+from datetime import datetime
 import json
 import os
 
 from bison.common.constants import CONFIG_PARAM
-from bison.process.sanity_check import Counter
+from bison.process.aggregate import Aggregator
 from bison.tools._config_parser import get_common_arguments
 
 DESCRIPTION = """\
@@ -12,18 +13,18 @@ Count summary occurrences from all aggregated summaries and compare to known cou
 PARAMETERS = {
     "required":
         {
-            "summary_filenames":
-                {
-                    CONFIG_PARAM.TYPE: str,
-                    CONFIG_PARAM.IS_INPUT_FILE: True,
-                    CONFIG_PARAM.HELP: "CSV files containing annotation summaries."
-                },
             "combined_summary_filename":
                 {
                     CONFIG_PARAM.TYPE: str,
                     CONFIG_PARAM.IS_INPUT_FILE: True,
                     CONFIG_PARAM.HELP: "CSV file summarizing all annotation summaries."
                 },
+            "output_path":
+                {
+                    CONFIG_PARAM.TYPE: str,
+                    CONFIG_PARAM.IS_OUPUT_DIR: True,
+                    CONFIG_PARAM.HELP: "Destination directory for output data."
+                }
         },
     "optional":
         {
@@ -51,9 +52,14 @@ def cli():
     script_name = os.path.splitext(os.path.basename(__file__))[0]
     config, logger, report_filename = get_common_arguments(
         script_name, DESCRIPTION, PARAMETERS)
+    annotated_riis_fname = config["riis_with_gbif_taxa_filename"]
 
-    report = Counter.compare_location_species_counts(
-        config["summary_filenames"], config["combined_summary_filename"], logger)
+    logger.log(f"Start Time : {datetime.now()}", refname=script_name)
+    agg = Aggregator(logger)
+    report = agg.aggregate_summary_for_regions(
+        config["combined_summary_filename"], config["riis_with_gbif_taxa_filename"],
+        config["output_path"])
+    logger.log(f"End Time : {datetime.now()}", refname=script_name)
 
     # If the output report was requested, write it
     report_filename = config["report_filename"]

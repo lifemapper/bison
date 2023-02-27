@@ -786,18 +786,18 @@ class BisonNameOp():
 
     # ...............................................
     @staticmethod
-    def get_location_summary_name(outpath, region, location):
+    def get_location_summary_name(outpath, region_type, region):
         """Construct a filename for the summary file for a region.
 
         Args:
             outpath (str): full directory path for output filename.
-            region (str): region name
-            location (str): file prefix indicating region type
+            region_type (str): file prefix indicating region type
+            region (str): name of region
 
         Returns:
             outfname: output filename derived from the state and county
         """
-        basename = f"{region}_{location}.csv"
+        basename = f"{region_type}_{region}.csv"
         outfname = os.path.join(outpath, basename)
         return outfname
 

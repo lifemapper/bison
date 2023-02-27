@@ -12,12 +12,6 @@ Count summary occurrences from all aggregated summaries and compare to known cou
 PARAMETERS = {
     "required":
         {
-            "summary_filenames":
-                {
-                    CONFIG_PARAM.TYPE: str,
-                    CONFIG_PARAM.IS_INPUT_FILE: True,
-                    CONFIG_PARAM.HELP: "CSV files containing annotation summaries."
-                },
             "combined_summary_filename":
                 {
                     CONFIG_PARAM.TYPE: str,
