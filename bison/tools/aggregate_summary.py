@@ -52,7 +52,6 @@ def cli():
     script_name = os.path.splitext(os.path.basename(__file__))[0]
     config, logger, report_filename = get_common_arguments(
         script_name, DESCRIPTION, PARAMETERS)
-    annotated_riis_fname = config["riis_with_gbif_taxa_filename"]
 
     logger.log(f"Start Time : {datetime.now()}", refname=script_name)
     agg = Aggregator(logger)

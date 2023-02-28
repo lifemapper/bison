@@ -6,8 +6,8 @@ from datetime import datetime
 import multiprocessing
 
 from bison.common.constants import (
-    AGGREGATOR_DELIMITER, APPEND_TO_DWC, DATA_PATH, DWC_PROCESS, ENCODING,
-    EXTRA_CSV_FIELD, GBIF, LMBISON, REGION, RIIS_DATA, US_STATES)
+    AGGREGATOR_DELIMITER, APPEND_TO_DWC, DWC_PROCESS, ENCODING,
+    EXTRA_CSV_FIELD, GBIF, LMBISON, REGION, US_STATES)
 from bison.common.log import Logger
 from bison.common.util import (
     available_cpu_count, BisonNameOp, get_csv_dict_reader, get_csv_writer,
@@ -482,10 +482,10 @@ class Aggregator():
                     # Use combo state-taxonkey-spname to track species and riis region for assessment
                     riis_region = self._get_riis_region(rec[APPEND_TO_DWC.RESOLVED_ST])
                     rr_species_key = self._get_compound_key(
-                        riis_region, rec[GBIF.ACC_TAXON_FLD]) 
-                        # rec[GBIF.ACC_NAME_FLD])
+                        riis_region, rec[GBIF.ACC_TAXON_FLD])
+                    # rec[GBIF.ACC_NAME_FLD])
                     # self.canonicals = {rr_species_key: species_name,  ... }
-                    # Save with accepted name and species name in case accepted name 
+                    # Save with accepted name and species name in case accepted name
                     # is for sub-species
                     self._acc_species_name[rr_species_key] = (
                         rec[GBIF.ACC_NAME_FLD], rec[GBIF.SPECIES_NAME_FLD])
@@ -564,7 +564,7 @@ class Aggregator():
             raise Exception(f"Failed to write to file {self._outf.name}, ({e})")
         finally:
             self._outf.close()
-            
+
     # ...............................................
     def _write_raw_region_summary_old(self):
         # Write summary of annotated records,
@@ -600,9 +600,6 @@ class Aggregator():
         Args:
             summary_filename: full filename of raw summary by region.
 
-        Returns:
-            report: dictionary of metadata about the data and process
-
         Raises:
             Exception: on failure to open or read a file.
         """
@@ -635,25 +632,21 @@ class Aggregator():
         finally:
             inf.close()
 
-
     # ...............................................
     def _read_location_summaries(self, summary_filename_list):
         """Read summary files and combine summaries in self._locations.
 
         Args:
-            summary_filename_list: list of full filenames of summary files.
+            summary_filename_list (list): full filenames of raw summary by region.
 
         Returns:
             report: dictionary of metadata about the data and process
-
-        Raises:
-            Exception: on failure to open or read a file.
         """
         # Reset location summary and species name lookup
         self._init_summaries()
         # Add summaries from each summary
         for sum_fname in summary_filename_list:
-            report = self._read_location_summary(sum_fname)
+            self._read_location_summary(sum_fname)
 
         report = self._report_summary()
         return report
@@ -748,7 +741,10 @@ class Aggregator():
             summary_filename: output file
 
         Raises:
+            Exception: on unexpected open file error
+            Exception: on missing rr_species_key in _acc_species_name lookup
             Exception: on unexpected write error
+            Exception: on unexpected error processing record
 
         [species_key, species_name, count, assessment]
         """
@@ -762,8 +758,8 @@ class Aggregator():
         except Exception as e:
             raise Exception(f"Unknown write error on {agg_fname}: {e}")
 
-        else:
-            rr_species_counts = self._locations[region_type][region_value]
+        rr_species_counts = self._locations[region_type][region_value]
+        try:
             for rr_species_key, count in rr_species_counts.items():
                 riis_region, gbif_taxon_key = self._parse_compound_key(rr_species_key)
 
@@ -771,7 +767,7 @@ class Aggregator():
                     (accepted_name,
                      species_name) = self._acc_species_name[rr_species_key]
                 except KeyError:
-                    raise (f"Missing species name for key {rr_species_key}")
+                    raise Exception(f"Missing species name for key {rr_species_key}")
 
                 assessments = riis.get_assessments_for_gbif_taxonkey(gbif_taxon_key)
                 try:
@@ -781,11 +777,14 @@ class Aggregator():
 
                 try:
                     # Record contents: LMBISON.region_summary_header()
-                    csv_wtr.writerow([rr_species_key, accepted_name, species_name, count, assess])
+                    csv_wtr.writerow(
+                        [rr_species_key, accepted_name, species_name, count, assess])
                 except Exception as e:
-                   self._log.log(
-                       f"Unknown write error on {rr_species_key}: {e}",
-                       refname=self.__class__.__name__, log_level=logging.ERROR)
+                    self._log.log(
+                        f"Unknown write error on {rr_species_key}: {e}",
+                        refname=self.__class__.__name__, log_level=logging.ERROR)
+        except Exception as e:
+            raise Exception(f"Unknown error with {rr_species_key}: {e}")
         finally:
             outf.close()
 
@@ -817,7 +816,7 @@ class Aggregator():
                     count = int(rec[LMBISON.COUNT_KEY])
                 except ValueError:
                     raise
-                assess[rec[LMBISON.ASSESS_KEY]][rec[LMBISON.SPECIES_KEY]] = count
+                assess[rec[LMBISON.ASSESS_KEY]][rec[LMBISON.RR_SPECIES_KEY]] = count
         except Exception as e:
             raise Exception(f"Unknown read error on {loc_summary_file}: {e}")
         finally:
@@ -877,6 +876,8 @@ class Aggregator():
         Args:
             combined_summary_filename (str): full filename of data summary of
                 annotated records.
+            annotated_riis_fname (str): full filename of RIIS data annotated with
+                GBIF accepted taxon.
             outpath (str): full directory path for output filenames.
 
         Returns:
@@ -889,23 +890,20 @@ class Aggregator():
         self._log.log(
             f"Read annotation summary {combined_summary_filename} to write by region")
 
-        region_aggregate_filenames = []
         riis = RIIS(annotated_riis_fname, self._log)
         riis.read_riis()
-
         report = {}
 
         for region_type, locations in self._locations.items():
             report[region_type] = {
-                "file": agg_fname,
-                "unique_locations": len(locations)
+                "unique_locations": len(locations),
+                "files": []
             }
-            for region_value, species_counts in locations.items():
+            for region_value, _species_counts in locations.items():
                 agg_fname = self._write_region_aggregate(
                     riis, region_type, region_value, outpath)
-                region_aggregate_filenames.append(agg_fname) 
-
-        return region_aggregate_filenames
+                report[region_type]["files"].append(agg_fname)
+        return report
 
 #     # ...............................................
 #     def aggregate_assessments(self, region_summary_filenames, outpath):

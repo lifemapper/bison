@@ -212,7 +212,9 @@ class Counter():
                 prefix = rec[LMBISON.LOCATION_TYPE_KEY]
                 location = rec[LMBISON.LOCATION_KEY]
                 count = int(rec[LMBISON.COUNT_KEY])
-                spkey = rec[LMBISON.SPECIES_KEY]
+                spkey = rec[LMBISON.RR_SPECIES_KEY]
+                # scinamekey = rec[LMBISON.SCIENTIFIC_NAME_KEY]
+                # spnamekey = rec[LMBISON.SPECIES_NAME_KEY]
                 # Count points in each location, ignore species
                 try:
                     locations[prefix][location] += count

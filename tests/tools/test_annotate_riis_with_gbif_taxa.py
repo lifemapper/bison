@@ -18,7 +18,7 @@ class Test_annotate_riis:
         """Test reading an original RIIS file by checking counts."""
         fn_args = get_test_parameters(script_name)
         logger = Logger(script_name)
-        riis = RIIS(fn_args["_test_small_riis_filename"], logger, is_annotated=False)
+        riis = RIIS(fn_args["_test_small_riis_filename"], logger)
         # Read original species data
         riis.read_riis()
         actual_line_count = count_lines_with_cat(fn_args["_test_small_riis_filename"])
@@ -31,7 +31,7 @@ class Test_annotate_riis:
         """Test reading an original RIIS file by checking counts."""
         fn_args = get_test_parameters(script_name)
         logger = Logger(script_name)
-        riis = RIIS(fn_args["riis_filename"], logger, is_annotated=False)
+        riis = RIIS(fn_args["riis_filename"], logger)
         # Read original species data
         riis.read_riis()
         actual_record_count = fn_args["_test_riis_record_count"]
@@ -46,7 +46,7 @@ class Test_annotate_riis:
         """Test resolving taxa in a small RIIS file by checking counts."""
         fn_args = get_test_parameters(script_name)
         logger = Logger(script_name)
-        riis = RIIS(fn_args["_test_small_riis_filename"], logger, is_annotated=False)
+        riis = RIIS(fn_args["_test_small_riis_filename"], logger)
         # Update species data
         name_count, rec_count = riis.resolve_riis_to_gbif_taxa(
                 fn_args["_test_small_annotated_riis_filename"], overwrite=True)

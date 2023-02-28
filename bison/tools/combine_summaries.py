@@ -55,6 +55,7 @@ def cli():
     """CLI to add locations and RIIS identifiers to GBIF occurrence records.
 
     Raises:
+        FileNotFoundError: on any missing files in summary_filenames.
         OSError: on failure to write to report_filename.
         IOError: on failure to write to report_filename.
         Exception: on unknown JSON write error.

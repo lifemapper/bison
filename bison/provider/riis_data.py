@@ -252,8 +252,6 @@ class RIIS:
 
         Args:
             riis_filename (str): Path to the RIIS datafile, with or without annotations.
-            is_annotated (bool): Flag indicating whether RIIS file has been
-                annotated with GBIF accepted taxon names.
             logger (object): logger for writing messages to file and console
         """
         self._riis_filename = riis_filename

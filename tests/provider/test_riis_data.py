@@ -16,7 +16,7 @@ class TestRIISInput(RIIS):
         """Test reading an original RIIS file by checking counts."""
         fn_args = get_test_parameters(script_name)
         logger = Logger(script_name)
-        riis = RIIS(fn_args["riis_filename"], logger, is_annotated=False)
+        riis = RIIS(fn_args["riis_filename"], logger)
         # Read original species data
         riis.read_riis()
 
