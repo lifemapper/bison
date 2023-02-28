@@ -10,20 +10,9 @@ data/*xml
 
 venv/
 /.pytest_cache/
-data/US-RIIS_MasterList_100.csv
-data/US-RIIS_MasterList_100_updated_gbif.csv
-data/US-RIIS_MasterList.csv
-data/US-RIIS_MasterList_updated_gbif.csv
-data/US-RIIS_MasterList_updated_gbif.csv.saveme
-data/cb_2020_us_state_500k.cpg
-data/cb_2020_us_state_500k.dbf
-data/cb_2020_us_state_500k.prj
-data/cb_2020_us_state_500k.shp
-data/cb_2020_us_state_500k.shp.ea.iso.xml
-data/cb_2020_us_state_500k.shp.iso.xml
-data/cb_2020_us_state_500k.shx
-data/cb_2020_us_state_500k.zip
-data/state*csv
-data/county*csv
 data/out
 big_data
+tests/data/process/*csv
+
+tests/data/process/*csv
+tests/data/output/*csv

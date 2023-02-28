@@ -1,0 +1,83 @@
+{
+  "_comment1": "Test configuration using very small data",
+  "_comment2": "Input, output, and config are mostly located under the `tests` directory",
+  "_comment3": "Some inputs are located under the main repository data directory",
+  "_comment4": "Intended for tests run outside of the Docker environment",
+  "_comment5": "Each top level key indicates the basename of a test file, with a dictionary value containing parmeters",
+  "_comment6": "Keys starting with `# comment` are comments, keys starting with `_test_` are unique for tests",
+
+  "test_config_parser":
+  {
+    "log_filename": "/volumes/bison/tests/output/test_config_parser.log",
+    "report_filename": "/volumes/bison/tests/output/test_config_parser.rpt",
+    "big_csv_filename": "/volumes/bison/tests/input/gbif_2023-01-26_10k.csv"
+  },
+  "test_chunk_large_file":
+  {
+    "log_filename": "/volumes/bison/tests/output/test_chunk_large_file.log",
+    "report_filename": "/volumes/bison/tests/output/test_chunk_large_file.rpt",
+    "output_path":  "/volumes/bison/tests/output",
+    "big_csv_filename": "/volumes/bison/tests/input/gbif_2023-01-26_10k.csv",
+    "number_of_chunks": 10,
+    "_test_record_count": 10000
+  },
+  "test_riis_data":
+  {
+    "log_filename": "/volumes/bison/tests/output/test_riis_data.log",
+    "report_filename": "/volumes/bison/tests/output/test_riis_data.rpt",
+    "riis_filename": "/volumes/bison/input/US-RIIS_MasterList_2021.csv",
+    "_test_riis_record_count": 15263,
+    "_test_riis_name_count": 12981,
+    "_test_annotated_riis_filename": "/volumes/bison/input/US-RIIS_MasterList_annotated.csv"
+  },
+  "test_annotate_riis_with_gbif_taxa":
+  {
+    "log_filename": "/volumes/bison/tests/output/test_annotate_riis_with_gbif_taxa.log",
+    "report_filename": "/volumes/bison/tests/output/test_annotate_riis_with_gbif_taxa.rpt",
+    "riis_filename": "/volumes/bison/input/US-RIIS_MasterList_2021.csv",
+    "_test_small_riis_filename": "/volumes/bison/tests/input/US-RIIS_MasterList_2021_100.csv",
+    "_test_small_annotated_riis_filename": "/volumes/bison/tests/output/US-RIIS_MasterList_2021_100_annotated.csv",
+    "_test_small_riis_record_count": 100,
+    "_test_small_riis_name_count": 100,
+    "_test_riis_record_count": 15264,
+    "_test_riis_name_count": 12981
+  },
+  "test_annotate_gbif_with_geo_and_riis":
+  {
+    "log_filename": "/volumes/bison/tests/output/test_annotate_gbif_with_geo_and_riis.log",
+    "report_filename": "/volumes/bison/tests/output/test_annotate_gbif_with_geo_and_riis.rpt",
+    "dwc_filenames": [
+      "/volumes/bison/tests/input/gbif-2023-01-26-10k_chunk-1-100.csv",
+      "/volumes/bison/tests/input/gbif-2023-01-26-10k_chunk-101-200.csv"],
+    "geoinput_path": "/volumes/bison/big_data/geodata",
+    "riis_with_gbif_taxa_filename": "/volumes/bison/input/US-RIIS_MasterList_2021_annotated.csv",
+    "output_path": "/volumes/bison/tests/output"
+  },
+  "test_summarize_annotations":
+  {
+    "log_filename": "/volumes/bison/tests/output/test_summarize_annotations.log",
+    "report_filename": "/volumes/bison/tests/output/test_summarize_annotations.rpt",
+    "annotated_dwc_filenames": [
+      "/volumes/bison/tests/input/gbif-2023-01-26-10k_chunk-1-100.csv",
+      "/volumes/bison/tests/input/gbif-2023-01-26-10k_chunk-101-200.csv"],
+    "output_path": "/volumes/bison/tests/output"
+  },
+  "test_combine_summaries":
+          {
+    "log_filename": "/volumes/bison/tests/output/test_combine_summaries.log",
+    "report_filename": "/volumes/bison/tests/output/test_combine_summaries.rpt",
+    "summary_filenames": [
+            "/volumes/bison/process/gbif-2023-01-26-10k_chunk-1001-2000_summary.csv",
+            "/volumes/bison/process/gbif-2023-01-26-10k_chunk-2001-3000_summary.csv",
+            "/volumes/bison/process/gbif-2023-01-26-10k_chunk-3001-4000_summary.csv",
+            "/volumes/bison/process/gbif-2023-01-26-10k_chunk-4001-5000_summary.csv",
+            "/volumes/bison/process/gbif-2023-01-26-10k_chunk-5001-6000_summary.csv",
+            "/volumes/bison/process/gbif-2023-01-26-10k_chunk-6001-7000_summary.csv",
+            "/volumes/bison/process/gbif-2023-01-26-10k_chunk-7001-8000_summary.csv",
+            "/volumes/bison/process/gbif-2023-01-26-10k_chunk-8001-9000_summary.csv",
+            "/volumes/bison/process/gbif-2023-01-26-10k_chunk-9001-10000_summary.csv"
+        ],
+    "output_path": "/volumes/bison/tests/output"
+}
+
+}

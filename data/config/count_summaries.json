@@ -1,0 +1,16 @@
+{
+    "log_filename": "/volumes/bison/output/count_summaries.log",
+    "report_filename": "/volumes/bison/output/count_summaries.rpt",
+    "summary_filenames": [
+            "/volumes/bison/process/gbif-2023-01-26-10k_chunk-1001-2000_summary.csv",
+            "/volumes/bison/process/gbif-2023-01-26-10k_chunk-2001-3000_summary.csv",
+            "/volumes/bison/process/gbif-2023-01-26-10k_chunk-3001-4000_summary.csv",
+            "/volumes/bison/process/gbif-2023-01-26-10k_chunk-4001-5000_summary.csv",
+            "/volumes/bison/process/gbif-2023-01-26-10k_chunk-5001-6000_summary.csv",
+            "/volumes/bison/process/gbif-2023-01-26-10k_chunk-6001-7000_summary.csv",
+            "/volumes/bison/process/gbif-2023-01-26-10k_chunk-7001-8000_summary.csv",
+            "/volumes/bison/process/gbif-2023-01-26-10k_chunk-8001-9000_summary.csv",
+            "/volumes/bison/process/gbif-2023-01-26-10k_chunk-9001-10000_summary.csv"
+        ],
+    "combined_summary_filename": "/volumes/bison/process/gbif-2023-01-26-10k_combine.csv"
+}
