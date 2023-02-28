@@ -144,7 +144,7 @@ start_container() {
         # Option string for bind mount
         bind_src="source=data/${BIG_DATA_VOLUME}"
         bind_target="target=${VOLUME_MOUNT}/${BIG_DATA_VOLUME}"
-        bind_opts="--mount type=bind,${bind_src},${bind_target},readonly"
+        bind_opts="--mount type=bind,${bind_src},${bind_target}"
 
         # Start the container, leaving it up
         echo " - Start container $CONTAINER_NAME from $IMAGE_NAME" | tee -a "$LOG"

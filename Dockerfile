@@ -1,11 +1,11 @@
 FROM osgeo/gdal:ubuntu-small-latest as backend
 
-RUN apt-get update && \
-    apt-get install -y git && \
-    apt-get install -y vim && \
-    apt-get install -y python3-rtree && \
-    apt-get install python3-requests && \
-    apt-get install -y python3-pip
+RUN apt-get update
+RUN apt-get install -y git
+RUN apt-get install -y vim
+RUN apt-get install -y python3-rtree
+# RUN apt-get install python3-requests
+RUN apt-get install -y python3-pip
 
 # .....................................................................................
 # Install lmbison projects for system
@@ -20,6 +20,8 @@ RUN cd git &&  \
     git clone https://github.com/lifemapper/bison.git &&  \
     cd bison \
     && pip install .
+
+RUN pip3 install requests
 
 ENV MAXENT_VERSION=3.4.4
 ENV MAXENT_JAR=/git/Maxent/ArchivedReleases/$MAXENT_VERSION/maxent.jar
