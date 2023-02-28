@@ -238,7 +238,6 @@ def get_csv_dict_writer(datafile, delimiter, encoding, fldnames, fmode='w'):
 #         log = get_logger(logname, logfname)
 #     return log
 
-
 # ...............................................
 def makerow(rec, outfields):
     row = []

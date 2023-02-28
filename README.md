@@ -162,7 +162,6 @@ pip3 install -r requirements.txt
 head -n 10001 occurrence.txt > gbif_2023-01-26_10k.csv
 ```
 
-
 ## Deploy
 
 ### Dependencies
