@@ -4,14 +4,10 @@ import os
 import pytest
 
 from bison.tools._config_parser import process_arguments_from_file
-from bison.tools.annotate_riis_with_gbif_taxa import \
-    DESCRIPTION as annotate_riis_desc
-from bison.tools.annotate_riis_with_gbif_taxa import \
-    PARAMETERS as annotate_riis_params
-from bison.tools.annotate_gbif_with_geo_and_riis import \
-    DESCRIPTION as annotate_gbif_desc
-from bison.tools.annotate_gbif_with_geo_and_riis import \
-    PARAMETERS as annotate_gbif_params
+from bison.tools.annotate_riis import DESCRIPTION as annotate_riis_desc
+from bison.tools.annotate_riis import PARAMETERS as annotate_riis_params
+from bison.tools.annotate_gbif import DESCRIPTION as annotate_gbif_desc
+from bison.tools.annotate_gbif import PARAMETERS as annotate_gbif_params
 from bison.tools.chunk_large_file import DESCRIPTION as chunk_large_file_desc
 from bison.tools.chunk_large_file import PARAMETERS as chunk_large_file_params
 from tests.tools.test_setup import get_test_parameters
@@ -21,14 +17,14 @@ command_meta = [
     (
         annotate_riis_params,
         annotate_riis_desc,
-        "annotate_riis_with_gbif_taxa.json",
-        get_test_parameters("test_annotate_riis_with_gbif_taxa")
+        "annotate_riis.json",
+        get_test_parameters("test_annotate_riis")
     ),
     (
         annotate_gbif_params,
         annotate_gbif_desc,
-        "annotate_gbif_with_geo_and_riis.json",
-        get_test_parameters("test_annotate_gbif_with_geo_and_riis")
+        "annotate_gbif.json",
+        get_test_parameters("test_annotate_gbif")
     ),
     (
         chunk_large_file_params,

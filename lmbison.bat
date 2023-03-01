@@ -60,9 +60,9 @@ exit /b 0
     if %CMD% == list_volumes ( call:list_all_volume_contents )
     if %CMD% == build_all ( call:build_all )
     :: LMBison tools needing config_file parameter
-    if %CMD% == annotate_riis_with_gbif_taxa ( call:execute_process )
+    if %CMD% == annotate_riis ( call:execute_process )
     if %CMD% == chunk_large_file ( call:execute_process )
-    if %CMD% == annotate_gbif_with_geo_and_riis ( call:execute_process )
+    if %CMD% == annotate_gbif ( call:execute_process )
     if %CMD% == summarize_annotations ( call:execute_process )
     if %CMD% == combine_summaries ( call:execute_process )
     if %CMD% == count_summaries ( call:execute_process )
@@ -94,9 +94,9 @@ exit /b 0
     echo     list_outputs
     echo     list_volumes
     echo or one of the following commands requiring a parameters file:
-    echo     annotate_riis_with_gbif_taxa
+    echo     annotate_riis
     echo     chunk_large_file
-    echo     annotate_gbif_with_geo_and_riis
+    echo     annotate_gbif
     echo     summarize_annotations
     echo     combine_summaries
     echo     count_summaries

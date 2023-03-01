@@ -17,7 +17,7 @@ RUN mkdir git
 
 # specify-lmpy latest from Github
 RUN cd git &&  \
-    git clone https://github.com/lifemapper/bison.git &&  \
+    git clone --branch docker-wrap https://github.com/lifemapper/bison.git &&  \
     cd bison \
     && pip install .
 
