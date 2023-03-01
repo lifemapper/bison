@@ -54,20 +54,23 @@ def process_arguments_from_file(config_filename, parameters):
             configuration file.
 
     Raises:
-        FileNotFoundError: on non-existent config_file.
+        Exception: on config_filename is None.
+        FileNotFoundError: on missing config_filename.
         json.decoder.JSONDecodeError: on badly constructed JSON file
         Exception: on missing configuration file argument.
         Exception: on missing required parameter in configuration file.
     """
     # Retrieve arguments from configuration file
-    if config_filename is not None:
-        try:
-            with open(config_filename, mode='rt') as in_json:
-                config = json.load(in_json)
-        except FileNotFoundError:
-            raise
-        except json.decoder.JSONDecodeError:
-            raise
+    if config_filename is None:
+        raise Exception("Missing required configuration file")
+
+    try:
+        with open(config_filename, mode='rt') as in_json:
+            config = json.load(in_json)
+    except FileNotFoundError:
+        raise
+    except json.decoder.JSONDecodeError:
+        raise
 
     # Test that required arguments are present in configuration file
     try:
@@ -125,9 +128,16 @@ def get_common_arguments(script_name, description, parameters):
         config: A parameter/argument dictionary contained in the config_filename.
         logger: logger for saving relevant processing messages
         report_filename: optional filename for saving summary process information.
+
+    Raises:
+        Exception: on missing --config_file argument
+
+    TODO: make config_file required or accept other parameters from the command line.
     """
     parser = _build_parser(script_name, description)
     config_filename = _get_config_file_argument(parser)
+    if not config_filename:
+        raise Exception(f"Script {script_name} requires value for config_file")
     config = process_arguments_from_file(config_filename, parameters)
 
     try:

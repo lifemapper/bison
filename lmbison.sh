@@ -56,7 +56,6 @@ set_defaults() {
     # Docker volumes
     IN_VOLUME="input"
     CONFIG_VOLUME="config"
-    OUT_VOLUME="output"
     # bind mount
     BIG_DATA_VOLUME="big_data"
 
@@ -117,15 +116,6 @@ create_volumes() {
     else
         echo " - Volume $CONFIG_VOLUME is already created"  | tee -a "$LOG"
     fi
-    # Create named RW output volume for use by any container
-    rw_vol_exists=$(docker volume ls | grep $OUT_VOLUME | wc -l )
-    if [ "$rw_vol_exists" == "0" ]; then
-        echo " - Create volume $OUT_VOLUME"  | tee -a "$LOG"
-        docker volume create --label=$VOLUME_DISCARD_LABEL $OUT_VOLUME
-    else
-
-        echo " - Volume $OUT_VOLUME is already created"  | tee -a "$LOG"
-    fi
 }
 
 
@@ -139,10 +129,9 @@ start_container() {
         # Option string for volumes
         # TODO: after debugging, add read-only back to data volume
         vol_opts="--volume ${IN_VOLUME}:${VOLUME_MOUNT}/${IN_VOLUME} \
-                  --volume ${ENV_VOLUME}:${VOLUME_MOUNT}/${ENV_VOLUME} \
-                  --volume ${OUT_VOLUME}:${VOLUME_MOUNT}/${OUT_VOLUME}"
+                  --volume ${CONFIG_VOLUME}:${VOLUME_MOUNT}/${CONFIG_VOLUME}"
         # Option string for bind mount
-        bind_src="source=data/${BIG_DATA_VOLUME}"
+        bind_src="source=/home/astewart/git/bison/data/${BIG_DATA_VOLUME}"
         bind_target="target=${VOLUME_MOUNT}/${BIG_DATA_VOLUME}"
         bind_opts="--mount type=bind,${bind_src},${bind_target}"
 
@@ -209,18 +198,14 @@ remove_image() {
 # -----------------------------------------------------------
 remove_volumes() {
     remove_container
-    echo " - Remove volumes $IN_VOLUME, $OUT_VOLUME, $ENV_VOLUME" | tee -a "$LOG"
+    echo " - Remove volumes $IN_VOLUME $CONFIG_VOLUME" | tee -a "$LOG"
     input_vol_exists=$(docker volume ls | grep $IN_VOLUME | wc -l )
     if [ "$input_vol_exists" != "0" ]; then
         docker volume rm $IN_VOLUME
     fi
-    output_vol_exists=$(docker volume ls | grep $OUT_VOLUME | wc -l )
-    if [ "$output_vol_exists" != "0" ]; then
-        docker volume rm $OUT_VOLUME
-    fi
-    env_vol_exists=$(docker volume ls | grep $ENV_VOLUME | wc -l )
-    if [ "$env_vol_exists" != "0" ]; then
-        docker volume rm $ENV_VOLUME
+    conf_vol_exists=$(docker volume ls | grep $CONFIG_VOLUME | wc -l )
+    if [ "$conf_vol_exists" != "0" ]; then
+        docker volume rm $CONFIG_VOLUME
     fi
 }
 
@@ -239,12 +224,12 @@ list_all_volume_contents() {
     start_container
     echo " - List volume contents $CONTAINER_NAME" | tee -a "$LOG"
     docker exec -it $CONTAINER_NAME ls -lahtr ${VOLUME_MOUNT}
-    echo "    - Volume $ENV_VOLUME" | tee -a "$LOG"
-    docker exec -it $CONTAINER_NAME ls -lahtr ${VOLUME_MOUNT}/${ENV_VOLUME}
+    echo "    - Volume $CONFIG_VOLUME" | tee -a "$LOG"
+    docker exec -it $CONTAINER_NAME ls -lahtr ${VOLUME_MOUNT}/${CONFIG_VOLUME}
     echo "    - Volume $IN_VOLUME" | tee -a "$LOG"
     docker exec -it $CONTAINER_NAME ls -lahtr ${VOLUME_MOUNT}/${IN_VOLUME}
-    echo "    - Volume $OUT_VOLUME" | tee -a "$LOG"
-    docker exec -it $CONTAINER_NAME ls -lahtr ${VOLUME_MOUNT}/${OUT_VOLUME}
+    echo "    - Volume $BIG_DATA_VOLUME" | tee -a "$LOG"
+    docker exec -it $CONTAINER_NAME ls -lahtr ${VOLUME_MOUNT}/${BIG_DATA_VOLUME}
 }
 
 
@@ -254,14 +239,6 @@ open_container_shell() {
     start_container
     echo " - Connect to $CONTAINER_NAME" | tee -a "$LOG"
     docker exec -it $CONTAINER_NAME bash
-}
-
-
-# -----------------------------------------------------------
-list_output_host_contents() {
-    # Find an image, start it with output volume, check contents
-    echo " - List host output directory contents " | tee -a "$LOG"
-    ls -lahtr ${IN_VOLUME}/${OUT_VOLUME}
 }
 
 
@@ -345,8 +322,8 @@ else
         echo "*** start_container ***" | tee -a "$LOG"
         execute_process
         echo "*** execute_process ***" | tee -a "$LOG"
-        save_outputs
-        echo "*** save_outputs ***" | tee -a "$LOG"
+        # save_outputs
+        # echo "*** save_outputs ***" | tee -a "$LOG"
         remove_container
         echo "*** remove_container ***" | tee -a "$LOG"
     else

@@ -64,30 +64,34 @@ values from the geometry nearest to the point.
 * For local setup and testing, create directories to mimic the volumes created by the Dockerfile.
 * Create a local /volumes/bison directory.  Everything contained in this
   directory will be a symlink to the repository or to the large data directory discussed next.
-* Identify a directory with plenty of space, and create directories to contain large data files:
-  * big_data
-  * big_data/geodata
-  * output
-  * process
-  * Example below with large data directory /mnt/sata8/bison/2023
+* Identify a directory with plenty of space, and create directories to contain
+  large data files
+  * input:
+    * big_data/gbif
+    * big_data/geodata
+  * temporary processing files:
+    * big_data/process
+  * final output files:
+    * big_data/output
+* Example below with large data directory /mnt/sata8/bison/2023
 
 ```shell
 astewart@murderbot:/mnt/sata8/bison/2023$ ll
 ...
 drwxrwxr-x 3 astewart astewart 4096 Feb 15 12:07 big_data/
-drwxrwxr-x 2 astewart astewart 4096 Feb 16 09:12 output/
-drwxrwxr-x 2 astewart astewart 4096 Feb 16 09:13 process/
-
 ```
 
 * In the big_data directory, place the gbif occurrence file
 
 ```shell
-astewart@badenov:/tank/bison/2023$ ll big_data/
-...
--rw-rw-r--  1 astewart astewart 40303076775 Jan 26 15:22 gbif_2023-01-26.csv
-drwxrwxr-x 16 astewart astewart        4096 Feb  8 15:04 geodata/
-
+astewart@murderbot:/mnt/sata8/bison/2023$ ll big_data/
+total 68
+drwxrwxr-x  6 astewart astewart  4096 Mar  1 16:33 ./
+drwxrwxr-x  4 astewart astewart  4096 Mar  1 16:33 ../
+drwxrwxr-x  2 astewart astewart  4096 Mar  1 12:02 gbif/
+drwxrwxr-x 15 astewart astewart  4096 Feb  9 16:05 geodata/
+drwxrwxr-x  2 astewart astewart 45056 Feb 27 15:50 output/
+drwxrwxr-x  2 astewart astewart  4096 Feb 27 14:50 process/
 ```
 
 * In the big_data/geodata directory, place all geospatial data files.  All data within this directory will be
@@ -114,8 +118,6 @@ drwxrwxr-x  2 astewart astewart  4096 Feb  8 13:15 PADUS3_0_Region_9_SHP/
 
 * In the /volumes/bison directory create symbolic links to the large directory:
   * big_data
-  * process
-  * output
 
 * and to the local repository
   * config (bison/data/config)
@@ -126,11 +128,10 @@ drwxrwxr-x  2 astewart astewart  4096 Feb  8 13:15 PADUS3_0_Region_9_SHP/
 
 ```shell
 astewart@murderbot:/volumes/bison$ ll
-...
+total 8
+drwxrwxr-x 2 astewart astewart 4096 Mar  1 16:35 ./
+drwxr-xr-x 5 astewart astewart 4096 Jan 31 15:47 ../
 lrwxrwxrwx 1 astewart astewart   30 Feb 16 09:48 big_data -> /mnt/sata8/bison/2023/big_data/
-lrwxrwxrwx 1 astewart astewart   28 Feb 16 09:28 output -> /mnt/sata8/bison/2023/output/
-lrwxrwxrwx 1 astewart astewart   29 Feb 16 09:28 process -> /mnt/sata8/bison/2023/process/
-
 lrwxrwxrwx 1 astewart astewart   36 Feb 15 12:13 config -> /home/astewart/git/bison/data/config/
 lrwxrwxrwx 1 astewart astewart   35 Feb 15 12:34 input -> /home/astewart/git/bison/data/input/
 lrwxrwxrwx 1 astewart astewart   35 Feb 15 12:16 tests -> /home/astewart/git/bison/tests/data/

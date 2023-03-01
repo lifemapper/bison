@@ -1,5 +1,7 @@
 FROM osgeo/gdal:ubuntu-small-latest as backend
 
+ARG BIG_DATA=/
+
 RUN apt-get update
 RUN apt-get install -y git
 RUN apt-get install -y vim
