@@ -18,19 +18,19 @@ usage ()
     # Commands that are substrings of other commands will match the superstring and
     # possibly print the wrong Usage string.
     config_required=(
-        "annotate_riis_with_gbif_taxa",
-        "chunk_large_file",
-        "annotate_gbif_with_geo_and_riis",
+        "annotate_riis_with_gbif_taxa"
+        "chunk_large_file"
+        "annotate_gbif_with_geo_and_riis"
         "summarize_annotations"
-        "combine_summaries",
-        "count_summaries",
-        "aggregate_summary",
+        "combine_summaries"
+        "count_summaries"
+        "aggregate_summary"
     )
     echo ""
     echo "Usage: $0 <cmd> "
     echo "   or:  $0 <cmd>  <parameters_file>"
     echo ""
-    echo "This script creates an environment for a biotaphy command to be run with "
+    echo "This script creates an environment for an lmbison command to be run with "
     echo "user-configured arguments in a docker container."
     echo "the <cmd> argument can be one of:"
     for i in "${!COMMANDS[@]}"; do
