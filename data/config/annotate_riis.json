@@ -2,5 +2,5 @@
     "log_filename": "/volumes/bison/big_data/output/annotate_riis.log",
     "report_filename": "/volumes/bison/big_data/output/annotate_riis.rpt",
     "riis_filename": "/volumes/bison/input/US-RIIS_MasterList_2021.csv",
-    "outpath": "/volumes/bison/input"
+    "outpath": "/volumes/bison/big_data/process"
 }
