@@ -57,6 +57,9 @@ values from the geometry nearest to the point.
 
 # Project setup
 
+## Dependencies
+Docker
+
 ## Develop and Test
 
 ### Data layout
@@ -163,13 +166,68 @@ pip3 install -r requirements.txt
 head -n 10001 occurrence.txt > gbif_2023-01-26_10k.csv
 ```
 
-## Deploy
+# Run all processes on GBIF data
 
-### Dependencies
-Docker
+## Subset GBIF file
+
+Chunk the large GBIF occurrence data file into smaller subsets:
+
+```commandline
+./lmbison.sh chunk_large_file data/config/chunk_large_file.json
+```
+
+## Annotate RIIS with GBIF Taxa
+
+Annotate USGS RIIS records with GBIF Accepted Taxa, in order to link GBIF occurrence
+   records with RIIS records using taxon and location.
+
+```commandline
+./lmbison.sh annotate_riis data/config/annotate_riis.json
+```
+
+## Annotate GBIF with RIIS and locations
+
+Annotate GBIF occurrence records (each subset file) with:
+   * state, for assigning RIIS determination and summarizing
+   * other geospatial regions for summarizing
+   * RIIS determinations using state and taxon contained in both GBIF and RIIS records
+
+```commandline
+./lmbison.sh annotate_gbif data/config/annotate_gbif.json
+```
+
+## Summarize annotations
+
+Summarize annotated GBIF occurrence records (each subset file), by:
+   * location type (state, county, AIANNH, PAD)
+   * location value
+   * combined RIIS region and taxon key (RIIS region: AK, HI, L48)
+   * scientific name, species name (for convenience in final aggregation outputs)
+   * count
+
+```commandline
+./lmbison.sh summarize_annotations data/config/summarize_annotations.json
+```
+
+## Combine summaries
+
+Summarize summaries (each subset file) into a single summary:
+
+```commandline
+./lmbison.sh combine_summaries data/config/combine_summaries.json
+```
+
+## Aggregate summary
+
+Aggregate summary into files of species and counts for each region:
+
+```commandline
+./lmbison.sh aggregate_summary data/config/aggregate_summary.json
+```
 
 
-## Documentation
+
+# Documentation
 
 * Auto-generate readthedocs:
   https://docs.readthedocs.io/en/stable/intro/getting-started-with-mkdocs.html

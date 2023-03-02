@@ -31,11 +31,9 @@ ENV MAXENT_JAR=/git/Maxent/ArchivedReleases/$MAXENT_VERSION/maxent.jar
 # .....................................................................................
 
 # .....................................................................................
-# Populate volumes with inputs
+# Populate volumes with small input data
 COPY ./data/input     /volumes/bison/input
 COPY ./data/config    /volumes/bison/config
-# User must place very large data in an appropriate place on the host machine
-#   GBIF CSV data, geospatial data, and temporary processing files
-# directory.  These data must be placed in an appropriate place on the host machine
-# GBIF CSV data, geospatial data, and temporary processing files
-#COPY ./data/big_data  /volumes/bison/big_data/
+# For large input data, the user must identify a large disk on the host machine to
+#   house inputs GBIF CSV and geospatial data, and temporary processing files created
+#   by tools.  Docker will bind-mount this directory into docker containers.
