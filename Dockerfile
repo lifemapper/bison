@@ -13,17 +13,23 @@ RUN apt-get install -y python3-pip
 # Install lmbison projects for system
 
 # Remove when this has been added to lmpy requirements
-RUN pip install requests
+# RUN pip3 install requests
 
 RUN mkdir git
 
-# specify-lmpy latest from Github
+# lmbison latest from Github
 RUN cd git &&  \
     git clone --branch docker-wrap https://github.com/lifemapper/bison.git &&  \
     cd bison \
     && pip install .
 
-RUN pip3 install requests
+# specify-lmpy latest from Github
+RUN cd /git &&  \
+    git clone https://github.com/specifysystems/lmpy.git &&  \
+    cd lmpy \
+    && pip install .
+# specify-lmpy from pypi
+#RUN pip install specify-lmpy
 
 ENV MAXENT_VERSION=3.4.4
 ENV MAXENT_JAR=/git/Maxent/ArchivedReleases/$MAXENT_VERSION/maxent.jar

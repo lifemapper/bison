@@ -1,4 +1,4 @@
-"""Tool to summarize annotated GBIF records by geographic area and RIIS assessment."""
+"""Tool to split annotated GBIF records by accepted species."""
 import json
 import os
 from datetime import datetime
@@ -8,13 +8,12 @@ from bison.common.util import BisonNameOp
 from bison.process.aggregate import Aggregator
 from bison.tools._config_parser import get_common_arguments
 
+from lmpy.point import Point, PointCsvReader, PointDwcaReader
+
 script_name = os.path.splitext(os.path.basename(__file__))[0]
 DESCRIPTION = """\
-        Summarize one or more annotated CSV files containing GBIF Occurrence records
-        with geographic areas including state and county designations from census
-        boundaries, American Indian/Alaska Native Areas/Hawaiian Home Lands (AIANNH),
-        and US Protected Areas (US-PAD), and determinations from the USGS Registry for
-        Introduced and Invasive Species (RIIS)."""
+        Split one or more CSV files containing GBIF Occurrence records by GBIF Accepted
+        species, creating a separate file for each species. """
 # Options to be placed in a configuration file for the command
 PARAMETERS = {
     "required":
@@ -47,6 +46,7 @@ PARAMETERS = {
 
         }
 }
+
 
 
 # .............................................................................

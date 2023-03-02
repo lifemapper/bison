@@ -62,6 +62,48 @@ Docker
 
 ## Develop and Test
 
+### Installing dependencies
+
+* For local setup, development, and testing, create and activate a python virtual
+  environment to hold project dependencies from [requirements.txt](requirements.txt),
+  and possibly [requirements-test.txt](requirements-test.txt).
+
+```commandline
+python3 -m venv venv
+. venv/bin/activate
+pip3 install -r requirements.txt
+pip3 install -r requirements-test.txt
+```
+
+* This project also depends on Specify-lmpy, still in active development (Mar 2023).
+  To easily keep these tools current, **from the activated bison venv**, install
+  specify-lmpy from a cloned copy of the repository.
+
+```commandline
+(venv) astewart@murderbot:~/git/bison cd ../lmpy
+(venv) astewart@murderbot:~/git/lmpy$ git pull
+Already up to date.
+(venv) astewart@murderbot:~/git/lmpy$ cd ../bison
+(venv) astewart@murderbot:~/git/bison$ pip install ../lmpy
+Processing /home/astewart/git/lmpy
+  Installing build dependencies ... error
+  ERROR: Command errored out with exit status 1:
+   command: /home/astewart/git/bison/venv/bin/python3 /home/astewart/git/bison/venv/lib/python3.8/site-packages/pip install --ignore-installed --no-user --prefix /tmp/pip-build-env-rrtd4jly/overlay --no-warn-script-location --no-binary :none: --only-binary :none: -i https://pypi.org/simple -- setuptools wheel
+       cwd: None
+  Complete output (8 lines):
+  WARNING: Retrying (Retry(total=4, connect=None, read=None, redirect=None, status=None)) after connection broken by 'SSLError(SSLCertVerificationError(1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1131)'))': /simple/setuptools/
+  WARNING: Retrying (Retry(total=3, connect=None, read=None, redirect=None, status=None)) after connection broken by 'SSLError(SSLCertVerificationError(1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1131)'))': /simple/setuptools/
+  WARNING: Retrying (Retry(total=2, connect=None, read=None, redirect=None, status=None)) after connection broken by 'SSLError(SSLCertVerificationError(1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1131)'))': /simple/setuptools/
+  WARNING: Retrying (Retry(total=1, connect=None, read=None, redirect=None, status=None)) after connection broken by 'SSLError(SSLCertVerificationError(1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1131)'))': /simple/setuptools/
+  WARNING: Retrying (Retry(total=0, connect=None, read=None, redirect=None, status=None)) after connection broken by 'SSLError(SSLCertVerificationError(1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1131)'))': /simple/setuptools/
+  Could not fetch URL https://pypi.org/simple/setuptools/: There was a problem confirming the ssl certificate: HTTPSConnectionPool(host='pypi.org', port=443): Max retries exceeded with url: /simple/setuptools/ (Caused by SSLError(SSLCertVerificationError(1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1131)'))) - skipping
+  ERROR: Could not find a version that satisfies the requirement setuptools (from versions: none)
+  ERROR: No matching distribution found for setuptools
+  ----------------------------------------
+ERROR: Command errored out with exit status 1: /home/astewart/git/bison/venv/bin/python3 /home/astewart/git/bison/venv/lib/python3.8/site-packages/pip install --ignore-installed --no-user --prefix /tmp/pip-build-env-rrtd4jly/overlay --no-warn-script-location --no-binary :none: --only-binary :none: -i https://pypi.org/simple -- setuptools wheel Check the logs for full command output.
+```
+
+
 ### Data layout
 
 * For local setup and testing, create directories to mimic the volumes created by the Dockerfile.
@@ -147,15 +189,6 @@ lrwxrwxrwx 1 astewart astewart   35 Feb 15 12:16 tests -> /home/astewart/git/bis
   restage them, then run commit again to ensure that changes are saved.
 
 ### Local Testing
-
-* Use a Python virtual environment, by creating and activating virtual environment
-  and installing dependencies from [requirements.txt](requirements.txt)
-
-```commandline
-python3 -m venv venv
-. venv/bin/activate
-pip3 install -r requirements.txt
-```
 
 * Include execution of tests in pre-commit hooks, example in
   [Specify7](https://github.com/specify/specify7/blob/production/.pre-commit-config.yaml)
