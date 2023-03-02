@@ -69,10 +69,10 @@ set_defaults() {
             exit 0
         else
             # Replace host directory with docker container path in config file argument
-            host_config_dir="data/$CONFIG_VOLUME"
-            container_config_dir="$VOLUME_MOUNT/$CONFIG_VOLUME"
+            host_dir="data/$CONFIG_VOLUME"
+            container_dir="$VOLUME_MOUNT/$CONFIG_VOLUME"
             CONTAINER_CONFIG_FILE=$(echo $HOST_CONFIG_FILE | sed "s:^$host_dir:$container_dir:g")
-            echo "$CONTAINER_CONFIG_FILE"
+            echo "CONTAINER_CONFIG_FILE is $CONTAINER_CONFIG_FILE"
         fi
     fi
 
@@ -268,7 +268,7 @@ COMMANDS=(
 CMD=$1
 HOST_CONFIG_FILE=$2
 arg_count=$#
-command_path=/git/lmpy/lmpy/tools
+command_path=/git/bison/bison/tools
 
 set_defaults
 time_stamp "# Start"
