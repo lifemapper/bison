@@ -84,23 +84,27 @@ pip3 install -r requirements-test.txt
 (venv) astewart@murderbot:~/git/lmpy$ git pull
 Already up to date.
 (venv) astewart@murderbot:~/git/lmpy$ cd ../bison
-(venv) astewart@murderbot:~/git/bison$ pip install ../lmpy
+(venv) astewart@murderbot:~/git/lmpy$ pip install --upgrade pip
+(venv) astewart@murderbot:~/git/bison$ pip install --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host files.pythonhosted.org ~/git/lmpy
 Processing /home/astewart/git/lmpy
-  Installing build dependencies ... error
-  ERROR: Command errored out with exit status 1:
-   command: /home/astewart/git/bison/venv/bin/python3 /home/astewart/git/bison/venv/lib/python3.8/site-packages/pip install --ignore-installed --no-user --prefix /tmp/pip-build-env-rrtd4jly/overlay --no-warn-script-location --no-binary :none: --only-binary :none: -i https://pypi.org/simple -- setuptools wheel
-       cwd: None
-  Complete output (8 lines):
-  WARNING: Retrying (Retry(total=4, connect=None, read=None, redirect=None, status=None)) after connection broken by 'SSLError(SSLCertVerificationError(1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1131)'))': /simple/setuptools/
-  WARNING: Retrying (Retry(total=3, connect=None, read=None, redirect=None, status=None)) after connection broken by 'SSLError(SSLCertVerificationError(1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1131)'))': /simple/setuptools/
-  WARNING: Retrying (Retry(total=2, connect=None, read=None, redirect=None, status=None)) after connection broken by 'SSLError(SSLCertVerificationError(1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1131)'))': /simple/setuptools/
-  WARNING: Retrying (Retry(total=1, connect=None, read=None, redirect=None, status=None)) after connection broken by 'SSLError(SSLCertVerificationError(1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1131)'))': /simple/setuptools/
-  WARNING: Retrying (Retry(total=0, connect=None, read=None, redirect=None, status=None)) after connection broken by 'SSLError(SSLCertVerificationError(1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1131)'))': /simple/setuptools/
-  Could not fetch URL https://pypi.org/simple/setuptools/: There was a problem confirming the ssl certificate: HTTPSConnectionPool(host='pypi.org', port=443): Max retries exceeded with url: /simple/setuptools/ (Caused by SSLError(SSLCertVerificationError(1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1131)'))) - skipping
-  ERROR: Could not find a version that satisfies the requirement setuptools (from versions: none)
-  ERROR: No matching distribution found for setuptools
-  ----------------------------------------
-ERROR: Command errored out with exit status 1: /home/astewart/git/bison/venv/bin/python3 /home/astewart/git/bison/venv/lib/python3.8/site-packages/pip install --ignore-installed --no-user --prefix /tmp/pip-build-env-rrtd4jly/overlay --no-warn-script-location --no-binary :none: --only-binary :none: -i https://pypi.org/simple -- setuptools wheel Check the logs for full command output.
+  Installing build dependencies ... done
+  Getting requirements to build wheel ... done
+  Preparing metadata (pyproject.toml) ... done
+Requirement already satisfied: defusedxml in ./venv/lib/python3.8/site-packages (from specify-lmpy==3.1.21.post0.dev175) (0.7.1)
+Requirement already satisfied: dendropy in /home/astewart/.local/lib/python3.8/site-packages (from specify-lmpy==3.1.21.post0.dev175) (4.5.2)
+Requirement already satisfied: matplotlib in /usr/lib/python3/dist-packages (from specify-lmpy==3.1.21.post0.dev175) (3.1.2)
+Requirement already satisfied: gdal in /usr/lib/python3/dist-packages (from specify-lmpy==3.1.21.post0.dev175) (3.0.4)
+Requirement already satisfied: rtree in ./venv/lib/python3.8/site-packages (from specify-lmpy==3.1.21.post0.dev175) (0.9.7)
+Requirement already satisfied: numpy in /home/astewart/.local/lib/python3.8/site-packages (from specify-lmpy==3.1.21.post0.dev175) (1.21.4)
+Requirement already satisfied: requests in /usr/lib/python3/dist-packages (from specify-lmpy==3.1.21.post0.dev175) (2.22.0)
+Requirement already satisfied: setuptools in ./venv/lib/python3.8/site-packages (from dendropy->specify-lmpy==3.1.21.post0.dev175) (60.5.0)
+Building wheels for collected packages: specify-lmpy
+  Building wheel for specify-lmpy (pyproject.toml) ... done
+  Created wheel for specify-lmpy: filename=specify_lmpy-3.1.21.post0.dev175-py3-none-any.whl size=207498 sha256=d0c8cb7c04edc2675ec08553490669a60efd0d648cf0334bfed4f4a0f050043e
+  Stored in directory: /tmp/pip-ephem-wheel-cache-19fai64l/wheels/1b/cc/3e/3bbc265f1071e7556f3c5562910676711a9fc5a56d8b8f672c
+Successfully built specify-lmpy
+Installing collected packages: specify-lmpy
+Successfully installed specify-lmpy-3.1.21.post0.dev175
 ```
 
 
