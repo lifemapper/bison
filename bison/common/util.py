@@ -683,7 +683,6 @@ class BisonNameOp():
             File will always start with basename, followed by chunk,
                 followed by process step completed (if any)
         """
-        outfname = None
         path, basename, ext, chunk, postfix = BisonNameOp.parse_process_filename(
             in_filename)
         if chunk is not None:

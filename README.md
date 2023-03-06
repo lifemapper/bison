@@ -262,6 +262,23 @@ Aggregate summary into files of species and counts for each region:
 ./lmbison.sh aggregate_summary data/config/aggregate_summary.json
 ```
 
+## Split annotated records by taxon
+
+Split the annotated records into CSV files for each species.  Annotation identifies (and
+flags and reports) records with rank higher than species, so tested the number of
+records and unique taxa when grouping by `acceptedScientificName` and `species`.
+Grouping by species filters out the same number of records filtered in the annotation
+step, and simplifies the file/species name.
+
+```commandline
+./lmbison.sh split_annotated_gbif data/config/split_annotated_gbif.json
+```
+
+
+# species: 10784 lines, 2127 headers/files = 8657 records (will leave out rank > species)
+# acceptedKey: 12290 lines, 2300 header/file = 9990 records
+# 9990 - 8657 = 1343 dropped, annotate_gbif.rpt totals the same
+
 
 
 # Documentation
