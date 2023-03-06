@@ -1,0 +1,15 @@
+{
+    "log_console": true,
+    "log_filename": "/volumes/output/encode_points_to_pam.log",
+    "report_filename": "/volumes/output/encode_points_to_pam.rpt",
+    "csv_file_pattern":  "/volumes/bison/big_data/process/occ_by_species/*csv",
+    "species_key": "species",
+    "x_key": "decimalLongitude",
+    "y_key": "decimalLatitude",
+    "min_x": -180,
+    "min_y": -60,
+    "max_x": 180,
+    "max_y": 90,
+    "resolution": 5.0,
+    "out_filename": "/volumes/bison/big_data/process/gbif-2023-01-26-10k.lmm"
+}
