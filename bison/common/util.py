@@ -818,32 +818,20 @@ class BisonNameOp():
         outfname = os.path.join(outpath, f"{basename}_riis_summary{ext}")
         return outfname
 
-    # # ...............................................
-    # @staticmethod
-    # def parse_location_summary_name(csvfile):
-    #     """Construct a filename for the summarized version of csvfile.
-    #
-    #     Args:
-    #         csvfile (str): full filename used to construct an annotated filename
-    #             for this data.
-    #
-    #     Returns:
-    #         outfname: output filename derived from the annotated GBIF DWC filename
-    #
-    #     Raises:
-    #         Exception: on filename does not start with "state_" or "county_"
-    #     """
-    #     county = None
-    #     _, basefilename = os.path.split(csvfile)
-    #     basename, ext = os.path.splitext(basefilename)
-    #     if basename.startswith("state_"):
-    #         _, state = basename.split("_")
-    #     elif basename.startswith("county_"):
-    #         _, state, county = basename.split("_")
-    #     else:
-    #         raise Exception(
-    #             f"Filename {csvfile} cannot be parsed into location elements")
-    #     return state, county
+    # ...............................................
+    @staticmethod
+    def get_grid_filename(resolution, outpath):
+        """Construct a filename for the summarized version of csvfile.
+
+        Args:
+            resolution (float): cellsize for output grid.
+            outpath (str): destination directory for output grid
+
+        Returns:
+            grid_fname: output filename for the gridded shapefile.
+        """
+        grid_fname = os.path.join(outpath, f"grid_{resolution}.shp")
+        return grid_fname
 
 
 # .............................................................................
