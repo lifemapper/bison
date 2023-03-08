@@ -4,12 +4,13 @@ import json
 import os
 
 from bison.common.constants import CONFIG_PARAM
-from bison.common.util import BisonNameOp
+from bison.common.util import BisonNameOp, get_site_headers_from_shapefile
 from bison.tools._config_parser import get_common_arguments
 
 from lmpy.data_preparation.build_grid import build_grid
+from lmpy.matrix import Matrix
 from lmpy.point import PointCsvReader
-from lmpy.spatial.map import create_point_heatmap_vector
+from lmpy.spatial.map import create_point_heatmap_vector, create_point_pa_vector, rasterize_geospatial_matrix
 
 script_name = os.path.splitext(os.path.basename(__file__))[0]
 DESCRIPTION = """\
@@ -20,22 +21,6 @@ DESCRIPTION = """\
 PARAMETERS = {
     "required":
         {
-            "csv_file_pattern":
-                {
-                    CONFIG_PARAM.TYPE: str,
-                    CONFIG_PARAM.IS_INPUT_FILE: True,
-                    CONFIG_PARAM.HELP:
-                        "Fullpath with filepattern of filenames, one per species, "
-                        "containing occurrence records in CSV format"
-                },
-            "csv_filename":
-                {
-                    CONFIG_PARAM.TYPE: list,
-                    CONFIG_PARAM.IS_INPUT_FILE: True,
-                    CONFIG_PARAM.HELP:
-                        "List of full filenames, one per species, containing "
-                        "occurrence records in CSV format"
-                },
             "species_key":
                 {
                     CONFIG_PARAM.TYPE: str,
@@ -80,11 +65,23 @@ PARAMETERS = {
                     CONFIG_PARAM.HELP:
                         "Grid cell size in decimal degrees for the output PAM."
                 },
-            "out_filename":
+            "process_path":
                 {
                     CONFIG_PARAM.TYPE: str,
                     CONFIG_PARAM.IS_OUPUT_DIR: True,
-                    CONFIG_PARAM.HELP: "Destination file for output PAM."
+                    CONFIG_PARAM.HELP: "Large destination directory for temporary data."
+                },
+            "output_path":
+                {
+                    CONFIG_PARAM.TYPE: str,
+                    CONFIG_PARAM.IS_OUPUT_DIR: True,
+                    CONFIG_PARAM.HELP: "Destination directory for outputs."
+                },
+            "output_basename":
+                {
+                    CONFIG_PARAM.TYPE: str,
+                    CONFIG_PARAM.IS_OUPUT_DIR: True,
+                    CONFIG_PARAM.HELP: "Base filename for output PAM."
                 },
         },
     "optional":
@@ -119,8 +116,9 @@ PARAMETERS = {
         }
 }
 
+
 # .............................................................................
-def build_grid(min_x, min_y, max_x, max_y, resolution, outpath, logger):
+def build_temp_grid(min_x, min_y, max_x, max_y, resolution, basename, outpath, logger):
     """Create a grid to structure the species layers.
 
     Args:
@@ -137,7 +135,10 @@ def build_grid(min_x, min_y, max_x, max_y, resolution, outpath, logger):
     """
     cell_sides = 4
     epsg = 4326
-    grid_filename = BisonNameOp.get_grid_filename(resolution, outpath)
+    site_id = "siteid"
+    site_x = "siteX"
+    site_y = "siteY"
+    grid_filename = BisonNameOp.get_grid_filename(basename, resolution, outpath)
     report = build_grid(
         grid_filename,
         min_x,
@@ -147,10 +148,16 @@ def build_grid(min_x, min_y, max_x, max_y, resolution, outpath, logger):
         resolution,
         epsg,
         cell_sides,
+        site_id=site_id,
+        site_x=site_x,
+        site_y=site_y,
         logger=logger
     )
     report = {
         "min_x": min_x,
+        "site_id": site_id,
+        "site_x": site_x,
+        "site_y": site_y,
         "min_y": min_y,
         "max_x": max_x,
         "max_y": max_y,
@@ -168,32 +175,45 @@ def cli():
     """CLI to add locations and RIIS identifiers to GBIF occurrence records.
 
     Raises:
+        Exception: on no input data.
         OSError: on failure to write to report_filename.
         IOError: on failure to write to report_filename.
         Exception: on unknown JSON write error.
     """
-    report = {}
-
     script_name = os.path.splitext(os.path.basename(__file__))[0]
     config, logger, report_filename = get_common_arguments(
         script_name, DESCRIPTION, PARAMETERS)
 
+    # Check both optional csv_file_pattern and csv_filename for inputs
     csv_filenames = []
-    if config["csv_file_pattern"] is not None:
-        csv_filenames = glob.glob(os.path.join(config["csv_file_pattern"]))
-
-    if config["csv_filename"]:
-        for fn in config["csv_filename"]:
+    try:
+        pattern = config["csv_file_pattern"]
+    except KeyError:
+        pass
+    else:
+        csv_filenames = glob.glob(pattern)
+    try:
+        filenames = config["csv_filename"]
+    except KeyError:
+        pass
+    else:
+        for fn in filenames:
             if os.path.exists(fn):
                 csv_filenames.append(fn)
 
-    # Build base PAM grid
-    grid_report = build_grid(
-        csv_filenames, config["x_min"], config["y_min"], config["x_max"],
-        config["x_max"], config["resolution"], config["output_path"], logger)
-    report["grid"] = grid_report
-    site_headers = report["site_headers"]
+    if not csv_filenames:
+        raise Exception("No input occurrence files provided for encoding")
 
+    # Build base PAM grid
+    basename = config['output_basename']
+    grid_report = build_temp_grid(
+        config["min_x"], config["min_y"], config["max_x"], config["max_y"],
+        config["resolution"], basename, config["process_path"], logger)
+    report = {"grid": grid_report}
+
+    site_headers = get_site_headers_from_shapefile(
+        grid_report["site_id"], grid_report["site_x"], grid_report["site_y"],
+        grid_report["grid_filename"])
     heat_mtx = None
     for csv_fn in csv_filenames:
         # Create a
@@ -202,15 +222,29 @@ def cli():
 
         basename = os.path.splitext(os.path.basename(csv_fn))[0]
         data_label = basename.replace(" ", "_")
-        heat_vct, sp_report = create_point_heatmap_vector(
-            reader, site_headers, data_label, logger=logger)
+        heat_vct, sp_report = create_point_pa_vector(
+            reader, site_headers, data_label, min_points=1, logger=logger)
+        # heat_vct, sp_report = create_point_heatmap_vector(
+        #     reader, site_headers, data_label, logger=logger)
 
-        if not heat_mtx:
+        if heat_mtx is None:
             heat_mtx = heat_vct
             report["inputs"] = [sp_report]
         else:
-            heat_mtx.concatenate([heat_vct])
+            heat_mtx = Matrix.concatenate([heat_mtx, heat_vct], axis=1)
             report["inputs"].append(sp_report)
+
+    out_fname_noext = os.path.join(
+        config["output_path"], f"{config['output_basename']}" )
+
+    out_matrix_filename = f"{out_fname_noext}.lmm"
+    heat_mtx.write(out_matrix_filename)
+    report["out_matrix_filename"] = out_matrix_filename
+
+    out_raster_filename = f"{out_fname_noext}.tif"
+    rst_report = rasterize_geospatial_matrix(
+        heat_mtx, out_raster_filename, is_pam=False, nodata=-9999, logger=logger)
+    report["raster"] = rst_report
 
     # If the output report was requested, write it
     if report_filename:

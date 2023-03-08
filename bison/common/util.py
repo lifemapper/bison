@@ -4,6 +4,7 @@ import glob
 import logging
 import math
 import os
+from osgeo import ogr
 import subprocess
 import sys
 
@@ -19,7 +20,9 @@ def delete_file(file_name, delete_dir=False):
         delete_dir (bool): flag - True to delete parent directory if it becomes empty
 
     Returns:
-        True if file was not found, or file (and optional newly-empty parent directories) was successfully deleted.
+        True if file was not found, or file was successfully deleted.  If
+            file deletion results in an empty parent directory, directory is also
+            successfully deleted.
         False if failed to delete file (and parent directories).
     """
     success = True
@@ -49,10 +52,12 @@ def ready_filename(fullfilename, overwrite=True):
 
     Args:
         fullfilename (str): full path of the file to check
-        overwrite (bool): flag indicating whether to delete the file if it already exists
+        overwrite (bool): flag indicating to delete the file if it already exists
 
     Returns:
-        True if file was not found, or file (and optional newly-empty parent directories) was successfully deleted.
+        boolean: True if file does not yet exist, or file was successfully deleted.  If
+            file deletion results in an empty parent directory, directory is also
+            successfully deleted.
         False if failed to delete file (and parent directories).
 
     Raises:
@@ -128,7 +133,9 @@ def get_csv_writer(datafile, delimiter, header=None, fmode="w", overwrite=True):
 
 
 # .............................................................................
-def get_csv_dict_writer(csvfile, header, delimiter, fmode="w", encoding=ENCODING, extrasaction="ignore", overwrite=True):
+def get_csv_dict_writer(
+        csvfile, header, delimiter, fmode="w", encoding=ENCODING, extrasaction="ignore",
+        overwrite=True):
     """Create a CSV dictionary writer and write the header.
 
     Args:
@@ -137,7 +144,8 @@ def get_csv_dict_writer(csvfile, header, delimiter, fmode="w", encoding=ENCODING
         delimiter (str): field separator
         fmode (str): Write ('w') or append ('a')
         encoding (str): Encoding for output file
-        extrasaction (str): Action to take if there are fields in a record dictionary not present in fieldnames
+        extrasaction (str): Action to take if there are fields in a record dictionary
+            not present in fieldnames
         overwrite (bool): True to delete an existing file before write
 
     Returns:
@@ -155,7 +163,8 @@ def get_csv_dict_writer(csvfile, header, delimiter, fmode="w", encoding=ENCODING
         csv.field_size_limit(sys.maxsize)
         try:
             f = open(csvfile, fmode, newline="", encoding=encoding)
-            writer = csv.DictWriter(f, fieldnames=header, delimiter=delimiter, extrasaction=extrasaction)
+            writer = csv.DictWriter(
+                f, fieldnames=header, delimiter=delimiter, extrasaction=extrasaction)
         except Exception as e:
             raise e
         else:
@@ -169,14 +178,16 @@ def get_csv_dict_writer(csvfile, header, delimiter, fmode="w", encoding=ENCODING
 def get_csv_dict_reader(
         csvfile, delimiter, fieldnames=None, encoding=ENCODING, quote_none=False,
         restkey=EXTRA_CSV_FIELD):
-    """Create a CSV dictionary reader from a file with the first line containing fieldnames.
+    """Create a CSV dictionary reader from a file with a fieldname header.
 
     Args:
         csvfile (str): output CSV file for reading
         delimiter (char): delimiter between fields
-        fieldnames (list): strings with corrected fieldnames, cleaned of illegal characters, for use with records.
+        fieldnames (list): strings with corrected fieldnames, cleaned of illegal
+            characters, for use with records.
         encoding (str): type of encoding
-        quote_none (bool): True opens csvfile with QUOTE_NONE, False opens with QUOTE_MINIMAL
+        quote_none (bool): True opens csvfile with QUOTE_NONE, False opens with
+            QUOTE_MINIMAL
         restkey (str): fieldname for extra fields in a record not present in header
 
     Returns:
@@ -203,7 +214,9 @@ def get_csv_dict_reader(
         raise
 
     if fieldnames is not None:
-        rdr = csv.DictReader(f, fieldnames=fieldnames, quoting=quoting, delimiter=delimiter, restkey=restkey)
+        rdr = csv.DictReader(
+            f, fieldnames=fieldnames, quoting=quoting, delimiter=delimiter,
+            restkey=restkey)
     else:
         rdr = csv.DictReader(f, quoting=quoting, delimiter=delimiter, restkey=restkey)
 
@@ -332,6 +345,31 @@ def count_lines(filename_or_pattern, grep_strings=None):
     line_count = _parse_wc_output(sp_outs)
 
     return line_count
+
+
+# .............................................................................
+def get_site_headers_from_shapefile(site_id_fld, x_fld, y_fld, shape_filename):
+    site_headers = []
+    driver = ogr.GetDriverByName("ESRI Shapefile")
+    data_src = driver.Open(shape_filename, 0)
+    lyr = data_src.GetLayer()
+    feat_count = lyr.GetFeatureCount()
+    print(f"Opened {shape_filename} with {feat_count} features")
+    lyr_def = lyr.GetLayerDefn()
+    site_id_idx = lyr_def.GetFieldIndex(site_id_fld)
+    x_idx = lyr_def.GetFieldIndex(x_fld)
+    y_idx = lyr_def.GetFieldIndex(y_fld)
+    for fid in range(0, feat_count):
+        try:
+            feat = lyr.GetFeature(fid)
+            site_id = int(feat.GetFieldAsString(site_id_idx))
+            x = float(feat.GetFieldAsString(x_idx))
+            y = float(feat.GetFieldAsString(y_idx))
+            site_headers.append((site_id, x, y))
+        except Exception as e:
+            raise Exception(
+                f"Error, failed to read features in {shape_filename}: {e}")
+    return site_headers
 
 
 # .............................................................................
@@ -820,7 +858,7 @@ class BisonNameOp():
 
     # ...............................................
     @staticmethod
-    def get_grid_filename(resolution, outpath):
+    def get_grid_filename(basename, resolution, outpath):
         """Construct a filename for the summarized version of csvfile.
 
         Args:
@@ -830,7 +868,7 @@ class BisonNameOp():
         Returns:
             grid_fname: output filename for the gridded shapefile.
         """
-        grid_fname = os.path.join(outpath, f"grid_{resolution}.shp")
+        grid_fname = os.path.join(outpath, f"grid_{basename}_{resolution}.shp")
         return grid_fname
 
 
