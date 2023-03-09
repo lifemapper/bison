@@ -7,10 +7,12 @@ from bison.common.constants import CONFIG_PARAM
 from bison.common.util import BisonNameOp, get_site_headers_from_shapefile
 from bison.tools._config_parser import get_common_arguments
 
-from lmpy.data_preparation.build_grid import build_grid
 from lmpy.matrix import Matrix
 from lmpy.point import PointCsvReader
-from lmpy.spatial.map import create_point_heatmap_vector, create_point_pa_vector, rasterize_geospatial_matrix
+from lmpy.spatial.map import (
+    create_point_pa_vector, create_site_headers_from_extent,
+    rasterize_geospatial_matrix)
+from lmpy.statistics.pam_stats import PamStats
 
 script_name = os.path.splitext(os.path.basename(__file__))[0]
 DESCRIPTION = """\
@@ -116,58 +118,17 @@ PARAMETERS = {
         }
 }
 
-
-# .............................................................................
-def build_temp_grid(min_x, min_y, max_x, max_y, resolution, basename, outpath, logger):
-    """Create a grid to structure the species layers.
-
-    Args:
-        min_x (float): minimum longitude boundary for the output PAM.
-        min_y (float): minimum latitude boundary for the output PAM.
-        max_x (float): maximum longitude boundary for the output PAM.
-        max_y (float): maximum latitude boundary for the output PAM.
-        resolution (float): resolution of gridcells for the output PAM>
-        output_path (str): destination directory for output species CSV files.
-        logger (object): logger for writing relevant processing messages.
-
-    Returns:
-        report (dict): dictionary of metadata about the data and process.
-    """
-    cell_sides = 4
-    epsg = 4326
-    site_id = "siteid"
-    site_x = "siteX"
-    site_y = "siteY"
-    grid_filename = BisonNameOp.get_grid_filename(basename, resolution, outpath)
-    report = build_grid(
-        grid_filename,
-        min_x,
-        min_y,
-        max_x,
-        max_y,
-        resolution,
-        epsg,
-        cell_sides,
-        site_id=site_id,
-        site_x=site_x,
-        site_y=site_y,
-        logger=logger
-    )
-    report = {
-        "min_x": min_x,
-        "site_id": site_id,
-        "site_x": site_x,
-        "site_y": site_y,
-        "min_y": min_y,
-        "max_x": max_x,
-        "max_y": max_y,
-        "resolution": resolution,
-        "cell_sides": cell_sides,
-        "epsg": epsg,
-        "grid_filename": grid_filename
-    }
-
-    return report
+# .....................................................................................
+def write_matrix_raster(geostats_mtx, geostats_mtx_fname, logger):
+    geostats_mtx.write(geostats_mtx_fname)
+    logger.log(
+        f"Wrote statistics to {geostats_mtx_fname}.", refname=script_name)
+    out_raster_filename = geostats_mtx_fname.replace(".lmm", ".tif")
+    rast_report = rasterize_geospatial_matrix(
+        geostats_mtx, out_raster_filename, is_pam=False, nodata=-9999, logger=None)
+    rast_report["matrix_filename"] = geostats_mtx_fname
+    rast_report["raster_filename"] = out_raster_filename
+    return rast_report
 
 
 # .....................................................................................
@@ -183,6 +144,7 @@ def cli():
     script_name = os.path.splitext(os.path.basename(__file__))[0]
     config, logger, report_filename = get_common_arguments(
         script_name, DESCRIPTION, PARAMETERS)
+    report = {}
 
     # Check both optional csv_file_pattern and csv_filename for inputs
     csv_filenames = []
@@ -204,47 +166,68 @@ def cli():
     if not csv_filenames:
         raise Exception("No input occurrence files provided for encoding")
 
-    # Build base PAM grid
-    basename = config['output_basename']
-    grid_report = build_temp_grid(
+    site_headers = create_site_headers_from_extent(
         config["min_x"], config["min_y"], config["max_x"], config["max_y"],
-        config["resolution"], basename, config["process_path"], logger)
-    report = {"grid": grid_report}
+        config["resolution"])
 
-    site_headers = get_site_headers_from_shapefile(
-        grid_report["site_id"], grid_report["site_x"], grid_report["site_y"],
-        grid_report["grid_filename"])
-    heat_mtx = None
+    pam = None
     for csv_fn in csv_filenames:
-        # Create a
         reader = PointCsvReader(
             csv_fn, config["species_key"], config["x_key"], config["y_key"])
 
         basename = os.path.splitext(os.path.basename(csv_fn))[0]
         data_label = basename.replace(" ", "_")
-        heat_vct, sp_report = create_point_pa_vector(
+        pav, sp_report = create_point_pa_vector(
             reader, site_headers, data_label, min_points=1, logger=logger)
-        # heat_vct, sp_report = create_point_heatmap_vector(
-        #     reader, site_headers, data_label, logger=logger)
 
-        if heat_mtx is None:
-            heat_mtx = heat_vct
+        if pam is None:
+            pam = pav
             report["inputs"] = [sp_report]
         else:
-            heat_mtx = Matrix.concatenate([heat_mtx, heat_vct], axis=1)
+            pam = Matrix.concatenate([pam, pav], axis=1)
             report["inputs"].append(sp_report)
 
     out_fname_noext = os.path.join(
         config["output_path"], f"{config['output_basename']}" )
 
     out_matrix_filename = f"{out_fname_noext}.lmm"
-    heat_mtx.write(out_matrix_filename)
+    pam.write(out_matrix_filename)
     report["out_matrix_filename"] = out_matrix_filename
 
-    out_raster_filename = f"{out_fname_noext}.tif"
-    rst_report = rasterize_geospatial_matrix(
-        heat_mtx, out_raster_filename, is_pam=False, nodata=-9999, logger=logger)
-    report["raster"] = rst_report
+    stats = PamStats(pam, logger=logger)
+
+    covariance_stats = stats.calculate_covariance_statistics()
+    for name, mtx in covariance_stats:
+        fn = f"{out_fname_noext}_covariance_{name.replace(' ', '_')}.lmm"
+        mtx.write(fn)
+        logger.log(
+            f"Wrote covariance {name} statistics to {fn}.", refname=script_name)
+        report[f"output covariance matrix {name}"] = fn
+
+    # Diversity statistics (geographic)
+    diversity_mtx_fname = f"{out_fname_noext}_diversity.lmm"
+    diversity_stats = stats.calculate_diversity_statistics()
+    diversity_report = write_matrix_raster(
+        diversity_stats, diversity_mtx_fname, logger)
+    report["output diversity_matrix"] = diversity_report
+
+    # Site statistics (geographic)
+    site_stats_mtx_fname = f"{out_fname_noext}_site_stats.lmm"
+    site_stats = stats.calculate_site_statistics()
+    site_stats_report = write_matrix_raster(
+        site_stats, site_stats_mtx_fname, logger)
+    report["output site_stats_matrix"] = site_stats_report
+
+    # Species statistics (not geographic)
+    species_stats_matrix_fname = f"{out_fname_noext}_species_stats.lmm"
+    species_stats = stats.calculate_species_statistics()
+    species_stats.write(species_stats_matrix_fname)
+    logger.log(
+        f"Wrote species statistics to {species_stats_matrix_fname}.",
+        refname=script_name)
+    report["output species_stats_matrix"] = species_stats_matrix_fname
+
+
 
     # If the output report was requested, write it
     if report_filename:
