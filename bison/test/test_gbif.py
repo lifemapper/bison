@@ -2,9 +2,8 @@
 import os
 
 from bison.common.constants import BIG_DATA_PATH, GBIF, LOG
-from bison.common.gbif import DwcData
-from bison.tools.gbif_api import GbifSvc
-from bison.tools.util import get_logger
+from bison.provider.gbif_data import DwcData
+from bison.provider.gbif_api import GbifSvc
 
 
 class TestGBIFData(DwcData):
@@ -49,22 +48,4 @@ class TestGBIFData(DwcData):
 
 # .............................................................................
 if __name__ == "__main__":
-    logname = "test_gbif"
-    csvfile = GBIF.TEST_DATA
-
-    # Test the taxonkey contents in GBIF simple CSV download file
-    logger = get_logger(os.path.join(BIG_DATA_PATH, LOG.DIR), logname=logname)
-
-    Tst = TestGBIFData(BIG_DATA_PATH, csvfile, logger)
-    Tst.test_gbif_name_accepted()
-
-"""
-from test.test_gbif import *
-
-logname = "test_gbif"
-csvfile = GBIF.TEST_DATA
-logger = get_logger(DATA_PATH, logname=logname)
-
-Tst = TestGBIFData(DATA_PATH, csvfile, logger)
-Tst.test_gbif_name_accepted()
-"""
+    pass

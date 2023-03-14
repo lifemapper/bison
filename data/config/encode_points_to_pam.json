@@ -12,6 +12,5 @@
     "max_y": 90,
     "resolution": 5.0,
     "process_path": "/volumes/bison/big_data/process",
-    "output_path": "/volumes/bison/big_data/output",
     "output_basename": "gbif-2023-01-26-10k"
 }

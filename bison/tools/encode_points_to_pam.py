@@ -4,7 +4,6 @@ import json
 import os
 
 from bison.common.constants import CONFIG_PARAM
-from bison.common.util import BisonNameOp, get_site_headers_from_shapefile
 from bison.tools._config_parser import get_common_arguments
 
 from lmpy.matrix import Matrix
@@ -12,7 +11,6 @@ from lmpy.point import PointCsvReader
 from lmpy.spatial.map import (
     create_point_pa_vector, create_site_headers_from_extent,
     rasterize_geospatial_matrix)
-from lmpy.statistics.pam_stats import PamStats
 
 script_name = os.path.splitext(os.path.basename(__file__))[0]
 DESCRIPTION = """\
@@ -73,12 +71,6 @@ PARAMETERS = {
                     CONFIG_PARAM.IS_OUPUT_DIR: True,
                     CONFIG_PARAM.HELP: "Large destination directory for temporary data."
                 },
-            "output_path":
-                {
-                    CONFIG_PARAM.TYPE: str,
-                    CONFIG_PARAM.IS_OUPUT_DIR: True,
-                    CONFIG_PARAM.HELP: "Destination directory for outputs."
-                },
             "output_basename":
                 {
                     CONFIG_PARAM.TYPE: str,
@@ -118,17 +110,35 @@ PARAMETERS = {
         }
 }
 
+
 # .....................................................................................
-def write_matrix_raster(geostats_mtx, geostats_mtx_fname, logger):
+def write_matrix_one_way(stats_mtx, stats_fname, logger):
+    stats_mtx.write(stats_fname)
+    stats_rpt = stats_mtx.get_report()
+    stats_rpt["filename"] = stats_fname
+    logger.log(
+        f"Wrote statistics to {stats_fname}.", refname=script_name)
+    return stats_rpt
+
+
+# .....................................................................................
+def write_matrix_all_ways(geostats_mtx, geostats_mtx_fname, logger):
     geostats_mtx.write(geostats_mtx_fname)
     logger.log(
         f"Wrote statistics to {geostats_mtx_fname}.", refname=script_name)
+    geostats_rpt = geostats_mtx.get_report()
+    geostats_rpt["filename"] = geostats_mtx_fname
+
     out_raster_filename = geostats_mtx_fname.replace(".lmm", ".tif")
     rast_report = rasterize_geospatial_matrix(
         geostats_mtx, out_raster_filename, is_pam=False, nodata=-9999, logger=None)
-    rast_report["matrix_filename"] = geostats_mtx_fname
-    rast_report["raster_filename"] = out_raster_filename
-    return rast_report
+    geostats_rpt["raster"] = rast_report
+
+    out_csv_filename = geostats_mtx_fname.replace(".lmm", ".csv")
+    csv_report = geostats_mtx.write_csv(out_csv_filename)
+    geostats_rpt["csv"] = csv_report
+
+    return geostats_rpt
 
 
 # .....................................................................................
@@ -188,46 +198,40 @@ def cli():
             report["inputs"].append(sp_report)
 
     out_fname_noext = os.path.join(
-        config["output_path"], f"{config['output_basename']}" )
+        config["process_path"], f"{config['output_basename']}" )
 
     out_matrix_filename = f"{out_fname_noext}.lmm"
     pam.write(out_matrix_filename)
     report["out_matrix_filename"] = out_matrix_filename
 
-    stats = PamStats(pam, logger=logger)
-
-    covariance_stats = stats.calculate_covariance_statistics()
-    for name, mtx in covariance_stats:
-        fn = f"{out_fname_noext}_covariance_{name.replace(' ', '_')}.lmm"
-        mtx.write(fn)
-        logger.log(
-            f"Wrote covariance {name} statistics to {fn}.", refname=script_name)
-        report[f"output covariance matrix {name}"] = fn
-
-    # Diversity statistics (geographic)
-    diversity_mtx_fname = f"{out_fname_noext}_diversity.lmm"
-    diversity_stats = stats.calculate_diversity_statistics()
-    diversity_report = write_matrix_raster(
-        diversity_stats, diversity_mtx_fname, logger)
-    report["output diversity_matrix"] = diversity_report
-
-    # Site statistics (geographic)
-    site_stats_mtx_fname = f"{out_fname_noext}_site_stats.lmm"
-    site_stats = stats.calculate_site_statistics()
-    site_stats_report = write_matrix_raster(
-        site_stats, site_stats_mtx_fname, logger)
-    report["output site_stats_matrix"] = site_stats_report
-
-    # Species statistics (not geographic)
-    species_stats_matrix_fname = f"{out_fname_noext}_species_stats.lmm"
-    species_stats = stats.calculate_species_statistics()
-    species_stats.write(species_stats_matrix_fname)
-    logger.log(
-        f"Wrote species statistics to {species_stats_matrix_fname}.",
-        refname=script_name)
-    report["output species_stats_matrix"] = species_stats_matrix_fname
-
-
+    # stats = PamStats(pam, logger=logger)
+    #
+    # # Covariance: sigma_sites (site x site), sigma_species (species x species)
+    # covariance_stats = stats.calculate_covariance_statistics()
+    # for name, mtx in covariance_stats:
+    #     fn = f"{out_fname_noext}_covariance_{name.replace(' ', '_')}.lmm"
+    #     rpt = write_matrix_one_way(mtx, fn, logger)
+    #     report[f"covariance_matrix_{name}"] = rpt
+    #
+    # # Diversity statistics (not geographic)
+    # diversity_mtx_fname = f"{out_fname_noext}_diversity.lmm"
+    # diversity_stats = stats.calculate_diversity_statistics()
+    # diversity_rpt = write_matrix_one_way(diversity_stats, diversity_mtx_fname, logger)
+    # report["diversity_matrix"] = diversity_rpt
+    #
+    # # Site statistics (4 geographic stats)
+    # site_stats_mtx_fname = f"{out_fname_noext}_site_stats.lmm"
+    # site_stats = stats.calculate_site_statistics()
+    # # Write matrix, raster, csv
+    # site_stats_report = write_matrix_all_ways(site_stats, site_stats_mtx_fname, logger)
+    # report["site_stats_matrix"] = site_stats_report
+    #
+    # # Species statistics (not geographic)
+    # species_stats_mtx_fname = f"{out_fname_noext}_species_stats.lmm"
+    # species_stats = stats.calculate_species_statistics()
+    # species_stats_rpt = write_matrix_one_way(
+    #     species_stats, species_stats_mtx_fname, logger)
+    # report["species_stats_matrix"] = species_stats_rpt
 
     # If the output report was requested, write it
     if report_filename:
