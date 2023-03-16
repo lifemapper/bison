@@ -9,8 +9,9 @@ from bison.tools._config_parser import get_common_arguments
 from lmpy.matrix import Matrix
 from lmpy.point import PointCsvReader
 from lmpy.spatial.map import (
-    create_point_pa_vector, create_site_headers_from_extent,
-    rasterize_geospatial_matrix)
+    create_point_heatmap_vector, create_point_pa_vector_from_vector,
+    create_point_pa_vector,
+    create_site_headers_from_extent, rasterize_geospatial_matrix)
 
 script_name = os.path.splitext(os.path.basename(__file__))[0]
 DESCRIPTION = """\
@@ -112,33 +113,68 @@ PARAMETERS = {
 
 
 # .....................................................................................
-def write_matrix_one_way(stats_mtx, stats_fname, logger):
-    stats_mtx.write(stats_fname)
-    stats_rpt = stats_mtx.get_report()
-    stats_rpt["filename"] = stats_fname
+def write_geo_matrix_all_ways(geo_mtx, geo_mtx_fname, logger):
+    geo_mtx.write(geo_mtx_fname)
+    report = geo_mtx.get_report()
+    report["filename"] = geo_mtx_fname
+
+    out_raster_filename = geo_mtx_fname.replace(".lmm", ".tif")
+    rast_rpt = rasterize_geospatial_matrix(
+        geo_mtx, out_raster_filename, is_pam=False, nodata=-9999, logger=None)
+    report["raster"] = rast_rpt
+
+    out_csv_filename = geo_mtx_fname.replace(".lmm", ".csv")
+    csv_report = geo_mtx.write_csv(out_csv_filename)
+    report["csv"] = csv_report
+
     logger.log(
-        f"Wrote statistics to {stats_fname}.", refname=script_name)
-    return stats_rpt
+        f"Wrote statistics to matrix {geo_mtx_fname}, raster {out_raster_filename}, "
+        f"csv {out_csv_filename}.", refname=script_name)
+
+    return report
 
 
-# .....................................................................................
-def write_matrix_all_ways(geostats_mtx, geostats_mtx_fname, logger):
-    geostats_mtx.write(geostats_mtx_fname)
-    logger.log(
-        f"Wrote statistics to {geostats_mtx_fname}.", refname=script_name)
-    geostats_rpt = geostats_mtx.get_report()
-    geostats_rpt["filename"] = geostats_mtx_fname
+def create_point_matrices(csv_filenames, species_key, x_key, y_key, site_headers, logger):
+    report = {}
+    pam_by_species = None
+    heatmap_by_species = None
+    for csv_fn in csv_filenames:
+        reader = PointCsvReader(csv_fn, species_key, x_key, y_key)
 
-    out_raster_filename = geostats_mtx_fname.replace(".lmm", ".tif")
-    rast_report = rasterize_geospatial_matrix(
-        geostats_mtx, out_raster_filename, is_pam=False, nodata=-9999, logger=None)
-    geostats_rpt["raster"] = rast_report
+        basename = os.path.splitext(os.path.basename(csv_fn))[0]
+        data_label = basename.replace(" ", "_")
 
-    out_csv_filename = geostats_mtx_fname.replace(".lmm", ".csv")
-    csv_report = geostats_mtx.write_csv(out_csv_filename)
-    geostats_rpt["csv"] = csv_report
+        hmv, hmv_rpt = create_point_heatmap_vector(
+            reader, site_headers, data_label, logger=None)
+        pav, pav_rpt = create_point_pa_vector_from_vector(
+            hmv, hmv_rpt, min_points=1, logger=logger)
 
-    return geostats_rpt
+        # Create a heatmap with all species in columns
+        if heatmap_by_species is None:
+            heatmap_by_species = hmv
+            report["inputs"] = [hmv_rpt]
+        else:
+            heatmap_by_species = Matrix.concatenate([heatmap_by_species, hmv], axis=1)
+            report["inputs"].append(hmv_rpt)
+
+        # Create a PAM with all species in columns
+        if pam_by_species is None:
+            pam_by_species = pav
+            report["inputs"] = [pav_rpt]
+        else:
+            pam_by_species = Matrix.concatenate([pam_by_species, pav], axis=1)
+            report["inputs"].append(pav_rpt)
+
+    # Sum to combine point counts
+    pam = pam_by_species.sum(axis=1)
+    pam.set_row_headers(site_headers)
+    pam.set_column_headers(["presence-absence"])
+    heatmap = heatmap_by_species.sum(axis=1)
+    heatmap.set_row_headers(site_headers)
+    pam.set_column_headers(["presence-absence"])
+
+    return pam_by_species, heatmap_by_species, pam, heatmap
+
 
 
 # .....................................................................................
@@ -154,7 +190,6 @@ def cli():
     script_name = os.path.splitext(os.path.basename(__file__))[0]
     config, logger, report_filename = get_common_arguments(
         script_name, DESCRIPTION, PARAMETERS)
-    report = {}
 
     # Check both optional csv_file_pattern and csv_filename for inputs
     csv_filenames = []
@@ -180,58 +215,15 @@ def cli():
         config["min_x"], config["min_y"], config["max_x"], config["max_y"],
         config["resolution"])
 
-    pam = None
-    for csv_fn in csv_filenames:
-        reader = PointCsvReader(
-            csv_fn, config["species_key"], config["x_key"], config["y_key"])
-
-        basename = os.path.splitext(os.path.basename(csv_fn))[0]
-        data_label = basename.replace(" ", "_")
-        pav, sp_report = create_point_pa_vector(
-            reader, site_headers, data_label, min_points=1, logger=logger)
-
-        if pam is None:
-            pam = pav
-            report["inputs"] = [sp_report]
-        else:
-            pam = Matrix.concatenate([pam, pav], axis=1)
-            report["inputs"].append(sp_report)
+    pam_by_species, heatmap_by_species, pam, heatmap, report = create_point_matrices(
+        csv_filenames, config["species_key"], config["x_key"], config["y_key"],
+        site_headers, logger)
 
     out_fname_noext = os.path.join(
         config["process_path"], f"{config['output_basename']}" )
 
     out_matrix_filename = f"{out_fname_noext}.lmm"
-    pam.write(out_matrix_filename)
-    report["out_matrix_filename"] = out_matrix_filename
-
-    # stats = PamStats(pam, logger=logger)
-    #
-    # # Covariance: sigma_sites (site x site), sigma_species (species x species)
-    # covariance_stats = stats.calculate_covariance_statistics()
-    # for name, mtx in covariance_stats:
-    #     fn = f"{out_fname_noext}_covariance_{name.replace(' ', '_')}.lmm"
-    #     rpt = write_matrix_one_way(mtx, fn, logger)
-    #     report[f"covariance_matrix_{name}"] = rpt
-    #
-    # # Diversity statistics (not geographic)
-    # diversity_mtx_fname = f"{out_fname_noext}_diversity.lmm"
-    # diversity_stats = stats.calculate_diversity_statistics()
-    # diversity_rpt = write_matrix_one_way(diversity_stats, diversity_mtx_fname, logger)
-    # report["diversity_matrix"] = diversity_rpt
-    #
-    # # Site statistics (4 geographic stats)
-    # site_stats_mtx_fname = f"{out_fname_noext}_site_stats.lmm"
-    # site_stats = stats.calculate_site_statistics()
-    # # Write matrix, raster, csv
-    # site_stats_report = write_matrix_all_ways(site_stats, site_stats_mtx_fname, logger)
-    # report["site_stats_matrix"] = site_stats_report
-    #
-    # # Species statistics (not geographic)
-    # species_stats_mtx_fname = f"{out_fname_noext}_species_stats.lmm"
-    # species_stats = stats.calculate_species_statistics()
-    # species_stats_rpt = write_matrix_one_way(
-    #     species_stats, species_stats_mtx_fname, logger)
-    # report["species_stats_matrix"] = species_stats_rpt
+    rpt = write_geo_matrix_all_ways(pam, out_matrix_filename, logger)
 
     # If the output report was requested, write it
     if report_filename:

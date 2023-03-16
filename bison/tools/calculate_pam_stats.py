@@ -50,33 +50,37 @@ PARAMETERS = {
 
 
 # .....................................................................................
-def write_matrix_one_way(stats_mtx, stats_fname, logger):
-    stats_mtx.write(stats_fname)
-    stats_rpt = stats_mtx.get_report()
-    stats_rpt["filename"] = stats_fname
+def write_matrix_one_way(mtx, out_filename, logger):
+    mtx.write(out_filename)
+    report = mtx.get_report()
+    report["filename"] = out_filename
     logger.log(
-        f"Wrote statistics to {stats_fname}.", refname=script_name)
-    return stats_rpt
+        f"Wrote matrix to {out_filename}.", refname=script_name)
+    return report
 
 
 # .....................................................................................
-def write_matrix_all_ways(geostats_mtx, geostats_mtx_fname, logger):
-    geostats_mtx.write(geostats_mtx_fname)
+def write_geo_matrix_all_ways(geo_mtx, geo_mtx_fname, logger):
+    geo_mtx.write(geo_mtx_fname)
     logger.log(
-        f"Wrote statistics to {geostats_mtx_fname}.", refname=script_name)
-    geostats_rpt = geostats_mtx.get_report()
-    geostats_rpt["filename"] = geostats_mtx_fname
+        f"Wrote statistics to {geo_mtx_fname}.", refname=script_name)
+    report = geo_mtx.get_report()
+    report["filename"] = geo_mtx_fname
 
-    out_raster_filename = geostats_mtx_fname.replace(".lmm", ".tif")
-    rast_report = rasterize_geospatial_matrix(
-        geostats_mtx, out_raster_filename, is_pam=False, nodata=-9999, logger=None)
-    geostats_rpt["raster"] = rast_report
+    out_raster_filename = geo_mtx_fname.replace(".lmm", ".tif")
+    rast_rpt = rasterize_geospatial_matrix(
+        geo_mtx, out_raster_filename, is_pam=False, nodata=-9999, logger=None)
+    report["raster"] = rast_rpt
 
-    out_csv_filename = geostats_mtx_fname.replace(".lmm", ".csv")
-    csv_report = geostats_mtx.write_csv(out_csv_filename)
-    geostats_rpt["csv"] = csv_report
+    out_csv_filename = geo_mtx_fname.replace(".lmm", ".csv")
+    csv_report = geo_mtx.write_csv(out_csv_filename)
+    report["csv"] = csv_report
 
-    return geostats_rpt
+    logger.log(
+        f"Wrote matrix as matrix {geo_mtx_fname}, raster {out_raster_filename}, "
+        f"csv {out_csv_filename}.", refname=script_name)
+
+    return report
 
 
 # .....................................................................................
@@ -117,8 +121,9 @@ def cli():
     site_stats_mtx_fname = f"{out_fname_noext}_site_stats.lmm"
     site_stats = stats.calculate_site_statistics()
     # Write matrix, raster, csv
-    site_stats_report = write_matrix_all_ways(site_stats, site_stats_mtx_fname, logger)
-    report["site_stats_matrix"] = site_stats_report
+    site_stats_rpt = write_geo_matrix_all_ways(
+        site_stats, site_stats_mtx_fname, logger)
+    report["site_stats_matrix"] = site_stats_rpt
 
     # Species statistics (not geographic)
     species_stats_mtx_fname = f"{out_fname_noext}_species_stats.lmm"
