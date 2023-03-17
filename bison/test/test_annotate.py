@@ -1,11 +1,11 @@
 """Module to test appending RIIS determinations to GBIF occurrences."""
 import os
 
-from bison.common.annotate import Annotator
+from bison.process.annotate import Annotator
 from bison.common.constants import BIG_DATA_PATH, DATA_PATH, GBIF, LOG
-from bison.common.riis import NNSL
-from bison.tools.util import get_logger, chunk_files
-
+from bison.provider.riis_data import RIIS
+from bison.common.log import Logger
+from bison.common.util import Chunker
 
 class TestAnnotator(Annotator):
     """Class for testing downloaded simple GBIF CSV file."""
@@ -40,21 +40,15 @@ class TestAnnotator(Annotator):
 # .............................................................................
 if __name__ == "__main__":
     # Test the taxonkey contents in GBIF simple CSV download file
-    big_gbif_fname = os.path.join(BIG_DATA_PATH, GBIF.TEST_DATA)
-    logger = get_logger(os.path.join(BIG_DATA_PATH, LOG.DIR), logname="test_annotate")
-    nnsl_data = NNSL(DATA_PATH, logger=logger)
-
-    chunk_fnames = chunk_files(big_gbif_fname)
-    for fname in chunk_fnames:
-        tst = TestAnnotator(fname, do_resolve=False, logger=logger)
-        tst.test_annotate_records()
-
-"""
-from test.test_annotate import *
-
-outpath = "/tmp"
-logname = "test_annotate"
-csvfile = GBIF.TEST_DATA
-logger = get_logger(DATA_PATH, logname=logname)
-
-"""
+    script_name = os.path.splitext(os.path.basename(__file__))[0]
+    # config, logger, report_filename = get_common_arguments(
+    #     script_name, DESCRIPTION, PARAMETERS)
+    #
+    # big_gbif_fname = os.path.join(BIG_DATA_PATH, GBIF.TEST_DATA)
+    # logger = Logger(script_name, os.path.join(BIG_DATA_PATH, LOG.DIR), logname=)
+    # nnsl_data = RIIS(DATA_PATH, logger=logger)
+    #
+    # chunk_fnames = Chunker.chunk_files(big_gbif_fname)
+    # for fname in chunk_fnames:
+    #     tst = TestAnnotator(fname, do_resolve=False, logger=logger)
+    #     tst.test_annotate_records()

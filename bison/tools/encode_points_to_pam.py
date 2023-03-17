@@ -1,4 +1,5 @@
 """Tool to split all annotated GBIF occurrence records by species for further processing."""
+from copy import deepcopy
 import glob
 import json
 import os
@@ -134,9 +135,13 @@ def write_geo_matrix_all_ways(geo_mtx, geo_mtx_fname, logger):
     return report
 
 
+# .....................................................................................
 def create_point_matrices(csv_filenames, species_key, x_key, y_key, site_headers, logger):
-    report = {}
-    pam_by_species = None
+    min_points = 1
+    report = {
+        "inputs": [],
+        "min_points_for_presence": min_points}
+    pam = None
     heatmap_by_species = None
     for csv_fn in csv_filenames:
         reader = PointCsvReader(csv_fn, species_key, x_key, y_key)
@@ -144,37 +149,44 @@ def create_point_matrices(csv_filenames, species_key, x_key, y_key, site_headers
         basename = os.path.splitext(os.path.basename(csv_fn))[0]
         data_label = basename.replace(" ", "_")
 
-        hmv, hmv_rpt = create_point_heatmap_vector(
-            reader, site_headers, data_label, logger=None)
-        pav, pav_rpt = create_point_pa_vector_from_vector(
-            hmv, hmv_rpt, min_points=1, logger=logger)
+        hmv, rpt = create_point_heatmap_vector(
+            reader, site_headers, data_label, logger=logger)
+        pav = create_point_pa_vector_from_vector(hmv, min_points=min_points)
+        report["inputs"].append(rpt)
 
         # Create a heatmap with all species in columns
         if heatmap_by_species is None:
             heatmap_by_species = hmv
-            report["inputs"] = [hmv_rpt]
         else:
             heatmap_by_species = Matrix.concatenate([heatmap_by_species, hmv], axis=1)
-            report["inputs"].append(hmv_rpt)
 
         # Create a PAM with all species in columns
-        if pam_by_species is None:
-            pam_by_species = pav
-            report["inputs"] = [pav_rpt]
+        if pam is None:
+            pam = pav
         else:
-            pam_by_species = Matrix.concatenate([pam_by_species, pav], axis=1)
-            report["inputs"].append(pav_rpt)
+            pam = Matrix.concatenate([pam, pav], axis=1)
 
     # Sum to combine point counts
-    pam = pam_by_species.sum(axis=1)
-    pam.set_row_headers(site_headers)
-    pam.set_column_headers(["presence-absence"])
-    heatmap = heatmap_by_species.sum(axis=1)
-    heatmap.set_row_headers(site_headers)
-    pam.set_column_headers(["presence-absence"])
+    species_counts = Matrix(
+        pam.sum(axis=1),
+        headers={
+            "0" : site_headers,
+            "1": ["species_count"]}
+    )
 
-    return pam_by_species, heatmap_by_species, pam, heatmap
+    heatmap = Matrix(
+        heatmap_by_species.sum(axis=1),
+        headers={
+            "0": site_headers,
+            "1": ["point_count"]}
+    )
 
+    matrices = {
+        "pam": pam,
+        "species_counts": species_counts,
+        "heatmap_by_species": heatmap_by_species,
+        "heatmap": heatmap}
+    return matrices, report
 
 
 # .....................................................................................
@@ -215,15 +227,19 @@ def cli():
         config["min_x"], config["min_y"], config["max_x"], config["max_y"],
         config["resolution"])
 
-    pam_by_species, heatmap_by_species, pam, heatmap, report = create_point_matrices(
+    matrices, report = create_point_matrices(
         csv_filenames, config["species_key"], config["x_key"], config["y_key"],
         site_headers, logger)
 
     out_fname_noext = os.path.join(
         config["process_path"], f"{config['output_basename']}" )
-
-    out_matrix_filename = f"{out_fname_noext}.lmm"
-    rpt = write_geo_matrix_all_ways(pam, out_matrix_filename, logger)
+    for name, geomtx in matrices.items():
+        out_matrix_filename = f"{out_fname_noext}_{name}.lmm"
+        rpt = write_geo_matrix_all_ways(geomtx, out_matrix_filename, logger)
+        try:
+            report[name]["outputs"] = rpt
+        except KeyError:
+            report[name] = {"outputs": rpt}
 
     # If the output report was requested, write it
     if report_filename:
