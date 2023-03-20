@@ -185,6 +185,7 @@ class CONFIG_PARAM:
     IS_INPUT_DIR = "is_input_dir"
     IS_OUPUT_DIR = "is_output_dir"
     IS_INPUT_FILE = "is_input_file"
+    CHOICES = "choices"
     HELP = "help"
     TYPE = "type"
 

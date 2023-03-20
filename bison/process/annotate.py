@@ -404,17 +404,17 @@ class Annotator():
 
 # .............................................................................
 def annotate_occurrence_file(
-        dwc_filename, riis_with_gbif_filename, geo_path, output_path, log_path=None):
+        dwc_filename, riis_annotated_filename, geo_path, output_path, logger):
     """Annotate GBIF records with census state and county, and RIIS key and assessment.
 
     Args:
         dwc_filename (str): full filename containing GBIF data for annotation.
-        riis_with_gbif_filename (str): full filename with RIIS records annotated with
+        riis_annotated_filename (str): full filename with RIIS records annotated with
             gbif accepted taxa
-        log_path (str): destination directory for logfiles
         geo_path (str): input directory containing geospatial files for
             geo-referencing occurrence points.
         output_path (str): destination directory for output annotated occurrence files.
+        logger (object): logger for saving relevant processing messages
 
     Returns:
         report (dict): metadata for the occurrence annotation data and process.
@@ -425,21 +425,14 @@ def annotate_occurrence_file(
     if not os.path.exists(dwc_filename):
         raise FileNotFoundError(dwc_filename)
 
-    _, basefname = os.path.split(dwc_filename)
-
-    logname = f"annotate_{basefname}"
-    log_filename = None
-    if log_path is not None:
-        log_filename = os.path.join(log_path, f"{logname}.log")
-    logger = Logger(
-        logname, log_filename=log_filename, log_console=False)
+    basename = os.path.split(os.path.basename(dwc_filename))[0]
 
     logger.log(
-        f"Submit {basefname} for annotation {datetime.now()}",
+        f"Submit {basename} for annotation {datetime.now()}",
         refname="annotate_occurrence_file")
 
     ant = Annotator(
-        geo_path, logger, riis_with_gbif_filename=riis_with_gbif_filename)
+        geo_path, logger, riis_with_gbif_filename=riis_annotated_filename)
 
     out_fname = BisonNameOp.get_out_process_filename(
         dwc_filename, outpath=output_path, step_or_process=DWC_PROCESS.ANNOTATE)

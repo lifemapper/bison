@@ -1,5 +1,4 @@
 """Tool to split all annotated GBIF occurrence records by species for further processing."""
-import glob
 import json
 import os
 

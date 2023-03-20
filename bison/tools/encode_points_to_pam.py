@@ -1,5 +1,4 @@
 """Tool to split all annotated GBIF occurrence records by species for further processing."""
-from copy import deepcopy
 import glob
 import json
 import os
@@ -11,7 +10,6 @@ from lmpy.matrix import Matrix
 from lmpy.point import PointCsvReader
 from lmpy.spatial.map import (
     create_point_heatmap_vector, create_point_pa_vector_from_vector,
-    create_point_pa_vector,
     create_site_headers_from_extent, rasterize_geospatial_matrix)
 
 script_name = os.path.splitext(os.path.basename(__file__))[0]
@@ -114,18 +112,18 @@ PARAMETERS = {
 
 
 # .....................................................................................
-def write_geo_matrix_all_ways(geo_mtx, geo_mtx_fname, logger):
+def write_geo_matrix_all_ways(geo_mtx, geo_mtx_fname, logger, is_pam=False):
     geo_mtx.write(geo_mtx_fname)
     report = geo_mtx.get_report()
     report["filename"] = geo_mtx_fname
 
     out_raster_filename = geo_mtx_fname.replace(".lmm", ".tif")
     rast_rpt = rasterize_geospatial_matrix(
-        geo_mtx, out_raster_filename, is_pam=False, nodata=-9999, logger=None)
+        geo_mtx, out_raster_filename, is_pam=is_pam, nodata=-9999, logger=None)
     report["raster"] = rast_rpt
 
     out_csv_filename = geo_mtx_fname.replace(".lmm", ".csv")
-    csv_report = geo_mtx.write_csv(out_csv_filename)
+    csv_report = geo_mtx.write_csv(out_csv_filename, is_pam=is_pam)
     report["csv"] = csv_report
 
     logger.log(
@@ -232,10 +230,11 @@ def cli():
         site_headers, logger)
 
     out_fname_noext = os.path.join(
-        config["process_path"], f"{config['output_basename']}" )
+        config["process_path"], f"{config['output_basename']}")
     for name, geomtx in matrices.items():
+        is_pam = True if name == "pam" else False
         out_matrix_filename = f"{out_fname_noext}_{name}.lmm"
-        rpt = write_geo_matrix_all_ways(geomtx, out_matrix_filename, logger)
+        rpt = write_geo_matrix_all_ways(geomtx, out_matrix_filename, logger, is_pam=is_pam)
         try:
             report[name]["outputs"] = rpt
         except KeyError:

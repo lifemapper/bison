@@ -657,7 +657,7 @@ class Chunker():
 class BisonNameOp():
 
     @staticmethod
-    def get_annotated_riis_filename(input_riis_filename, outpath=None):
+    def get_annotated_riis_filename(input_riis_filename, outpath):
         """Construct a filename for a chunk of CSV records.
 
         Args:
@@ -862,6 +862,7 @@ class BisonNameOp():
         """Construct a filename for the summarized version of csvfile.
 
         Args:
+            basename (str): basefilename for output grid shapefile.
             resolution (float): cellsize for output grid.
             outpath (str): destination directory for output grid
 

@@ -1,0 +1,11 @@
+{
+    "log_console": true,
+    "log_filename": "/volumes/bison/big_data/output/write_matrices.log",
+    "report_filename": "/volumes/bison/big_data/output/write_matrices.rpt",
+    "matrix": [
+        "/volumes/bison/big_data/process/gbif-2023-01-26-10k_heatmap_by_species.lmm",
+        "/volumes/bison/big_data/process/gbif-2023-01-26-10k_heatmap.lmm",
+        "/volumes/bison/big_data/process/gbif-2023-01-26-10k_pam.lmm",
+        "/volumes/bison/big_data/process/gbif-2023-01-26-10k_species_counts.lmm"],
+    "output_path": "/volumes/bison/big_data/output"
+}

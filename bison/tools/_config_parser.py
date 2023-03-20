@@ -41,6 +41,18 @@ def _get_config_file_argument(parser):
 
 
 # .....................................................................................
+def _test_choices(key, val, paramdict):
+    try:
+        options = paramdict[CONFIG_PARAM.CHOICES]
+    except KeyError:
+        pass
+    else:
+        if val not in options:
+            raise Exception(
+                f"Value {val} is not in valid options {options} for {key}.")
+
+
+# .....................................................................................
 def process_arguments_from_file(config_filename, parameters):
     """Process arguments provided by configuration file.
 
@@ -77,14 +89,16 @@ def process_arguments_from_file(config_filename, parameters):
         params = parameters["required"]
     except Exception:
         params = {}
-    for key, _paramdict in params.items():
+    for key, paramdict in params.items():
         try:
-            _ = config[key]
+            val = config[key]
+            _test_choices(key, val, paramdict)
         except Exception:
             raise Exception(f"Missing required argument {key} in {config_filename}")
 
     try:
         opt_args = parameters["optional"]
+        _test_choices(key, val, paramdict)
     except Exception:
         opt_args = {}
     params.update(opt_args)
