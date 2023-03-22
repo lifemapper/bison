@@ -7,7 +7,6 @@ from logging import ERROR
 
 from bison.common.constants import (
     APPEND_TO_DWC, DWC_PROCESS, ENCODING, GBIF, LOG, REGION)
-from bison.common.log import Logger
 from bison.common.util import (available_cpu_count, BisonNameOp, get_csv_dict_writer)
 from bison.process.geoindex import GeoResolver
 from bison.provider.gbif_data import DwcData

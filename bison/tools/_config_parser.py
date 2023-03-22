@@ -101,6 +101,16 @@ def process_arguments_from_file(config_filename, parameters):
         _test_choices(key, val, paramdict)
     except Exception:
         opt_args = {}
+    for okey, paramdict in opt_args.items():
+        try:
+            val = config[okey]
+            _test_choices(okey, val, paramdict)
+        except Exception:
+            # Add optional argument with value None to config dictionary
+            if paramdict[CONFIG_PARAM.TYPE] is list:
+                config[okey] = []
+            else:
+                config[okey] = None
     params.update(opt_args)
 
     # # Test some arguments for existence

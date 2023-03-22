@@ -241,7 +241,7 @@ class Aggregator():
 
         # Reset summaries by location (self._locations)
         #   and species name lookup (self._canonicals)
-        self._init_summaries()
+        self._reset_summaries()
 
     # ...............................................
     def close(self):
@@ -289,7 +289,7 @@ class Aggregator():
         """
         self.close()
         # Reset summaries by location and species name lookup
-        self._init_summaries()
+        self._reset_summaries()
         if not os.path.exists(annotated_filename):
             raise FileNotFoundError(f"File {annotated_filename} does not exist")
         if output_summary_filename is None:
@@ -324,7 +324,7 @@ class Aggregator():
         # Close input and output IO
         self.close()
         # Reset summaries by location and species name lookup
-        self._init_summaries()
+        self._reset_summaries()
 
         if ready_filename(combined_summary_filename, overwrite=True):
             try:
@@ -447,7 +447,7 @@ class Aggregator():
                             refname=self.__class__.__name__, log_level=logging.ERROR)
 
     # ...............................................
-    def _init_summaries(self):
+    def _reset_summaries(self):
         # Reset species name lookup
         self._canonicals = {LMBISON.NOT_APPLICABLE: LMBISON.NOT_APPLICABLE}
         self._acc_species_name = {
@@ -458,9 +458,30 @@ class Aggregator():
             self._locations[prefix] = {}
 
     # ...............................................
+    @property
+    def summarized(self):
+        if (
+                len(self._canonicals) == 1 or
+                len(self._acc_species_name) == 1 or
+                len(self._locations) == len(REGION.summary_fields())
+        ):
+            return False
+        else:
+            return True
+
+    # ...............................................
+    def summary(self):
+        msg = "Read the following unique values:"
+        msg += f"   {len(self._canonicals)} canonical names"
+        msg += f"   {len(self._acc_species_name)} accepted species names"
+        for rtype, rloc in self._locations.items():
+            msg += f"   {len(rloc)} {rtype} locations"
+        return msg
+
+    # ...............................................
     def _summarize_annotations_by_region(self):
         # Reset summaries by location and species name lookup
-        self._init_summaries()
+        self._reset_summaries()
         region_disjoint = REGION.region_disjoint()
         filtered_count = 0
 
@@ -643,7 +664,7 @@ class Aggregator():
             report: dictionary of metadata about the data and process
         """
         # Reset location summary and species name lookup
-        self._init_summaries()
+        self._reset_summaries()
         # Add summaries from each summary
         for sum_fname in summary_filename_list:
             self._read_location_summary(sum_fname)
@@ -674,23 +695,27 @@ class Aggregator():
         return report
 
     # ...............................................
-    def summarize_summaries(self, summary_filename_list, out_filename):
+    def summarize_summaries(self, summary_filename_list, output_path):
         """Read summary files and combine summaries in self._locations.
 
         Args:
             summary_filename_list: list of full filenames of summary files.
-            out_filename (str): full filename for combined output summary file.
+            output_path (str): destination directory for combined summary file.
 
         Returns:
             report: dictionary of metadata about the data and process
         """
+        full_summary_filename = BisonNameOp.get_out_process_filename(
+            summary_filename_list, outpath=output_path,
+            step_or_process=DWC_PROCESS.AGGREGATE)
         report = {
             "summary_filename_list": summary_filename_list,
-            "output_filename": out_filename
+            "full_summary_filename": full_summary_filename
         }
-        self._initialize_combine_summaries_io(out_filename)
-        report = self._read_location_summaries(summary_filename_list)
+        self._initialize_combine_summaries_io(full_summary_filename)
+        report["summary_report"] = self._read_location_summaries(summary_filename_list)
         self._write_raw_region_summary()
+
         self.close()
         return report
 
@@ -869,7 +894,7 @@ class Aggregator():
         return sp_counts, occ_counts
 
     # ...............................................
-    def aggregate_summary_for_regions(
+    def aggregate_file_summary_for_regions(
             self, combined_summary_filename, annotated_riis_fname, outpath):
         """Read summary data from file, summarize by species and location.
 
@@ -885,11 +910,37 @@ class Aggregator():
                 counts and percentages of species in that region.
         """
         # Reset location summary and species name lookup
-        self._init_summaries()
+        self._reset_summaries()
         self._read_location_summary(combined_summary_filename)
         self._log.log(
             f"Read annotation summary {combined_summary_filename} to write by region")
 
+        report = self.aggregate_summary_for_regions(annotated_riis_fname, outpath)
+        return report
+
+    # ...............................................
+    def aggregate_summary_for_regions(self, annotated_riis_fname, outpath):
+        """Read summary data from file, summarize by species and location.
+
+        Args:
+            annotated_riis_fname (str): full filename of RIIS data annotated with
+                GBIF accepted taxon.
+            outpath (str): full directory path for output filenames.
+
+        Returns:
+            region_summary_filenames (list): full filenames by region, of summaries of
+                counts and percentages of species in that region.
+
+        Raises:
+            Exception: on aggregated summaries not present.
+        """
+        summary_msg = self.summary()
+        if self.summarized:
+            self._log.log(f"Aggregating summary {summary_msg}")
+        else:
+            raise Exception(
+                f"Read species/region summaries before aggregating. Current summary "
+                f"is {summary_msg}")
         riis = RIIS(annotated_riis_fname, self._log)
         riis.read_riis()
         report = {}
@@ -922,7 +973,7 @@ class Aggregator():
 #             Exception: on unexpected open or write error
 #         """
 #         # Reset location summary and species name lookup
-#         self._init_summaries()
+#         self._reset_summaries()
 #         assess_summary_filename = BisonNameOp.get_assessment_summary_name(self._datapath)
 #
 #         try:
@@ -1039,7 +1090,7 @@ def summarize_annotations(annotated_filename, output_path, log_path):
 
 # .............................................................................
 def summarize_summaries(annotated_filename, output_path, log_path):
-    """Summarize data in an annotated GBIF DwC file by state, county, and RIIS.
+    """Summarize data in one annotated GBIF DwC file by state, county, and RIIS.
 
     Args:
         annotated_filename (str): full filename of an annotated GBIF data file.

@@ -548,13 +548,8 @@ class RIIS:
         return new_key, new_name
 
     # ...............................................
-    def resolve_riis_to_gbif_taxa(self, outfname, overwrite=True):
+    def resolve_riis_to_gbif_taxa(self):
         """Annotate RIIS records with GBIF accepted taxon name/key, write to file.
-
-        Args:
-            outfname: full filename of an output file for the RIIS data annotated with
-                GBIF accepted taxon name and key
-            overwrite (bool): True to delete an existing updated RIIS file.
 
         Returns:
             name_count (int): count of updated records
@@ -763,8 +758,7 @@ def resolve_riis_taxa(riis_filename, annotated_riis_filename, logger, overwrite=
     riis = RIIS(riis_filename, logger)
     # Update species data
     try:
-        name_count, rec_count = riis.resolve_riis_to_gbif_taxa(
-            annotated_riis_filename, overwrite=True)
+        name_count, rec_count = riis.resolve_riis_to_gbif_taxa()
         report[refname]["riis_record_count"] = rec_count
         report[refname]["unique_name_count"] = name_count
         logger.log(

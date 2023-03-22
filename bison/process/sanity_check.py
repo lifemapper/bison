@@ -93,12 +93,12 @@ class Counter():
     # .............................................................................
     @classmethod
     def compare_location_species_counts(
-            cls, summary_filenames, combined_summary_filename, logger):
+            cls, subset_summary_filenames, combined_summary_filename, logger):
         """Count records for each of the valid assessments in a file.
 
         Args:
-            summary_filenames (list): full filename of summary files to compare with
-                combined summary file.
+            subset_summary_filenames (list): full filename of summary files of
+                individual subsets to compare with combined summary file.
             combined_summary_filename (str): full filename of combined summaries.
             logger (object): logger for saving relevant processing messages
 
@@ -115,7 +115,7 @@ class Counter():
         for prefix in REGION.summary_fields().keys():
             sum_locations[prefix] = {}
 
-        for sum_fname in summary_filenames:
+        for sum_fname in subset_summary_filenames:
             sum_locations, sum_species_keys = cls.count_locations_species(
                 sum_fname, locations=sum_locations, species_keys=sum_species_keys)
 

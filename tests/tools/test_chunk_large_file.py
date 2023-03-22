@@ -3,8 +3,7 @@ import math
 import os
 
 from bison.common.log import Logger
-from bison.common.util import (chunk_files, count_lines, identify_chunk_files,
-                               identify_chunks)
+from bison.common.util import Chunker, count_lines
 from tests.tools.test_setup import get_test_parameters
 
 script_name = os.path.splitext(os.path.basename(__file__))[0]
@@ -19,7 +18,7 @@ class Test_chunk_large_file:
         """Test identifying the chunks of records to be put into smaller files."""
         fn_args = get_test_parameters(script_name)
 
-        boundary_pairs, rec_count, chunk_size = identify_chunks(
+        boundary_pairs, rec_count, chunk_size = Chunker.identify_chunks(
             fn_args["big_csv_filename"],
             chunk_count=fn_args["number_of_chunks"])
         expected_chunk_size = math.ceil(
@@ -44,7 +43,7 @@ class Test_chunk_large_file:
         fn_args = get_test_parameters(script_name)
         logger = Logger(script_name)
 
-        chunk_filenames, _report = chunk_files(
+        chunk_filenames, _report = Chunker.chunk_files(
             fn_args["big_csv_filename"], fn_args["output_path"],
             logger, chunk_count=fn_args["number_of_chunks"])
 
@@ -70,7 +69,7 @@ class Test_chunk_large_file:
     def test_identify_chunk_files(self):
         """Test identifying subset filenames created from chunking a large file."""
         fn_args = get_test_parameters(script_name)
-        chunk_filenames = identify_chunk_files(
+        chunk_filenames = Chunker.identify_chunk_files(
             fn_args["big_csv_filename"], chunk_count=fn_args["number_of_chunks"])
 
         assert (len(chunk_filenames) == fn_args["_test_small_number_of_chunks"])

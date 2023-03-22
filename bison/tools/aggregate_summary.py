@@ -55,7 +55,7 @@ def cli():
 
     logger.log(f"Start Time : {datetime.now()}", refname=script_name)
     agg = Aggregator(logger)
-    report = agg.aggregate_summary_for_regions(
+    report = agg.aggregate_file_summary_for_regions(
         config["combined_summary_filename"], config["riis_with_gbif_taxa_filename"],
         config["output_path"])
     logger.log(f"End Time : {datetime.now()}", refname=script_name)
