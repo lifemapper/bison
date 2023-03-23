@@ -3,7 +3,7 @@ import json
 import os
 from datetime import datetime
 
-from bison.common.constants import CONFIG_PARAM, DWC_PROCESS
+from bison.common.constants import CONFIG_PARAM, LMBISON_PROCESS
 from bison.common.util import BisonNameOp
 from bison.process.aggregate import Aggregator
 from bison.tools._config_parser import get_common_arguments
@@ -76,7 +76,7 @@ def summarize_occurrence_annotations(
     agg = Aggregator(logger)
     for ann_fname in annotated_dwc_filenames:
         output_summary_fname = BisonNameOp.get_out_process_filename(
-            ann_fname, outpath=output_path, step_or_process=DWC_PROCESS.SUMMARIZE)
+            ann_fname, outpath=output_path, step_or_process=LMBISON_PROCESS.SUMMARIZE)
 
         logger.log(
             f"Start Time: {datetime.now()}: Submit {ann_fname} for aggregation "

@@ -2,7 +2,7 @@
 import os
 from rtree.index import Index as rtree_index
 
-from bison.common.constants import APPEND_TO_DWC, DWC_PROCESS
+from bison.common.constants import APPEND_TO_DWC, LMBISON_PROCESS
 from bison.common.log import Logger
 from bison.common.util import BisonNameOp, get_fields_from_header
 from bison.process.annotate import Annotator, annotate_occurrence_file
@@ -44,7 +44,7 @@ class Test_annotate_gbif:
         for fn in fn_args["dwc_filenames"]:
             outfile = BisonNameOp.get_out_process_filename(
                 fn, outpath=fn_args["output_path"],
-                step_or_process=DWC_PROCESS.ANNOTATE)
+                step_or_process=LMBISON_PROCESS.ANNOTATE)
             ant.annotate_dwca_records(fn, outfile)
             outfields = get_fields_from_header(outfile)
             assert(len(infields) + len(new_fields) == len(outfields))

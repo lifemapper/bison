@@ -8,7 +8,7 @@ from osgeo import ogr
 import subprocess
 import sys
 
-from bison.common.constants import (DWC_PROCESS, ENCODING, EXTRA_CSV_FIELD, GBIF)
+from bison.common.constants import (LMBISON_PROCESS, ENCODING, EXTRA_CSV_FIELD, GBIF)
 
 
 # ...............................................
@@ -690,9 +690,9 @@ class BisonNameOp():
             followed by chunk
             followed by process step completed (if any)
         """
-        postfix = DWC_PROCESS.CHUNK['postfix']
-        sep = DWC_PROCESS.SEP
-        chunkfix = f"{DWC_PROCESS.CHUNK['prefix']}-{start}-{stop}"
+        postfix = LMBISON_PROCESS.CHUNK['postfix']
+        sep = LMBISON_PROCESS.SEP
+        chunkfix = f"{LMBISON_PROCESS.CHUNK['prefix']}-{start}-{stop}"
         return f"{basename}{sep}{chunkfix}{sep}{postfix}{ext}"
 
     # .............................................................................
@@ -724,17 +724,17 @@ class BisonNameOp():
         path, basename, ext, chunk, postfix = BisonNameOp.parse_process_filename(
             in_filename)
         if chunk is not None:
-            basename = f"{basename}{DWC_PROCESS.SEP}{chunk}"
+            basename = f"{basename}{LMBISON_PROCESS.SEP}{chunk}"
         # If step is not provided, get the step after that of the input file.
         if step_or_process is None:
-            step_or_process = DWC_PROCESS.get_step(postfix) + 1
-        new_postfix = DWC_PROCESS.get_postfix(step_or_process)
+            step_or_process = LMBISON_PROCESS.get_step(postfix) + 1
+        new_postfix = LMBISON_PROCESS.get_postfix(step_or_process)
         if new_postfix is None:
             raise Exception(
                 f"No next step for {in_filename} or processing step for "
                 f"{step_or_process}")
         else:
-            outbasename = f"{basename}{DWC_PROCESS.SEP}{new_postfix}{ext}"
+            outbasename = f"{basename}{LMBISON_PROCESS.SEP}{new_postfix}{ext}"
             # If outpath is not provided, use the same path as the input file.
             if outpath is None:
                 outpath = path
@@ -768,13 +768,13 @@ class BisonNameOp():
         # path will be None if filename is basefilename
         path, fname = os.path.split(filename)
         basefname, ext = os.path.splitext(fname)
-        parts = basefname.split(DWC_PROCESS.SEP)
+        parts = basefname.split(LMBISON_PROCESS.SEP)
         # File will always start with basename
         basename = parts.pop(0)
         if len(parts) >= 1:
             p = parts.pop(0)
             # if chunk exists
-            if not p.startswith(DWC_PROCESS.CHUNK["prefix"]):
+            if not p.startswith(LMBISON_PROCESS.CHUNK["prefix"]):
                 process_postfix = p
             else:
                 chunk = p
@@ -813,8 +813,8 @@ class BisonNameOp():
         """
         path, basename, ext, chunk, postfix = BisonNameOp.parse_process_filename(
             csvfile)
-        postfix = DWC_PROCESS.COMBINE["postfix"]
-        outbasename = f"{basename}{DWC_PROCESS.SEP}{postfix}{ext}"
+        postfix = LMBISON_PROCESS.COMBINE["postfix"]
+        outbasename = f"{basename}{LMBISON_PROCESS.SEP}{postfix}{ext}"
         # If outpath is not provided, use the same path as the input file.
         if outpath is None:
             outpath = path

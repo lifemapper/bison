@@ -4,9 +4,9 @@ import logging
 import os
 
 from bison.common.constants import (
-    APPEND_TO_RIIS, ERR_SEPARATOR, GBIF, LINENO_FLD, RIIS_DATA)
+    APPEND_TO_RIIS, LMBISON_PROCESS, ERR_SEPARATOR, GBIF, LINENO_FLD, REPORT, RIIS_DATA)
 from bison.common.util import (
-    get_csv_dict_reader, get_csv_dict_writer, get_fields_from_header)
+    BisonNameOp, get_csv_dict_reader, get_csv_dict_writer, get_fields_from_header)
 from bison.provider.gbif_api import GbifSvc
 
 
@@ -548,8 +548,10 @@ class RIIS:
         return new_key, new_name
 
     # ...............................................
-    def resolve_riis_to_gbif_taxa(self):
+    def resolve_riis_to_gbif_taxa(self, output_path):
         """Annotate RIIS records with GBIF accepted taxon name/key, write to file.
+
+        Args:
 
         Returns:
             name_count (int): count of updated records
@@ -558,10 +560,15 @@ class RIIS:
         Raises:
             Exception: on unknown error in resolution
         """
+        report = {}
         msgdict = {}
 
         if not self.by_taxon:
             self.read_riis()
+
+        report[REPORT.INFILE] = self._riis_filename
+        report[REPORT.RIIS_IDENTIFIER] = len(self.by_riis_id)
+        report[REPORT.RIIS_TAXA] = len(self.by_taxon)
 
         name_count = 0
         rec_count = 0
@@ -595,25 +602,36 @@ class RIIS:
                         self.by_riis_id[rec.data[RIIS_DATA.SPECIES_GEO_KEY]] = rec
                         rec_count += 1
 
-                    # self._log.log(f"Updated {len(reclist)} records with {new_name}",
-                    #     refname=self.__class__.__name__)
                     if (name_count % 1000) == 0:
                         self._log.log(
                             f"*** RIIS Name {name_count} ***",
                             refname=self.__class__.__name__)
 
+            report[REPORT.PROCESS] = LMBISON_PROCESS.RESOLVE["postfix"]
+            report[REPORT.SUMMARY] = {
+                REPORT.RIIS_IDENTIFIER: len(self.by_riis_id),
+                REPORT.RIIS_TAXA: len(self.by_taxon),
+                REPORT.RIIS_RESOLVE_FAIL: len(self.bad_species),
+                REPORT.TAXA_RESOLVED: name_count,
+                REPORT.RECORDS_UPDATED: rec_count
+            }
+
         except Exception as e:
             self._add_msg(msgdict, "unknown_error", f"{e}")
             raise
 
-        return name_count, rec_count
+        out_rec_count, outfname = self._write_resolved_riis(output_path, overwrite=True)
+        report[REPORT.OUTFILE] = outfname
+        report[REPORT.RECORDS_OUTPUT] = out_rec_count
+
+        return report
 
     # ...............................................
-    def write_resolved_riis(self, outfname, overwrite=True):
+    def _write_resolved_riis(self, output_path, overwrite=True):
         """Write RIIS records to file.
 
         Args:
-            outfname (str): Full path and filename for updated RIIS records.
+            output_path (str): Full path for output filename for annotated records.
             overwrite (bool): True to delete an existing updated RIIS file.
 
         Raises:
@@ -625,6 +643,8 @@ class RIIS:
         Returns:
             count of successfully written records
         """
+        outfname = BisonNameOp.get_annotated_riis_filename(
+            self._riis_filename, output_path)
         msgdict = {}
         # Make sure data is present
         if not self.by_riis_id:
@@ -667,7 +687,7 @@ class RIIS:
         finally:
             outf.close()
 
-        return rec_count
+        return rec_count, outfname
 
     # ...............................................
     def _only_ascii(self, name):

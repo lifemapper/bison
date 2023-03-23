@@ -6,7 +6,7 @@ from datetime import datetime
 from logging import ERROR
 
 from bison.common.constants import (
-    APPEND_TO_DWC, DWC_PROCESS, ENCODING, GBIF, LOG, REGION)
+    APPEND_TO_DWC, LMBISON_PROCESS, ENCODING, GBIF, LOG, REGION, REPORT)
 from bison.common.util import (available_cpu_count, BisonNameOp, get_csv_dict_writer)
 from bison.process.geoindex import GeoResolver
 from bison.provider.gbif_data import DwcData
@@ -348,13 +348,12 @@ class Annotator():
         return dwcrec
 
     # ...............................................
-    def annotate_dwca_records(self, dwc_filename, output_occ_filename):
+    def annotate_dwca_records(self, dwc_filename, output_path):
         """Resolve and append state, county, RIIS assessment and key to GBIF records.
 
         Args:
             dwc_filename: full filename of input file of DWC records.
-            output_occ_filename: full filename for writing DWC records with
-                RIIS appended fields.
+            output_path (str): destination directory for annotated occurrence file.
 
         Returns:
             report: dictionary of metadata about the data and process
@@ -363,15 +362,20 @@ class Annotator():
             Exception: on failure to open input or output data.
             Exception: on unexpected failure to read or write data.
         """
-        report = {
-            "dwc_filename": dwc_filename,
-            "dwc_with_geo_and_riis_filename": output_occ_filename,
-            "record_failed_gbifids": []
-        }
-        self.initialize_occurrences_io(dwc_filename, output_occ_filename)
         self._log.log(
-            f"Annotating {dwc_filename} to create {output_occ_filename}",
-            refname=self.__class__.__name__)
+            "Start Time : {}".format(datetime.now()), refname=self.__class__.__name__)
+
+        out_filename = BisonNameOp.get_out_process_filename(
+            dwc_filename, outpath=output_path, step_or_process=LMBISON_PROCESS.ANNOTATE)
+        self.initialize_occurrences_io(dwc_filename, out_filename)
+        self._log.log(
+            f"Annotate {dwc_filename} to {out_filename}", refname=self.__class__.__name__)
+
+        report = {
+            REPORT.INFILE: dwc_filename,
+            REPORT.OUTFILE: out_filename,
+            REPORT.ANNOTATE_FAIL: []
+        }
         try:
             # iterate over DwC records
             dwcrec = self._dwcdata.get_record()
@@ -385,19 +389,21 @@ class Annotator():
                     self._log.log(
                         f"Error {e} record, gbifID {dwcrec[GBIF.ID_FLD]}",
                         refname=self.__class__.__name__, log_level=ERROR)
-                    report["record_failed_gbifids"].append(dwcrec[GBIF.ID_FLD])
+                    report[REPORT.ANNOTATE_FAIL].append(dwcrec[GBIF.ID_FLD])
                 # Get next
                 dwcrec = self._dwcdata.get_record()
         except Exception as e:
             raise Exception(
                 f"Unexpected error {e} reading {self._dwcdata.input_file} or "
-                + f"writing {output_occ_filename}")
+                + f"writing {out_filename}")
 
-        report["bad_ranks_filtered"] = list(self.bad_ranks)
-        report["records_filtered_by_rank"] = self.rank_filtered_records
+        report[REPORT.RANK_FAIL] = list(self.bad_ranks)
+        report[REPORT.RANK_FAIL_COUNT] = self.rank_filtered_records
         self._log.log(
             f"Annotate records filtered out {self.rank_filtered_records} " +
             f"records with {self.bad_ranks} ranks", refname=self.__class__.__name__)
+        self._log.log(
+            "End Time : {}".format(datetime.now()), refname=self.__class__.__name__)
         return report
 
 
@@ -427,15 +433,12 @@ def annotate_occurrence_file(
     basename = os.path.split(os.path.basename(dwc_filename))[0]
 
     logger.log(
-        f"Submit {basename} for annotation {datetime.now()}",
+        f"Submit {dwc_filename} for annotation {datetime.now()}",
         refname="annotate_occurrence_file")
 
     ant = Annotator(
         geo_path, logger, riis_with_gbif_filename=riis_annotated_filename)
-
-    out_fname = BisonNameOp.get_out_process_filename(
-        dwc_filename, outpath=output_path, step_or_process=DWC_PROCESS.ANNOTATE)
-    report = ant.annotate_dwca_records(dwc_filename, out_fname)
+    report = ant.annotate_dwca_records(dwc_filename, output_path)
 
     logger.log(
         "End Time : {}".format(datetime.now()), refname="annotate_occurrence_file")
@@ -444,7 +447,7 @@ def annotate_occurrence_file(
 
 # .............................................................................
 def parallel_annotate(
-        dwc_filenames, riis_with_gbif_filename, main_logger, geo_path, output_path):
+        dwc_filenames, riis_with_gbif_filename, geo_path, output_path, main_logger):
     """Main method for parallel execution of DwC annotation script.
 
     Args:
@@ -452,11 +455,11 @@ def parallel_annotate(
             annotation.
         riis_with_gbif_filename (str): full filename with RIIS records annotated with
             gbif accepted taxa
-        main_logger (logger): logger for the process that calls this function,
-            initiating subprocesses
         geo_path (str): input directory containing geospatial files for
             geo-referencing occurrence points.
         output_path (str): destination directory for output annotated occurrence files.
+        main_logger (logger): logger for the process that calls this function,
+            initiating subprocesses
 
     Returns:
         reports (list of dict): metadata for the occurrence annotation data and process.
@@ -470,7 +473,7 @@ def parallel_annotate(
     # Process only needed files
     for dwc_fname in dwc_filenames:
         out_fname = BisonNameOp.get_out_process_filename(
-            dwc_fname, outpath=output_path, step_or_process=DWC_PROCESS.ANNOTATE)
+            dwc_fname, outpath=output_path, step_or_process=LMBISON_PROCESS.ANNOTATE)
         if os.path.exists(out_fname):
             main_logger.log(
                 f"Annotations exist in {out_fname}, moving on.", refname=refname)
