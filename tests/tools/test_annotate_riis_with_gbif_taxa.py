@@ -1,6 +1,7 @@
 """Tests for the annotate_riis tool and dependent objects."""
 import os
 
+from bison.common.constants import REPORT
 from bison.common.log import Logger
 from bison.common.util import count_lines_with_cat
 from bison.provider.riis_data import RIIS
@@ -48,7 +49,7 @@ class Test_annotate_riis:
         logger = Logger(script_name)
         riis = RIIS(fn_args["_test_small_riis_filename"], logger)
         # Update species data
-        name_count, rec_count = riis.resolve_riis_to_gbif_taxa(
+        report = riis.resolve_riis_to_gbif_taxa(
                 fn_args["_test_small_annotated_riis_filename"], overwrite=True)
-        assert name_count == fn_args["_test_small_riis_name_count"]
-        assert rec_count == fn_args["_test_small_riis_record_count"]
+        assert report[REPORT.TAXA_RESOLVED] == fn_args["_test_small_riis_name_count"]
+        assert report[REPORT.RECORDS_UPDATED] == fn_args["_test_small_riis_record_count"]

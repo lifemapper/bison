@@ -14,14 +14,15 @@ script_name = os.path.splitext(os.path.basename(__file__))[0]
 # .............................................................................
 class Test_annotate_gbif:
     """Test the CLI tool and dependencies that annotate RIIS data with GBIF taxa."""
+    def __init__(self):
+        self._logger = Logger(script_name)
 
     # .....................................
     def test_ant_init(self):
         """Test reading an original RIIS file by checking counts."""
         fn_args = get_test_parameters(script_name)
-        logger = Logger(script_name)
         ant = Annotator(
-            fn_args["geoinput_path"], logger,
+            fn_args["geoinput_path"], self._logger,
             riis_with_gbif_filename=fn_args["riis_with_gbif_taxa_filename"])
         spatial_idxs = ant._geo_fulls
         spatial_idxs.extend(ant._geo_partials.values())
@@ -33,16 +34,15 @@ class Test_annotate_gbif:
     def test_annotate_occs(self):
         """Test reading an original RIIS file by checking counts."""
         fn_args = get_test_parameters(script_name)
-        logger = Logger(script_name)
         ant = Annotator(
-            fn_args["geoinput_path"], logger,
+            fn_args["geoinput_path"], self._logger,
             riis_with_gbif_filename=fn_args["riis_with_gbif_taxa_filename"])
         infile = fn_args["dwc_filenames"][0]
         infields = get_fields_from_header(infile)
         new_fields = APPEND_TO_DWC.annotation_fields()
 
         for fn in fn_args["dwc_filenames"]:
-            outfile = BisonNameOp.get_out_process_filename(
+            outfile = BisonNameOp.get_process_outfilename(
                 fn, outpath=fn_args["output_path"],
                 step_or_process=LMBISON_PROCESS.ANNOTATE)
             ant.annotate_dwca_records(fn, outfile)
@@ -61,7 +61,7 @@ class Test_annotate_gbif:
 
         report = annotate_occurrence_file(
             infile, fn_args["riis_with_gbif_taxa_filename"],
-            fn_args["geoinput_path"], fn_args["output_path"])
+            fn_args["geoinput_path"], fn_args["output_path"], self._logger)
 
         outfile = report["dwc_with_geo_and_riis_filename"]
         outfields = get_fields_from_header(outfile)

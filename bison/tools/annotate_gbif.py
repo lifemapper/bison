@@ -99,7 +99,7 @@ def annotate_occurrence_files(
     ant = Annotator(
         geo_path, logger, riis_with_gbif_filename=riis_w_gbif_taxa_filename)
     for dwc_fname in dwc_filenames:
-        out_fname = BisonNameOp.get_out_process_filename(
+        out_fname = BisonNameOp.get_process_outfilename(
             dwc_fname, outpath=output_path, step_or_process=LMBISON_PROCESS.ANNOTATE)
 
         logger.log(

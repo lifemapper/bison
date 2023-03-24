@@ -365,7 +365,7 @@ class Annotator():
         self._log.log(
             "Start Time : {}".format(datetime.now()), refname=self.__class__.__name__)
 
-        out_filename = BisonNameOp.get_out_process_filename(
+        out_filename = BisonNameOp.get_process_outfilename(
             dwc_filename, outpath=output_path, step_or_process=LMBISON_PROCESS.ANNOTATE)
         self.initialize_occurrences_io(dwc_filename, out_filename)
         self._log.log(
@@ -430,8 +430,6 @@ def annotate_occurrence_file(
     if not os.path.exists(dwc_filename):
         raise FileNotFoundError(dwc_filename)
 
-    basename = os.path.split(os.path.basename(dwc_filename))[0]
-
     logger.log(
         f"Submit {dwc_filename} for annotation {datetime.now()}",
         refname="annotate_occurrence_file")
@@ -472,7 +470,7 @@ def parallel_annotate(
 
     # Process only needed files
     for dwc_fname in dwc_filenames:
-        out_fname = BisonNameOp.get_out_process_filename(
+        out_fname = BisonNameOp.get_process_outfilename(
             dwc_fname, outpath=output_path, step_or_process=LMBISON_PROCESS.ANNOTATE)
         if os.path.exists(out_fname):
             main_logger.log(

@@ -75,7 +75,7 @@ def summarize_occurrence_annotations(
 
     agg = Aggregator(logger)
     for ann_fname in annotated_dwc_filenames:
-        output_summary_fname = BisonNameOp.get_out_process_filename(
+        output_summary_fname = BisonNameOp.get_process_outfilename(
             ann_fname, outpath=output_path, step_or_process=LMBISON_PROCESS.SUMMARIZE)
 
         logger.log(

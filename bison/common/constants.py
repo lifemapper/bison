@@ -110,13 +110,12 @@ class REPORT:
     RANK_FAIL_COUNT = "records_failed_rank"
 
 
-
-    # .............................................................................
+# .............................................................................
 class LMBISON_PROCESS:
     """Process steps and associated filename postfixes indicating completion."""
     CHUNK = {"step": 0, "postfix": "raw", "prefix": "chunk"}
     RESOLVE = {"step": 0, "postfix": "resolve"}
-    ANNOTATE = {"step": 1, "postfix": "georiis"}
+    ANNOTATE = {"step": 1, "postfix": "annotate"}
     SUMMARIZE = {"step": 2, "postfix": "summary"}
     COMBINE = {"step": 3, "postfix": "combine"}
     AGGREGATE = {"step": 4, "postfix": "aggregate"}
@@ -133,6 +132,21 @@ class LMBISON_PROCESS:
             LMBISON_PROCESS.CHUNK, LMBISON_PROCESS.ANNOTATE,
             LMBISON_PROCESS.SUMMARIZE, LMBISON_PROCESS.COMBINE, LMBISON_PROCESS.AGGREGATE
         )
+
+    @staticmethod
+    def postfixes():
+        """Return all DWC Process types.
+
+        Returns:
+            List of all DWC_Process types.
+        """
+        postfixes = []
+        for p in LMBISON_PROCESS.process_types():
+            try:
+                postfixes.append(p["postfix"])
+            except:
+                pass
+        return postfixes
 
     @staticmethod
     def _is_instance(obj):
@@ -201,6 +215,29 @@ class LMBISON_PROCESS:
                 return pt
         return None
 
+    @staticmethod
+    def get_next_process(postfix=None, step=None):
+        """For a given postfix or step number, return the DWC_PROCESS object.
+
+        Args:
+            postfix (str): String appended to the end of a filename (before the
+                extension) to indicate the stage of processing completed.
+            step (int): Numerical stage of processing completed.
+
+        Returns:
+            DWC_Process type for the given filename postfix or step.
+        """
+        for pt in LMBISON_PROCESS.process_types():
+            if postfix is not None and pt["postfix"] == postfix:
+                this_process = pt
+            elif step is not None and pt["step"] == step:
+                this_process = pt
+        if this_process is not None:
+            next_step = this_process["step"] + 1
+            next_process = LMBISON_PROCESS.get_process(step=next_step)
+            return next_process
+
+        return None
 
 # .............................................................................
 class CONFIG_PARAM:

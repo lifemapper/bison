@@ -399,8 +399,7 @@ class RIIS:
             self._riis_filename, RIIS_DATA.DELIMITER, fieldnames=good_header,
             quote_none=False)
         self._log.log(
-            f"Reading RIIS from {self._riis_filename}", refname=self.__class__.__name__,
-            log_level=logging.INFO)
+            f"Reading RIIS from {self._riis_filename}", refname=self.__class__.__name__)
         try:
             for row in rdr:
                 lineno = rdr.line_num
@@ -435,15 +434,15 @@ class RIIS:
                     # Also index on RIIS occurrenceID
                     riis_id = row[RIIS_DATA.SPECIES_GEO_KEY]
                     self.by_riis_id[riis_id] = rec
-
-            print(f"Finished at linenum {lineno} with {len(self.by_riis_id)} unique records")
-
         except Exception:
             raise
         finally:
             inf.close()
+        self._log.log(
+            f"Read {lineno} lines from RIIS with {len(self.by_riis_id)} unique records",
+            refname=self.__class__.__name__)
 
-    # ...............................................
+        # ...............................................
     def _get_alternatives(self, gbifrec):
         name = None
         key = None
@@ -548,10 +547,12 @@ class RIIS:
         return new_key, new_name
 
     # ...............................................
-    def resolve_riis_to_gbif_taxa(self, output_path):
+    def resolve_riis_to_gbif_taxa(self, output_path, overwrite=False):
         """Annotate RIIS records with GBIF accepted taxon name/key, write to file.
 
         Args:
+            output_path (str): Destination directory for output files.
+            overwrite (bool): Flag indicating to overwrite existing resolved file.
 
         Returns:
             name_count (int): count of updated records
@@ -778,12 +779,10 @@ def resolve_riis_taxa(riis_filename, annotated_riis_filename, logger, overwrite=
     riis = RIIS(riis_filename, logger)
     # Update species data
     try:
-        name_count, rec_count = riis.resolve_riis_to_gbif_taxa()
-        report[refname]["riis_record_count"] = rec_count
-        report[refname]["unique_name_count"] = name_count
-        logger.log(
-            f"Resolved {len(riis.by_riis_id)} taxa in {riis_filename}, next, write.",
-            refname=refname)
+        report = riis.resolve_riis_to_gbif_taxa()
+        rec_count = report[REPORT.RECORDS_UPDATED]
+        name_count = report[REPORT.TAXA_RESOLVED]
+        out_rec_count = report[REPORT.RECORDS_OUTPUT]
     except Exception as e:
         report[refname]["error"] = f"Failed to resolve {refname}: {e}"
         logger.log(
@@ -791,33 +790,23 @@ def resolve_riis_taxa(riis_filename, annotated_riis_filename, logger, overwrite=
             log_level=logging.ERROR)
         raise
 
-    # Debug statements for inconsistent counts
-    if len(riis.by_riis_id) != rec_count:
-        logger.log(
-            f"Records in RIIS {len(riis.by_riis_id)} != {rec_count} records read "
-            f"from {riis_filename} by RIIS", refname=refname, log_level=logging.DEBUG)
-    if len(riis.by_taxon) != name_count:
-        logger.log(
-            f"Taxa in RIIS {len(riis.by_taxon)} != {rec_count} names resolved "
-            f"from {riis_filename} by RIIS", refname=refname, log_level=logging.DEBUG)
+    logger.log(
+        f"Resolved {name_count} taxa in {rec_count} records in {riis_filename} to "
+        f"{out_rec_count} in {report[REPORT.OUTFILE]}.",
+        refname=refname)
 
-    # Write, always replace
-    try:
-        count = riis.write_resolved_riis(annotated_riis_filename, overwrite=overwrite)
-        report[refname]["annotated_count"] = count
-        logger.log(
-            f"Wrote {count} records to {annotated_riis_filename}.", refname=refname)
-    except Exception as e:
-        report[refname]["error"] = f"Failed to write {refname}: {e}"
-        logger.log(
-            f"Unexpected failure {e} in resolve_riis_taxa", refname=refname,
-            log_level=logging.ERROR)
-    else:
-        if count != RIIS_DATA.SPECIES_GEO_DATA_COUNT:
-            logger.log(
-                f"Resolved {count} RIIS records, expecting " +
-                f"{RIIS_DATA.SPECIES_GEO_DATA_COUNT}", refname=refname,
-                log_level=logging.ERROR)
+    # Debug statements for inconsistent counts
+    logger.log(
+        f"by_riis_id {len(riis.by_riis_id)} ?= {rec_count} records read",
+        refname=refname, log_level=logging.DEBUG)
+
+    logger.log(
+        f"by_taxon {len(riis.by_taxon)} ?= {name_count} names resolved.",
+        refname=refname, log_level=logging.DEBUG)
+
+    logger.log(
+        f"output recs {out_rec_count} ?= {RIIS_DATA.SPECIES_GEO_DATA_COUNT} expected.",
+        refname=refname, log_level=logging.ERROR)
 
     return report
 

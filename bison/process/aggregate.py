@@ -489,9 +489,9 @@ class Aggregator():
                     occ_count += count
                     sp_count += 1
             report[prefix] = {
-                    REPORT.LOCATION_COUNT: loc_count,
-                    REPORT.SPECIES_COUNT: sp_count,
-                    REPORT.OCCURRENCE_COUNT: occ_count
+                    REPORT.LOCATION: loc_count,
+                    REPORT.SPECIES: sp_count,
+                    REPORT.OCCURRENCE: occ_count
             }
         return report
 
@@ -714,7 +714,7 @@ class Aggregator():
         Returns:
             report: dictionary of metadata about the data and process
         """
-        full_summary_filename = BisonNameOp.get_out_process_filename(
+        full_summary_filename = BisonNameOp.get_process_outfilename(
             summary_filename_list, outpath=output_path,
             step_or_process=LMBISON_PROCESS.AGGREGATE)
         report = {
@@ -739,8 +739,8 @@ class Aggregator():
 
         Args:
             annotated_filename (str): full filename input annotated DwC occurrence file.
-            tmp_output_summary_filename (str): destination full filename for the
-                unorganized summary by locations.
+            output_path (str): destination directory for the unorganized summary by
+                locations.
             overwrite (bool): Flag indicating whether to overwrite existing files.
 
         Returns:
@@ -751,7 +751,7 @@ class Aggregator():
             summary file contains records like:
                 SPECIES_KEY, GBIF_TAXON_KEY, ASSESS_KEY, STATE_KEY, COUNTY_KEY, COUNT_KEY
         """
-        summary_filename = BisonNameOp.get_out_process_filename(
+        summary_filename = BisonNameOp.get_process_outfilename(
             annotated_filename, outpath=output_path,
             step_or_process=LMBISON_PROCESS.SUMMARIZE)
 
@@ -965,7 +965,7 @@ class Aggregator():
 
         for region_type, locations in self._locations.items():
             report[region_type] = {
-                REPORT.LOCATION_COUNT: len(locations),
+                REPORT.LOCATION: len(locations),
                 REPORT.INFILE: []
             }
             for region_value, _species_counts in locations.items():
@@ -1000,7 +1000,7 @@ def summarize_annotations(annotated_filename, output_path, log_path):
 
     logger.log(f"Start Time : {datetime.now()}", refname=refname)
     agg = Aggregator(logger)
-    summary_filename = BisonNameOp.get_out_process_filename(
+    summary_filename = BisonNameOp.get_process_outfilename(
         annotated_filename, outpath=output_path, step_or_process=LMBISON_PROCESS.AGGREGATE)
 
     # Do not overwrite existing summary
@@ -1035,7 +1035,7 @@ def summarize_summaries(annotated_filename, output_path, log_path):
 
     logger.log(f"Start Time : {datetime.now()}", refname=refname)
     agg = Aggregator(logger)
-    summary_filename = BisonNameOp.get_out_process_filename(
+    summary_filename = BisonNameOp.get_process_outfilename(
         annotated_filename, outpath=output_path, step_or_process=LMBISON_PROCESS.AGGREGATE)
 
     # Do not overwrite existing summary
@@ -1063,7 +1063,7 @@ def parallel_summarize(annotated_filenames, output_path, main_logger):
     refname = "parallel_summarize"
     inputs = []
     for in_csv in annotated_filenames:
-        out_csv = BisonNameOp.get_out_process_filename(
+        out_csv = BisonNameOp.get_process_outfilename(
             in_csv, outpath=output_path, step_or_process=LMBISON_PROCESS.SUMMARIZE)
         if os.path.exists(out_csv):
             main_logger.info(

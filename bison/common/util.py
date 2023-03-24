@@ -543,11 +543,12 @@ class Chunker():
 
     # .............................................................................
     @classmethod
-    def identify_chunk_files(cls, big_csv_filename, chunk_count=0):
+    def identify_chunk_files(cls, big_csv_filename, output_path, chunk_count=0):
         """Construct filenames for smaller files subset from a large file.
 
         Args:
             big_csv_filename (str): Full path to the original large CSV file of records
+            output_path (str): Destination directory for subset files.
             chunk_count (int): Number of smaller files to split large file into.  Defaults
                 to the number of available CPUs minus 2.
 
@@ -555,13 +556,13 @@ class Chunker():
             chunk_filenames: a list of chunk filenames
         """
         chunk_filenames = []
-        in_base_filename, ext = os.path.splitext(big_csv_filename)
+        basename, ext = os.path.splitext(os.path.basename(big_csv_filename))
         boundary_pairs, _rec_count, _chunk_size = cls.identify_chunks(
             big_csv_filename, chunk_count=chunk_count)
         for (start, stop) in boundary_pairs:
             chunk_fname = BisonNameOp.get_chunk_filename(
-                in_base_filename, ext, start, stop)
-            chunk_filenames.append(chunk_fname)
+                basename, ext, start, stop)
+            chunk_filenames.append(os.path.join(output_path, chunk_fname))
         return chunk_filenames
 
     # .............................................................................
@@ -697,7 +698,7 @@ class BisonNameOp():
 
     # .............................................................................
     @staticmethod
-    def get_out_process_filename(in_filename, outpath=None, step_or_process=None):
+    def get_process_outfilename(in_filename, outpath=None, step_or_process=None):
         """Construct output filename for the next processing step of the given file.
 
         Args:
@@ -721,14 +722,16 @@ class BisonNameOp():
             File will always start with basename, followed by chunk,
                 followed by process step completed (if any)
         """
-        path, basename, ext, chunk, postfix = BisonNameOp.parse_process_filename(
+        pth, basename, ext, chunk, postfix = BisonNameOp.parse_process_filename(
             in_filename)
+        if postfix is not None:
+            tmp = LMBISON_PROCESS.get_step(postfix) + 1
         if chunk is not None:
             basename = f"{basename}{LMBISON_PROCESS.SEP}{chunk}"
         # If step is not provided, get the step after that of the input file.
         if step_or_process is None:
-            step_or_process = LMBISON_PROCESS.get_step(postfix) + 1
-        new_postfix = LMBISON_PROCESS.get_postfix(step_or_process)
+            step_or_process = LMBISON_PROCESS.get_next_process(postfix=postfix)
+        new_postfix = step_or_process["postfix"]
         if new_postfix is None:
             raise Exception(
                 f"No next step for {in_filename} or processing step for "
@@ -737,9 +740,10 @@ class BisonNameOp():
             outbasename = f"{basename}{LMBISON_PROCESS.SEP}{new_postfix}{ext}"
             # If outpath is not provided, use the same path as the input file.
             if outpath is None:
-                outpath = path
+                outpath = pth
             outfname = os.path.join(outpath, outbasename)
         return outfname
+
 
     # .............................................................................
     @staticmethod
@@ -759,27 +763,30 @@ class BisonNameOp():
                 processing has been completed.
 
         Note:
-            File will always start with basename,
-            followed by chunk (if chunked)
-            followed by process step completed (if any)
+            Filename will contain, in this order:
+                1. basename
+                2. chunk (if chunked)
+                3. process step completed
         """
         chunk = None
         process_postfix = None
+        poss_postfixes = LMBISON_PROCESS.postfixes()
         # path will be None if filename is basefilename
         path, fname = os.path.split(filename)
         basefname, ext = os.path.splitext(fname)
         parts = basefname.split(LMBISON_PROCESS.SEP)
         # File will always start with basename
         basename = parts.pop(0)
-        if len(parts) >= 1:
-            p = parts.pop(0)
-            # if chunk exists
-            if not p.startswith(LMBISON_PROCESS.CHUNK["prefix"]):
-                process_postfix = p
-            else:
+        for p in parts:
+            # if still part of basename
+            if p.startswith(LMBISON_PROCESS.CHUNK["prefix"]):
                 chunk = p
-                if len(parts) >= 1:
-                    process_postfix = parts.pop(0)
+            else:
+                if p in poss_postfixes:
+                    process_postfix = p
+                else:
+                    # Add to basename
+                    basename = f"{basename}{LMBISON_PROCESS.SEP}{p}"
         return path, basename, ext, chunk, process_postfix
 
     # ...............................................
