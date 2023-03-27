@@ -1,5 +1,6 @@
 """Main script to execute all elements of the summarize-GBIF BISON workflow."""
 import csv
+import logging
 from datetime import datetime
 import json
 import os
@@ -128,7 +129,7 @@ def a_resolve_riis_taxa(riis_filename, output_path, logger, overwrite=False):
     nnsl = RIIS(riis_filename, logger=logger)
     # Update species data
     try:
-        report = nnsl.resolve_riis_to_gbif_taxa(output_path)
+        report = nnsl.resolve_riis_to_gbif_taxa(output_path, overwrite=overwrite)
         logger.info(
             f"Found {report[REPORT.TAXA_RESOLVED]} names, "
             f"{report[REPORT.RECORDS_UPDATED]} updated, "
@@ -136,7 +137,9 @@ def a_resolve_riis_taxa(riis_filename, output_path, logger, overwrite=False):
             f"of total {report[REPORT.RIIS_IDENTIFIER]} from {riis_filename} "
             f"to {report[REPORT.OUTFILE]}.")
     except Exception as e:
-        logger.error(f"Unexpected failure {e} in resolve_riis_taxa")
+        logger.log(
+            f"Unexpected failure {e} in resolve_riis_taxa", refname=script_name,
+            log_level=logging.ERROR)
     else:
         if report[REPORT.RECORDS_OUTPUT] != RIIS_DATA.SPECIES_GEO_DATA_COUNT:
             logger.debug(
@@ -336,7 +339,9 @@ def test_bad_line(trouble_id, raw_filenames, geoinput_path, logger):
             rdr = csv.DictReader(f, quoting=csv.QUOTE_NONE, delimiter="\t",
                                  restkey=EXTRA_CSV_FIELD)
         except Exception as e:
-            logger.error(f"Unexpected open error {e} on file {csvfile}")
+            logger.log(
+                f"Unexpected open error {e} on file {csvfile}", refname=script_name,
+                log_level=logging.ERROR)
         else:
             logger.info(f"Opened file {csvfile}")
             try:
@@ -362,17 +367,24 @@ def test_bad_line(trouble_id, raw_filenames, geoinput_path, logger):
                             geo_county, dwcrec[GBIF.LON_FLD], dwcrec[GBIF.LAT_FLD],
                             buffer_vals=REGION.COUNTY["buffer"])
                     except ValueError as e:
-                        logger.error(f"Record gbifID: {gbif_id}: {e}")
+                        logger.log(
+                            f"Record gbifID: {gbif_id}: {e}", refname=script_name,
+                            log_level=logging.ERROR)
                     except GeoException as e:
-                        logger.error(f"Record gbifID: {gbif_id}: {e}")
+                        logger.log(
+                            f"Record gbifID: {gbif_id}: {e}", refname=script_name,
+                            log_level=logging.ERROR)
                     if ogr_seconds > 0.75:
-                        logger.debug(
-                            f"Record gbifID: {gbif_id}; OGR time {ogr_seconds}")
+                        logger.log(
+                            f"Record gbifID: {gbif_id}; OGR time {ogr_seconds}",
+                            refname=script_name, log_level=logging.DEBUG)
 
                     dwcrec = next(rdr)
 
             except Exception as e:
-                logger.error(f"Unexpected read error {e} on file {csvfile}")
+                logger.log(
+                    f"Unexpected read error {e} on file {csvfile}", refname=script_name,
+                    log_level=logging.ERROR)
 
 
 # .............................................................................
@@ -514,7 +526,7 @@ def execute_command(config, logger):
 
     if config["command"] == "resolve":
         report = a_resolve_riis_taxa(
-            config["riis_filename"], riis_annotated_filename, logger)
+            config["riis_filename"], riis_annotated_filename, logger, overwrite=False)
         logger.log(f"Resolved RIIS filename: {report[REPORT.OUTFILE]}")
 
     elif config["command"] == "annotate":
@@ -562,7 +574,9 @@ def execute_command(config, logger):
             line_num=config["line_num"])
 
     else:
-        logger.error(f"Unsupported command {config['command']}")
+        logger.log(
+            f"Unsupported command {config['command']}", refname=script_name,
+            log_level=logging.ERROR)
 
     return report
 
