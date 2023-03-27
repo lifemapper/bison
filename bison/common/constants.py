@@ -256,6 +256,7 @@ class LMBISON_PROCESS:
 class CONFIG_PARAM:
     """Parameter keys for CLI tool configuration files."""
     FILE = "config_file"
+    COMMAND = "command"
     IS_INPUT_DIR = "is_input_dir"
     IS_OUPUT_DIR = "is_output_dir"
     IS_INPUT_FILE = "is_input_file"

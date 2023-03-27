@@ -471,6 +471,7 @@ def parallel_annotate(
         reports (list of dict): metadata for the occurrence annotation data and process.
     """
     refname = "parallel_annotate"
+    messages = []
     inputs = []
     if output_path is None:
         output_path = os.path.dirname(dwc_filenames[0])
@@ -481,8 +482,9 @@ def parallel_annotate(
         out_fname = BisonNameOp.get_process_outfilename(
             dwc_fname, outpath=output_path, step_or_process=LMBISON_PROCESS.ANNOTATE)
         if os.path.exists(out_fname):
-            main_logger.log(
-                f"Annotations exist in {out_fname}, moving on.", refname=refname)
+            msg = f"Annotations exist in {out_fname}."
+            main_logger.log(msg, refname=refname)
+            messages.append(msg)
         else:
             inputs.append(
                 (dwc_fname, riis_with_gbif_filename, geo_path, output_path, log_path))
@@ -495,12 +497,18 @@ def parallel_annotate(
     map_result = pool.starmap_async(annotate_occurrence_file, inputs)
     # Wait for results
     map_result.wait()
+    # list of reports for each process
     reports = map_result.get()
+
+    report = {
+        "reports": reports,
+        "messages": messages
+    }
 
     main_logger.log(
         "Parallel Annotation End Time : {}".format(datetime.now()), refname=refname)
 
-    return reports
+    return report
 
 
 # .............................................................................

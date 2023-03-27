@@ -25,14 +25,6 @@ COMMANDS = ("resolve", "split", "annotate", "summarize", "aggregate", "test")
 PARAMETERS = {
     "required":
         {
-            "command":
-                {
-                    CONFIG_PARAM.TYPE: str,
-                    CONFIG_PARAM.IS_INPUT_FILE: True,
-                    CONFIG_PARAM.CHOICES: COMMANDS,
-                    CONFIG_PARAM.HELP:
-                        "Full filename of input USGS RIIS data in CSV format."
-                },
             "riis_filename":
                 {
                     CONFIG_PARAM.TYPE: str,
@@ -130,21 +122,21 @@ def a_resolve_riis_taxa(riis_filename, output_path, logger, overwrite=False):
     # Update species data
     try:
         report = nnsl.resolve_riis_to_gbif_taxa(output_path, overwrite=overwrite)
-        logger.info(
+        logger.log(
             f"Found {report[REPORT.TAXA_RESOLVED]} names, "
             f"{report[REPORT.RECORDS_UPDATED]} updated, "
             f"{report[REPORT.RECORDS_OUTPUT]} written "
             f"of total {report[REPORT.RIIS_IDENTIFIER]} from {riis_filename} "
-            f"to {report[REPORT.OUTFILE]}.")
+            f"to {report[REPORT.OUTFILE]}.", refname=script_name)
     except Exception as e:
         logger.log(
             f"Unexpected failure {e} in resolve_riis_taxa", refname=script_name,
             log_level=logging.ERROR)
     else:
         if report[REPORT.RECORDS_OUTPUT] != RIIS_DATA.SPECIES_GEO_DATA_COUNT:
-            logger.debug(
+            logger.log(
                 f"Wrote {report[REPORT.RECORDS_OUTPUT]} RIIS records, expecting "
-                f"{RIIS_DATA.SPECIES_GEO_DATA_COUNT}")
+                f"{RIIS_DATA.SPECIES_GEO_DATA_COUNT}", refname=script_name)
     return report
 
 
@@ -301,7 +293,7 @@ def log_list(logger, msg, outlist):
     msg = f"{msg}\n"
     for elt in outlist:
         msg += f"  {elt}\n"
-    logger.log(msg)
+    logger.log(msg, refname=script_name, log_level=logging.INFO)
 
 
 # ...............................................
@@ -343,23 +335,28 @@ def test_bad_line(trouble_id, raw_filenames, geoinput_path, logger):
                 f"Unexpected open error {e} on file {csvfile}", refname=script_name,
                 log_level=logging.ERROR)
         else:
-            logger.info(f"Opened file {csvfile}")
+            logger.log(f"Opened file {csvfile}", refname=script_name)
             try:
                 # iterate over DwC records
                 dwcrec = next(rdr)
                 while dwcrec is not None:
                     gbif_id = dwcrec[GBIF.ID_FLD]
                     if (rdr.line_num % LOG.INTERVAL) == 0:
-                        logger.debug(f"*** Record number {rdr.line_num}, gbifID: {gbif_id} ***")
+                        logger.log(
+                            f"*** Record number {rdr.line_num}, gbifID: {gbif_id} ***",
+                            refname=script_name, log_level=logging.DEBUG)
 
                     # Debug: examine data
                     if gbif_id == trouble_id:
-                        logger.debug(f"Found gbifID {trouble_id} on line {rdr.line_num}")
+                        logger.log(
+                            f"Found gbifID {trouble_id} on line {rdr.line_num}",
+                            refname=script_name, log_level=logging.DEBUG)
 
                     if EXTRA_CSV_FIELD in dwcrec.keys():
-                        logger.debug(
+                        logger.log(
                             "Extra fields detected: possible bad read for record "
-                            f"{gbif_id} on line {rdr.line_num}")
+                            f"{gbif_id} on line {rdr.line_num}", refname=script_name,
+                            log_level=logging.DEBUG)
 
                     # Find county and state for these coords
                     try:
@@ -410,21 +407,30 @@ def read_bad_line(in_filename, logger, gbif_id=None, line_num=None):
     try:
         for dwcrec in rdr:
             if (rdr.line_num % LOG.INTERVAL) == 0:
-                logger.debug(f"*** Record number {rdr.line_num}, gbifID: {gbif_id} ***")
+                logger.log(
+                    f"*** Record number {rdr.line_num}, gbifID: {gbif_id} ***",
+                    refname=script_name, log_level=logging.DEBUG)
 
             # Debug: examine data
             if gbif_id == dwcrec[GBIF.ID_FLD]:
-                logger.debug(f"Found gbifID {gbif_id} on line {rdr.line_num}")
+                logger.log(
+                    f"Found gbifID {gbif_id} on line {rdr.line_num}",
+                    refname=script_name, log_level=logging.DEBUG)
             elif rdr.line_num == line_num:
-                logger.debug(f"Found line {rdr.line_num}")
+                logger.log(
+                    f"Found line {rdr.line_num}", refname=script_name,
+                    log_level=logging.DEBUG)
 
             if EXTRA_CSV_FIELD in dwcrec.keys():
-                logger.debug(
+                logger.log(
                     f"Extra fields detected: possible bad read for record {gbif_id} on "
-                    f"line {rdr.line_num}")
+                    f"line {rdr.line_num}", refname=script_name,
+                    log_level=logging.DEBUG)
 
     except Exception as e:
-        logger.error(f"Unexpected read error {e} on file {in_filename}")
+        logger.log(
+            f"Unexpected read error {e} on file {in_filename}", refname=script_name,
+            log_level=logging.ERROR)
 
 
 # .............................................................................
@@ -537,7 +543,7 @@ def execute_command(config, logger):
             config["process_path"], logger, log_path, run_parallel=True)
         log_list(
             logger, "Newly annotated filenames:",
-            [rpt[REPORT.OUTFILE] for rpt in report.values()])
+            [rpt[REPORT.OUTFILE] for rpt in report["reports"]])
 
     elif config["command"] == "summarize":
         # Summarize each annotated file by region, write summary to a file
@@ -586,23 +592,23 @@ def execute_command(config, logger):
 if __name__ == '__main__':
     """Main script to execute all elements of the summarize-GBIF BISON workflow."""
     # log_name = f"{script_name}_{start.isoformat()}"
-    config, logger, report_filename = get_common_arguments(
+    config, logger = get_common_arguments(
         script_name, DESCRIPTION, PARAMETERS)
 
-    logger.log(f"Command: {config['command']}")
-    logger.log(f"Start Time : {datetime.now().isoformat()}")
+    logger.log(f"Command: {config['command']}", refname=script_name)
+    logger.log(f"Start Time : {datetime.now().isoformat()}", refname=script_name)
 
     report = execute_command(config, logger)
-    # If the output report was requested, write it
-    if report_filename:
-        try:
-            with open(report_filename, mode='wt') as out_file:
-                json.dump(report, out_file, indent=4)
-        except OSError:
-            raise
-        except IOError:
-            raise
-        logger.log(
-            f"Wrote report file to {report_filename}", refname=script_name)
 
-    logger.info(f"End Time : {datetime.now().isoformat()}")
+    # Write output report
+    try:
+        with open(config["report_filename"], mode='wt') as out_file:
+            json.dump(report, out_file, indent=4)
+    except OSError:
+        raise
+    except IOError:
+        raise
+    logger.log(
+        f"Wrote report file to {config['report_filename']}", refname=script_name)
+
+    logger.log(f"End Time : {datetime.now().isoformat()}", refname=script_name)

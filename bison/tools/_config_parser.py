@@ -1,9 +1,12 @@
 """Module containing a tool for parsing a configuration file for argparse."""
 import argparse
 import json
+import os
 
 from bison.common.constants import CONFIG_PARAM
 from bison.common.log import Logger
+
+COMMANDS = ("resolve", "split", "annotate", "summarize", "aggregate", "test")
 
 
 # .....................................................................................
@@ -20,11 +23,14 @@ def _build_parser(command, description):
     parser = argparse.ArgumentParser(prog=command, description=description)
     parser.add_argument(
         f"--{CONFIG_PARAM.FILE}", type=str, help='Path to configuration file.')
+    parser.add_argument(
+        "command", type=str, choices=COMMANDS, help="Process to execute on data."
+    )
     return parser
 
 
 # .....................................................................................
-def _get_config_file_argument(parser):
+def _get_command_config_file_arguments(parser):
     """Retrieve the configuration file argument passed through a ArgumentParser.
 
     Args:
@@ -37,7 +43,8 @@ def _get_config_file_argument(parser):
     args = parser.parse_args()
     if hasattr(args, CONFIG_PARAM.FILE):
         config_filename = getattr(args, CONFIG_PARAM.FILE)
-    return config_filename
+    cmd = getattr(args, CONFIG_PARAM.COMMAND)
+    return cmd, config_filename
 
 
 # .....................................................................................
@@ -159,24 +166,21 @@ def get_common_arguments(script_name, description, parameters):
     TODO: make config_file required or accept other parameters from the command line.
     """
     parser = _build_parser(script_name, description)
-    config_filename = _get_config_file_argument(parser)
+    command, config_filename = _get_command_config_file_arguments(parser)
     if not config_filename:
         raise Exception(f"Script {script_name} requires value for config_file")
     config = process_arguments_from_file(config_filename, parameters)
+    config["command"] = command
+    meta_basename = f"{script_name}_{command}"
 
-    try:
-        log_filename = config["log_filename"]
-    except KeyError:
-        log_filename = None
+    config["report_filename"] = os.path.join(
+        config["output_path"], f"{meta_basename}.rpt")
+    log_filename = os.path.join(
+        config["output_path"], f"{meta_basename}.log")
+
     logger = Logger(script_name, log_filename=log_filename)
 
-    # If the output report was requested, write it
-    try:
-        report_filename = config["report_filename"]
-    except KeyError:
-        report_filename = None
-
-    return config, logger, report_filename
+    return config, logger
 
 
 # .....................................................................................

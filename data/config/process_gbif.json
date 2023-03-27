@@ -1,5 +1,4 @@
 {
-    "command": "resolve",
     "riis_filename": "/volumes/bison/input/US-RIIS_MasterList_2021.csv",
 
     "gbif_filename": "/volumes/bison/big_data/gbif/gbif_2023-01-26.csv",

@@ -30,20 +30,6 @@ PARAMETERS = {
                     CONFIG_PARAM.IS_OUPUT_DIR: True,
                     CONFIG_PARAM.HELP: "Destination directory for outputs."
                 }
-        },
-    "optional":
-        {
-            "log_filename":
-                {
-                    CONFIG_PARAM.TYPE: str,
-                    CONFIG_PARAM.HELP: "Filename to write logging data."
-                },
-            "report_filename":
-                {
-                    CONFIG_PARAM.TYPE: str,
-                    CONFIG_PARAM.HELP: "Filename to write summary metadata."
-                }
-
         }
 }
 
@@ -93,7 +79,7 @@ def cli():
         Exception: on unknown JSON write error.
     """
     script_name = os.path.splitext(os.path.basename(__file__))[0]
-    config, logger, report_filename = get_common_arguments(
+    config, logger = get_common_arguments(
         script_name, DESCRIPTION, PARAMETERS)
     report = {}
 
@@ -131,19 +117,17 @@ def cli():
         species_stats, species_stats_mtx_fname, logger)
     report["species_stats_matrix"] = species_stats_rpt
 
-    # If the output report was requested, write it
-    if report_filename:
-        try:
-            with open(report_filename, mode='wt') as out_file:
-                json.dump(report, out_file, indent=4)
-        except OSError:
-            raise
-        except IOError:
-            raise
-        except Exception:
-            raise
-        logger.log(
-            f"Wrote report file to {report_filename}", refname=script_name)
+    try:
+        with open(config["report_filename"], mode='wt') as out_file:
+            json.dump(report, out_file, indent=4)
+    except OSError:
+        raise
+    except IOError:
+        raise
+    except Exception:
+        raise
+    logger.log(
+        f"Wrote report file to {config['report_filename']}", refname=script_name)
 
 
 # .....................................................................................

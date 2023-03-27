@@ -31,16 +31,7 @@ PARAMETERS = {
                 {
                     CONFIG_PARAM.TYPE: int,
                     CONFIG_PARAM.HELP: "Number of subset files to create from this large file."
-                },
-            "log_filename":
-                {
-                    CONFIG_PARAM.TYPE: str,
-                    CONFIG_PARAM.HELP: "Filename to write logging data."},
-            "report_filename":
-                {
-                    CONFIG_PARAM.TYPE: str,
-                    CONFIG_PARAM.HELP: "Filename to write summary metadata."}
-
+                }
         }
 }
 
@@ -56,7 +47,7 @@ def cli():
         IOError: on failure to write to report_filename.
     """
     script_name = os.path.splitext(os.path.basename(__file__))[0]
-    config, logger, report_filename = get_common_arguments(
+    config, logger = get_common_arguments(
         script_name, DESCRIPTION, PARAMETERS)
 
     infilename = config["big_csv_filename"]
@@ -69,17 +60,15 @@ def cli():
     _, report = Chunker.chunk_files(
         infilename, output_path, logger, chunk_count=config["number_of_chunks"])
 
-    # If the output report was requested, write it
-    if report_filename is not None:
-        try:
-            with open(report_filename, mode='wt') as out_file:
-                json.dump(report, out_file, indent=4)
-        except OSError:
-            raise
-        except IOError:
-            raise
-        logger.log(
-            f"Wrote report file to {report_filename}", refname=script_name)
+    try:
+        with open(config["report_filename"], mode='wt') as out_file:
+            json.dump(report, out_file, indent=4)
+    except OSError:
+        raise
+    except IOError:
+        raise
+    logger.log(
+        f"Wrote report file to {config['report_filename']}", refname=script_name)
 
 
 # .....................................................................................
