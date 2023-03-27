@@ -7,6 +7,7 @@ from logging import ERROR
 
 from bison.common.constants import (
     APPEND_TO_DWC, LMBISON_PROCESS, ENCODING, GBIF, LOG, REGION, REPORT)
+from bison.common.log import Logger
 from bison.common.util import (available_cpu_count, BisonNameOp, get_csv_dict_writer)
 from bison.process.geoindex import GeoResolver
 from bison.provider.gbif_data import DwcData
@@ -409,7 +410,7 @@ class Annotator():
 
 # .............................................................................
 def annotate_occurrence_file(
-        dwc_filename, riis_annotated_filename, geo_path, output_path, logger):
+        dwc_filename, riis_annotated_filename, geo_path, output_path, log_path):
     """Annotate GBIF records with census state and county, and RIIS key and assessment.
 
     Args:
@@ -419,7 +420,7 @@ def annotate_occurrence_file(
         geo_path (str): input directory containing geospatial files for
             geo-referencing occurrence points.
         output_path (str): destination directory for output annotated occurrence files.
-        logger (object): logger for saving relevant processing messages
+        log_path (object): destination directory for logging processing messages.
 
     Returns:
         report (dict): metadata for the occurrence annotation data and process.
@@ -429,6 +430,13 @@ def annotate_occurrence_file(
     """
     if not os.path.exists(dwc_filename):
         raise FileNotFoundError(dwc_filename)
+
+    sep = BisonNameOp.separator
+    path, basename, ext, chunk, process_postfix = BisonNameOp.parse_process_filename(dwc_filename)
+    logname = f"annotate{sep}{basename}{sep}{chunk}.log"
+    log_fname = os.path.join(log_path, logname)
+    logger = Logger(
+        logname, log_filename=log_fname, log_console=False)
 
     logger.log(
         f"Submit {dwc_filename} for annotation {datetime.now()}",
@@ -477,8 +485,7 @@ def parallel_annotate(
                 f"Annotations exist in {out_fname}, moving on.", refname=refname)
         else:
             inputs.append(
-                (dwc_fname, riis_with_gbif_filename, geo_path, log_path, output_path))
-
+                (dwc_fname, riis_with_gbif_filename, geo_path, output_path, log_path))
     main_logger.log(
         "Parallel Annotation Start Time : {}".format(datetime.now()), refname=refname)
 

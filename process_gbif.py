@@ -186,7 +186,7 @@ def c_summarize_annotated_files(annotated_filenames, output_path, logger):
 # .............................................................................
 def b_annotate_occurrence_files(
         occ_filenames, riis_annotated_filename, geoinput_path, output_path, logger,
-        log_path, run_parallel=False):
+        log_path, run_parallel=True):
     """Annotate GBIF records with census state and county, and RIIS key and assessment.
 
     Args:
@@ -534,7 +534,7 @@ def execute_command(config, logger):
         # Annotate DwC records with regions, and if found, RIIS determination
         report = b_annotate_occurrence_files(
             raw_filenames, riis_annotated_filename, config["geoinput_path"],
-            config["process_path"], logger, log_path, run_parallel=False)
+            config["process_path"], logger, log_path, run_parallel=True)
         log_list(
             logger, "Newly annotated filenames:",
             [rpt[REPORT.OUTFILE] for rpt in report.values()])
