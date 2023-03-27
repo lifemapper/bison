@@ -16,6 +16,7 @@ class Test_combine_summaries:
     """Test the CLI tool and dependencies that annotate RIIS data with GBIF taxa."""
 
     def __init__(self):
+        """Constructor."""
         self._logger = Logger(script_name)
 
     # .....................................

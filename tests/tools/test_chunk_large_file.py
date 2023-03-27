@@ -13,6 +13,10 @@ script_name = os.path.splitext(os.path.basename(__file__))[0]
 class Test_chunk_large_file:
     """Test the CLI tool and dependencies that annotate RIIS data with GBIF taxa."""
 
+    def __init__(self):
+        """Constructor."""
+        self._logger = Logger(script_name)
+
     # .....................................
     def test_identify_chunks(self):
         """Test identifying the chunks of records to be put into smaller files."""
@@ -41,11 +45,10 @@ class Test_chunk_large_file:
     def test_chunk_files(self):
         """Test chunking a large file into smaller files."""
         fn_args = get_test_parameters(script_name)
-        logger = Logger(script_name)
 
         chunk_filenames, _report = Chunker.chunk_files(
             fn_args["big_csv_filename"], fn_args["output_path"],
-            logger, chunk_count=fn_args["number_of_chunks"])
+            self._logger, chunk_count=fn_args["number_of_chunks"])
 
         file_count = len(chunk_filenames)
         assert (file_count == fn_args["_test_small_number_of_chunks"])
@@ -70,6 +73,7 @@ class Test_chunk_large_file:
         """Test identifying subset filenames created from chunking a large file."""
         fn_args = get_test_parameters(script_name)
         chunk_filenames = Chunker.identify_chunk_files(
-            fn_args["big_csv_filename"], chunk_count=fn_args["number_of_chunks"])
+            fn_args["big_csv_filename"], fn_args["output_path"],
+            chunk_count=fn_args["number_of_chunks"])
 
         assert (len(chunk_filenames) == fn_args["_test_small_number_of_chunks"])

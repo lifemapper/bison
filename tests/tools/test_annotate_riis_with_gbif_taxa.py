@@ -14,12 +14,15 @@ script_name = os.path.splitext(os.path.basename(__file__))[0]
 class Test_annotate_riis:
     """Test the CLI tool and dependencies that annotate RIIS data with GBIF taxa."""
 
+    def __init__(self):
+        """Constructor."""
+        self._logger = Logger(script_name)
+
     # .....................................
     def test_read_small_riis(self):
         """Test reading an original RIIS file by checking counts."""
         fn_args = get_test_parameters(script_name)
-        logger = Logger(script_name)
-        riis = RIIS(fn_args["_test_small_riis_filename"], logger)
+        riis = RIIS(fn_args["_test_small_riis_filename"], self._logger)
         # Read original species data
         riis.read_riis()
         actual_line_count = count_lines_with_cat(fn_args["_test_small_riis_filename"])
@@ -31,8 +34,7 @@ class Test_annotate_riis:
     def test_read_original_riis(self):
         """Test reading an original RIIS file by checking counts."""
         fn_args = get_test_parameters(script_name)
-        logger = Logger(script_name)
-        riis = RIIS(fn_args["riis_filename"], logger)
+        riis = RIIS(fn_args["riis_filename"], self._logger)
         # Read original species data
         riis.read_riis()
         actual_record_count = fn_args["_test_riis_record_count"]
@@ -46,8 +48,7 @@ class Test_annotate_riis:
     def test_resolve_small_riis(self):
         """Test resolving taxa in a small RIIS file by checking counts."""
         fn_args = get_test_parameters(script_name)
-        logger = Logger(script_name)
-        riis = RIIS(fn_args["_test_small_riis_filename"], logger)
+        riis = RIIS(fn_args["_test_small_riis_filename"], self._logger)
         # Update species data
         report = riis.resolve_riis_to_gbif_taxa(
                 fn_args["_test_small_annotated_riis_filename"], overwrite=True)

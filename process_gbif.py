@@ -440,7 +440,7 @@ def _prepare_args(config):
     # riis_annotated_filename = BisonNameOp.get_process_outfilename(
     #     config["riis_filename"], outpath=config["process_path"],
     #     step_or_process=LMBISON_PROCESS.RESOLVE)
-        # os.path.join(inpath, f"{basename}_resolved{ext}")
+    # os.path.join(inpath, f"{basename}_resolved{ext}")
     log_path, _ = os.path.split(config["log_filename"])
     # Geospatial/output/processing filenames will be generated, and located in paths
     # Process entire GBIF file, or do it in chunks
@@ -490,6 +490,18 @@ def _prepare_args(config):
 
 # .............................................................................
 def execute_command(config, logger):
+    """Execute processing command with parameters extracted from configuration file.
+
+    Args:
+        config (dict): dictionary of keyword parameters and values for current process.
+        logger (obj): logger for writing messages to file and processing window.
+
+    Returns:
+        report: dictionary of metadata for process.
+
+    Raises:
+        FileNotFoundError: on missing input file.
+    """
     (riis_annotated_filename, log_path,
         raw_filenames, annotated_filenames, summary_filenames,
         full_summary_filename) = _prepare_args(config)
@@ -551,6 +563,8 @@ def execute_command(config, logger):
 
     else:
         logger.error(f"Unsupported command {config['command']}")
+
+    return report
 
 
 # .............................................................................

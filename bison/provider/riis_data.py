@@ -753,12 +753,12 @@ class RIIS:
 
 
 # .............................................................................
-def resolve_riis_taxa(riis_filename, annotated_riis_filename, logger, overwrite=True):
+def resolve_riis_taxa(riis_filename, output_path, logger, overwrite=True):
     """Resolve and write GBIF accepted names and taxonKeys in RIIS records.
 
     Args:
         riis_filename (str): full filename for original RIIS data records.
-        annotated_riis_filename (str): full filename for output RIIS data records.
+        output_path (str): full destination directory for output RIIS data records.
         logger (object): logger for saving relevant processing messages
         overwrite (bool): True to delete an existing updated RIIS file.
 
@@ -771,15 +771,13 @@ def resolve_riis_taxa(riis_filename, annotated_riis_filename, logger, overwrite=
     refname = "resolve_riis_taxa"
     report = {
         refname: {
-            "riis_filename": riis_filename,
-            "annotated_riis_filename": annotated_riis_filename,
             "expected_count": RIIS_DATA.SPECIES_GEO_DATA_COUNT
         }
     }
     riis = RIIS(riis_filename, logger)
     # Update species data
     try:
-        report = riis.resolve_riis_to_gbif_taxa()
+        report = riis.resolve_riis_to_gbif_taxa(output_path)
         rec_count = report[REPORT.RECORDS_UPDATED]
         name_count = report[REPORT.TAXA_RESOLVED]
         out_rec_count = report[REPORT.RECORDS_OUTPUT]

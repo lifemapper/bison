@@ -90,6 +90,7 @@ US_STATES = {
 
 # .............................................................................
 class REPORT:
+    """Common keys for process report dictionary."""
     PROCESS = "process"
     RIIS_IDENTIFIER = "riis_ids"
     RIIS_TAXA = "riis_taxa"
@@ -113,13 +114,12 @@ class REPORT:
 # .............................................................................
 class LMBISON_PROCESS:
     """Process steps and associated filename postfixes indicating completion."""
-    CHUNK = {"step": 0, "postfix": "raw", "prefix": "chunk"}
     RESOLVE = {"step": 0, "postfix": "resolve"}
-    ANNOTATE = {"step": 1, "postfix": "annotate"}
-    SUMMARIZE = {"step": 2, "postfix": "summary"}
-    COMBINE = {"step": 3, "postfix": "combine"}
-    AGGREGATE = {"step": 4, "postfix": "aggregate"}
-    SEP = "_"
+    CHUNK = {"step": 1, "postfix": "raw", "prefix": "chunk"}
+    ANNOTATE = {"step": 2, "postfix": "annotate"}
+    SUMMARIZE = {"step": 3, "postfix": "summary"}
+    COMBINE = {"step": 4, "postfix": "combine"}
+    AGGREGATE = {"step": 5, "postfix": "aggregate"}
 
     @staticmethod
     def process_types():
@@ -144,7 +144,7 @@ class LMBISON_PROCESS:
         for p in LMBISON_PROCESS.process_types():
             try:
                 postfixes.append(p["postfix"])
-            except:
+            except KeyError:
                 pass
         return postfixes
 
@@ -207,7 +207,12 @@ class LMBISON_PROCESS:
 
         Returns:
             DWC_Process type for the given filename postfix or step.
+
+        Raises:
+            Exception: if neither postfix, not step is provided.
         """
+        if postfix is None and step is None:
+            raise Exception("Must provide either prefix or step for process.")
         for pt in LMBISON_PROCESS.process_types():
             if postfix is not None and pt["postfix"] == postfix:
                 return pt
@@ -226,7 +231,14 @@ class LMBISON_PROCESS:
 
         Returns:
             DWC_Process type for the given filename postfix or step.
+
+        Raises:
+            Exception: if neither postfix, not step is provided.
         """
+        # If nothing provided, return the first
+        if postfix is None and step is None:
+            raise Exception("Must provide either prefix or step for next process.")
+
         for pt in LMBISON_PROCESS.process_types():
             if postfix is not None and pt["postfix"] == postfix:
                 this_process = pt
@@ -238,6 +250,7 @@ class LMBISON_PROCESS:
             return next_process
 
         return None
+
 
 # .............................................................................
 class CONFIG_PARAM:

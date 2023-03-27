@@ -657,6 +657,8 @@ class Chunker():
 # .............................................................................
 class BisonNameOp():
 
+    separator = "_"
+
     @staticmethod
     def get_annotated_riis_filename(input_riis_filename, outpath):
         """Construct a filename for a chunk of CSV records.
@@ -692,7 +694,7 @@ class BisonNameOp():
             followed by process step completed (if any)
         """
         postfix = LMBISON_PROCESS.CHUNK['postfix']
-        sep = LMBISON_PROCESS.SEP
+        sep = BisonNameOp.separator
         chunkfix = f"{LMBISON_PROCESS.CHUNK['prefix']}-{start}-{stop}"
         return f"{basename}{sep}{chunkfix}{sep}{postfix}{ext}"
 
@@ -722,28 +724,26 @@ class BisonNameOp():
             File will always start with basename, followed by chunk,
                 followed by process step completed (if any)
         """
+        sep = BisonNameOp.separator
         pth, basename, ext, chunk, postfix = BisonNameOp.parse_process_filename(
             in_filename)
-        if postfix is not None:
-            tmp = LMBISON_PROCESS.get_step(postfix) + 1
-        if chunk is not None:
-            basename = f"{basename}{LMBISON_PROCESS.SEP}{chunk}"
         # If step is not provided, get the step after that of the input file.
         if step_or_process is None:
             step_or_process = LMBISON_PROCESS.get_next_process(postfix=postfix)
+        if chunk is not None:
+            basename = f"{basename}{sep}{chunk}"
         new_postfix = step_or_process["postfix"]
         if new_postfix is None:
             raise Exception(
                 f"No next step for {in_filename} or processing step for "
                 f"{step_or_process}")
         else:
-            outbasename = f"{basename}{LMBISON_PROCESS.SEP}{new_postfix}{ext}"
+            outbasename = f"{basename}{sep}{new_postfix}{ext}"
             # If outpath is not provided, use the same path as the input file.
             if outpath is None:
                 outpath = pth
             outfname = os.path.join(outpath, outbasename)
         return outfname
-
 
     # .............................................................................
     @staticmethod
@@ -770,11 +770,12 @@ class BisonNameOp():
         """
         chunk = None
         process_postfix = None
+        sep = BisonNameOp.separator
         poss_postfixes = LMBISON_PROCESS.postfixes()
         # path will be None if filename is basefilename
         path, fname = os.path.split(filename)
         basefname, ext = os.path.splitext(fname)
-        parts = basefname.split(LMBISON_PROCESS.SEP)
+        parts = basefname.split(sep)
         # File will always start with basename
         basename = parts.pop(0)
         for p in parts:
@@ -786,7 +787,7 @@ class BisonNameOp():
                     process_postfix = p
                 else:
                     # Add to basename
-                    basename = f"{basename}{LMBISON_PROCESS.SEP}{p}"
+                    basename = f"{basename}{sep}{p}"
         return path, basename, ext, chunk, process_postfix
 
     # ...............................................
@@ -818,10 +819,11 @@ class BisonNameOp():
         Returns:
             outfname: output filename derived from the summarized GBIF DWC filename
         """
+        sep = BisonNameOp.separator
         path, basename, ext, chunk, postfix = BisonNameOp.parse_process_filename(
             csvfile)
         postfix = LMBISON_PROCESS.COMBINE["postfix"]
-        outbasename = f"{basename}{LMBISON_PROCESS.SEP}{postfix}{ext}"
+        outbasename = f"{basename}{sep}{postfix}{ext}"
         # If outpath is not provided, use the same path as the input file.
         if outpath is None:
             outpath = path

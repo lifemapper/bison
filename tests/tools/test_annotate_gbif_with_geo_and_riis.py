@@ -15,6 +15,7 @@ script_name = os.path.splitext(os.path.basename(__file__))[0]
 class Test_annotate_gbif:
     """Test the CLI tool and dependencies that annotate RIIS data with GBIF taxa."""
     def __init__(self):
+        """Constructor."""
         self._logger = Logger(script_name)
 
     # .....................................
