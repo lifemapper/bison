@@ -1,9 +1,10 @@
 """Main script to execute all elements of the summarize-GBIF BISON workflow."""
 import csv
 import logging
-from datetime import datetime
+# from datetime import datetime
 import json
 import os
+import time
 
 from bison.common.constants import (
     APPEND_TO_DWC, CONFIG_PARAM, LMBISON_PROCESS, GBIF, ENCODING, EXTRA_CSV_FIELD, LOG,
@@ -64,18 +65,7 @@ PARAMETERS = {
                     CONFIG_PARAM.TYPE: str,
                     CONFIG_PARAM.IS_OUPUT_DIR: True,
                     CONFIG_PARAM.HELP: "Large destination directory for output data."
-                },
-            "log_filename":
-                {
-                    CONFIG_PARAM.TYPE: str,
-                    CONFIG_PARAM.HELP: "Filename to write logging data."
-                },
-            "report_filename":
-                {
-                    CONFIG_PARAM.TYPE: str,
-                    CONFIG_PARAM.HELP: "Filename to write summary metadata."
                 }
-
         },
     "optional":
         {
@@ -196,29 +186,45 @@ def b_annotate_occurrence_files(
             county, RIIS assessment, and RIIS key.  If a file exists, do not annotate.
     """
     if run_parallel and len(occ_filenames) > 1:
+        start = time.perf_counter()
         log_list(logger, "Annotate files in parallel: ", occ_filenames)
         reports = parallel_annotate(
             occ_filenames, riis_annotated_filename, geoinput_path, output_path, logger)
+        end = time.perf_counter()
+        logger.log(
+            f"Parallel Annotation End Time : {time.asctime()}, duration {end-start} "
+            f"seconds", refname=script_name)
 
-    else:
-        reports = {}
-        ant = Annotator(
-            geoinput_path, logger, riis_with_gbif_filename=riis_annotated_filename)
-        for occ_fname in occ_filenames:
-            logger.log(
-                f"Start Time: {datetime.now()}: Submit {occ_fname} for annotation",
-                refname=script_name)
+    if not reports:
+        reports = {
+        "reports": [],
+        "messages": []
+    }
+    start = time.perf_counter()
+    ant = Annotator(
+        geoinput_path, logger, riis_with_gbif_filename=riis_annotated_filename)
+    for occ_fname in occ_filenames:
+        logger.log(
+            f"Start Time: {time.asctime()}: Submit {occ_fname} for annotation",
+            refname=script_name)
 
-            basename = os.path.splitext(os.path.basename(occ_fname))[0]
-            logname = f"annotate_{basename}"
-            log_filename = os.path.join(log_path, f"{logname}.log")
-            logger = Logger(
-                logname, log_filename=log_filename, log_console=False)
+        logname, log_fname = BisonNameOp.get_process_logfilename(
+            occ_fname, logpath=log_path, step_or_process=LMBISON_PROCESS.ANNOTATE)
+        logger = Logger(
+            logname, log_filename=log_fname, log_console=False)
 
-            # Add locality-intersections and RIIS determinations to GBIF DwC records
-            rpt = ant.annotate_dwca_records(occ_fname, output_path)
+        # Add locality-intersections and RIIS determinations to GBIF DwC records
+        # TODO: replace the following testing line with commented following line,
+        #   using "log_path" redirects output for testing against parallel
+        rpt = ant.annotate_dwca_records(occ_fname, log_path)
+        # rpt = ant.annotate_dwca_records(occ_fname, output_path)
 
-            reports[basename] = rpt
+        reports["reports"].append(rpt)
+    end = time.perf_counter()
+    logger.log(
+        f"Parallel Annotation End Time : {time.asctime()}, duration {end-start} "
+        f"seconds", refname=script_name)
+
 
     return reports
 
@@ -451,15 +457,6 @@ def _prepare_args(config):
     Raises:
         FileNotFoundError: on missing input occurrence file.
     """
-    # Input files, logfile, report file must be full path
-    # riis_filename =
-    # inpath, fname = os.path.split(riis_filename)
-    # basename, ext = os.path.splitext(fname)
-    # riis_annotated_filename = BisonNameOp.get_process_outfilename(
-    #     config["riis_filename"], outpath=config["process_path"],
-    #     step_or_process=LMBISON_PROCESS.RESOLVE)
-    # os.path.join(inpath, f"{basename}_resolved{ext}")
-    log_path, _ = os.path.split(config["log_filename"])
     # Geospatial/output/processing filenames will be generated, and located in paths
     # Process entire GBIF file, or do it in chunks
     booltmp = str(config["do_split"]).lower()
@@ -470,6 +467,7 @@ def _prepare_args(config):
     infile = config["gbif_filename"]
     if not os.path.exists(infile):
         raise FileNotFoundError(f"Missing input file {infile}")
+    log_path = config["output_path"]
 
     # First determine whether to process one file or smaller subsets
     if do_split is True:
@@ -596,7 +594,7 @@ if __name__ == '__main__':
         script_name, DESCRIPTION, PARAMETERS)
 
     logger.log(f"Command: {config['command']}", refname=script_name)
-    logger.log(f"Start Time : {datetime.now().isoformat()}", refname=script_name)
+    logger.log(f"Start Time : {time.asctime()}", refname=script_name)
 
     report = execute_command(config, logger)
 
@@ -611,4 +609,4 @@ if __name__ == '__main__':
     logger.log(
         f"Wrote report file to {config['report_filename']}", refname=script_name)
 
-    logger.log(f"End Time : {datetime.now().isoformat()}", refname=script_name)
+    logger.log(f"End Time : {time.asctime()}", refname=script_name)

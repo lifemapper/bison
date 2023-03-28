@@ -1,6 +1,6 @@
 """Common classes for BISON RIIS data processing."""
 import csv
-import logging
+from logging import DEBUG, ERROR
 import os
 
 from bison.common.constants import (
@@ -743,11 +743,10 @@ class RIIS:
 
             if good_fieldname != expected_header[i]:
                 self._log.log(
-                    ERR_SEPARATOR, refname=self.__class__.__name__,
-                    log_level=logging.ERROR)
-                self._log.error(
+                    ERR_SEPARATOR, refname=self.__class__.__name__, log_level=ERROR)
+                self._log.log(
                     f"[Error] Header {header[i]} != {expected_header[i]} expected",
-                    refname=self.__class__.__name__, log_level=logging.ERROR)
+                    refname=self.__class__.__name__, log_level=ERROR)
                 good_header = None
         return good_header
 
@@ -785,7 +784,7 @@ def resolve_riis_taxa(riis_filename, output_path, logger, overwrite=True):
         report[refname]["error"] = f"Failed to resolve {refname}: {e}"
         logger.log(
             f"Unexpected failure {e} in resolve_riis_taxa", refname=refname,
-            log_level=logging.ERROR)
+            log_level=ERROR)
         raise
 
     logger.log(
@@ -796,15 +795,15 @@ def resolve_riis_taxa(riis_filename, output_path, logger, overwrite=True):
     # Debug statements for inconsistent counts
     logger.log(
         f"by_riis_id {len(riis.by_riis_id)} ?= {rec_count} records read",
-        refname=refname, log_level=logging.DEBUG)
+        refname=refname, log_level=DEBUG)
 
     logger.log(
         f"by_taxon {len(riis.by_taxon)} ?= {name_count} names resolved.",
-        refname=refname, log_level=logging.DEBUG)
+        refname=refname, log_level=DEBUG)
 
     logger.log(
         f"output recs {out_rec_count} ?= {RIIS_DATA.SPECIES_GEO_DATA_COUNT} expected.",
-        refname=refname, log_level=logging.ERROR)
+        refname=refname, log_level=ERROR)
 
     return report
 

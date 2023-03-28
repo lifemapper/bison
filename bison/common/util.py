@@ -747,6 +747,45 @@ class BisonNameOp():
 
     # .............................................................................
     @staticmethod
+    def get_process_logfilename(in_filename, logpath=None, step_or_process=None):
+        """Construct output filename for the next processing step of the given file.
+
+        Args:
+            in_filename (str): base or full filename of CSV data.
+            outpath (str): destination directory for output filename
+            step_or_process (int or lmbison.common.constants.DWC_PROCESS):
+                stage of processing completed on the output file.
+
+        Returns:
+            logname: name for logger
+            log_filename: full filename for logging output
+
+        Note:
+            The input filename is parsed for process step.
+
+            File will always start with basename, followed by chunk,
+                followed by process step completed (if any)
+        """
+        sep = BisonNameOp.separator
+        pth, basename, ext, chunk, postfix = BisonNameOp.parse_process_filename(
+            in_filename)
+
+        # If step is not provided, get the step of the input file.
+        if step_or_process is None:
+            step_or_process = LMBISON_PROCESS.get_process(postfix=postfix)
+        if chunk is not None:
+            basename = f"{basename}{sep}{chunk}"
+
+        pname = step_or_process["postfix"]
+        logname = f"{basename}{sep}{pname}"
+        log_fname = os.path.join(logpath, f"{logname}.log")
+
+        return logname, log_fname
+
+
+
+    # .............................................................................
+    @staticmethod
     def parse_process_filename(filename):
         """Parse a filename into path, basename, chunk, processing step, extension.
 
@@ -764,7 +803,7 @@ class BisonNameOp():
 
         Note:
             Filename will contain, in this order:
-                1. basename
+                1. basename (>= 1 parts)
                 2. chunk (if chunked)
                 3. process step completed
         """

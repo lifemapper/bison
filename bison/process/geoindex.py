@@ -1,7 +1,7 @@
 """Class for a spatial index and tools for intersecting with a point and extracting attributes."""
 import os
 import time
-from logging import DEBUG
+from logging import DEBUG, ERROR
 
 from osgeo import ogr
 import rtree
@@ -148,7 +148,7 @@ class GeoResolver(object):
             # Second, find nearest feature in spatial index
             intersect_fids = list(self.spatial_index.nearest(pt.GetEnvelope()))
             if not intersect_fids:
-                self._log.info("Buffer to intersect with contiguous spatial index")
+                self._log.log("Buffer to intersect with contiguous spatial index")
                 # Third, try increasingly large buffers to find intersection
                 for buffer in self._buffer_vals:
                     geom = pt.Buffer(buffer)
@@ -158,12 +158,13 @@ class GeoResolver(object):
                     if intersect_fids:
                         break
                 if not intersect_fids:
-                    self._log.error(
-                        f"Failed to intersect spatial index with {buffer} dd buffer")
+                    self._log.log(
+                        f"Failed to intersect spatial index with {buffer} dd buffer",
+                        refname=self.__class__.__name__, log_level=ERROR)
                 else:
-                    self._log.info(
+                    self._log.log(
                         f"Intersected {len(intersect_fids)} features in spatial index "
-                        f"with {buffer} dd buffer.")
+                        f"with {buffer} dd buffer.", refname=self.__class__.__name__)
         return intersect_fids
 
     # ...............................................
@@ -182,7 +183,9 @@ class GeoResolver(object):
         fid = self._get_first_best_feature(pt, intersect_fids)
         if fid is None:
             # Buffer may be unnecessary
-            self._log.info("Must buffer point to find best feature!")
+            self._log.log(
+                "Must buffer point to find best feature!",
+                refname=self.__class__.__name__)
             geom = pt
             # Try increasingly large buffer, (0.1 dd ~= 11.1 km, 1 dd ~= 111 km)
             for buffer in self._buffer_vals:
@@ -191,11 +194,13 @@ class GeoResolver(object):
                 if fid is not None:
                     break
             if fid is not None:
-                self._log.info(
-                    f"Found best feature {fid} using buffer {buffer} dd")
+                self._log.log(
+                    f"Found best feature {fid} using buffer {buffer} dd",
+                    refname=self.__class__.__name__)
             else:
-                self._log.info(
-                    f"Failed to intersect point using buffer {buffer} dd")
+                self._log.log(
+                    f"Failed to intersect point using buffer {buffer} dd",
+                    refname=self.__class__.__name__)
         return fid
 
     # ...............................................
@@ -268,7 +273,9 @@ class GeoResolver(object):
         except ValueError:
             raise
         except GeoException as e:
-            self._log.error(f"No polygon found: {e}")
+            self._log.log(
+                f"No polygon found: {e}", refname=self.__class__.__name__,
+                log_level=ERROR)
             for fn in self.bison_spatial_fields:
                 fldvals[fn] = None
 
