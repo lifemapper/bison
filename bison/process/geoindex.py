@@ -1,17 +1,18 @@
 """Class for a spatial index and tools for intersecting with a point and extracting attributes."""
 import os
 import time
-from logging import DEBUG, ERROR
-
+from logging import INFO, DEBUG, ERROR
 from osgeo import ogr
 import rtree
+
+from bison.common.constants import REGION
 
 
 # .............................................................................
 class GeoResolver(object):
     """Object for intersecting coordinates with a polygon shapefile."""
     def __init__(
-            self, full_spatial_fname, spatial_fields, logger, is_disjoint=True,
+            self, full_spatial_fname, spatial_fields, logger=None, is_disjoint=True,
             buffer_vals=()):
         """Construct a geospatial index to intersect with a set of coordinates.
 
@@ -91,7 +92,7 @@ class GeoResolver(object):
                 for name, idx in fld_indexes:
                     sp_feats[fid][name] = feat.GetFieldAsString(idx)
             except Exception as e:
-                self._log.log(
+                self.logit(
                     f"Warning, unable to add FID {fid} for {self.filename}: {e}")
         return sp_index, sp_feats, bison_fldnames
 
@@ -148,7 +149,7 @@ class GeoResolver(object):
             # Second, find nearest feature in spatial index
             intersect_fids = list(self.spatial_index.nearest(pt.GetEnvelope()))
             if not intersect_fids:
-                self._log.log("Buffer to intersect with contiguous spatial index")
+                self.logit("Buffer to intersect with contiguous spatial index")
                 # Third, try increasingly large buffers to find intersection
                 for buffer in self._buffer_vals:
                     geom = pt.Buffer(buffer)
@@ -158,11 +159,11 @@ class GeoResolver(object):
                     if intersect_fids:
                         break
                 if not intersect_fids:
-                    self._log.log(
+                    self.logit(
                         f"Failed to intersect spatial index with {buffer} dd buffer",
                         refname=self.__class__.__name__, log_level=ERROR)
                 else:
-                    self._log.log(
+                    self.logit(
                         f"Intersected {len(intersect_fids)} features in spatial index "
                         f"with {buffer} dd buffer.", refname=self.__class__.__name__)
         return intersect_fids
@@ -183,7 +184,7 @@ class GeoResolver(object):
         fid = self._get_first_best_feature(pt, intersect_fids)
         if fid is None:
             # Buffer may be unnecessary
-            self._log.log(
+            self.logit(
                 "Must buffer point to find best feature!",
                 refname=self.__class__.__name__)
             geom = pt
@@ -194,11 +195,11 @@ class GeoResolver(object):
                 if fid is not None:
                     break
             if fid is not None:
-                self._log.log(
+                self.logit(
                     f"Found best feature {fid} using buffer {buffer} dd",
                     refname=self.__class__.__name__)
             else:
-                self._log.log(
+                self.logit(
                     f"Failed to intersect point using buffer {buffer} dd",
                     refname=self.__class__.__name__)
         return fid
@@ -273,7 +274,7 @@ class GeoResolver(object):
         except ValueError:
             raise
         except GeoException as e:
-            self._log.log(
+            self.logit(
                 f"No polygon found: {e}", refname=self.__class__.__name__,
                 log_level=ERROR)
             for fn in self.bison_spatial_fields:
@@ -282,11 +283,58 @@ class GeoResolver(object):
         # Elapsed time
         ogr_seconds = time.time()-start
         if ogr_seconds > 0.75:
-            self._log.log(
+            self.logit(
                 f"Intersect point {lon}, {lat}; OGR time {ogr_seconds}",
                 refname=self.__class__.__name__, log_level=DEBUG)
 
         return fldvals
+
+    # ...............................................
+    def logit(self, msg, refname=None, log_level=None):
+        if self._log is not None:
+            self._log.log(msg, refname=refname, log_level=INFO)
+        else:
+            print(msg)
+
+
+# .............................................................................
+def get_full_coverage_resolvers(geo_input_path, logger=None):
+    """Get geospatial indexes for regions in the area of interest.
+
+    Args:
+        geo_input_path (str): input path for geospatial files to intersect points
+        logger (object): logger for saving relevant processing messages
+
+    Returns:
+        geo_partials: list of spatial indexes.
+    """
+    geo_fulls = []
+    for region in REGION.full_region():
+        fn = os.path.join(geo_input_path, region["file"])
+        geo_fulls.append(GeoResolver(
+            fn, region["map"], logger=logger, is_disjoint=region["is_disjoint"],
+            buffer_vals=region["buffer"]))
+
+
+# .............................................................................
+def get_subsets_of_one_coverage_resolvers(geo_input_path, logger=None):
+    """Get geospatial indexes for subset regions of a whole.
+
+    Args:
+        geo_input_path (str): input path for geospatial files to intersect points
+        logger (object): logger for saving relevant processing messages
+
+    Returns:
+        geo_partials: dictionary of subset name and spatial index.
+    """
+    geo_partials = {}
+    region = REGION.combine_to_region()
+    for subset, rel_fn in region["files"]:
+        fn = os.path.join(geo_input_path, rel_fn)
+        geo_partials[subset] = GeoResolver(
+            fn, region["map"], logger=logger, is_disjoint=region["is_disjoint"],
+            buffer_vals=region["buffer"])
+    return geo_partials
 
 
 # .............................................................................
@@ -299,3 +347,9 @@ class GeoException(Exception):
             message: optional message attached to Exception.
         """
         Exception(message)
+
+# .............................................................................
+__all__ = [
+    "get_full_coverage_resolvers",
+    "get_subsets_of_one_coverage_resolvers"
+]

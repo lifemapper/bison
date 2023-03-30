@@ -13,7 +13,9 @@ from bison.common.log import Logger
 from bison.common.util import BisonNameOp, Chunker, delete_file, get_csv_dict_reader
 from bison.process.aggregate import Aggregator
 from bison.process.annotate import Annotator, parallel_annotate
-from bison.process.geoindex import GeoResolver, GeoException
+from bison.process.geoindex import (
+    GeoResolver, GeoException, get_full_coverage_resolvers,
+    get_subsets_of_one_coverage_resolvers)
 from bison.process.sanity_check import Counter
 from bison.provider.riis_data import RIIS
 from bison.tools._config_parser import get_common_arguments
@@ -167,7 +169,7 @@ def c_summarize_annotated_files(annotated_filenames, output_path, logger):
 
 # .............................................................................
 def b_annotate_occurrence_files(
-        occ_filenames, riis_annotated_filename, geoinput_path, output_path, logger,
+        occ_filenames, riis_annotated_filename, geo_input_path, output_path, logger,
         log_path, run_parallel=True):
     """Annotate GBIF records with census state and county, and RIIS key and assessment.
 
@@ -189,7 +191,7 @@ def b_annotate_occurrence_files(
         start = time.perf_counter()
         log_list(logger, "Annotate files in parallel: ", occ_filenames)
         reports = parallel_annotate(
-            occ_filenames, riis_annotated_filename, geoinput_path, output_path, logger)
+            occ_filenames, riis_annotated_filename, geo_input_path, output_path, logger)
         end = time.perf_counter()
         logger.log(
             f"Parallel Annotation End Time : {time.asctime()}, duration {end-start} "
@@ -200,18 +202,27 @@ def b_annotate_occurrence_files(
         "reports": [],
         "messages": []
     }
+    # Compare with serial execution
     start = time.perf_counter()
+    # Use the same resolvers and RIIS for all Annotators
+    full_resolvers = get_full_coverage_resolvers(geo_input_path)
+    subset_resolvers = get_subsets_of_one_coverage_resolvers(geo_input_path)
+    riis = RIIS(riis_annotated_filename, logger)
+    riis.read_riis()
+
     ant = Annotator(
-        geoinput_path, logger, riis_with_gbif_filename=riis_annotated_filename)
+        logger, geo_full_coverages=full_resolvers,
+        geo_subsets_of_whole=subset_resolvers, riis=riis)
+
     for occ_fname in occ_filenames:
         logger.log(
             f"Start Time: {time.asctime()}: Submit {occ_fname} for annotation",
             refname=script_name)
 
-        logname, log_fname = BisonNameOp.get_process_logfilename(
-            occ_fname, logpath=log_path, step_or_process=LMBISON_PROCESS.ANNOTATE)
-        logger = Logger(
-            logname, log_filename=log_fname, log_console=False)
+        # logname, log_fname = BisonNameOp.get_process_logfilename(
+        #     occ_fname, logpath=log_path, step_or_process=LMBISON_PROCESS.ANNOTATE)
+        # logger = Logger(
+        #     logname, log_filename=log_fname, log_console=False)
 
         # Add locality-intersections and RIIS determinations to GBIF DwC records
         # TODO: replace the following testing line with commented following line,
@@ -224,7 +235,6 @@ def b_annotate_occurrence_files(
     logger.log(
         f"Parallel Annotation End Time : {time.asctime()}, duration {end-start} "
         f"seconds", refname=script_name)
-
 
     return reports
 

@@ -10,7 +10,8 @@ from bison.common.constants import (
     APPEND_TO_DWC, LMBISON_PROCESS, ENCODING, GBIF, LOG, REGION, REPORT)
 from bison.common.log import Logger
 from bison.common.util import (available_cpu_count, BisonNameOp, get_csv_dict_writer)
-from bison.process.geoindex import GeoResolver
+from bison.process.geoindex import (
+    GeoResolver, get_full_coverage_resolvers, get_subsets_of_one_coverage_resolvers)
 from bison.provider.gbif_data import DwcData
 from bison.provider.riis_data import RIIS
 
@@ -19,7 +20,8 @@ from bison.provider.riis_data import RIIS
 class Annotator():
     """Class for adding USGS RIIS info to GBIF occurrences."""
     def __init__(
-            self, geo_input_path, logger, riis_with_gbif_filename=None, riis=None):
+            self, logger, geo_input_path=None, geo_full_coverages=[],
+            geo_subsets_of_whole={}, riis_with_gbif_filename=None, riis=None):
         """Constructor.
 
         Args:
@@ -69,23 +71,26 @@ class Annotator():
             raise Exception(
                 "Must provide either RIIS with annotations or riis_with_gbif_filename")
 
-        # Geospatial indexes for regional attributes to add to records
-        self._geo_fulls = []
-        for region in REGION.full_region():
-            fn = os.path.join(geo_input_path, region["file"])
-            self._geo_fulls.append(GeoResolver(
-                fn, region["map"], self._log, is_disjoint=region["is_disjoint"],
-                buffer_vals=region["buffer"]))
+        if geo_full_coverages:
+            self._geo_fulls = geo_full_coverages
+        elif geo_input_path is not None:
+            # Geospatial indexes for regional attributes to add to records
+            self._geo_fulls = get_full_coverage_resolvers(geo_input_path, self._log)
+        else:
+            raise Exception(
+                f"Must provide either full-coverage GeoResolvers or geospatial path")
 
         # Geospatial indexes for subset regions of a whole, all with same
         # attributes to add
-        self._geo_partials = {}
-        region = REGION.combine_to_region()
-        for filter_val, rel_fn in region["files"]:
-            fn = os.path.join(geo_input_path, rel_fn)
-            self._geo_partials[filter_val] = GeoResolver(
-                fn, region["map"], self._log, is_disjoint=region["is_disjoint"],
-                buffer_vals=region["buffer"])
+        if geo_subsets_of_whole:
+            self._geo_partials = geo_subsets_of_whole
+        elif geo_input_path is not None:
+            # Geospatial indexes for regional attributes to add to records
+            self._geo_partials = get_subsets_of_one_coverage_resolvers(
+                geo_input_path, self._log)
+        else:
+            raise Exception(
+                f"Must provide either subset-coverage GeoResolvers or geospatial path")
 
     # ...............................................
     def initialize_occurrences_io(self, gbif_occ_filename, output_occ_filename):
@@ -346,17 +351,18 @@ class Annotator():
 
 # .............................................................................
 def annotate_occurrence_file(
-        dwc_filename, riis_annotated_filename, geo_path, output_path, log_path):
+        dwc_filename, full_resolvers, subset_resolvers, riis, output_path, log_path):
     """Annotate GBIF records with census state and county, and RIIS key and assessment.
 
     Args:
         dwc_filename (str): full filename containing GBIF data for annotation.
         riis_annotated_filename (str): full filename with RIIS records annotated with
             gbif accepted taxa
-        geo_path (str): input directory containing geospatial files for
-            geo-referencing occurrence points.
         output_path (str): destination directory for output annotated occurrence files.
         log_path (object): destination directory for logging processing messages.
+        geo_path (str): input directory containing geospatial files for
+            geo-referencing occurrence points.
+        geo_resolvers (dict):
 
     Returns:
         report (dict): metadata for the occurrence annotation data and process.
@@ -377,7 +383,8 @@ def annotate_occurrence_file(
         refname="annotate_occurrence_file")
 
     ant = Annotator(
-        geo_path, logger, riis_with_gbif_filename=riis_annotated_filename)
+        logger, geo_full_coverages=full_resolvers,
+        geo_subsets_of_whole=subset_resolvers, riis=riis)
     report = ant.annotate_dwca_records(dwc_filename, output_path)
 
     logger.log(
@@ -411,6 +418,12 @@ def parallel_annotate(
         output_path = os.path.dirname(dwc_filenames[0])
     log_path = main_logger.log_directory
 
+    # Use the same resolvers and RIIS for all Annotators
+    full_resolvers = get_full_coverage_resolvers(geo_path)
+    subset_resolvers = get_subsets_of_one_coverage_resolvers(geo_path)
+    riis = RIIS(riis_with_gbif_filename, main_logger)
+    riis.read_riis()
+
     # Process only needed files
     for dwc_fname in dwc_filenames:
         out_fname = BisonNameOp.get_process_outfilename(
@@ -421,7 +434,8 @@ def parallel_annotate(
             messages.append(msg)
         else:
             inputs.append(
-                (dwc_fname, riis_with_gbif_filename, geo_path, output_path, log_path))
+                (dwc_fname, full_resolvers, subset_resolvers, riis, output_path,
+                 log_path))
     main_logger.log(
         f"Parallel Annotation Start Time : {time.asctime()}", refname=refname)
 
