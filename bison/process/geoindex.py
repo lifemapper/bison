@@ -314,6 +314,7 @@ def get_full_coverage_resolvers(geo_input_path, logger=None):
         geo_fulls.append(GeoResolver(
             fn, region["map"], logger=logger, is_disjoint=region["is_disjoint"],
             buffer_vals=region["buffer"]))
+    return geo_fulls
 
 
 # .............................................................................
@@ -347,6 +348,7 @@ class GeoException(Exception):
             message: optional message attached to Exception.
         """
         Exception(message)
+
 
 # .............................................................................
 __all__ = [

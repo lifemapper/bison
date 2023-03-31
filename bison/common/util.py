@@ -747,12 +747,12 @@ class BisonNameOp():
 
     # .............................................................................
     @staticmethod
-    def get_process_logfilename(in_filename, logpath=None, step_or_process=None):
+    def get_process_logfilename(in_filename, log_path=None, step_or_process=None):
         """Construct output filename for the next processing step of the given file.
 
         Args:
             in_filename (str): base or full filename of CSV data.
-            outpath (str): destination directory for output filename
+            log_path (str): Destination directory for log files.
             step_or_process (int or lmbison.common.constants.DWC_PROCESS):
                 stage of processing completed on the output file.
 
@@ -778,11 +778,9 @@ class BisonNameOp():
 
         pname = step_or_process["postfix"]
         logname = f"{basename}{sep}{pname}"
-        log_fname = os.path.join(logpath, f"{logname}.log")
+        log_fname = os.path.join(log_path, f"{logname}.log")
 
         return logname, log_fname
-
-
 
     # .............................................................................
     @staticmethod

@@ -1,6 +1,6 @@
 """Common classes for BISON RIIS data processing."""
 import csv
-from logging import DEBUG, ERROR
+from logging import DEBUG, ERROR, WARNING
 import os
 
 from bison.common.constants import (
@@ -458,7 +458,7 @@ class RIIS:
                 except KeyError:
                     self._log.log(
                         f"Failed to get status from alternative {alt}",
-                        refname=self.__class__.__name__, log_level=logging.WARNING)
+                        refname=self.__class__.__name__, log_level=WARNING)
                 else:
                     if status == "accepted":
                         key = alt["usageKey"]
@@ -480,7 +480,7 @@ class RIIS:
         except KeyError:
             self._log.log(
                 f"Failed to get matchType from {gbifrec}",
-                refname=self.__class__.__name__, log_level=logging.ERROR)
+                refname=self.__class__.__name__, log_level=ERROR)
         else:
             if match_type != 'NONE':
                 try:
@@ -489,7 +489,7 @@ class RIIS:
                 except KeyError:
                     self._log.log(
                         f"Failed to get status from {gbifrec}",
-                        refname=self.__class__.__name__, log_level=logging.ERROR)
+                        refname=self.__class__.__name__, log_level=ERROR)
                 else:
                     if status == "accepted":
                         key = gbifrec["usageKey"]
@@ -511,7 +511,7 @@ class RIIS:
         except KeyError:
             self._log.log(
                 f"Failed to get status from {gbifrec}", refname=self.__class__.__name__,
-                log_level=logging.ERROR)
+                log_level=ERROR)
         else:
             if status == "accepted":
                 key = gbifrec["key"]
@@ -592,7 +592,7 @@ class RIIS:
                           f" {data[RIIS_DATA.SCINAME_FLD]}, {e}"
                     self._add_msg(msgdict, name, err)
                     self._log.log(
-                        err, refname=self.__class__.__name__, log_level=logging.ERROR)
+                        err, refname=self.__class__.__name__, log_level=ERROR)
                 else:
                     name_count += 1
                     # Annotate all records for this name with GBIF accepted key/sciname
@@ -678,7 +678,7 @@ class RIIS:
                 except Exception as e:
                     msg = f"Failed to write {rec.data}, {e}"
                     self._log.log(
-                        msg, refname=self.__class__.__name__, log_level=logging.ERROR)
+                        msg, refname=self.__class__.__name__, log_level=ERROR)
                     self._add_msg(msgdict, name, msg)
                     raise
 
@@ -730,10 +730,10 @@ class RIIS:
         fld_count = len(header)
         if fld_count != len(expected_header):
             self._log.log(
-                ERR_SEPARATOR, refname=self.__class__.__name__, log_level=logging.ERROR)
+                ERR_SEPARATOR, refname=self.__class__.__name__, log_level=ERROR)
             self._log.log(
                 f"[Error] Header has {fld_count} fields, != {len(expected_header)} " +
-                "expected", refname=self.__class__.__name__, log_level=logging.ERROR)
+                "expected", refname=self.__class__.__name__, log_level=ERROR)
 
         good_header = []
         for i in range(len(header)):

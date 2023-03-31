@@ -1,7 +1,6 @@
 """Main script to execute all elements of the summarize-GBIF BISON workflow."""
 import csv
-import logging
-# from datetime import datetime
+from logging import DEBUG, ERROR, INFO
 import json
 import os
 import time
@@ -9,13 +8,10 @@ import time
 from bison.common.constants import (
     APPEND_TO_DWC, CONFIG_PARAM, LMBISON_PROCESS, GBIF, ENCODING, EXTRA_CSV_FIELD, LOG,
     REGION, REPORT, RIIS_DATA)
-from bison.common.log import Logger
 from bison.common.util import BisonNameOp, Chunker, delete_file, get_csv_dict_reader
 from bison.process.aggregate import Aggregator
-from bison.process.annotate import Annotator, parallel_annotate
-from bison.process.geoindex import (
-    GeoResolver, GeoException, get_full_coverage_resolvers,
-    get_subsets_of_one_coverage_resolvers)
+from bison.process.annotate import (annotate_occurrence_file, parallel_annotate)
+from bison.process.geoindex import (GeoResolver, GeoException)
 from bison.process.sanity_check import Counter
 from bison.provider.riis_data import RIIS
 from bison.tools._config_parser import get_common_arguments
@@ -49,7 +45,7 @@ PARAMETERS = {
                         "Flag indicating whether the GBIF data is to be (or has been) "
                         "split into smaller subsets."
                 },
-            "geoinput_path":
+            "geo_path":
                 {
                     CONFIG_PARAM.TYPE: str,
                     CONFIG_PARAM.IS_INPUT_DIR: True,
@@ -123,13 +119,68 @@ def a_resolve_riis_taxa(riis_filename, output_path, logger, overwrite=False):
     except Exception as e:
         logger.log(
             f"Unexpected failure {e} in resolve_riis_taxa", refname=script_name,
-            log_level=logging.ERROR)
+            log_level=ERROR)
     else:
         if report[REPORT.RECORDS_OUTPUT] != RIIS_DATA.SPECIES_GEO_DATA_COUNT:
             logger.log(
                 f"Wrote {report[REPORT.RECORDS_OUTPUT]} RIIS records, expecting "
                 f"{RIIS_DATA.SPECIES_GEO_DATA_COUNT}", refname=script_name)
     return report
+
+
+# .............................................................................
+def b_annotate_occurrence_files(
+        occ_filenames, riis_annotated_filename, geo_path, output_path, logger,
+        log_path, run_parallel=True):
+    """Annotate GBIF records with census state and county, and RIIS key and assessment.
+
+    Args:
+        occ_filenames (list): list of full filenames containing GBIF data for
+            annotation.
+        riis_annotated_filename (str): Full path to RIIS data annotated with GBIF names.
+        geo_path (str): Base directory containing geospatial region files
+        output_path (str): Destination directory for output files.
+        logger (object): logger for saving relevant processing messages
+        log_path (str): Destination directory for log files.
+        run_parallel (bool): Flag indicating whether to process subset files in parallel
+
+    Returns:
+        annotated_filenames: full filenames for GBIF data newly annotated with state,
+            county, RIIS assessment, and RIIS key.  If a file exists, do not annotate.
+    """
+    if run_parallel and len(occ_filenames) > 1:
+        reports = parallel_annotate(
+            occ_filenames, riis_annotated_filename, geo_path, output_path, logger)
+
+    else:
+        reports = {"reports": []}
+        # Compare with serial execution
+        all_start = time.perf_counter()
+        # Use the same RIIS for all Annotators
+        riis = RIIS(riis_annotated_filename, logger)
+        riis.read_riis()
+
+        for occ_fname in occ_filenames:
+            logger.log(
+                f"Annotate files serially: {time.asctime()}", refname=script_name)
+
+            # Add locality-intersections and RIIS determinations to GBIF DwC records
+            start = time.perf_counter()
+            rpt = annotate_occurrence_file(
+                occ_fname, geo_path, riis, output_path, log_path)
+            end = time.perf_counter()
+
+            reports["reports"].append(rpt)
+            logger.log(
+                f"Elapsed time: {end-start} seconds",
+                refname=script_name)
+
+        all_end = time.perf_counter()
+        logger.log(
+            f"Serial Annotation End Time: {time.asctime()}, {all_end-all_start} "
+            f"seconds elapsed", refname=script_name)
+
+    return reports
 
 
 # .............................................................................
@@ -165,78 +216,6 @@ def c_summarize_annotated_files(annotated_filenames, output_path, logger):
         report = rpt
 
     return report
-
-
-# .............................................................................
-def b_annotate_occurrence_files(
-        occ_filenames, riis_annotated_filename, geo_input_path, output_path, logger,
-        log_path, run_parallel=True):
-    """Annotate GBIF records with census state and county, and RIIS key and assessment.
-
-    Args:
-        occ_filenames (list): list of full filenames containing GBIF data for
-            annotation.
-        riis_annotated_filename (str): Full path to RIIS data annotated with GBIF names.
-        geoinput_path (str): Base directory containing geospatial region files
-        output_path (str): Destination directory for output files.
-        logger (object): logger for saving relevant processing messages
-        log_path (str): Destination directory for log files.
-        run_parallel (bool): Flag indicating whether to process subset files in parallel
-
-    Returns:
-        annotated_filenames: full filenames for GBIF data newly annotated with state,
-            county, RIIS assessment, and RIIS key.  If a file exists, do not annotate.
-    """
-    if run_parallel and len(occ_filenames) > 1:
-        start = time.perf_counter()
-        log_list(logger, "Annotate files in parallel: ", occ_filenames)
-        reports = parallel_annotate(
-            occ_filenames, riis_annotated_filename, geo_input_path, output_path, logger)
-        end = time.perf_counter()
-        logger.log(
-            f"Parallel Annotation End Time : {time.asctime()}, duration {end-start} "
-            f"seconds", refname=script_name)
-
-    if not reports:
-        reports = {
-        "reports": [],
-        "messages": []
-    }
-    # Compare with serial execution
-    start = time.perf_counter()
-    # Use the same resolvers and RIIS for all Annotators
-    full_resolvers = get_full_coverage_resolvers(geo_input_path)
-    subset_resolvers = get_subsets_of_one_coverage_resolvers(geo_input_path)
-    riis = RIIS(riis_annotated_filename, logger)
-    riis.read_riis()
-
-    ant = Annotator(
-        logger, geo_full_coverages=full_resolvers,
-        geo_subsets_of_whole=subset_resolvers, riis=riis)
-
-    for occ_fname in occ_filenames:
-        logger.log(
-            f"Start Time: {time.asctime()}: Submit {occ_fname} for annotation",
-            refname=script_name)
-
-        # logname, log_fname = BisonNameOp.get_process_logfilename(
-        #     occ_fname, logpath=log_path, step_or_process=LMBISON_PROCESS.ANNOTATE)
-        # logger = Logger(
-        #     logname, log_filename=log_fname, log_console=False)
-
-        # Add locality-intersections and RIIS determinations to GBIF DwC records
-        # TODO: replace the following testing line with commented following line,
-        #   using "log_path" redirects output for testing against parallel
-        rpt = ant.annotate_dwca_records(occ_fname, log_path)
-        # rpt = ant.annotate_dwca_records(occ_fname, output_path)
-
-        reports["reports"].append(rpt)
-    end = time.perf_counter()
-    logger.log(
-        f"Parallel Annotation End Time : {time.asctime()}, duration {end-start} "
-        f"seconds", refname=script_name)
-
-    return reports
 
 
 # .............................................................................
@@ -309,7 +288,7 @@ def log_list(logger, msg, outlist):
     msg = f"{msg}\n"
     for elt in outlist:
         msg += f"  {elt}\n"
-    logger.log(msg, refname=script_name, log_level=logging.INFO)
+    logger.log(msg, refname=script_name, log_level=INFO)
 
 
 # ...............................................
@@ -330,16 +309,16 @@ def _find_county_state(geo_county, lon, lat, buffer_vals):
 
 
 # .............................................................................
-def test_bad_line(trouble_id, raw_filenames, geoinput_path, logger):
+def test_bad_line(trouble_id, raw_filenames, geo_path, logger):
     """Test georeferencing line with gbif_id .
 
     Args:
         trouble_id: gbifID for bad record to find
         raw_filenames: List of files to test, looking for troublesome data.
-        geoinput_path: Full base directory for geospatial data
+        geo_path: Full base directory for geospatial data
         logger: logger for writing messages.
     """
-    geofile = os.path.join(geoinput_path, REGION.COUNTY["file"])
+    geofile = os.path.join(geo_path, REGION.COUNTY["file"])
     geo_county = GeoResolver(geofile, REGION.COUNTY["map"], logger)
     for csvfile in raw_filenames:
         try:
@@ -349,7 +328,7 @@ def test_bad_line(trouble_id, raw_filenames, geoinput_path, logger):
         except Exception as e:
             logger.log(
                 f"Unexpected open error {e} on file {csvfile}", refname=script_name,
-                log_level=logging.ERROR)
+                log_level=ERROR)
         else:
             logger.log(f"Opened file {csvfile}", refname=script_name)
             try:
@@ -360,19 +339,19 @@ def test_bad_line(trouble_id, raw_filenames, geoinput_path, logger):
                     if (rdr.line_num % LOG.INTERVAL) == 0:
                         logger.log(
                             f"*** Record number {rdr.line_num}, gbifID: {gbif_id} ***",
-                            refname=script_name, log_level=logging.DEBUG)
+                            refname=script_name, log_level=DEBUG)
 
                     # Debug: examine data
                     if gbif_id == trouble_id:
                         logger.log(
                             f"Found gbifID {trouble_id} on line {rdr.line_num}",
-                            refname=script_name, log_level=logging.DEBUG)
+                            refname=script_name, log_level=DEBUG)
 
                     if EXTRA_CSV_FIELD in dwcrec.keys():
                         logger.log(
                             "Extra fields detected: possible bad read for record "
                             f"{gbif_id} on line {rdr.line_num}", refname=script_name,
-                            log_level=logging.DEBUG)
+                            log_level=DEBUG)
 
                     # Find county and state for these coords
                     try:
@@ -382,22 +361,22 @@ def test_bad_line(trouble_id, raw_filenames, geoinput_path, logger):
                     except ValueError as e:
                         logger.log(
                             f"Record gbifID: {gbif_id}: {e}", refname=script_name,
-                            log_level=logging.ERROR)
+                            log_level=ERROR)
                     except GeoException as e:
                         logger.log(
                             f"Record gbifID: {gbif_id}: {e}", refname=script_name,
-                            log_level=logging.ERROR)
+                            log_level=ERROR)
                     if ogr_seconds > 0.75:
                         logger.log(
                             f"Record gbifID: {gbif_id}; OGR time {ogr_seconds}",
-                            refname=script_name, log_level=logging.DEBUG)
+                            refname=script_name, log_level=DEBUG)
 
                     dwcrec = next(rdr)
 
             except Exception as e:
                 logger.log(
                     f"Unexpected read error {e} on file {csvfile}", refname=script_name,
-                    log_level=logging.ERROR)
+                    log_level=ERROR)
 
 
 # .............................................................................
@@ -425,28 +404,28 @@ def read_bad_line(in_filename, logger, gbif_id=None, line_num=None):
             if (rdr.line_num % LOG.INTERVAL) == 0:
                 logger.log(
                     f"*** Record number {rdr.line_num}, gbifID: {gbif_id} ***",
-                    refname=script_name, log_level=logging.DEBUG)
+                    refname=script_name, log_level=DEBUG)
 
             # Debug: examine data
             if gbif_id == dwcrec[GBIF.ID_FLD]:
                 logger.log(
                     f"Found gbifID {gbif_id} on line {rdr.line_num}",
-                    refname=script_name, log_level=logging.DEBUG)
+                    refname=script_name, log_level=DEBUG)
             elif rdr.line_num == line_num:
                 logger.log(
                     f"Found line {rdr.line_num}", refname=script_name,
-                    log_level=logging.DEBUG)
+                    log_level=DEBUG)
 
             if EXTRA_CSV_FIELD in dwcrec.keys():
                 logger.log(
                     f"Extra fields detected: possible bad read for record {gbif_id} on "
                     f"line {rdr.line_num}", refname=script_name,
-                    log_level=logging.DEBUG)
+                    log_level=DEBUG)
 
     except Exception as e:
         logger.log(
             f"Unexpected read error {e} on file {in_filename}", refname=script_name,
-            log_level=logging.ERROR)
+            log_level=ERROR)
 
 
 # .............................................................................
@@ -544,10 +523,9 @@ def execute_command(config, logger):
         logger.log(f"Resolved RIIS filename: {report[REPORT.OUTFILE]}")
 
     elif config["command"] == "annotate":
-        log_list(logger, "Input filenames", raw_filenames)
         # Annotate DwC records with regions, and if found, RIIS determination
         report = b_annotate_occurrence_files(
-            raw_filenames, riis_annotated_filename, config["geoinput_path"],
+            raw_filenames, riis_annotated_filename, config["geo_path"],
             config["process_path"], logger, log_path, run_parallel=True)
         log_list(
             logger, "Newly annotated filenames:",
@@ -579,7 +557,7 @@ def execute_command(config, logger):
 
     elif config["command"] == "test_bad_data" and config["gbif_id"] is not None:
         test_bad_line(
-            config["gbif_id"], config["examine_filenames"], config["geoinput_path"], logger)
+            config["gbif_id"], config["examine_filenames"], config["geo_path"], logger)
 
     elif config["command"] == "find_bad_record":
         # Should only be one file in the examine_filenames list
@@ -590,7 +568,7 @@ def execute_command(config, logger):
     else:
         logger.log(
             f"Unsupported command {config['command']}", refname=script_name,
-            log_level=logging.ERROR)
+            log_level=ERROR)
 
     return report
 
@@ -604,7 +582,7 @@ if __name__ == '__main__':
         script_name, DESCRIPTION, PARAMETERS)
 
     logger.log(f"Command: {config['command']}", refname=script_name)
-    logger.log(f"Start Time : {time.asctime()}", refname=script_name)
+    logger.log(f"main start time: {time.asctime()}", refname=script_name)
 
     report = execute_command(config, logger)
 
@@ -619,4 +597,4 @@ if __name__ == '__main__':
     logger.log(
         f"Wrote report file to {config['report_filename']}", refname=script_name)
 
-    logger.log(f"End Time : {time.asctime()}", refname=script_name)
+    logger.log(f"main end time: {time.asctime()}", refname=script_name)

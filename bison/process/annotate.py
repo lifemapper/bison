@@ -1,6 +1,5 @@
 """Common classes for adding USGS RIIS info to GBIF occurrences."""
 import logging
-import time
 from multiprocessing import Pool
 import os
 from logging import ERROR
@@ -11,7 +10,7 @@ from bison.common.constants import (
 from bison.common.log import Logger
 from bison.common.util import (available_cpu_count, BisonNameOp, get_csv_dict_writer)
 from bison.process.geoindex import (
-    GeoResolver, get_full_coverage_resolvers, get_subsets_of_one_coverage_resolvers)
+    get_full_coverage_resolvers, get_subsets_of_one_coverage_resolvers)
 from bison.provider.gbif_data import DwcData
 from bison.provider.riis_data import RIIS
 
@@ -19,14 +18,12 @@ from bison.provider.riis_data import RIIS
 # .............................................................................
 class Annotator():
     """Class for adding USGS RIIS info to GBIF occurrences."""
-    def __init__(
-            self, logger, geo_input_path=None, geo_full_coverages=[],
-            geo_subsets_of_whole={}, riis_with_gbif_filename=None, riis=None):
+    def __init__(self, logger, geo_path, riis_with_gbif_filename=None, riis=None):
         """Constructor.
 
         Args:
-            geo_input_path (str): input path for geospatial files to intersect points
             logger (object): logger for saving relevant processing messages
+            geo_path (str): input path for geospatial files to intersect points
             riis_with_gbif_filename (str): full filename of RIIS data annotated with
                 GBIF accepted taxon names.
             riis (bison.common.riis.RIIS): object containing USGS RIIS data for
@@ -71,26 +68,12 @@ class Annotator():
             raise Exception(
                 "Must provide either RIIS with annotations or riis_with_gbif_filename")
 
-        if geo_full_coverages:
-            self._geo_fulls = geo_full_coverages
-        elif geo_input_path is not None:
-            # Geospatial indexes for regional attributes to add to records
-            self._geo_fulls = get_full_coverage_resolvers(geo_input_path, self._log)
-        else:
-            raise Exception(
-                f"Must provide either full-coverage GeoResolvers or geospatial path")
+        # Geospatial indexes for regional attributes to add to records
+        self._geo_fulls = get_full_coverage_resolvers(geo_path, self._log)
 
-        # Geospatial indexes for subset regions of a whole, all with same
-        # attributes to add
-        if geo_subsets_of_whole:
-            self._geo_partials = geo_subsets_of_whole
-        elif geo_input_path is not None:
-            # Geospatial indexes for regional attributes to add to records
-            self._geo_partials = get_subsets_of_one_coverage_resolvers(
-                geo_input_path, self._log)
-        else:
-            raise Exception(
-                f"Must provide either subset-coverage GeoResolvers or geospatial path")
+        # Geospatial indexes for subset regions of a whole, with identical attributes
+        self._geo_partials = get_subsets_of_one_coverage_resolvers(
+            geo_path, self._log)
 
     # ...............................................
     def initialize_occurrences_io(self, gbif_occ_filename, output_occ_filename):
@@ -296,7 +279,8 @@ class Annotator():
         """
         start = time.perf_counter()
         self._log.log(
-            f"Start Time : {time.asctime()}", refname=self.__class__.__name__)
+            f"Start Annotator.annotate_dwca_records: {time.asctime()}",
+            refname=self.__class__.__name__)
 
         out_filename = BisonNameOp.get_process_outfilename(
             dwc_filename, outpath=output_path, step_or_process=LMBISON_PROCESS.ANNOTATE)
@@ -339,30 +323,28 @@ class Annotator():
         report[REPORT.RANK_FAIL] = list(self.bad_ranks)
         report[REPORT.RANK_FAIL_COUNT] = self.rank_filtered_records
         end = time.perf_counter()
+
         self._log.log(
-            f"Annotate records filtered out {self.rank_filtered_records} " +
-            f"records with {self.bad_ranks} ranks", refname=self.__class__.__name__)
+            f"End Annotator.annotate_dwca_records: {time.asctime()}, {end - start} "
+            f"seconds elapsed", refname=self.__class__.__name__)
         self._log.log(
-            f"End Time : {time.asctime()}, duration {end - start} seconds",
+            f"Filtered out {self.rank_filtered_records} records of {self.bad_ranks}",
             refname=self.__class__.__name__)
 
         return report
 
 
 # .............................................................................
-def annotate_occurrence_file(
-        dwc_filename, full_resolvers, subset_resolvers, riis, output_path, log_path):
+def annotate_occurrence_file(dwc_filename, geo_path, riis, output_path, log_path):
     """Annotate GBIF records with census state and county, and RIIS key and assessment.
 
     Args:
         dwc_filename (str): full filename containing GBIF data for annotation.
-        riis_annotated_filename (str): full filename with RIIS records annotated with
-            gbif accepted taxa
+        geo_path (str): Base directory containing geospatial region files
+        riis (bison.provider.riis_data.RIIS): object containing RIIS records annotated
+            with gbif accepted taxa
         output_path (str): destination directory for output annotated occurrence files.
         log_path (object): destination directory for logging processing messages.
-        geo_path (str): input directory containing geospatial files for
-            geo-referencing occurrence points.
-        geo_resolvers (dict):
 
     Returns:
         report (dict): metadata for the occurrence annotation data and process.
@@ -374,21 +356,12 @@ def annotate_occurrence_file(
         raise FileNotFoundError(dwc_filename)
 
     logname, log_fname = BisonNameOp.get_process_logfilename(
-        dwc_filename, logpath=log_path, step_or_process=LMBISON_PROCESS.ANNOTATE)
-    logger = Logger(
-        logname, log_filename=log_fname, log_console=False)
+        dwc_filename, log_path=log_path, step_or_process=LMBISON_PROCESS.ANNOTATE)
+    logger = Logger(logname, log_filename=log_fname, log_console=False)
 
-    logger.log(
-        f"Submit {dwc_filename} for annotation {time.asctime()}",
-        refname="annotate_occurrence_file")
-
-    ant = Annotator(
-        logger, geo_full_coverages=full_resolvers,
-        geo_subsets_of_whole=subset_resolvers, riis=riis)
+    ant = Annotator(logger, geo_path, riis=riis)
     report = ant.annotate_dwca_records(dwc_filename, output_path)
 
-    logger.log(
-        f"End Time : {time.asctime()}", refname="annotate_occurrence_file")
     return report
 
 
@@ -419,8 +392,6 @@ def parallel_annotate(
     log_path = main_logger.log_directory
 
     # Use the same resolvers and RIIS for all Annotators
-    full_resolvers = get_full_coverage_resolvers(geo_path)
-    subset_resolvers = get_subsets_of_one_coverage_resolvers(geo_path)
     riis = RIIS(riis_with_gbif_filename, main_logger)
     riis.read_riis()
 
@@ -433,9 +404,8 @@ def parallel_annotate(
             main_logger.log(msg, refname=refname)
             messages.append(msg)
         else:
-            inputs.append(
-                (dwc_fname, full_resolvers, subset_resolvers, riis, output_path,
-                 log_path))
+            inputs.append((dwc_fname, geo_path, riis, output_path, log_path))
+
     main_logger.log(
         f"Parallel Annotation Start Time : {time.asctime()}", refname=refname)
 

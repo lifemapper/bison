@@ -85,7 +85,7 @@ def annotate_occurrence_files(
             raise FileNotFoundError(f"Missing input DWC occurrence file {dwc_fname}.")
 
     ant = Annotator(
-        geo_path, logger, riis_with_gbif_filename=riis_w_gbif_taxa_filename)
+        logger, geo_path, riis_with_gbif_filename=riis_w_gbif_taxa_filename)
     for dwc_fname in dwc_filenames:
         out_fname = BisonNameOp.get_process_outfilename(
             dwc_fname, outpath=output_path, step_or_process=LMBISON_PROCESS.ANNOTATE)

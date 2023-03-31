@@ -2,10 +2,11 @@
 import os
 from rtree.index import Index as rtree_index
 
-from bison.common.constants import APPEND_TO_DWC, LMBISON_PROCESS
+from bison.common.constants import APPEND_TO_DWC, REPORT
 from bison.common.log import Logger
-from bison.common.util import BisonNameOp, get_fields_from_header
+from bison.common.util import get_fields_from_header
 from bison.process.annotate import Annotator, annotate_occurrence_file
+from bison.provider.riis_data import RIIS
 from tests.tools.test_setup import get_test_parameters
 
 script_name = os.path.splitext(os.path.basename(__file__))[0]
@@ -23,7 +24,7 @@ class Test_annotate_gbif:
         """Test reading an original RIIS file by checking counts."""
         fn_args = get_test_parameters(script_name)
         ant = Annotator(
-            fn_args["geoinput_path"], self._logger,
+            self._logger, fn_args["geoinput_path"],
             riis_with_gbif_filename=fn_args["riis_with_gbif_taxa_filename"])
         spatial_idxs = ant._geo_fulls
         spatial_idxs.extend(ant._geo_partials.values())
@@ -36,18 +37,15 @@ class Test_annotate_gbif:
         """Test reading an original RIIS file by checking counts."""
         fn_args = get_test_parameters(script_name)
         ant = Annotator(
-            fn_args["geoinput_path"], self._logger,
+            self._logger, fn_args["geoinput_path"],
             riis_with_gbif_filename=fn_args["riis_with_gbif_taxa_filename"])
         infile = fn_args["dwc_filenames"][0]
         infields = get_fields_from_header(infile)
         new_fields = APPEND_TO_DWC.annotation_fields()
 
         for fn in fn_args["dwc_filenames"]:
-            outfile = BisonNameOp.get_process_outfilename(
-                fn, outpath=fn_args["output_path"],
-                step_or_process=LMBISON_PROCESS.ANNOTATE)
-            ant.annotate_dwca_records(fn, outfile)
-            outfields = get_fields_from_header(outfile)
+            rpt = ant.annotate_dwca_records(fn, fn_args["output_path"])
+            outfields = get_fields_from_header(rpt[REPORT.OUTFILE])
             assert(len(infields) + len(new_fields) == len(outfields))
             for fld in APPEND_TO_DWC.annotation_fields():
                 assert(fld in outfields)
@@ -60,12 +58,14 @@ class Test_annotate_gbif:
         infields = get_fields_from_header(infile)
         new_fields = APPEND_TO_DWC.annotation_fields()
 
-        report = annotate_occurrence_file(
-            infile, fn_args["riis_with_gbif_taxa_filename"],
-            fn_args["geoinput_path"], fn_args["output_path"], self._logger)
+        riis = RIIS(fn_args["riis_with_gbif_taxa_filename"], self._logger)
+        riis.read_riis()
 
-        outfile = report["dwc_with_geo_and_riis_filename"]
-        outfields = get_fields_from_header(outfile)
+        report = annotate_occurrence_file(
+            infile, fn_args["geoinput_path"], riis, fn_args["output_path"],
+            fn_args["log_path"])
+
+        outfields = get_fields_from_header(report[REPORT.OUTFILE])
         assert (len(infields) + len(new_fields) == len(outfields))
         for fld in APPEND_TO_DWC.annotation_fields():
             assert (fld in outfields)
