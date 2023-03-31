@@ -745,6 +745,41 @@ class BisonNameOp():
             outfname = os.path.join(outpath, outbasename)
         return outfname
 
+
+    # .............................................................................
+    @staticmethod
+    def _get_process_base_filename(in_filename, step_or_process=None):
+        """Construct output base filename for this processing step of the given file.
+
+        Args:
+            in_filename (str): base or full filename of CSV data.
+            step_or_process (int or lmbison.common.constants.DWC_PROCESS):
+                stage of processing completed on the output file.
+
+        Returns:
+            base_filename: base filename without path or extension.
+
+        Note:
+            The input filename is parsed for process step.
+
+            File will always start with basename, followed by chunk,
+                followed by process step completed (if any)
+        """
+        sep = BisonNameOp.separator
+        pth, basename, ext, chunk, postfix = BisonNameOp.parse_process_filename(
+            in_filename)
+
+        # If step is not provided, get the step of the input file.
+        if step_or_process is None:
+            step_or_process = LMBISON_PROCESS.get_process(postfix=postfix)
+        if chunk is not None:
+            basename = f"{basename}{sep}{chunk}"
+
+        pname = step_or_process["postfix"]
+        base_filename = f"{basename}{sep}{pname}"
+
+        return base_filename
+
     # .............................................................................
     @staticmethod
     def get_process_logfilename(in_filename, log_path=None, step_or_process=None):
@@ -766,21 +801,38 @@ class BisonNameOp():
             File will always start with basename, followed by chunk,
                 followed by process step completed (if any)
         """
-        sep = BisonNameOp.separator
-        pth, basename, ext, chunk, postfix = BisonNameOp.parse_process_filename(
-            in_filename)
+        base_filename = BisonNameOp._get_process_base_filename(
+            in_filename, step_or_process=step_or_process)
+        log_fname = os.path.join(log_path, f"{base_filename}.log")
 
-        # If step is not provided, get the step of the input file.
-        if step_or_process is None:
-            step_or_process = LMBISON_PROCESS.get_process(postfix=postfix)
-        if chunk is not None:
-            basename = f"{basename}{sep}{chunk}"
+        return base_filename, log_fname
 
-        pname = step_or_process["postfix"]
-        logname = f"{basename}{sep}{pname}"
-        log_fname = os.path.join(log_path, f"{logname}.log")
+    # .............................................................................
+    @staticmethod
+    def get_process_report_filename(in_filename, output_path=None, step_or_process=None):
+        """Construct output filename for the next processing step of the given file.
 
-        return logname, log_fname
+        Args:
+            in_filename (str): base or full filename of CSV data.
+            output_path (str): Destination directory for report files.
+            step_or_process (int or lmbison.common.constants.DWC_PROCESS):
+                stage of processing completed on the output file.
+
+        Returns:
+            logname: name for logger
+            log_filename: full filename for logging output
+
+        Note:
+            The input filename is parsed for process step.
+
+            File will always start with basename, followed by chunk,
+                followed by process step completed (if any)
+        """
+        base_filename = BisonNameOp._get_process_base_filename(
+            in_filename, step_or_process=step_or_process)
+        log_fname = os.path.join(output_path, f"{base_filename}.log")
+
+        return log_fname
 
     # .............................................................................
     @staticmethod

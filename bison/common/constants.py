@@ -100,6 +100,8 @@ class REPORT:
     RECORDS_OUTPUT = "records_output"
     INFILE = "input_filename"
     OUTFILE = "output_filename"
+    LOGFILE = "log_filename"
+    REPORTFILE = "report_filename"
     SUMMARY = "summary"
     REGION = "region"
     LOCATION = "locations"

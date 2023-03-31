@@ -1,4 +1,5 @@
 """Common classes for adding USGS RIIS info to GBIF occurrences."""
+from concurrent.futures import ProcessPoolExecutor
 import logging
 from multiprocessing import Pool
 import os
@@ -335,14 +336,15 @@ class Annotator():
 
 
 # .............................................................................
-def annotate_occurrence_file(dwc_filename, geo_path, riis, output_path, log_path):
+def annotate_occurrence_file(
+        dwc_filename, riis_with_gbif_filename, geo_path, output_path, log_path):
     """Annotate GBIF records with census state and county, and RIIS key and assessment.
 
     Args:
         dwc_filename (str): full filename containing GBIF data for annotation.
+        riis_with_gbif_filename (str): full filename with RIIS records annotated with
+            gbif accepted taxa
         geo_path (str): Base directory containing geospatial region files
-        riis (bison.provider.riis_data.RIIS): object containing RIIS records annotated
-            with gbif accepted taxa
         output_path (str): destination directory for output annotated occurrence files.
         log_path (object): destination directory for logging processing messages.
 
@@ -355,12 +357,26 @@ def annotate_occurrence_file(dwc_filename, geo_path, riis, output_path, log_path
     if not os.path.exists(dwc_filename):
         raise FileNotFoundError(dwc_filename)
 
+    rpt_filename = BisonNameOp.get_process_report_filename(
+        dwc_filename, output_path=output_path, step_or_process=LMBISON_PROCESS.ANNOTATE)
     logname, log_fname = BisonNameOp.get_process_logfilename(
         dwc_filename, log_path=log_path, step_or_process=LMBISON_PROCESS.ANNOTATE)
     logger = Logger(logname, log_filename=log_fname, log_console=False)
 
-    ant = Annotator(logger, geo_path, riis=riis)
+    ant = Annotator(logger, geo_path, riis_with_gbif_filename=riis_with_gbif_filename)
     report = ant.annotate_dwca_records(dwc_filename, output_path)
+
+    # Write individual output report
+    import json
+    try:
+        with open(rpt_filename, mode='wt') as out_file:
+            json.dump(report, out_file, indent=4)
+    except OSError:
+        raise
+    except IOError:
+        raise
+    logger.log(
+        f"Wrote report file to {rpt_filename}", refname="annotate_occurrence_file")
 
     return report
 
@@ -391,9 +407,52 @@ def parallel_annotate(
         output_path = os.path.dirname(dwc_filenames[0])
     log_path = main_logger.log_directory
 
-    # Use the same resolvers and RIIS for all Annotators
-    riis = RIIS(riis_with_gbif_filename, main_logger)
-    riis.read_riis()
+    main_logger.log(
+        f"Parallel Annotation Start Time : {time.asctime()}", refname=refname)
+
+    with ProcessPoolExecutor() as executor:
+        for dwc_fname in dwc_filenames:
+            out_fname = BisonNameOp.get_process_outfilename(
+                dwc_fname, outpath=output_path, step_or_process=LMBISON_PROCESS.ANNOTATE)
+            if os.path.exists(out_fname):
+                msg = f"Annotations exist in {out_fname}."
+                main_logger.log(msg, refname=refname)
+                messages.append(msg)
+            else:
+                executor.submit(
+                    annotate_occurrence_file, dwc_fname, riis_with_gbif_filename,
+                    geo_path, output_path, log_path)
+
+    main_logger.log(
+        f"Parallel Annotation End Time : {time.asctime()}", refname=refname)
+
+
+
+# .............................................................................
+def parallel_annotate_new(
+        dwc_filenames, riis_with_gbif_filename, geo_path, output_path, main_logger):
+    """Main method for parallel execution of DwC annotation script.
+
+    Args:
+        dwc_filenames (list): list of full filenames containing GBIF data for
+            annotation.
+        riis_with_gbif_filename (str): full filename with RIIS records annotated with
+            gbif accepted taxa
+        geo_path (str): input directory containing geospatial files for
+            geo-referencing occurrence points.
+        output_path (str): destination directory for output annotated occurrence files.
+        main_logger (logger): logger for the process that calls this function,
+            initiating subprocesses
+
+    Returns:
+        reports (list of dict): metadata for the occurrence annotation data and process.
+    """
+    refname = "parallel_annotate"
+    messages = []
+    inputs = []
+    if output_path is None:
+        output_path = os.path.dirname(dwc_filenames[0])
+    log_path = main_logger.log_directory
 
     # Process only needed files
     for dwc_fname in dwc_filenames:
@@ -404,7 +463,8 @@ def parallel_annotate(
             main_logger.log(msg, refname=refname)
             messages.append(msg)
         else:
-            inputs.append((dwc_fname, geo_path, riis, output_path, log_path))
+            inputs.append(
+                (dwc_fname, riis_with_gbif_filename, geo_path, output_path, log_path))
 
     main_logger.log(
         f"Parallel Annotation Start Time : {time.asctime()}", refname=refname)

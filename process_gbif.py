@@ -10,7 +10,7 @@ from bison.common.constants import (
     REGION, REPORT, RIIS_DATA)
 from bison.common.util import BisonNameOp, Chunker, delete_file, get_csv_dict_reader
 from bison.process.aggregate import Aggregator
-from bison.process.annotate import (annotate_occurrence_file, parallel_annotate)
+from bison.process.annotate import (Annotator, annotate_occurrence_file, parallel_annotate)
 from bison.process.geoindex import (GeoResolver, GeoException)
 from bison.process.sanity_check import Counter
 from bison.provider.riis_data import RIIS
@@ -110,17 +110,22 @@ def a_resolve_riis_taxa(riis_filename, output_path, logger, overwrite=False):
     # Update species data
     try:
         report = nnsl.resolve_riis_to_gbif_taxa(output_path, overwrite=overwrite)
+    except Exception as e:
+        logger.log(
+            f"Unexpected failure {e} in resolve_riis_taxa", refname=script_name,
+            log_level=ERROR)
+    else:
         logger.log(
             f"Found {report[REPORT.TAXA_RESOLVED]} names, "
             f"{report[REPORT.RECORDS_UPDATED]} updated, "
             f"{report[REPORT.RECORDS_OUTPUT]} written "
             f"of total {report[REPORT.RIIS_IDENTIFIER]} from {riis_filename} "
             f"to {report[REPORT.OUTFILE]}.", refname=script_name)
-    except Exception as e:
-        logger.log(
-            f"Unexpected failure {e} in resolve_riis_taxa", refname=script_name,
-            log_level=ERROR)
-    else:
+        report_filename = BisonNameOp.get_process_report_filename(
+            config["riis_filename"], output_path=config["output_path"],
+            step_or_process=LMBISON_PROCESS.RESOLVE)
+        report[REPORT.REPORTFILE] = report_filename
+
         if report[REPORT.RECORDS_OUTPUT] != RIIS_DATA.SPECIES_GEO_DATA_COUNT:
             logger.log(
                 f"Wrote {report[REPORT.RECORDS_OUTPUT]} RIIS records, expecting "
@@ -166,8 +171,10 @@ def b_annotate_occurrence_files(
 
             # Add locality-intersections and RIIS determinations to GBIF DwC records
             start = time.perf_counter()
-            rpt = annotate_occurrence_file(
-                occ_fname, geo_path, riis, output_path, log_path)
+            ant = Annotator(logger, geo_path, riis=riis)
+            rpt = ant.annotate_dwca_records(occ_fname, output_path)
+            # rpt = annotate_occurrence_file(
+            #     occ_fname, geo_path, riis, output_path, log_path)
             end = time.perf_counter()
 
             reports["reports"].append(rpt)
@@ -215,6 +222,11 @@ def c_summarize_annotated_files(annotated_filenames, output_path, logger):
     else:
         report = rpt
 
+    report_filename = BisonNameOp.get_process_report_filename(
+        report[REPORT.OUTFILE], output_path=output_path,
+        step_or_process=LMBISON_PROCESS.SUMMARIZE)
+    report[REPORT.REPORTFILE] = report_filename
+
     return report
 
 
@@ -241,6 +253,10 @@ def d_aggregate_summary_by_region(
     agg = Aggregator(logger)
     report = agg.aggregate_file_summary_for_regions(
             summary_filename, resolved_riis_filename, output_path)
+    report_filename = BisonNameOp.get_process_report_filename(
+        summary_filename, output_path=output_path,
+        step_or_process=LMBISON_PROCESS.SUMMARIZE)
+    report[REPORT.REPORTFILE] = report_filename
 
     return report
 
@@ -507,6 +523,8 @@ def execute_command(config, logger):
     Raises:
         FileNotFoundError: on missing input file.
     """
+    report = {}
+    step_or_process = None
     (riis_annotated_filename, log_path,
         raw_filenames, annotated_filenames, summary_filenames,
         full_summary_filename) = _prepare_args(config)
@@ -518,26 +536,31 @@ def execute_command(config, logger):
     log_list(logger, "Input filenames:", raw_filenames)
 
     if config["command"] == "resolve":
+        step_or_process = LMBISON_PROCESS.RESOLVE
         report = a_resolve_riis_taxa(
             config["riis_filename"], riis_annotated_filename, logger, overwrite=False)
         logger.log(f"Resolved RIIS filename: {report[REPORT.OUTFILE]}")
 
     elif config["command"] == "annotate":
+        step_or_process = LMBISON_PROCESS.ANNOTATE
         # Annotate DwC records with regions, and if found, RIIS determination
         report = b_annotate_occurrence_files(
             raw_filenames, riis_annotated_filename, config["geo_path"],
             config["process_path"], logger, log_path, run_parallel=True)
-        log_list(
-            logger, "Newly annotated filenames:",
-            [rpt[REPORT.OUTFILE] for rpt in report["reports"]])
+
+        # log_list(
+        #     logger, "Newly annotated filenames:",
+        #     [rpt[REPORT.OUTFILE] for rpt in report["reports"]])
 
     elif config["command"] == "summarize":
+        step_or_process = LMBISON_PROCESS.SUMMARIZE
         # Summarize each annotated file by region, write summary to a file
         report = c_summarize_annotated_files(
             annotated_filenames, config["output_path"], logger)
         logger.log("Summary of annotations", report[REPORT.OUTFILE])
 
     elif config["command"] == "aggregate":
+        step_or_process = LMBISON_PROCESS.AGGREGATE
         # Write summaries for each region to its own file
         report = d_aggregate_summary_by_region(
             full_summary_filename, config["output_path"], log_path, logger)
@@ -570,6 +593,12 @@ def execute_command(config, logger):
             f"Unsupported command {config['command']}", refname=script_name,
             log_level=ERROR)
 
+    if step_or_process is not None and report is not None:
+        report_filename = BisonNameOp.get_process_report_filename(
+            config["gbif_filename"], output_path=config["output_path"],
+            step_or_process=step_or_process)
+        report[REPORT.REPORTFILE] = report_filename
+
     return report
 
 
@@ -587,14 +616,15 @@ if __name__ == '__main__':
     report = execute_command(config, logger)
 
     # Write output report
-    try:
-        with open(config["report_filename"], mode='wt') as out_file:
-            json.dump(report, out_file, indent=4)
-    except OSError:
-        raise
-    except IOError:
-        raise
-    logger.log(
-        f"Wrote report file to {config['report_filename']}", refname=script_name)
+    if report:
+        try:
+            with open(report[REPORT.REPORTFILE], mode='wt') as out_file:
+                json.dump(report, out_file, indent=4)
+        except OSError:
+            raise
+        except IOError:
+            raise
+        logger.log(
+            f"Wrote report file to {report[REPORT.REPORTFILE]}", refname=script_name)
 
     logger.log(f"main end time: {time.asctime()}", refname=script_name)
