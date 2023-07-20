@@ -93,12 +93,11 @@ PARAMETERS = {
 
 
 # .............................................................................
-def a_resolve_riis_taxa(riis_filename, output_path, logger, overwrite=False):
+def a_resolve_riis_taxa(riis_filename, logger, overwrite=False):
     """Resolve and write GBIF accepted names and taxonKeys in RIIS records.
 
     Args:
         riis_filename (str): full filename for RIIS data records.
-        output_path (str): Destination directory for subset files.
         logger (object): logger for saving relevant processing messages
         overwrite (bool): Flag indicating whether to overwrite existing resolved file.
 
@@ -109,16 +108,17 @@ def a_resolve_riis_taxa(riis_filename, output_path, logger, overwrite=False):
     nnsl = RIIS(riis_filename, logger=logger)
     # Update species data
     try:
-        report = nnsl.resolve_riis_to_gbif_taxa(output_path, overwrite=overwrite)
+        report = nnsl.resolve_riis_to_gbif_taxa(overwrite=overwrite)
     except Exception as e:
         logger.log(
             f"Unexpected failure {e} in resolve_riis_taxa", refname=script_name,
             log_level=ERROR)
     else:
         logger.log(
-            f"Found {report[REPORT.TAXA_RESOLVED]} names, "
-            f"{report[REPORT.RECORDS_UPDATED]} updated, "
-            f"{report[REPORT.RECORDS_OUTPUT]} written "
+            f"Found {report[REPORT.SUMMARY][REPORT.RIIS_IDENTIFIER]} names, "
+            f"{report[REPORT.SUMMARY][REPORT.TAXA_RESOLVED]} resolved, "
+            f"{report[REPORT.SUMMARY][REPORT.RECORDS_UPDATED]} updated, "
+            f"{report[REPORT.SUMMARY][REPORT.RECORDS_OUTPUT]} written "
             f"of total {report[REPORT.RIIS_IDENTIFIER]} from {riis_filename} "
             f"to {report[REPORT.OUTFILE]}.", refname=script_name)
         report_filename = BisonNameOp.get_process_report_filename(
@@ -126,28 +126,28 @@ def a_resolve_riis_taxa(riis_filename, output_path, logger, overwrite=False):
             step_or_process=LMBISON_PROCESS.RESOLVE)
         report[REPORT.REPORTFILE] = report_filename
 
-        if report[REPORT.RECORDS_OUTPUT] != RIIS_DATA.SPECIES_GEO_DATA_COUNT:
+        if report[REPORT.SUMMARY][REPORT.RECORDS_OUTPUT] != RIIS_DATA.SPECIES_GEO_DATA_COUNT:
             logger.log(
-                f"Wrote {report[REPORT.RECORDS_OUTPUT]} RIIS records, expecting "
-                f"{RIIS_DATA.SPECIES_GEO_DATA_COUNT}", refname=script_name)
+                f"Wrote {report[REPORT.SUMMARY][REPORT.RECORDS_OUTPUT]} RIIS records, "
+                f"expecting {RIIS_DATA.SPECIES_GEO_DATA_COUNT}", refname=script_name)
     return report
 
 
 # .............................................................................
 def b_annotate_occurrence_files(
-        occ_filenames, riis_annotated_filename, geo_path, output_path, logger,
-        log_path, run_parallel=True):
+        occ_filenames, annotated_riis_filename, geo_path, output_path, logger,
+        run_parallel=True, overwrite=False):
     """Annotate GBIF records with census state and county, and RIIS key and assessment.
 
     Args:
         occ_filenames (list): list of full filenames containing GBIF data for
             annotation.
-        riis_annotated_filename (str): Full path to RIIS data annotated with GBIF names.
+        annotated_riis_filename (str): Full path to RIIS data annotated with GBIF names.
         geo_path (str): Base directory containing geospatial region files
-        output_path (str): Destination directory for output files.
+        process_path (str): Destination directory for output files.
         logger (object): logger for saving relevant processing messages
-        log_path (str): Destination directory for log files.
         run_parallel (bool): Flag indicating whether to process subset files in parallel
+        overwrite (bool): Flag indicating whether to overwrite existing annotated file.
 
     Returns:
         annotated_filenames: full filenames for GBIF data newly annotated with state,
@@ -155,26 +155,24 @@ def b_annotate_occurrence_files(
     """
     if run_parallel and len(occ_filenames) > 1:
         reports = parallel_annotate(
-            occ_filenames, riis_annotated_filename, geo_path, output_path, logger)
+            occ_filenames, annotated_riis_filename, geo_path, output_path, logger,
+            overwrite)
 
     else:
         reports = {"reports": []}
         # Compare with serial execution
         all_start = time.perf_counter()
         # Use the same RIIS for all Annotators
-        riis = RIIS(riis_annotated_filename, logger)
+        riis = RIIS(annotated_riis_filename, logger)
         riis.read_riis()
 
+        logger.log(
+            f"Annotate files serially: {time.asctime()}", refname=script_name)
         for occ_fname in occ_filenames:
-            logger.log(
-                f"Annotate files serially: {time.asctime()}", refname=script_name)
-
             # Add locality-intersections and RIIS determinations to GBIF DwC records
             start = time.perf_counter()
             ant = Annotator(logger, geo_path, riis=riis)
-            rpt = ant.annotate_dwca_records(occ_fname, output_path)
-            # rpt = annotate_occurrence_file(
-            #     occ_fname, geo_path, riis, output_path, log_path)
+            rpt = ant.annotate_dwca_records(occ_fname, output_path, overwrite=overwrite)
             end = time.perf_counter()
 
             reports["reports"].append(rpt)
@@ -191,12 +189,14 @@ def b_annotate_occurrence_files(
 
 
 # .............................................................................
-def c_summarize_annotated_files(annotated_filenames, output_path, logger):
+def c_summarize_annotated_files(
+        annotated_filenames, full_summary_filename, output_path, logger):
     """Annotate GBIF records with census state and county, and RIIS key and assessment.
 
     Args:
         annotated_filenames (list): full filenames containing annotated GBIF data.
-        output_path (str): Destination directory for summary files.
+        full_summary_filename (str): Full filename for output combined summary file.
+        output_path (str): Destination directory for log, report, and final output files.
         logger (object): logger for saving relevant processing messages
 
     Returns:
@@ -209,16 +209,17 @@ def c_summarize_annotated_files(annotated_filenames, output_path, logger):
     summary_filenames = []
     for ann_fname in annotated_filenames:
         agg = Aggregator(logger)
+        process_path, _ = os.path.split(ann_fname)
 
         # Overwrite existing summary
         rpt = agg.summarize_annotated_recs_by_location(
-            ann_fname, output_path, overwrite=True)
-        summary_filenames.append(rpt["annotated_filename"])
+            ann_fname, process_path, overwrite=True)
+        summary_filenames.append(rpt[REPORT.OUTFILE])
 
     # Aggregate all the subset summaries into a single
     # Summary data written to report["full_summary_filename"]
     if len(summary_filenames) > 1:
-        report = agg.summarize_summaries(summary_filenames, output_path)
+        report = agg.summarize_summaries(summary_filenames, full_summary_filename)
     else:
         report = rpt
 
@@ -232,15 +233,15 @@ def c_summarize_annotated_files(annotated_filenames, output_path, logger):
 
 # .............................................................................
 def d_aggregate_summary_by_region(
-        summary_filename, resolved_riis_filename, output_path, logger):
+        summary_filename, annotated_riis_filename, output_path, logger):
     """Aggregate annotated GBIF records with region, and RIIS key and assessment.
 
     Args:
         summary_filename (str): Full filename containing summarized
             GBIF data by region for RIIS assessment of records.
-        resolved_riis_filename (str): full filename of RIIS data annotated with GBIF
+        annotated_riis_filename (str): full filename of RIIS data annotated with GBIF
             names.
-        output_path (str): Destination directory for summary files.
+        output_path (str): Destination directory for final summary files.
         logger (object): logger for saving relevant processing messages
 
     Returns:
@@ -252,7 +253,7 @@ def d_aggregate_summary_by_region(
     # Create a new Aggregator, ignore file used for construction,
     agg = Aggregator(logger)
     report = agg.aggregate_file_summary_for_regions(
-            summary_filename, resolved_riis_filename, output_path)
+            summary_filename, annotated_riis_filename, output_path)
     report_filename = BisonNameOp.get_process_report_filename(
         summary_filename, output_path=output_path,
         step_or_process=LMBISON_PROCESS.SUMMARIZE)
@@ -452,8 +453,8 @@ def _prepare_args(config):
         config (dict): user-provided parameters
 
     Returns:
-        riis_annotated_filename: Full annotated RIIS filename
-        log_path: destination path for logfiles
+        annotated_riis_filename: Full annotated RIIS filename
+        out_path: destination path for output and logfiles
         raw_filenames: input CVS file(s) of original GBIF records
         annotated_filenames: output file(s) of annotated GBIF records
         summary_filenames: output file(s) of subset summaries of GBIF annotated records
@@ -472,7 +473,7 @@ def _prepare_args(config):
     infile = config["gbif_filename"]
     if not os.path.exists(infile):
         raise FileNotFoundError(f"Missing input file {infile}")
-    log_path = config["output_path"]
+    out_path = config["output_path"]
 
     # First determine whether to process one file or smaller subsets
     if do_split is True:
@@ -482,9 +483,8 @@ def _prepare_args(config):
     else:
         raw_filenames = [infile]
 
-    riis_annotated_filename = BisonNameOp.get_process_outfilename(
-        config["riis_filename"], outpath=config["process_path"],
-        step_or_process=LMBISON_PROCESS.RESOLVE)
+    annotated_riis_filename = BisonNameOp.get_annotated_riis_filename(
+        config["riis_filename"])
 
     annotated_filenames = [
         BisonNameOp.get_process_outfilename(
@@ -500,10 +500,10 @@ def _prepare_args(config):
 
     full_summary_filename = BisonNameOp.get_process_outfilename(
         infile, outpath=config["process_path"],
-        step_or_process=LMBISON_PROCESS.SUMMARIZE)
+        step_or_process=LMBISON_PROCESS.COMBINE)
 
     return (
-        riis_annotated_filename, log_path,
+        annotated_riis_filename, out_path,
         raw_filenames, annotated_filenames, summary_filenames,
         full_summary_filename
     )
@@ -525,7 +525,7 @@ def execute_command(config, logger):
     """
     report = {}
     step_or_process = None
-    (riis_annotated_filename, log_path,
+    (annotated_riis_filename, out_path,
         raw_filenames, annotated_filenames, summary_filenames,
         full_summary_filename) = _prepare_args(config)
 
@@ -538,15 +538,16 @@ def execute_command(config, logger):
     if config["command"] == "resolve":
         step_or_process = LMBISON_PROCESS.RESOLVE
         report = a_resolve_riis_taxa(
-            config["riis_filename"], riis_annotated_filename, logger, overwrite=False)
-        logger.log(f"Resolved RIIS filename: {report[REPORT.OUTFILE]}")
+            config["riis_filename"], logger, overwrite=False)
+        logger.log(
+            f"Resolved RIIS filename: {report[REPORT.OUTFILE]}", refname=script_name)
 
     elif config["command"] == "annotate":
         step_or_process = LMBISON_PROCESS.ANNOTATE
         # Annotate DwC records with regions, and if found, RIIS determination
         report = b_annotate_occurrence_files(
-            raw_filenames, riis_annotated_filename, config["geo_path"],
-            config["process_path"], logger, log_path, run_parallel=True)
+            raw_filenames, annotated_riis_filename, config["geo_path"],
+            config["process_path"], logger, run_parallel=True, overwrite=True)
 
         # log_list(
         #     logger, "Newly annotated filenames:",
@@ -556,14 +557,14 @@ def execute_command(config, logger):
         step_or_process = LMBISON_PROCESS.SUMMARIZE
         # Summarize each annotated file by region, write summary to a file
         report = c_summarize_annotated_files(
-            annotated_filenames, config["output_path"], logger)
+            annotated_filenames, full_summary_filename, config["output_path"], logger)
         logger.log("Summary of annotations", report[REPORT.OUTFILE])
 
     elif config["command"] == "aggregate":
         step_or_process = LMBISON_PROCESS.AGGREGATE
         # Write summaries for each region to its own file
         report = d_aggregate_summary_by_region(
-            full_summary_filename, config["output_path"], log_path, logger)
+            full_summary_filename, annotated_riis_filename, out_path, logger)
         for region_type in report.keys():
             log_list(
                 logger, "Region filenames, assessment filename:",
@@ -572,7 +573,7 @@ def execute_command(config, logger):
     elif config["command"] == "test":
         # Test summarized summaries
         full_summary_filename = BisonNameOp.get_process_outfilename(
-            summary_filenames, outpath=config["output_path"],
+            summary_filenames, outpath=out_path,
             step_or_process=LMBISON_PROCESS.AGGREGATE)
 
         report = Counter.compare_location_species_counts(

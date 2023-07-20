@@ -675,16 +675,16 @@ class Aggregator():
         for sum_fname in summary_filename_list:
             self._read_location_summary(sum_fname)
 
-        report = self._report_summary()
-        return report
+        summary_report = self._report_summary()
+        return summary_report
 
     # ...............................................
     def _report_summary(self):
-        report = {REPORT.REGION: {}}
+        summary = {}
         # Report count of locations for each region type
         for region_type, loc_dict in self._locations.items():
             # Count unique locations for each region type (county, state, PAD, AIANNH)
-            report[REPORT.REGION][region_type] = {
+            summary[region_type] = {
                 REPORT.LOCATION: len(loc_dict),
                 REPORT.SPECIES: {},
                 REPORT.OCCURRENCE: {}
@@ -695,46 +695,41 @@ class Aggregator():
                 for occ_count in sp_count.values():
                     occ_total += occ_count
                 # Record number of unique species
-                report[REPORT.REGION][region_type][loc] = {
+                summary[region_type][loc] = {
                     REPORT.SPECIES: len(sp_count),
                     REPORT.OCCURRENCE: occ_total
                 }
-        report[REPORT.SPECIES] = len(self._canonicals)
-        report[REPORT.PROCESS] = LMBISON_PROCESS.SUMMARIZE["postfix"]
-        return report
+        summary[REPORT.SPECIES] = len(self._acc_species_name)
+        return summary
 
     # ...............................................
-    def summarize_summaries(self, summary_filename_list, output_path):
+    def summarize_summaries(self, summary_filename_list, full_summary_filename):
         """Read summary files and combine summaries in self._locations.
 
         Args:
             summary_filename_list: list of full filenames of summary files.
-            output_path (str): destination directory for combined summary file.
+            full_summary_filename (str): Full filename for combined output summary file.
 
         Returns:
             report: dictionary of metadata about the data and process
         """
-        full_summary_filename = BisonNameOp.get_process_outfilename(
-            summary_filename_list, outpath=output_path,
-            step_or_process=LMBISON_PROCESS.AGGREGATE)
+        self._initialize_combine_summaries_io(full_summary_filename)
+        summary_report = self._read_location_summaries(summary_filename_list)
+        # Save to single file
+        self._write_raw_region_summary()
         report = {
             REPORT.PROCESS: LMBISON_PROCESS.SUMMARIZE["postfix"],
             REPORT.INFILE: summary_filename_list,
-            REPORT.OUTFILE: full_summary_filename
+            REPORT.OUTFILE: full_summary_filename,
+            REPORT.SUMMARY: summary_report
         }
-        self._initialize_combine_summaries_io(full_summary_filename)
-        report[REPORT.SUMMARY] = self._read_location_summaries(summary_filename_list)
-        report[REPORT.PROCESS] = LMBISON_PROCESS.SUMMARIZE["postfix"]
-
-        # Save to single file
-        self._write_raw_region_summary()
 
         self.close()
         return report
 
     # ...............................................
     def summarize_annotated_recs_by_location(
-            self, annotated_filename, output_path, overwrite=True):
+            self, annotated_filename, process_path, overwrite=True):
         """Read an annotated file, summarize by species and location, write to csvfile.
 
         Args:
@@ -752,7 +747,7 @@ class Aggregator():
                 SPECIES_KEY, GBIF_TAXON_KEY, ASSESS_KEY, STATE_KEY, COUNTY_KEY, COUNT_KEY
         """
         summary_filename = BisonNameOp.get_process_outfilename(
-            annotated_filename, outpath=output_path,
+            annotated_filename, outpath=process_path,
             step_or_process=LMBISON_PROCESS.SUMMARIZE)
 
         self._initialize_summary_io(
@@ -760,7 +755,8 @@ class Aggregator():
         # Summarize and write
         file_report = self._summarize_annotations_by_region()
         report = {
-            REPORT.INFILE: summary_filename,
+            REPORT.INFILE: annotated_filename,
+            REPORT.OUTFILE: summary_filename,
             REPORT.SUMMARY: file_report
         }
         self._write_raw_region_summary()
@@ -1010,40 +1006,40 @@ def summarize_annotations(annotated_filename, output_path, log_path):
     return summary_filename
 
 
-# .............................................................................
-def summarize_summaries(annotated_filename, output_path, log_path):
-    """Summarize data in one annotated GBIF DwC file by state, county, and RIIS.
-
-    Args:
-        annotated_filename (str): full filename of an annotated GBIF data file.
-        output_path (str): destination directory for output files.
-        log_path (str): destination directory for logfile
-
-    Returns:
-        summary_filename (str): full filename of a summary file
-
-    Raises:
-        FileNotFoundError: on missing input file
-    """
-    if not os.path.exists(annotated_filename):
-        raise FileNotFoundError(annotated_filename)
-
-    datapath, basefname = os.path.split(annotated_filename)
-    refname = f"summarize_{basefname}"
-    logger = Logger(refname, log_filename=os.path.join(log_path, f"{refname}.log"))
-    logger.log(f"Submit {basefname} for summarizing.", refname=refname)
-
-    logger.log(f"Start Time : {datetime.now()}", refname=refname)
-    agg = Aggregator(logger)
-    summary_filename = BisonNameOp.get_process_outfilename(
-        annotated_filename, outpath=output_path, step_or_process=LMBISON_PROCESS.AGGREGATE)
-
-    # Do not overwrite existing summary
-    agg.summarize_annotated_recs_by_location(
-        annotated_filename, summary_filename, overwrite=False)
-
-    logger.log(f"End Time : {datetime.now()}", refname=refname)
-    return summary_filename
+# # .............................................................................
+# def summarize_summaries(annotated_filename, output_path, log_path):
+#     """Summarize data in one annotated GBIF DwC file by state, county, and RIIS.
+#
+#     Args:
+#         annotated_filename (str): full filename of an annotated GBIF data file.
+#         output_path (str): destination directory for output files.
+#         log_path (str): destination directory for logfile
+#
+#     Returns:
+#         summary_filename (str): full filename of a summary file
+#
+#     Raises:
+#         FileNotFoundError: on missing input file
+#     """
+#     if not os.path.exists(annotated_filename):
+#         raise FileNotFoundError(annotated_filename)
+#
+#     datapath, basefname = os.path.split(annotated_filename)
+#     refname = f"summarize_{basefname}"
+#     logger = Logger(refname, log_filename=os.path.join(log_path, f"{refname}.log"))
+#     logger.log(f"Submit {basefname} for summarizing.", refname=refname)
+#
+#     logger.log(f"Start Time : {datetime.now()}", refname=refname)
+#     agg = Aggregator(logger)
+#     summary_filename = BisonNameOp.get_process_outfilename(
+#         annotated_filename, outpath=output_path, step_or_process=LMBISON_PROCESS.AGGREGATE)
+#
+#     # Do not overwrite existing summary
+#     agg.summarize_annotated_recs_by_location(
+#         annotated_filename, summary_filename, overwrite=False)
+#
+#     logger.log(f"End Time : {datetime.now()}", refname=refname)
+#     return summary_filename
 
 
 # .............................................................................

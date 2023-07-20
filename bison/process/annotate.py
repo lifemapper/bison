@@ -264,12 +264,14 @@ class Annotator():
         return dwcrec
 
     # ...............................................
-    def annotate_dwca_records(self, dwc_filename, output_path):
+    def annotate_dwca_records(self, dwc_filename, output_path, overwrite=False):
         """Resolve and append state, county, RIIS assessment and key to GBIF records.
 
         Args:
             dwc_filename: full filename of input file of DWC records.
             output_path (str): destination directory for annotated occurrence file.
+            overwrite (bool): Flag indicating whether to overwrite existing annotated
+                file.
 
         Returns:
             report: dictionary of metadata about the data and process
@@ -285,52 +287,54 @@ class Annotator():
 
         out_filename = BisonNameOp.get_process_outfilename(
             dwc_filename, outpath=output_path, step_or_process=LMBISON_PROCESS.ANNOTATE)
-        self.initialize_occurrences_io(dwc_filename, out_filename)
-        self._log.log(
-            f"Annotate {dwc_filename} to {out_filename}", refname=self.__class__.__name__)
-
         report = {
             REPORT.INFILE: dwc_filename,
-            REPORT.OUTFILE: out_filename,
-            REPORT.ANNOTATE_FAIL: []
+            REPORT.OUTFILE: out_filename
         }
-        try:
-            # iterate over DwC records
-            dwcrec = self._dwcdata.get_record()
-            while dwcrec is not None:
-                # Annotate
-                dwcrec_ann = self._annotate_one_record(dwcrec)
-                # Write
-                try:
-                    self._csv_writer.writerow(dwcrec_ann)
-                except Exception as e:
-                    self._log.log(
-                        f"Error {e} record, gbifID {dwcrec[GBIF.ID_FLD]}",
-                        refname=self.__class__.__name__, log_level=ERROR)
-                    report[REPORT.ANNOTATE_FAIL].append(dwcrec[GBIF.ID_FLD])
-
-                if (self._dwcdata.recno % LOG.INTERVAL) == 0:
-                    self._log.log(
-                        f"*** Record number {self._dwcdata.recno}, gbifID: "
-                        f"{dwcrec[GBIF.ID_FLD]} ***", refname=self.__class__.__name__)
-
-                # Get next
+        if not os.path.exists(out_filename) or overwrite is True:
+            self.initialize_occurrences_io(dwc_filename, out_filename)
+            self._log.log(
+                f"Annotate {dwc_filename} to {out_filename}",
+                refname=self.__class__.__name__)
+            summary = {REPORT.ANNOTATE_FAIL: []}
+            try:
+                # iterate over DwC records
                 dwcrec = self._dwcdata.get_record()
-        except Exception as e:
-            raise Exception(
-                f"Unexpected error {e} reading {self._dwcdata.input_file} or "
-                + f"writing {out_filename}")
+                while dwcrec is not None:
+                    # Annotate
+                    dwcrec_ann = self._annotate_one_record(dwcrec)
+                    # Write
+                    try:
+                        self._csv_writer.writerow(dwcrec_ann)
+                    except Exception as e:
+                        self._log.log(
+                            f"Error {e} record, gbifID {dwcrec[GBIF.ID_FLD]}",
+                            refname=self.__class__.__name__, log_level=ERROR)
+                        summary[REPORT.ANNOTATE_FAIL].append(dwcrec[GBIF.ID_FLD])
 
-        report[REPORT.RANK_FAIL] = list(self.bad_ranks)
-        report[REPORT.RANK_FAIL_COUNT] = self.rank_filtered_records
-        end = time.perf_counter()
+                    if (self._dwcdata.recno % LOG.INTERVAL) == 0:
+                        self._log.log(
+                            f"*** Record number {self._dwcdata.recno}, gbifID: "
+                            f"{dwcrec[GBIF.ID_FLD]} ***", refname=self.__class__.__name__)
 
-        self._log.log(
-            f"End Annotator.annotate_dwca_records: {time.asctime()}, {end - start} "
-            f"seconds elapsed", refname=self.__class__.__name__)
-        self._log.log(
-            f"Filtered out {self.rank_filtered_records} records of {self.bad_ranks}",
-            refname=self.__class__.__name__)
+                    # Get next
+                    dwcrec = self._dwcdata.get_record()
+            except Exception as e:
+                raise Exception(
+                    f"Unexpected error {e} reading {self._dwcdata.input_file} or "
+                    + f"writing {out_filename}")
+            else:
+                end = time.perf_counter()
+                summary[REPORT.RANK_FAIL] = list(self.bad_ranks)
+                summary[REPORT.RANK_FAIL_COUNT] = self.rank_filtered_records
+                report[REPORT.SUMMARY] = summary
+
+                self._log.log(
+                    f"End Annotator.annotate_dwca_records: {time.asctime()}, {end - start} "
+                    f"seconds elapsed", refname=self.__class__.__name__)
+                self._log.log(
+                    f"Filtered out {self.rank_filtered_records} records of {self.bad_ranks}",
+                    refname=self.__class__.__name__)
 
         return report
 
@@ -383,7 +387,8 @@ def annotate_occurrence_file(
 
 # .............................................................................
 def parallel_annotate(
-        dwc_filenames, riis_with_gbif_filename, geo_path, output_path, main_logger):
+        dwc_filenames, riis_with_gbif_filename, geo_path, output_path, main_logger,
+        overwrite):
     """Main method for parallel execution of DwC annotation script.
 
     Args:
@@ -396,6 +401,7 @@ def parallel_annotate(
         output_path (str): destination directory for output annotated occurrence files.
         main_logger (logger): logger for the process that calls this function,
             initiating subprocesses
+        overwrite (bool): Flag indicating whether to overwrite existing annotated file.
 
     Returns:
         reports (list of dict): metadata for the occurrence annotation data and process.
@@ -414,7 +420,7 @@ def parallel_annotate(
         for dwc_fname in dwc_filenames:
             out_fname = BisonNameOp.get_process_outfilename(
                 dwc_fname, outpath=output_path, step_or_process=LMBISON_PROCESS.ANNOTATE)
-            if os.path.exists(out_fname):
+            if os.path.exists(out_fname) and overwrite is False:
                 msg = f"Annotations exist in {out_fname}."
                 main_logger.log(msg, refname=refname)
                 messages.append(msg)

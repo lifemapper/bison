@@ -660,7 +660,7 @@ class BisonNameOp():
     separator = "_"
 
     @staticmethod
-    def get_annotated_riis_filename(input_riis_filename, outpath):
+    def get_annotated_riis_filename(input_riis_filename, outpath=None):
         """Construct a filename for a chunk of CSV records.
 
         Args:
@@ -671,7 +671,10 @@ class BisonNameOp():
         Returns:
             out_filename: full filename for the output file.
         """
-        basename, ext = os.path.splitext(os.path.split(input_riis_filename)[1])
+        inpath, fname = os.path.split(input_riis_filename)
+        if outpath is None:
+            outpath = inpath
+        basename, _ = os.path.splitext(fname)
         out_filename = os.path.join(outpath, f"{basename}_annotated.csv")
         return out_filename
 
@@ -830,9 +833,9 @@ class BisonNameOp():
         """
         base_filename = BisonNameOp._get_process_base_filename(
             in_filename, step_or_process=step_or_process)
-        log_fname = os.path.join(output_path, f"{base_filename}.log")
+        rpt_fname = os.path.join(output_path, f"{base_filename}.rpt")
 
-        return log_fname
+        return rpt_fname
 
     # .............................................................................
     @staticmethod
@@ -881,27 +884,11 @@ class BisonNameOp():
 
     # ...............................................
     @classmethod
-    def get_raw_summary_name(cls, csvfile):
+    def get_combined_summary_name(cls, summary_filename_list, outpath=None):
         """Construct a filename for the summarized version of annotated csvfile.
 
         Args:
-            csvfile (str): full filename used to construct an annotated filename for
-                this data.
-
-        Returns:
-            outfname: output filename derived from the annotated GBIF DWC filename
-        """
-        basename, ext = os.path.splitext(csvfile)
-        outfname = f"{basename}_summary{ext}"
-        return outfname
-
-    # ...............................................
-    @classmethod
-    def get_combined_summary_name(cls, csvfile, outpath=None):
-        """Construct a filename for the summarized version of annotated csvfile.
-
-        Args:
-            csvfile (str): full filename of one subset summary file (of one or more) for
+            summary_filename_list (list): full filename(s) of subset summary files for
                 this data.
             outpath (str): full directory path for output filename.
 
@@ -910,7 +897,8 @@ class BisonNameOp():
         """
         sep = BisonNameOp.separator
         path, basename, ext, chunk, postfix = BisonNameOp.parse_process_filename(
-            csvfile)
+            summary_filename_list[0]
+        )
         postfix = LMBISON_PROCESS.COMBINE["postfix"]
         outbasename = f"{basename}{sep}{postfix}{ext}"
         # If outpath is not provided, use the same path as the input file.
