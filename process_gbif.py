@@ -147,7 +147,7 @@ def b_annotate_occurrence_files(
         process_path (str): Destination directory for output files.
         logger (object): logger for saving relevant processing messages
         run_parallel (bool): Flag indicating whether to process subset files in parallel
-        overwrite (bool): Flag indicating whether to overwrite existing annotated file.
+        overwrite (bool): Flag indicating whether to overwrite existing annotated file(s).
 
     Returns:
         annotated_filenames: full filenames for GBIF data newly annotated with state,
@@ -190,8 +190,9 @@ def b_annotate_occurrence_files(
 
 
 # .............................................................................
-def c_summarize_annotated_files(
-        annotated_filenames, full_summary_filename, output_path, logger):
+def c_summarize_combine_annotated_files(
+        annotated_filenames, full_summary_filename, output_path, logger,
+        overwrite=True):
     """Annotate GBIF records with census state and county, and RIIS key and assessment.
 
     Args:
@@ -199,10 +200,12 @@ def c_summarize_annotated_files(
         full_summary_filename (str): Full filename for output combined summary file.
         output_path (str): Destination directory for log, report, and final output files.
         logger (object): logger for saving relevant processing messages
+        overwrite (bool): Flag indicating whether to overwrite existing summarized and
+            combined files.
 
     Returns:
-        summary_filenames (list): full filenames of summaries of location, species,
-            occurrence counts, one file per each file in annotated_filenames.
+        report (dict): dictionary summarizing metadata about the processes and
+            output files.
 
     Note:
         This process is fast, and need not be performed in parallel
@@ -212,13 +215,13 @@ def c_summarize_annotated_files(
         agg = Aggregator(logger)
         process_path, _ = os.path.split(ann_fname)
 
-        # Overwrite existing summary
+        # Summarize each annotated file
         rpt = agg.summarize_annotated_recs_by_location(
-            ann_fname, process_path, overwrite=True)
+            ann_fname, process_path, overwrite=overwrite)
         summary_filenames.append(rpt[REPORT.OUTFILE])
 
-    # Aggregate all the subset summaries into a single
-    # Summary data written to report["full_summary_filename"]
+    # Combine all the subset summaries into a single summary data written to
+    # report["full_summary_filename"]
     if len(summary_filenames) > 1:
         report = agg.summarize_summaries(summary_filenames, full_summary_filename)
     else:
@@ -234,32 +237,57 @@ def c_summarize_annotated_files(
 
 # .............................................................................
 def d_aggregate_summary_by_region(
-        summary_filename, annotated_riis_filename, output_path, logger):
+        summary_filename, annotated_riis_filename, output_path, logger, overwrite=True):
     """Aggregate annotated GBIF records with region, and RIIS key and assessment.
 
     Args:
-        summary_filename (str): Full filename containing summarized
+        full_summary_filename (str): Full filename containing summarized
             GBIF data by region for RIIS assessment of records.
         annotated_riis_filename (str): full filename of RIIS data annotated with GBIF
             names.
         output_path (str): Destination directory for final summary files.
         logger (object): logger for saving relevant processing messages
+        overwrite (bool): Flag indicating whether to overwrite existing
+            summarized-by-region files.
+
+    Note:
+        It is preferable to manually delete old summary files prior to running this
+        function, since the filenames cannot be anticipated without executing the full
+        process.
 
     Returns:
-        state_aggregation_filenames (list): full filenames of species counts and
-            percentages for each state.
-        cty_aggregation_filename (list): full filenames of species counts and
-            percentages for each county-state.
+        report (dict): dictionary summarizing metadata about the processes and
+            output files.
     """
     # Create a new Aggregator, ignore file used for construction,
     agg = Aggregator(logger)
     report = agg.aggregate_file_summary_for_regions(
-            summary_filename, annotated_riis_filename, output_path)
+        summary_filename, annotated_riis_filename, output_path, overwrite=overwrite)
     report_filename = BisonNameOp.get_process_report_filename(
         summary_filename, output_path=output_path,
         step_or_process=LMBISON_PROCESS.SUMMARIZE)
     report[REPORT.REPORTFILE] = report_filename
 
+    return report
+
+
+# .............................................................................
+def z_test(summary_filenames, full_summary_filename, output_path, logger):
+    """Test the outputs to make sure counts are in sync.
+
+    Args:
+        summary_filenames (list): full filenames of summaries of location, species,
+            occurrence counts, one file per each file in annotated_filenames.
+        full_summary_filename (str): Full filename containing combined summarized
+            GBIF data by region for RIIS assessment of records.
+        output_path (str): Destination directory for subset files.
+        logger (object): logger for saving relevant processing messages
+    Returns:
+        report (dict): dictionary summarizing metadata about the processes and
+            output files.
+    """
+    report = Counter.compare_location_species_counts(
+        summary_filenames, full_summary_filename, logger)
     return report
 
 
@@ -501,7 +529,7 @@ def _prepare_args(config):
 
     full_summary_filename = BisonNameOp.get_process_outfilename(
         infile, outpath=config["process_path"],
-        step_or_process=LMBISON_PROCESS.COMBINE)
+        step_or_process=LMBISON_PROCESS.SUMMARIZE)
 
     return (
         annotated_riis_filename, out_path,
@@ -557,28 +585,29 @@ def execute_command(config, logger):
     elif config["command"] == "summarize":
         step_or_process = LMBISON_PROCESS.SUMMARIZE
         # Summarize each annotated file by region, write summary to a file
-        report = c_summarize_annotated_files(
-            annotated_filenames, full_summary_filename, config["output_path"], logger)
+        report = c_summarize_combine_annotated_files(
+            annotated_filenames, full_summary_filename, config["output_path"], logger,
+            overwrite=True)
         logger.log("Summary of annotations", report[REPORT.OUTFILE])
 
     elif config["command"] == "aggregate":
         step_or_process = LMBISON_PROCESS.AGGREGATE
         # Write summaries for each region to its own file
         report = d_aggregate_summary_by_region(
-            full_summary_filename, annotated_riis_filename, out_path, logger)
+            full_summary_filename, annotated_riis_filename, out_path, logger,
+            overwrite=True)
         for region_type in report.keys():
-            log_list(
-                logger, "Region filenames, assessment filename:",
-                report[region_type][REPORT.OUTFILE])
+            try:
+                log_list(
+                    logger, f"Region {region_type} filenames, assessment filename:",
+                    report[region_type][REPORT.OUTFILE])
+            except:
+                pass
 
-    elif config["command"] == "test":
+    elif config["command"] == "check_counts":
+        step_or_process = LMBISON_PROCESS.CHECK_COUNTS
         # Test summarized summaries
-        full_summary_filename = BisonNameOp.get_process_outfilename(
-            summary_filenames, outpath=out_path,
-            step_or_process=LMBISON_PROCESS.AGGREGATE)
-
-        report = Counter.compare_location_species_counts(
-            summary_filenames, full_summary_filename, logger)
+        report = z_test(summary_filenames, full_summary_filename, logger)
 
     elif config["command"] == "test_bad_data" and config["gbif_id"] is not None:
         test_bad_line(

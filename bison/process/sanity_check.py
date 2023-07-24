@@ -134,10 +134,10 @@ class Counter():
             if sum_location_num == cmb_location_num:
                 counts["unique locations"] = sum_location_num
             else:
-                msg = (
-                    f"{prefix}: {sum_location_num} <> {cmb_location_num}")
+                msg = (f"{prefix}: {sum_location_num} <> {cmb_location_num}")
                 logger.log(
-                    f"{unique_loc_key}: {msg}", refname=cls.__name__, log_level=logging.ERROR)
+                    f"{unique_loc_key}: {msg}", refname=cls.__name__,
+                    log_level=logging.ERROR)
                 unique_loc_count_errs.append(msg)
                 inconsistencies[unique_loc_key] = unique_loc_count_errs
 

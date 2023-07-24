@@ -122,6 +122,7 @@ class LMBISON_PROCESS:
     SUMMARIZE = {"step": 3, "postfix": "summary"}
     COMBINE = {"step": 4, "postfix": "combine"}
     AGGREGATE = {"step": 5, "postfix": "aggregate"}
+    CHECK_COUNTS = {"step": 6, "postfix": "check_counts"}
 
     @staticmethod
     def process_types():

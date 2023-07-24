@@ -566,8 +566,27 @@ class Chunker():
         return chunk_filenames
 
     # .............................................................................
+    def cleanup_obsolete_chunks(
+            self, boundary_pairs, output_path, basename, ext, overwrite):
+        # Check if rewrite needed
+        missing_chunks = []
+        existing_chunks = []
+        for (start, stop) in boundary_pairs:
+            chunk_basefilename = BisonNameOp.get_chunk_filename(
+                basename, ext, start, stop)
+            chunk_fname = os.path.join(output_path, chunk_basefilename)
+            if os.path.exists(chunk_fname):
+                existing_chunks.append(chunk_fname)
+            else:
+                missing_chunks.append(chunk_fname)
+        if overwrite is True or len(missing_chunks) > 0:
+            for fn in existing_chunks:
+                delete_file(fn)
+
+    # .............................................................................
     @classmethod
-    def chunk_files(cls, big_csv_filename, output_path, logger, chunk_count=0):
+    def chunk_files(
+            cls, big_csv_filename, output_path, logger, chunk_count=0, overwrite=False):
         """Split a large input csv file into multiple smaller input csv files.
 
         Args:
@@ -576,6 +595,9 @@ class Chunker():
             logger (object): logger for writing messages to file and console
             chunk_count (int): Number of smaller files to split large file into.  Defaults
                 to the number of available CPUs minus 2.
+            overwrite (bool): Flag indicating whether to overwrite existing chunked
+                files. If only some of the chunk files exist, delete them all before
+                writing new files, regardless of this flag.
 
         Returns:
             chunk_filenames: a list of chunk filenames
@@ -593,6 +615,8 @@ class Chunker():
         chunk_filenames = []
         boundary_pairs, rec_count, chunk_size = cls.identify_chunks(
             big_csv_filename, chunk_count=chunk_count)
+        cls.cleanup_obsolete_chunks(
+            boundary_pairs, output_path, basename, ext, overwrite)
 
         try:
             bigf = open(big_csv_filename, 'r', newline="", encoding='utf-8')
