@@ -734,7 +734,7 @@ class Aggregator():
 
         Args:
             annotated_filename (str): full filename input annotated DwC occurrence file.
-            output_path (str): destination directory for the unorganized summary by
+            process_path (str): destination directory for the unorganized summary by
                 locations.
             overwrite (bool): Flag indicating whether to overwrite existing files.
 

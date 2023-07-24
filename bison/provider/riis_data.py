@@ -569,6 +569,7 @@ class RIIS:
         report[REPORT.INFILE] = self._riis_filename
         report[REPORT.RIIS_IDENTIFIER] = len(self.by_riis_id)
         report[REPORT.RIIS_TAXA] = len(self.by_taxon)
+
         out_filename = BisonNameOp.get_annotated_riis_filename(self._riis_filename)
         report[REPORT.OUTFILE] = out_filename
 

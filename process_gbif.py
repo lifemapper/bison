@@ -10,7 +10,7 @@ from bison.common.constants import (
     REGION, REPORT, RIIS_DATA)
 from bison.common.util import BisonNameOp, Chunker, delete_file, get_csv_dict_reader
 from bison.process.aggregate import Aggregator
-from bison.process.annotate import (Annotator, annotate_occurrence_file, parallel_annotate)
+from bison.process.annotate import (Annotator, parallel_annotate)
 from bison.process.geoindex import (GeoResolver, GeoException)
 from bison.process.sanity_check import Counter
 from bison.provider.riis_data import RIIS
@@ -135,7 +135,7 @@ def a_resolve_riis_taxa(riis_filename, logger, overwrite=False):
 
 # .............................................................................
 def b_annotate_occurrence_files(
-        occ_filenames, annotated_riis_filename, geo_path, output_path, logger,
+        occ_filenames, annotated_riis_filename, geo_path, process_path, logger,
         run_parallel=True, overwrite=False):
     """Annotate GBIF records with census state and county, and RIIS key and assessment.
 
@@ -154,9 +154,10 @@ def b_annotate_occurrence_files(
             county, RIIS assessment, and RIIS key.  If a file exists, do not annotate.
     """
     if run_parallel and len(occ_filenames) > 1:
-        reports = parallel_annotate(
-            occ_filenames, annotated_riis_filename, geo_path, output_path, logger,
+        rpts = parallel_annotate(
+            occ_filenames, annotated_riis_filename, geo_path, process_path, logger,
             overwrite)
+        reports = {"reports": rpts}
 
     else:
         reports = {"reports": []}
@@ -172,7 +173,7 @@ def b_annotate_occurrence_files(
             # Add locality-intersections and RIIS determinations to GBIF DwC records
             start = time.perf_counter()
             ant = Annotator(logger, geo_path, riis=riis)
-            rpt = ant.annotate_dwca_records(occ_fname, output_path, overwrite=overwrite)
+            rpt = ant.annotate_dwca_records(occ_fname, process_path, overwrite=overwrite)
             end = time.perf_counter()
 
             reports["reports"].append(rpt)

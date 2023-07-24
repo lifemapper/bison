@@ -54,12 +54,12 @@ PARAMETERS = {
 
 # .............................................................................
 def annotate_occurrence_files(
-        dwc_filenames, riis_w_gbif_taxa_filename, geo_path, output_path, logger):
+        dwc_filenames, annotated_riis_filename, geo_path, output_path, logger):
     """Annotate GBIF records with geographic areas, and RIIS key and assessment.
 
     Args:
         dwc_filenames (list): full filenames containing GBIF data for annotation.
-        riis_w_gbif_taxa_filename (str): filename containing RIIS data annotated with
+        annotated_riis_filename (str): filename containing RIIS data annotated with
              GBIF accepted taxon name and ID.
         geo_path (str): Base directory containing geospatial data inputs.
         output_path: destination directory for output files of annotated records
@@ -73,19 +73,19 @@ def annotate_occurrence_files(
         FileNotFoundError: on missing DWC input file(s).
     """
     report = {
-        "riis_w_gbif_taxa_filename": riis_w_gbif_taxa_filename,
+        "annotated_riis_filename": annotated_riis_filename,
         "geospatial_data_dir": geo_path,
         "dwc_inputs": [],
     }
-    if not os.path.exists(riis_w_gbif_taxa_filename):
+    if not os.path.exists(annotated_riis_filename):
         raise FileNotFoundError(
-            f"Missing annotated RIIS file {riis_w_gbif_taxa_filename}.")
+            f"Missing annotated RIIS file {annotated_riis_filename}.")
     for dwc_fname in dwc_filenames:
         if not os.path.exists(dwc_fname):
             raise FileNotFoundError(f"Missing input DWC occurrence file {dwc_fname}.")
 
     ant = Annotator(
-        logger, geo_path, riis_with_gbif_filename=riis_w_gbif_taxa_filename)
+        logger, geo_path, annotated_riis_filename=annotated_riis_filename)
     for dwc_fname in dwc_filenames:
         out_fname = BisonNameOp.get_process_outfilename(
             dwc_fname, outpath=output_path, step_or_process=LMBISON_PROCESS.ANNOTATE)

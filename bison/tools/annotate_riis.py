@@ -3,7 +3,6 @@ import json
 import os
 
 from bison.common.constants import CONFIG_PARAM
-from bison.common.util import BisonNameOp
 from bison.provider.riis_data import resolve_riis_taxa
 from bison.tools._config_parser import get_common_arguments
 
@@ -42,11 +41,9 @@ def cli():
     script_name = os.path.splitext(os.path.basename(__file__))[0]
     config, logger = get_common_arguments(
         script_name, DESCRIPTION, PARAMETERS)
-    annotated_riis_filename = BisonNameOp.get_annotated_riis_filename(
-        config["riis_filename"])
 
     report = resolve_riis_taxa(
-        config["riis_filename"], annotated_riis_filename, logger, overwrite=True)
+        config["riis_filename"], logger, overwrite=True)
 
     try:
         with open(config["report_filename"], mode='wt') as out_file:

@@ -176,7 +176,7 @@ def get_common_arguments(script_name, description, parameters):
     config["report_filename"] = os.path.join(
         config["output_path"], f"{meta_basename}.rpt")
     log_filename = os.path.join(
-        config["output_path"], f"{meta_basename}.log")
+        config["process_path"], f"{meta_basename}.log")
 
     logger = Logger(script_name, log_filename=log_filename)
 

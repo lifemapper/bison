@@ -50,7 +50,6 @@ class Test_annotate_riis:
         fn_args = get_test_parameters(script_name)
         riis = RIIS(fn_args["_test_small_riis_filename"], self._logger)
         # Update species data
-        report = riis.resolve_riis_to_gbif_taxa(
-                fn_args["_test_small_annotated_riis_filename"], overwrite=True)
+        report = riis.resolve_riis_to_gbif_taxa(overwrite=True)
         assert report[REPORT.TAXA_RESOLVED] == fn_args["_test_small_riis_name_count"]
         assert report[REPORT.RECORDS_UPDATED] == fn_args["_test_small_riis_record_count"]

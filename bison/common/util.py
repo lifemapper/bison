@@ -748,7 +748,6 @@ class BisonNameOp():
             outfname = os.path.join(outpath, outbasename)
         return outfname
 
-
     # .............................................................................
     @staticmethod
     def _get_process_base_filename(in_filename, step_or_process=None):

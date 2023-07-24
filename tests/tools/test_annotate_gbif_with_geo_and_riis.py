@@ -6,7 +6,6 @@ from bison.common.constants import APPEND_TO_DWC, REPORT
 from bison.common.log import Logger
 from bison.common.util import get_fields_from_header
 from bison.process.annotate import Annotator, annotate_occurrence_file
-from bison.provider.riis_data import RIIS
 from tests.tools.test_setup import get_test_parameters
 
 script_name = os.path.splitext(os.path.basename(__file__))[0]
@@ -25,7 +24,7 @@ class Test_annotate_gbif:
         fn_args = get_test_parameters(script_name)
         ant = Annotator(
             self._logger, fn_args["geoinput_path"],
-            riis_with_gbif_filename=fn_args["riis_with_gbif_taxa_filename"])
+            annotated_riis_filename=fn_args["riis_with_gbif_taxa_filename"])
         spatial_idxs = ant._geo_fulls
         spatial_idxs.extend(ant._geo_partials.values())
 
@@ -38,7 +37,7 @@ class Test_annotate_gbif:
         fn_args = get_test_parameters(script_name)
         ant = Annotator(
             self._logger, fn_args["geoinput_path"],
-            riis_with_gbif_filename=fn_args["riis_with_gbif_taxa_filename"])
+            annotated_riis_filename=fn_args["riis_with_gbif_taxa_filename"])
         infile = fn_args["dwc_filenames"][0]
         infields = get_fields_from_header(infile)
         new_fields = APPEND_TO_DWC.annotation_fields()
@@ -52,18 +51,15 @@ class Test_annotate_gbif:
 
     # .....................................
     def test_annotate_dwca_records(self):
-        """Test reading an original RIIS file by checking counts."""
+        """Test annotating one occurrence file and checking for added fields."""
         fn_args = get_test_parameters(script_name)
         infile = fn_args["dwc_filenames"][0]
         infields = get_fields_from_header(infile)
         new_fields = APPEND_TO_DWC.annotation_fields()
 
-        riis = RIIS(fn_args["riis_with_gbif_taxa_filename"], self._logger)
-        riis.read_riis()
-
         report = annotate_occurrence_file(
-            infile, fn_args["geoinput_path"], riis, fn_args["output_path"],
-            fn_args["log_path"])
+            infile, fn_args["annotated_riis_filename"], fn_args["geoinput_path"],
+            fn_args["output_path"], fn_args["log_path"])
 
         outfields = get_fields_from_header(report[REPORT.OUTFILE])
         assert (len(infields) + len(new_fields) == len(outfields))
