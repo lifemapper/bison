@@ -566,8 +566,21 @@ class Chunker():
         return chunk_filenames
 
     # .............................................................................
+    @classmethod
     def cleanup_obsolete_chunks(
             self, boundary_pairs, output_path, basename, ext, overwrite):
+        """Delete existing chunk files if any are missing or if overwrite is True.
+
+        Args:
+            boundary_pairs (list): List of pairs of record numbers corresponding
+                to the first and last record in a subset chunk of the original data.
+            output_path (str): Destination directory for chunk files.
+            basename (str): Base filename for chunk files.
+            ext (str): File extension for chunk files.
+            overwrite (bool): Flag indicating whether to overwrite existing chunked
+                files. If only some of the chunk files exist, delete them all before
+                writing new files, regardless of this flag.
+        """
         # Check if rewrite needed
         missing_chunks = []
         existing_chunks = []

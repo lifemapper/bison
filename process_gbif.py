@@ -19,7 +19,6 @@ from bison.tools._config_parser import get_common_arguments
 script_name = os.path.splitext(os.path.basename(__file__))[0]
 DESCRIPTION = """Execute one or more steps of annotating GBIF data with RIIS
                 assessments, and summarizing by species, county, and state"""
-COMMANDS = ("resolve", "split", "annotate", "summarize", "aggregate", "test")
 # .............................................................................
 PARAMETERS = {
     "required":
@@ -237,7 +236,7 @@ def c_summarize_combine_annotated_files(
 
 # .............................................................................
 def d_aggregate_summary_by_region(
-        summary_filename, annotated_riis_filename, output_path, logger, overwrite=True):
+        full_summary_filename, annotated_riis_filename, output_path, logger, overwrite=True):
     """Aggregate annotated GBIF records with region, and RIIS key and assessment.
 
     Args:
@@ -262,9 +261,9 @@ def d_aggregate_summary_by_region(
     # Create a new Aggregator, ignore file used for construction,
     agg = Aggregator(logger)
     report = agg.aggregate_file_summary_for_regions(
-        summary_filename, annotated_riis_filename, output_path, overwrite=overwrite)
+        full_summary_filename, annotated_riis_filename, output_path, overwrite=overwrite)
     report_filename = BisonNameOp.get_process_report_filename(
-        summary_filename, output_path=output_path,
+        full_summary_filename, output_path=output_path,
         step_or_process=LMBISON_PROCESS.SUMMARIZE)
     report[REPORT.REPORTFILE] = report_filename
 
@@ -272,7 +271,7 @@ def d_aggregate_summary_by_region(
 
 
 # .............................................................................
-def z_test(summary_filenames, full_summary_filename, output_path, logger):
+def z_test(summary_filenames, full_summary_filename, logger):
     """Test the outputs to make sure counts are in sync.
 
     Args:
@@ -280,8 +279,8 @@ def z_test(summary_filenames, full_summary_filename, output_path, logger):
             occurrence counts, one file per each file in annotated_filenames.
         full_summary_filename (str): Full filename containing combined summarized
             GBIF data by region for RIIS assessment of records.
-        output_path (str): Destination directory for subset files.
         logger (object): logger for saving relevant processing messages
+
     Returns:
         report (dict): dictionary summarizing metadata about the processes and
             output files.
@@ -601,7 +600,7 @@ def execute_command(config, logger):
                 log_list(
                     logger, f"Region {region_type} filenames, assessment filename:",
                     report[region_type][REPORT.OUTFILE])
-            except:
+            except TypeError:
                 pass
 
     elif config["command"] == "check_counts":

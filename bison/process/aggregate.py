@@ -729,6 +729,7 @@ class Aggregator():
             region_type (str): Type of region for file prefix (state, county, ...)
             region_value (str): region name
             outpath (str): output path for aggregate file
+            overwrite (bool): Flag indicating whether to overwrite existing output files.
 
         Returns:
             summary_filename: output file
@@ -873,8 +874,8 @@ class Aggregator():
             annotated_riis_fname (str): full filename of RIIS data annotated with
                 GBIF accepted taxon.
             outpath (str): full directory path for output filenames.
-        overwrite (bool): Flag indicating whether to overwrite existing
-            summarized-by-region files.
+            overwrite (bool): Flag indicating whether to overwrite existing
+                summarized-by-region files.
 
         Returns:
             region_summary_filenames (list): full filenames by region, of summaries of
@@ -900,6 +901,7 @@ class Aggregator():
             annotated_riis_fname (str): full filename of RIIS data annotated with
                 GBIF accepted taxon.
             outpath (str): full directory path for output filenames.
+            overwrite (bool): Flag indicating whether to overwrite existing output files.
 
         Returns:
             region_summary_filenames (list): full filenames by region, of summaries of
