@@ -92,6 +92,37 @@ PARAMETERS = {
 
 
 # .............................................................................
+def a_find_or_create_subset_files(gbif_filename, output_path, logger):
+    """Find or create subset files from a large file based on the file size and CPUs.
+
+    Args:
+        gbif_filename (str): full filename of data file to be subsetted into chunks.
+        output_path (str): Destination directory for subset files.
+        logger (object): logger for saving relevant processing messages
+
+    Returns:
+        raw_filenames (list): full filenames for subset files created from large
+            input file.
+        output_path (str): Destination directory for subset files.
+    """
+    chunk_filenames = Chunker.identify_chunk_files(gbif_filename, output_path)
+    # If any are missing, delete them all and split
+    re_split = False
+    for chunk_fname in chunk_filenames:
+        if not os.path.exists(chunk_fname):
+            re_split = True
+            break
+    if re_split is True:
+        # Delete any existing files
+        for chunk_fname in chunk_filenames:
+            delete_file(chunk_fname)
+        # Resplit into subset files
+        chunk_filenames = Chunker.chunk_files(gbif_filename, output_path, logger)
+
+    return chunk_filenames
+
+
+# .............................................................................
 def a_resolve_riis_taxa(riis_filename, logger, overwrite=False):
     """Resolve and write GBIF accepted names and taxonKeys in RIIS records.
 
@@ -260,6 +291,7 @@ def d_aggregate_summary_by_region(
     """
     # Create a new Aggregator, ignore file used for construction,
     agg = Aggregator(logger)
+    # Aggregate to files
     report = agg.aggregate_file_summary_for_regions(
         full_summary_filename, annotated_riis_filename, output_path, overwrite=overwrite)
     report_filename = BisonNameOp.get_process_report_filename(
@@ -288,37 +320,6 @@ def z_test(summary_filenames, full_summary_filename, logger):
     report = Counter.compare_location_species_counts(
         summary_filenames, full_summary_filename, logger)
     return report
-
-
-# .............................................................................
-def a_find_or_create_subset_files(gbif_filename, output_path, logger):
-    """Find or create subset files from a large file based on the file size and CPUs.
-
-    Args:
-        gbif_filename (str): full filename of data file to be subsetted into chunks.
-        output_path (str): Destination directory for subset files.
-        logger (object): logger for saving relevant processing messages
-
-    Returns:
-        raw_filenames (list): full filenames for subset files created from large
-            input file.
-        output_path (str): Destination directory for subset files.
-    """
-    chunk_filenames = Chunker.identify_chunk_files(gbif_filename, output_path)
-    # If any are missing, delete them all and split
-    re_split = False
-    for chunk_fname in chunk_filenames:
-        if not os.path.exists(chunk_fname):
-            re_split = True
-            break
-    if re_split is True:
-        # Delete any existing files
-        for chunk_fname in chunk_filenames:
-            delete_file(chunk_fname)
-        # Resplit into subset files
-        chunk_filenames = Chunker.chunk_files(gbif_filename, output_path, logger)
-
-    return chunk_filenames
 
 
 # .............................................................................

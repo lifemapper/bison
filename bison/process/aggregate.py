@@ -44,6 +44,9 @@ class RIIS_Counts():
         self.introduced = int(introduced)
         self.invasive = int(invasive)
         self.presumed_native = int(presumed_native)
+        # self.counts = {}
+        # for ass in LMBISON.assess_values():
+        #     self.counts[ass] = {}
         self.is_group = is_group
         self._log = logger
 
@@ -578,6 +581,36 @@ class Aggregator():
             self._outf.close()
 
     # ...............................................
+    def summarize_assessments_by_region(self):
+        # Write summary of annotated records,
+        #       with LOCATION_PREFIX, LOCATION_KEY, SPECIES_KEY, SPECIES_NAME, COUNT_KEY
+        try:
+            self._log.log(
+                f"Summarizing region summaries to ",
+                refname=self.__class__.__name__)
+
+            # Location_type is state, county, aiannh, pad
+            for location_type, loc_info in self._locations.items():
+                # Location keys are values in each location_type
+                for location, sp_info in loc_info.items():
+                    for species_key, count in sp_info.items():
+                        try:
+                            accepted_name, species_name = self._acc_species_name[
+                                species_key]
+                        except KeyError:
+                            self._log.log(f"No species {species_key} in canonicals.")
+                        except Exception:
+                            raise
+                        row = [
+                            location_type, location, species_key, accepted_name,
+                            species_name, count]
+                        self._csv_writer.writerow(row)
+        except Exception as e:
+            raise Exception(f"Failed to write to file {self._outf.name}, ({e})")
+        finally:
+            self._outf.close()
+
+    # ...............................................
     def _read_location_summary(self, summary_filename):
         """Read summary files and combine summaries in self._locations.
 
@@ -794,9 +827,24 @@ class Aggregator():
 
     # ...............................................
     def _summarize_region_by_riis(
-            self, csvwriter, loc_summary_file, state, county=None):
-        # read [SPECIES_KEY, COUNT_KEY, ASSESS_KEY]
-        assess = {"introduced": {}, "invasive": {}, "presumed_native": {}}
+            self, csvwriter, loc_summary_file, region_type, region_name):
+        """Summarize regions by assessment with counts and percentages.
+
+        Args:
+             csvwriter (obj): writer object for output summaries
+             loc_summary_file (str): filename of summary for region of interest.
+
+        Returns:
+            sp_counts (RIIS_Counts): counts for species
+            occ_counts (RIIS_Counts): counts for occurrences
+            region_type (str): type of region
+            region_name (str): name of region
+        """
+        # Initialize counts by assessment for this region
+        assess = {}
+        for ass in LMBISON.assess_values():
+            assess[ass] = {}
+
         try:
             rdr, inf = get_csv_dict_reader(
                 loc_summary_file, GBIF.DWCA_DELIMITER, encoding=ENCODING,
@@ -804,6 +852,9 @@ class Aggregator():
         except Exception as e:
             raise Exception(f"Unknown open error on {loc_summary_file}: {e}")
 
+        # assess = {"introduced": {rrspkey: count, rrspkey: count, ...},
+        #           "invasive": {rrspkey: count, rrspkey: count, ...},
+        #           "presumed_native": {rrspkey: count, rrspkey: count, ...}}
         try:
             for rec in rdr:
                 try:
@@ -820,15 +871,17 @@ class Aggregator():
         occ_counts = RIIS_Counts(self._log, is_group=False)
 
         # Count introduced/invasive
-        for _species, count in assess["introduced"].items():
-            sp_counts.introduced += 1
-            occ_counts.introduced += int(count)
-        for _species, count in assess["invasive"].items():
-            sp_counts.invasive += 1
-            occ_counts.invasive += int(count)
-        for _species, count in assess["presumed_native"].items():
-            sp_counts.presumed_native += 1
-            occ_counts.presumed_native += int(count)
+        for ass in LMBISON.assess_values():
+            for _species, count in assess[ass].items():
+                if ass == "introduced":
+                    sp_counts.introduced += 1
+                    occ_counts.introduced += int(count)
+                elif ass == "invasive":
+                    sp_counts.invasive += 1
+                    occ_counts.invasive += int(count)
+                elif ass == "presumed_native":
+                    sp_counts.presumed_native += 1
+                    occ_counts.presumed_native += int(count)
 
         pct_sp = (
                 sp_counts.percent_introduced
@@ -836,7 +889,8 @@ class Aggregator():
                 + sp_counts.percent_presumed_native)
         if pct_sp != 1:
             self._log.log(
-                f"Percent species totals for {state} {county}: {pct_sp} <> 1.0",
+                f"Percent species totals for {region_type} {region_name}: "
+                f"{pct_sp} <> 1.0",
                 refname=self.__class__.__name__)
 
         pct_occ = (
@@ -845,11 +899,11 @@ class Aggregator():
                 + occ_counts.percent_presumed_native)
         if pct_occ != 1:
             self._log.log(
-                f"Percent occ totals for {state} {county}: {pct_occ} <> 1.0",
+                f"Percent occ totals for {region_type} {region_name}: {pct_occ} <> 1.0",
                 refname=self.__class__.__name__)
 
         csvwriter.writerow([
-            state, county,
+            region_type, region_name,
             sp_counts.introduced, sp_counts.invasive, sp_counts.presumed_native,
             sp_counts.total,
             sp_counts.percent_introduced_rnd, sp_counts.percent_invasive_rnd,
@@ -927,9 +981,13 @@ class Aggregator():
                 REPORT.OUTFILE: []
             }
             for region_value, _species_counts in locations.items():
+                # Aggregate region to file
                 agg_fname = self._write_region_aggregate(
                     riis, region_type, region_value, outpath, overwrite=overwrite)
                 report[region_type][REPORT.OUTFILE].append(agg_fname)
+                # Count occurrences and species by assessment to one line in summary file
+                self._summarize_region_by_riis(
+                    csvwriter, agg_fname, region_type, region_value)
         return report
 
 

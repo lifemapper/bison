@@ -92,9 +92,27 @@ class Counter():
 
     # .............................................................................
     @classmethod
+    def compare_assessment_counts(
+            cls, annotated_filenames, combined_summary_filename, logger):
+        """Compare record counts in subset summaries to counts in the combined summary.
+
+        Args:
+            subset_summary_filenames (list): full filename of summary files of
+                individual subsets to compare with combined summary file.
+            combined_summary_filename (str): full filename of combined summaries.
+            logger (object): logger for saving relevant processing messages
+
+        Returns:
+            report (dict): dictionary with summaries of count comparisons and lists of
+                .error types.
+        """
+
+
+    # .............................................................................
+    @classmethod
     def compare_location_species_counts(
             cls, subset_summary_filenames, combined_summary_filename, logger):
-        """Count records for each of the valid assessments in a file.
+        """Compare record counts in subset summaries to counts in the combined summary.
 
         Args:
             subset_summary_filenames (list): full filename of summary files of
