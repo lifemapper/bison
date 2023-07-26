@@ -6,7 +6,9 @@ import os
 from bison.common.constants import CONFIG_PARAM
 from bison.common.log import Logger
 
-COMMANDS = ("resolve", "split", "annotate", "summarize", "aggregate", "check_counts")
+COMMANDS = (
+    "resolve", "split", "annotate", "summarize", "aggregate", "check_counts",
+    "heat_matrix")
 
 
 # .....................................................................................

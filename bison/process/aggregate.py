@@ -10,7 +10,7 @@ from bison.common.constants import (
     EXTRA_CSV_FIELD, GBIF, LMBISON, REGION, REPORT, US_STATES)
 from bison.common.log import Logger
 from bison.common.util import (
-    available_cpu_count, BisonNameOp, get_csv_dict_reader, get_csv_writer,
+    available_cpu_count, BisonKey, BisonNameOp, get_csv_dict_reader, get_csv_writer,
     ready_filename)
 from bison.provider.riis_data import RIIS
 
@@ -345,45 +345,6 @@ class Aggregator():
             self._states[st] = set()
 
     # ...............................................
-    @staticmethod
-    def _get_compound_key(part1, part2):
-        """Construct a compound key for dictionaries.
-
-        Args:
-            part1 (str): first element of compound key.
-            part2 (str): second element of compound key.
-
-        Returns:
-             str combining part1 and part2 to use as a dictionary key.
-        """
-        return f"{part1}{AGGREGATOR_DELIMITER}{part2}"
-
-    # ...............................................
-    @staticmethod
-    def _parse_compound_key(compound_key):
-        """Parse a compound key into its elements.
-
-        Args:
-             compound_key (str): key combining 2 elements.
-
-        Returns:
-            part1 (str): first element of compound key.
-            second (str): first element of compound key.
-
-        Raises:
-            ValueError: on unexpected input
-        """
-        parts = compound_key.split(AGGREGATOR_DELIMITER)
-        part1 = parts[0]
-        if len(parts) == 2:
-            part2 = parts[1]
-        elif len(parts) == 1:
-            part2 = None
-        else:
-            raise ValueError(f"Unexpected compound_key {compound_key}")
-        return part1, part2
-
-    # ...............................................
     def _add_record_to_location_summaries(
             self, prefix, is_disjoint, location, species_key, count=1):
         # locations = {prefix: {location: {species_key: count,  ... },
@@ -425,7 +386,7 @@ class Aggregator():
         # in each state
         if prefix == "county":
             try:
-                state, county = self._parse_compound_key(location)
+                state, county = BisonKey.parse_compound_key(location)
             except ValueError:
                 raise
             else:
@@ -484,6 +445,51 @@ class Aggregator():
         return report
 
     # ...............................................
+    def get_species_counts_for_location(self, region_type, region_name):
+        """Return a list of species, with the count for each, in a particular region.
+
+        Args:
+            region_type (str): Type of region (state, county, aiannh, pad ...)
+            region_value (str): region name
+
+        Returns:
+            list of tuples containing a species key and occurrence count
+        """
+        return self._locations[region_type][region_name]
+
+    # ...............................................
+    def get_locations_for_region_type(self, region_type):
+        """Return a list of regions in a type of region.
+
+        Args:
+            region_type (str): Type of region (state, county, aiannh, pad ...)
+
+        Returns:
+            list of region names.
+        """
+        return list(self._locations[region_type].keys())
+
+    # ...............................................
+    def get_species_from_key(self, rr_species_key):
+        """Return the GBIF accepted species name, and the canonical name for a key.
+
+        Args:
+            rr_species_key (str): A compound key used for a species occurring in
+                a particular RIIS region (AK, HI, L48)
+
+        self._acc_species_name[rr_species_key] = (
+                        rec[GBIF.ACC_NAME_FLD], rec[GBIF.SPECIES_NAME_FLD])
+
+        Returns:
+            tuple containing a GBIF accepted species name, and canonical name
+        """
+        return self._acc_species_name[rr_species_key]
+
+    # ...............................................
+    def get_species_lookup(self):
+        return self._acc_species_name
+
+    # ...............................................
     def _summarize_annotations_by_region(self):
         # Reset summaries by location and species name lookup
         self._reset_summaries()
@@ -507,7 +513,7 @@ class Aggregator():
                     #     rec[GBIF.ACC_TAXON_FLD], rec[GBIF.ACC_NAME_FLD])
                     # Use combo state-taxonkey-spname to track species and riis region for assessment
                     riis_region = self._get_riis_region(rec[APPEND_TO_DWC.RESOLVED_ST])
-                    rr_species_key = self._get_compound_key(
+                    rr_species_key = BisonKey.get_compound_key(
                         riis_region, rec[GBIF.ACC_TAXON_FLD])
                     # rec[GBIF.ACC_NAME_FLD])
                     # self.canonicals = {rr_species_key: species_name,  ... }
@@ -524,7 +530,8 @@ class Aggregator():
                             if isinstance(fld, str):
                                 location = rec[fld]
                             elif isinstance(fld, tuple) and len(fld) == 2:
-                                location = self._get_compound_key(rec[fld[0]], rec[fld[1]])
+                                location = BisonKey.get_compound_key(
+                                    rec[fld[0]], rec[fld[1]])
                             else:
                                 raise Exception(f"Bad summary fields {fld}")
 
@@ -788,7 +795,7 @@ class Aggregator():
         rr_species_counts = self._locations[region_type][region_value]
         try:
             for rr_species_key, count in rr_species_counts.items():
-                riis_region, gbif_taxon_key = self._parse_compound_key(rr_species_key)
+                riis_region, gbif_taxon_key = BisonKey.parse_compound_key(rr_species_key)
 
                 try:
                     (accepted_name,
@@ -837,8 +844,9 @@ class Aggregator():
         Returns:
             sp_counts (RIIS_Counts): counts for species
             occ_counts (RIIS_Counts): counts for occurrences
-            region_type (str): type of region
-            region_name (str): name of region
+            region_type (str): type of region; first value in each tuples contained in
+                list of common.constants.REGION[<key>]["summary"]
+            region_name (str): name of region; named locations for the type of region
         """
         # Initialize counts by assessment for this region
         assess = {}
@@ -917,13 +925,32 @@ class Aggregator():
         return sp_counts, occ_counts
 
     # ...............................................
-    def aggregate_file_summary_for_regions(
-            self, combined_summary_filename, annotated_riis_fname, outpath,
+    def read_region_assessments(self, full_summary_filename):
+        """Read summary data from file, summarize by species and location.
+
+        Args:
+            full_summary_filename (str): full filename of occurrence summary of
+                annotated records.
+
+        Post condition:
+            region_summary_filenames (list): full filenames by region, of summaries of
+                counts and percentages of species in that region.
+        """
+        # Reset location summary and species name lookup
+        self._reset_summaries()
+        self._read_location_summary(full_summary_filename)
+        self._log.log(
+            f"Read annotation summary {full_summary_filename} to write by region")
+
+
+    # ...............................................
+    def aggregate_summary_for_regions_assessments(
+            self, full_summary_filename, annotated_riis_fname, outpath,
             overwrite=True):
         """Read summary data from file, summarize by species and location.
 
         Args:
-            combined_summary_filename (str): full filename of data summary of
+            full_summary_filename (str): full filename of occurrence summary of
                 annotated records.
             annotated_riis_fname (str): full filename of RIIS data annotated with
                 GBIF accepted taxon.
@@ -936,24 +963,24 @@ class Aggregator():
                 counts and percentages of species in that region.
         """
         # Reset location summary and species name lookup
-        self._reset_summaries()
-        self._read_location_summary(combined_summary_filename)
-        self._log.log(
-            f"Read annotation summary {combined_summary_filename} to write by region")
+        self.read_region_assessments(full_summary_filename)
 
         report = self.aggregate_summary_for_regions(
-            annotated_riis_fname, outpath, overwrite=overwrite)
-        report[REPORT.INFILE] = combined_summary_filename
+            annotated_riis_fname, full_summary_filename, outpath,
+            overwrite=overwrite)
+        report[REPORT.INFILE] = full_summary_filename
         return report
 
     # ...............................................
     def aggregate_summary_for_regions(
-            self, annotated_riis_fname, outpath, overwrite=True):
+            self, annotated_riis_fname, full_summary_filename, outpath, overwrite=True):
         """Read summary data from file, summarize by species and location.
 
         Args:
             annotated_riis_fname (str): full filename of RIIS data annotated with
                 GBIF accepted taxon.
+            full_summary_filename (str): full filename of occurrence summary of
+                annotated records.
             outpath (str): full directory path for output filenames.
             overwrite (bool): Flag indicating whether to overwrite existing output files.
 
@@ -975,6 +1002,22 @@ class Aggregator():
         riis.read_riis()
         report = {}
 
+        # Count occurrences and species by assessment to one line in summary file
+        assessment_summary_filename = BisonNameOp.get_assessment_summary_name(
+            full_summary_filename, outpath)
+        if ready_filename(assessment_summary_filename, overwrite=overwrite):
+            try:
+                ass_csv_writer, self._outf = get_csv_writer(
+                    assessment_summary_filename, GBIF.DWCA_DELIMITER,
+                    header=LMBISON.all_summary_header(), fmode="w")
+            except Exception as e:
+                raise Exception(
+                    "Failed to open summary CSV file "
+                    f"{assessment_summary_filename}: {e}")
+        report["RIIS assessments by location"] = {
+            REPORT.OUTFILE: assessment_summary_filename
+        }
+
         for region_type, locations in self._locations.items():
             report[region_type] = {
                 REPORT.LOCATION: len(locations),
@@ -985,9 +1028,10 @@ class Aggregator():
                 agg_fname = self._write_region_aggregate(
                     riis, region_type, region_value, outpath, overwrite=overwrite)
                 report[region_type][REPORT.OUTFILE].append(agg_fname)
-                # Count occurrences and species by assessment to one line in summary file
+                # Write one line for region to summary of occurrence/species counts
+                # and percentages
                 self._summarize_region_by_riis(
-                    csvwriter, agg_fname, region_type, region_value)
+                    ass_csv_writer, agg_fname, region_type, region_value)
         return report
 
 

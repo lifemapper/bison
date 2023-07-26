@@ -8,10 +8,12 @@ import time
 from bison.common.constants import (
     APPEND_TO_DWC, CONFIG_PARAM, LMBISON_PROCESS, GBIF, ENCODING, EXTRA_CSV_FIELD, LOG,
     REGION, REPORT, RIIS_DATA)
-from bison.common.util import BisonNameOp, Chunker, delete_file, get_csv_dict_reader
+from bison.common.util import (
+    BisonKey, BisonNameOp, Chunker, delete_file, get_csv_dict_reader)
 from bison.process.aggregate import Aggregator
 from bison.process.annotate import (Annotator, parallel_annotate)
 from bison.process.geoindex import (GeoResolver, GeoException)
+from bison.process.poly_matrix import PolygonMatrix
 from bison.process.sanity_check import Counter
 from bison.provider.riis_data import RIIS
 from bison.tools._config_parser import get_common_arguments
@@ -292,18 +294,75 @@ def d_aggregate_summary_by_region(
     # Create a new Aggregator, ignore file used for construction,
     agg = Aggregator(logger)
     # Aggregate to files
-    report = agg.aggregate_file_summary_for_regions(
+    report = agg.aggregate_summary_for_regions_assessments(
         full_summary_filename, annotated_riis_filename, output_path, overwrite=overwrite)
     report_filename = BisonNameOp.get_process_report_filename(
         full_summary_filename, output_path=output_path,
-        step_or_process=LMBISON_PROCESS.SUMMARIZE)
+        step_or_process=LMBISON_PROCESS.AGGREGATE)
     report[REPORT.REPORTFILE] = report_filename
 
     return report
 
 
 # .............................................................................
-def z_test(summary_filenames, full_summary_filename, logger):
+def e_county_heatmap_pam(
+        full_summary_filename, geo_path, process_path, logger, overwrite=True):
+    """Annotate GBIF records with census state and county, and RIIS key and assessment.
+
+    Args:
+        full_summary_filename (str): Full filename containing summarized
+            GBIF data by region for RIIS assessment of records.
+        geo_path (str): Base directory containing geospatial region files
+        process_path (str): Destination directory for output files.
+        logger (object): logger for saving relevant processing messages
+        overwrite (bool): Flag indicating whether to overwrite existing matrix file(s).
+
+    Returns:
+        annotated_filenames: full filenames for GBIF data newly annotated with state,
+            county, RIIS assessment, and RIIS key.  If a file exists, do not annotate.
+    """
+    report = {}
+    region_type = "county"
+    # from common.constants.REGION.COUNTY["map"]
+    county_fldname = "NAME"
+    state_fldname = "STUSPS"
+    county_filename = os.path.join(geo_path, REGION.COUNTY["file"])
+
+    # Create a new Aggregator, ignore file used for construction,
+    agg = Aggregator(logger)
+    # Aggregate species/location/count
+    agg.read_region_assessments(full_summary_filename)
+    species_lookup = agg.get_species_lookup()
+
+    # Initialize dictionary for species in counties structure
+    # Species may be different RIIS region (AK, HI, L48), each as a different key
+    species_fids = {}
+    for rr_species_key in species_lookup.keys():
+        species_fids[rr_species_key] = {}
+
+    county_matrix = PolygonMatrix(
+        county_filename, county_fldname, parent_fldname=state_fldname, logger=logger,
+        is_disjoint=False)
+    location_lookup = county_matrix.cell_attribute_lookup
+
+    region_names = agg.get_locations_for_region_type(region_type)
+    # for each cell (county) in the county matrix
+    for reg_name in region_names:
+        fid = location_lookup[reg_name]
+        species_counts = agg.get_species_counts_for_location(region_type, reg_name)
+        for rr_species_key, sp_count in species_counts:
+            # acc_sciname, sciname = agg.get_species_from_key(rr_species_key)
+            species_fids[rr_species_key][fid] = sp_count
+
+    for rr_species_key, fid_count in species_fids.items():
+        county_matrix.add_column_for_species(rr_species_key, fid_count)
+
+    matrix = county_matrix.matrix
+    print(matrix.columns)
+    print(matrix.index)
+
+# .............................................................................
+def z_test(summary_filenames, full_summary_filename, output_path, logger):
     """Test the outputs to make sure counts are in sync.
 
     Args:
@@ -311,6 +370,7 @@ def z_test(summary_filenames, full_summary_filename, logger):
             occurrence counts, one file per each file in annotated_filenames.
         full_summary_filename (str): Full filename containing combined summarized
             GBIF data by region for RIIS assessment of records.
+        output_path (str): Destination directory for testing report file.
         logger (object): logger for saving relevant processing messages
 
     Returns:
@@ -319,6 +379,10 @@ def z_test(summary_filenames, full_summary_filename, logger):
     """
     report = Counter.compare_location_species_counts(
         summary_filenames, full_summary_filename, logger)
+    report_filename = BisonNameOp.get_process_report_filename(
+        full_summary_filename, output_path=output_path,
+        step_or_process=LMBISON_PROCESS.AGGREGATE)
+    report[REPORT.REPORTFILE] = report_filename
     return report
 
 
@@ -607,7 +671,13 @@ def execute_command(config, logger):
     elif config["command"] == "check_counts":
         step_or_process = LMBISON_PROCESS.CHECK_COUNTS
         # Test summarized summaries
-        report = z_test(summary_filenames, full_summary_filename, logger)
+        report = z_test(summary_filenames, full_summary_filename, out_path, logger)
+
+    elif config["command"] == "heat_matrix":
+        step_or_process = LMBISON_PROCESS.PAM
+        report = e_county_heatmap_pam(
+            full_summary_filename, config["geo_path"], config["process_path"], logger,
+            overwrite=True)
 
     elif config["command"] == "test_bad_data" and config["gbif_id"] is not None:
         test_bad_line(

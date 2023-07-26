@@ -8,7 +8,8 @@ from osgeo import ogr
 import subprocess
 import sys
 
-from bison.common.constants import (LMBISON_PROCESS, ENCODING, EXTRA_CSV_FIELD, GBIF)
+from bison.common.constants import (
+    AGGREGATOR_DELIMITER, LMBISON_PROCESS, ENCODING, EXTRA_CSV_FIELD, GBIF)
 
 
 # ...............................................
@@ -495,6 +496,46 @@ def get_fields_from_header(csvfile, delimiter=GBIF.DWCA_DELIMITER, encoding="utf
         f.close()
 
     return fields
+
+class BisonKey():
+    # ...............................................
+    @staticmethod
+    def get_compound_key(part1, part2):
+        """Construct a compound key for dictionaries.
+
+        Args:
+            part1 (str): first element of compound key.
+            part2 (str): second element of compound key.
+
+        Returns:
+             str combining part1 and part2 to use as a dictionary key.
+        """
+        return f"{part1}{AGGREGATOR_DELIMITER}{part2}"
+
+    # ...............................................
+    @staticmethod
+    def parse_compound_key(compound_key):
+        """Parse a compound key into its elements.
+
+        Args:
+             compound_key (str): key combining 2 elements.
+
+        Returns:
+            part1 (str): first element of compound key.
+            second (str): first element of compound key.
+
+        Raises:
+            ValueError: on unexpected input
+        """
+        parts = compound_key.split(AGGREGATOR_DELIMITER)
+        part1 = parts[0]
+        if len(parts) == 2:
+            part2 = parts[1]
+        elif len(parts) == 1:
+            part2 = None
+        else:
+            raise ValueError(f"Unexpected compound_key {compound_key}")
+        return part1, part2
 
 
 # .............................................................................

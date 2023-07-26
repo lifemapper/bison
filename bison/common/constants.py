@@ -105,6 +105,7 @@ class REPORT:
     SUMMARY = "summary"
     REGION = "region"
     LOCATION = "locations"
+    AGGREGATION = "RIIS assessments by location"
     SPECIES = "species"
     OCCURRENCE = "occurrences"
     ANNOTATE_FAIL = "annotate_gbifid_failed"
@@ -123,6 +124,7 @@ class LMBISON_PROCESS:
     COMBINE = {"step": 4, "postfix": "combine"}
     AGGREGATE = {"step": 5, "postfix": "aggregate"}
     CHECK_COUNTS = {"step": 6, "postfix": "check_counts"}
+    PAM = {"step": 7, "postfix": "pam"}
 
     @staticmethod
     def process_types():
