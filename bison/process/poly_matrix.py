@@ -1,62 +1,68 @@
 """Class for a spatial index and tools for intersecting with a point and extracting attributes."""
-# import lmpy
+import lmpy
 import numpy
 import os
 import pandas
 from osgeo import ogr
 
-from bison.common.util import BisonKey
+from bison.common.util import BisonKey, ready_filename
 
 
 # .............................................................................
 class PolygonMatrix(object):
     """Object for intersecting coordinates with a polygon shapefile."""
     def __init__(
-            self, full_spatial_fname, fldname, parent_fldname=None, logger=None,
-            is_disjoint=True):
-        """Construct a geospatial index to intersect with a set of coordinates.
+            self, matrix_filename=None, spatial_filename=None, fieldname=None,
+            parent_fieldname=None, logger=None):
+        """Construct a pandas.Dataframe from a matrix file, or a shapefile of polygons.
 
         Args:
-            full_spatial_fname (str): full filename for a shapefile to construct index
-            fldname (str): fieldname for polygon attribute of interest
-            parent_fldname (dict): fieldname for parent name attribute of interest,
+            matrix_filename (str): full filename for a zipped CSV file containing a
+                pandas.DataFrame,
+            spatial_filename (str): full filename for a shapefile to construct index
+            fieldname (str): fieldname for polygon attribute of interest
+            parent_fieldname (dict): fieldname for parent name attribute of interest,
                 ex: state name for county
             logger (object): logger for saving relevant processing messages
-            is_disjoint (bool): True indicates the spatial features are disjoint;
-                False indicates contiguous features.
 
         Raises:
             FileNotFoundError: if spatial_fname does not exist on the file system
         """
-        # full_spatial_fname = os.path.join(DATA_PATH, spatial_fname)
-        if not os.path.exists(full_spatial_fname):
-            raise FileNotFoundError(f"{full_spatial_fname}")
         self._log = logger
-        self._spatial_filename = full_spatial_fname
-        self._fldname = fldname
-        self._parent_fldname = parent_fldname
-        self._is_disjoint = is_disjoint
-        self._initialize_geospatial_data()
+        self._row_values = None
+
+        if matrix_filename:
+            if os.path.exists(matrix_filename):
+                self.read_matrix(matrix_filename)
+            else:
+                raise FileNotFoundError(f"{spatial_filename}")
+        elif spatial_filename:
+            if os.path.exists(spatial_filename):
+                self._initialize_geospatial_data(
+                    spatial_filename, fieldname, parent_fieldname)
+            else:
+                raise FileNotFoundError(f"{spatial_filename}")
+        else:
+            raise Exception("Must provide either spatial_filename or matrix_filename.")
 
     # ...............................................
-    def _get_location_key(self, feat):
-        name = feat.GetField(self._fldname)
-        if self._parent_fldname is not None:
-            parent = feat.GetField(self._parent_fldname)
+    def _get_location_key(self, feat, fieldname, parent_fieldname):
+        name = feat.GetField(fieldname)
+        if parent_fieldname is not None:
+            parent = feat.GetField(parent_fieldname)
             key = BisonKey.get_compound_key(parent, name)
         else:
             key = name
         return key
 
     # ...............................................
-    def _initialize_geospatial_data(self):
+    def _initialize_geospatial_data(self, spatial_filename, fieldname, parent_fieldname):
         """Init a lookup table for polygon features in the file and their attributes."""
         driver = ogr.GetDriverByName("ESRI Shapefile")
 
-        dataset = driver.Open(self._spatial_filename, 0)
+        dataset = driver.Open(spatial_filename, 0)
         lyr = dataset.GetLayer()
-        # lookup table of parent_
-        self._cells = {}
+        # lookup table of attribute_value: fid
         # Zero-based
         for fid in range(0, lyr.GetFeatureCount()):
             try:
@@ -67,12 +73,12 @@ class PolygonMatrix(object):
                     f" {e}", refname=self.__class__.__name__
                 )
             else:
-                loc_key = self._get_location_key(feat)
-                self._cells[loc_key] = fid
+                loc_key = self._get_location_key(feat, fieldname, parent_fieldname)
+                self._row_values[fid] = loc_key
         self._dataframe = None
 
     # ...............................................
-    def create_column_for_species(self, fid_count):
+    def create_data_column(self, fid_count):
         """Add a column to the dataframe.
 
         Args:
@@ -95,6 +101,13 @@ class PolygonMatrix(object):
                 a value of a list of counts for each row index (fid).
         """
         self._dataframe = pandas.DataFrame(species_cols)
+        row_value_index = []
+        for fid in range(self._dataframe.shape[0]):
+            row_value_index.append(self._row_values[fid])
+        # Convert the original index to a MultiIndex with the new_index as the second level
+        self._dataframe.index = pandas.MultiIndex.from_arrays(
+            [self._dataframe.index, row_value_index]
+        )
 
     # ...............................................
     @property
@@ -154,7 +167,9 @@ class PolygonMatrix(object):
         Returns:
             The count of cells/rows for this instance.
         """
-        return len(self._cells.keys())
+        if self._cells is not None:
+            count = len(self._cells)
+        return count
 
     # ...............................................
     @property
@@ -167,22 +182,33 @@ class PolygonMatrix(object):
         """
         return self._cells
 
-    def write_matrix(self, heatmatrix_filename):
+    # ...............................................
+    def write_matrix(self, heatmatrix_filename, overwrite=True):
         """Write the matrix to a zipped CSV file.
 
         Args:
             heatmatrix_filename (str): Full filename for output pandas.DataFrame.
+            overwrite (bool): Flag indicating whether to overwrite existing matrix file(s).
 
         Raises:
             Exception: on failure to write matrix.
         """
-        try:
-            self._dataframe.to_csv(
-                path_or_buf=heatmatrix_filename, sep=",", header=True, index=True,
-                index_label=False, mode='w', encoding="utf-8", compression="zip"
-            )
-        except Exception:
-            raise
+        if ready_filename(heatmatrix_filename, overwrite=overwrite):
+            try:
+                self._dataframe.to_csv(
+                    path_or_buf=heatmatrix_filename, sep=",", header=True, index=True,
+                    index_label=False, mode='w', encoding="utf-8", compression="zip"
+                )
+            except Exception:
+                raise
+        else:
+            self._log.log(f"File {heatmatrix_filename} already exists.")
+
+    # ...............................................
+    def read_matrix(self, matrix_filename):
+        self._dataframe = pandas.read_csv(
+            matrix_filename, sep=",", header=0, index_col=0, memory_map=True)
+
 
 
 # .............................................................................

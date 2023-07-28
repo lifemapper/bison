@@ -305,7 +305,7 @@ def d_aggregate_summary_by_region(
 
 
 # .............................................................................
-def e_county_heatmap_pam(
+def e_county_heatmap(
         full_summary_filename, geo_path, heatmatrix_filename, logger, overwrite=True):
     """Annotate GBIF records with census state and county, and RIIS key and assessment.
 
@@ -365,13 +365,48 @@ def e_county_heatmap_pam(
         species_columns[rr_species_key] = county_matrix.create_column_for_species(
             fid_count)
     county_matrix.create_dataframe_from_cols(species_columns)
-    county_matrix.write_matrix(heatmatrix_filename)
+    county_matrix.write_matrix(heatmatrix_filename, overwrite=overwrite)
 
     report[REPORT.OUTFILE] = heatmatrix_filename
     report[REPORT.HEATMATRIX] = {
         REPORT.ROWS: county_matrix.row_count,
         REPORT.COLUMNS: county_matrix.columns
     }
+    return report
+
+
+# .............................................................................
+def f_county_pam(
+        heatmatrix_filename, logger, overwrite=True):
+    """Annotate GBIF records with census state and county, and RIIS key and assessment.
+
+    Args:
+        full_summary_filename (str): Full filename containing summarized
+            GBIF data by region for RIIS assessment of records.
+        geo_path (str): Base directory containing geospatial region files
+        heatmatrix_filename (str): Full filename for output pandas.DataFrame.
+        logger (object): logger for saving relevant processing messages
+        overwrite (bool): Flag indicating whether to overwrite existing matrix file(s).
+
+    Returns:
+        report (dict): dictionary summarizing metadata about the processes and
+            output files.
+    """
+    region_type = "county"
+    report = {
+        REPORT.INFILE: heatmatrix_filename,
+        REPORT.REGION: region_type,
+        REPORT.PROCESS: LMBISON_PROCESS.PAM
+    }
+
+    # county_matrix = PolygonMatrix(
+    #     county_filename, county_fldname, parent_fldname=state_fldname, logger=logger,
+    #     is_disjoint=False)
+    # location_fid = county_matrix.cell_attribute_lookup
+
+
+    report[REPORT.OUTFILE] = heatmatrix_filename
+    report[REPORT.PAM] = {}
     return report
 
 
@@ -693,9 +728,13 @@ def execute_command(config, logger):
 
     elif config["command"] == "heat_matrix":
         step_or_process = LMBISON_PROCESS.HEATMATRIX
-        report = e_county_heatmap_pam(
+        report = e_county_heatmap(
             full_summary_filename, config["geo_path"], heatmatrix_filename, logger,
             overwrite=True)
+
+    elif config["command"] == "county_pam":
+        step_or_process = LMBISON_PROCESS.PAM
+        report = f_county_pam(heatmatrix_filename, logger, overwrite=True)
 
     elif config["command"] == "test_bad_data" and config["gbif_id"] is not None:
         test_bad_line(

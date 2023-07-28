@@ -128,6 +128,7 @@ class LMBISON_PROCESS:
     AGGREGATE = {"step": 5, "postfix": "aggregate"}
     CHECK_COUNTS = {"step": 6, "postfix": "check_counts"}
     HEATMATRIX = {"step": 7, "postfix": "heatmatrix"}
+    PAM = {"step": 8, "postfix": "pam"}
 
     @staticmethod
     def process_types():
@@ -138,7 +139,9 @@ class LMBISON_PROCESS:
         """
         return (
             LMBISON_PROCESS.CHUNK, LMBISON_PROCESS.ANNOTATE,
-            LMBISON_PROCESS.SUMMARIZE, LMBISON_PROCESS.COMBINE, LMBISON_PROCESS.AGGREGATE
+            LMBISON_PROCESS.SUMMARIZE, LMBISON_PROCESS.COMBINE,
+            LMBISON_PROCESS.AGGREGATE, LMBISON_PROCESS.HEATMATRIX,
+            LMBISON_PROCESS.PAM
         )
 
     @staticmethod

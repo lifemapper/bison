@@ -822,8 +822,8 @@ class BisonNameOp():
         else:
             # all outputs are CSV files except heatmatrix, which is a zipped CSV file.
             ext = ".csv"
-            if step_or_process == LMBISON_PROCESS.HEATMATRIX:
-                ext = ".zip"
+            # if step_or_process == LMBISON_PROCESS.HEATMATRIX:
+            #     ext = ".zip"
             outbasename = f"{basename}{sep}{new_postfix}{ext}"
             # If outpath is not provided, use the same path as the input file.
             if outpath is None:
