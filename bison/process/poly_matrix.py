@@ -1,10 +1,10 @@
 """Class for a spatial index and tools for intersecting with a point and extracting attributes."""
+# import lmpy
+import numpy
 import os
 import pandas
-from logging import INFO, DEBUG, ERROR
 from osgeo import ogr
 
-from bison.common.constants import REGION
 from bison.common.util import BisonKey
 
 
@@ -36,7 +36,6 @@ class PolygonMatrix(object):
         self._fldname = fldname
         self._parent_fldname = parent_fldname
         self._is_disjoint = is_disjoint
-        self._cell_count = 0
         self._initialize_geospatial_data()
 
     # ...............................................
@@ -63,46 +62,127 @@ class PolygonMatrix(object):
             try:
                 feat = lyr.GetFeature(fid)
             except Exception as e:
-                self.logit(
-                    f"Warning, unable to add FID {fid} for {self.filename}: {e}")
+                self._log.log(
+                    f"Warning, unable to add FID {fid} for {self._spatial_filename}:"
+                    f" {e}", refname=self.__class__.__name__
+                )
             else:
                 loc_key = self._get_location_key(feat)
                 self._cells[loc_key] = fid
-
-        self._dataframe = pandas.DataFrame()
+        self._dataframe = None
 
     # ...............................................
-    def add_column_for_species(self, colname, fid_count):
+    def create_column_for_species(self, fid_count):
         """Add a column to the dataframe.
 
         Args:
-            colname: species name for the new column
             fid_count (dict): dictionary of fid (row index) and count
 
+        Returns:
+            column (list): ordered list of counts for each row index (fid).
         """
-        counts = []
-        for fid in self.cell_count:
-            try:
-                counts.append(fid_count[fid])
-            except KeyError:
-                counts.append(0)
-        self._dataframe[colname] = counts
+        counts = numpy.zeros(self.cell_count, dtype=numpy.int32)
+        for fid, count in fid_count.items():
+            counts[fid] = count
+        return list(counts)
+
+    # ...............................................
+    def create_dataframe_from_cols(self, species_cols):
+        """Add a column to the dataframe.
+
+        Args:
+            species_cols (dict): keys contain species(column) name, with
+                a value of a list of counts for each row index (fid).
+        """
+        self._dataframe = pandas.DataFrame(species_cols)
 
     # ...............................................
     @property
     def matrix(self):
-        """Return the pandas dataframe"""
+        """Return the pandas dataframe.
+
+        Returns:
+            The pandas.DataFrame for this instance.
+        """
         return self._dataframe
 
     # ...............................................
     @property
+    def row_count(self):
+        """Return the number of rows in the dataframe.
+
+        Returns:
+            The count of rows for the DataFrame instance.
+        """
+        return self._dataframe.shape[0]
+
+    # ...............................................
+    @property
+    def rows(self):
+        """Return rows in the dataframe as a list.
+
+        Returns:
+            The row indexes for the DataFrame instance.
+        """
+        return self._dataframe.index.to_list()
+
+    # ...............................................
+    @property
+    def column_count(self):
+        """Return the number of columns in the dataframe.
+
+        Returns:
+            The count of columns for the DataFrame instance.
+        """
+        return self._dataframe.shape[1]
+
+    # ...............................................
+    @property
+    def columns(self):
+        """Return columns in the dataframe as a list.
+
+        Returns:
+            list of column names for the dataframe.
+        """
+        return self._dataframe.columns.to_list()
+
+    # ...............................................
+    @property
     def cell_count(self):
+        """Return the number of cells/polygons (rows in the dataframe) in this instance.
+
+        Returns:
+            The count of cells/rows for this instance.
+        """
         return len(self._cells.keys())
 
     # ...............................................
     @property
     def cell_attribute_lookup(self):
+        """Return a dictionary of the spatial cells/polygons with unique_attribute: fid.
+
+        Returns:
+            Dictionary of the spatial cells/polygons, with the key as a unique feature
+                attribute, and the value as the FID.
+        """
         return self._cells
+
+    def write_matrix(self, heatmatrix_filename):
+        """Write the matrix to a zipped CSV file.
+
+        Args:
+            heatmatrix_filename (str): Full filename for output pandas.DataFrame.
+
+        Raises:
+            Exception: on failure to write matrix.
+        """
+        try:
+            self._dataframe.to_csv(
+                path_or_buf=heatmatrix_filename, sep=",", header=True, index=True,
+                index_label=False, mode='w', encoding="utf-8", compression="zip"
+            )
+        except Exception:
+            raise
 
 
 # .............................................................................

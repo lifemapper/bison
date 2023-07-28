@@ -497,6 +497,7 @@ def get_fields_from_header(csvfile, delimiter=GBIF.DWCA_DELIMITER, encoding="utf
 
     return fields
 
+
 class BisonKey():
     # ...............................................
     @staticmethod
@@ -806,7 +807,7 @@ class BisonNameOp():
                 followed by process step completed (if any)
         """
         sep = BisonNameOp.separator
-        pth, basename, ext, chunk, postfix = BisonNameOp.parse_process_filename(
+        pth, basename, orig_ext, chunk, postfix = BisonNameOp.parse_process_filename(
             in_filename)
         # If step is not provided, get the step after that of the input file.
         if step_or_process is None:
@@ -819,6 +820,10 @@ class BisonNameOp():
                 f"No next step for {in_filename} or processing step for "
                 f"{step_or_process}")
         else:
+            # all outputs are CSV files except heatmatrix, which is a zipped CSV file.
+            ext = ".csv"
+            if step_or_process == LMBISON_PROCESS.HEATMATRIX:
+                ext = ".zip"
             outbasename = f"{basename}{sep}{new_postfix}{ext}"
             # If outpath is not provided, use the same path as the input file.
             if outpath is None:

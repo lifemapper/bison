@@ -105,9 +105,12 @@ class REPORT:
     SUMMARY = "summary"
     REGION = "region"
     LOCATION = "locations"
-    AGGREGATION = "RIIS assessments by location"
+    AGGREGATION = "riis_assessments_by_location"
     SPECIES = "species"
     OCCURRENCE = "occurrences"
+    HEATMATRIX = "heatmatrix"
+    ROWS = "rows"
+    COLUMNS = "columns"
     ANNOTATE_FAIL = "annotate_gbifid_failed"
     ANNOTATE_FAIL_COUNT = "records_failed_annotate"
     RANK_FAIL = "rank_failed"
@@ -124,7 +127,7 @@ class LMBISON_PROCESS:
     COMBINE = {"step": 4, "postfix": "combine"}
     AGGREGATE = {"step": 5, "postfix": "aggregate"}
     CHECK_COUNTS = {"step": 6, "postfix": "check_counts"}
-    PAM = {"step": 7, "postfix": "pam"}
+    HEATMATRIX = {"step": 7, "postfix": "heatmatrix"}
 
     @staticmethod
     def process_types():

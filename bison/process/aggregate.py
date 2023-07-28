@@ -6,8 +6,8 @@ from datetime import datetime
 import multiprocessing
 
 from bison.common.constants import (
-    AGGREGATOR_DELIMITER, APPEND_TO_DWC, LMBISON_PROCESS, ENCODING,
-    EXTRA_CSV_FIELD, GBIF, LMBISON, REGION, REPORT, US_STATES)
+    APPEND_TO_DWC, LMBISON_PROCESS, ENCODING, EXTRA_CSV_FIELD, GBIF, LMBISON, REGION,
+    REPORT, US_STATES)
 from bison.common.log import Logger
 from bison.common.util import (
     available_cpu_count, BisonKey, BisonNameOp, get_csv_dict_reader, get_csv_writer,
@@ -450,7 +450,7 @@ class Aggregator():
 
         Args:
             region_type (str): Type of region (state, county, aiannh, pad ...)
-            region_value (str): region name
+            region_name (str): region name
 
         Returns:
             list of tuples containing a species key and occurrence count
@@ -593,7 +593,7 @@ class Aggregator():
         #       with LOCATION_PREFIX, LOCATION_KEY, SPECIES_KEY, SPECIES_NAME, COUNT_KEY
         try:
             self._log.log(
-                f"Summarizing region summaries to ",
+                "Summarizing region summaries to ",
                 refname=self.__class__.__name__)
 
             # Location_type is state, county, aiannh, pad
@@ -838,15 +838,20 @@ class Aggregator():
         """Summarize regions by assessment with counts and percentages.
 
         Args:
-             csvwriter (obj): writer object for output summaries
-             loc_summary_file (str): filename of summary for region of interest.
+            csvwriter (obj): writer object for output summaries
+            loc_summary_file (str): filename of summary for region of interest.
+            region_type (str): type of region; first value in each tuples contained in
+                list of common.constants.REGION[<key>]["summary"]
+            region_name (str): name of region; named locations for the type of region
 
         Returns:
             sp_counts (RIIS_Counts): counts for species
             occ_counts (RIIS_Counts): counts for occurrences
-            region_type (str): type of region; first value in each tuples contained in
-                list of common.constants.REGION[<key>]["summary"]
-            region_name (str): name of region; named locations for the type of region
+
+        Raises:
+            Exception: on failure to open a csvreader.
+            ValueError: on missing "count" value in record.
+            Exception: on failure to read a record.
         """
         # Initialize counts by assessment for this region
         assess = {}
@@ -941,7 +946,6 @@ class Aggregator():
         self._read_location_summary(full_summary_filename)
         self._log.log(
             f"Read annotation summary {full_summary_filename} to write by region")
-
 
     # ...............................................
     def aggregate_summary_for_regions_assessments(

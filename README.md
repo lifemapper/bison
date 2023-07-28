@@ -76,10 +76,48 @@ pip3 install -r requirements-test.txt
 ```
 
 * This project also depends on Specify-lmpy, still in active development (Mar 2023).
-  To easily keep these tools current, **from the activated bison venv**, install
-  specify-lmpy from a cloned copy of the repository.
+  To easily keep these tools current, **from the activated bison venv**, uninstall if
+  necessary, then install specify-lmpy from a cloned copy of the repository.
 
 ```commandline
+(venv) astewart@murderbot:~/git/bison pip uninstall specify-lmpy
+Found existing installation: specify-lmpy 3.1.21.post0.dev184
+Uninstalling specify-lmpy-3.1.21.post0.dev184:
+  Would remove:
+    /home/astewart/git/bison/venv/bin/aggregate_matrices
+    /home/astewart/git/bison/venv/bin/build_grid
+    /home/astewart/git/bison/venv/bin/calculate_p_values
+    /home/astewart/git/bison/venv/bin/calculate_pam_stats
+    /home/astewart/git/bison/venv/bin/convert_csv_to_lmm
+    /home/astewart/git/bison/venv/bin/convert_lmm_to_csv
+    /home/astewart/git/bison/venv/bin/convert_lmm_to_geojson
+    /home/astewart/git/bison/venv/bin/convert_lmm_to_raster
+    /home/astewart/git/bison/venv/bin/convert_lmm_to_shapefile
+    /home/astewart/git/bison/venv/bin/create_rare_species_model
+    /home/astewart/git/bison/venv/bin/create_scatter_plot
+    /home/astewart/git/bison/venv/bin/create_sdm
+    /home/astewart/git/bison/venv/bin/create_tree_matrix
+    /home/astewart/git/bison/venv/bin/encode_layers
+    /home/astewart/git/bison/venv/bin/encode_tree_mcpa
+    /home/astewart/git/bison/venv/bin/mcpa_run
+    /home/astewart/git/bison/venv/bin/randomize_pam
+    /home/astewart/git/bison/venv/bin/rasterize_point_heatmap
+    /home/astewart/git/bison/venv/bin/split_occurrence_data
+    /home/astewart/git/bison/venv/bin/wrangle_matrix
+    /home/astewart/git/bison/venv/bin/wrangle_occurrences
+    /home/astewart/git/bison/venv/bin/wrangle_species_list
+    /home/astewart/git/bison/venv/bin/wrangle_tree
+    /home/astewart/git/bison/venv/lib/python3.8/site-packages/lmpy/*
+    /home/astewart/git/bison/venv/lib/python3.8/site-packages/specify_lmpy-3.1.21.post0.dev184.dist-info/*
+    /home/astewart/git/bison/venv/lib/python3.8/site-packages/tests/test_plots/*
+    /home/astewart/git/bison/venv/lib/python3.8/site-packages/tests/test_randomize/*
+    /home/astewart/git/bison/venv/lib/python3.8/site-packages/tests/test_spatial/*
+    /home/astewart/git/bison/venv/lib/python3.8/site-packages/tests/test_statistics/*
+    /home/astewart/git/bison/venv/lib/python3.8/site-packages/tests/test_tutorials/*
+Proceed (Y/n)? Y
+  Successfully uninstalled specify-lmpy-3.1.21.post0.dev184
+
+
 (venv) astewart@murderbot:~/git/bison cd ../lmpy
 (venv) astewart@murderbot:~/git/lmpy$ git pull
 Already up to date.

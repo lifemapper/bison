@@ -93,7 +93,7 @@ class Counter():
     # .............................................................................
     @classmethod
     def compare_assessment_counts(
-            cls, annotated_filenames, combined_summary_filename, logger):
+            cls, subset_summary_filenames, combined_summary_filename, logger):
         """Compare record counts in subset summaries to counts in the combined summary.
 
         Args:
@@ -106,7 +106,8 @@ class Counter():
             report (dict): dictionary with summaries of count comparisons and lists of
                 .error types.
         """
-
+        report = {}
+        return report
 
     # .............................................................................
     @classmethod

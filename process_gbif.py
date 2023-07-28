@@ -9,7 +9,7 @@ from bison.common.constants import (
     APPEND_TO_DWC, CONFIG_PARAM, LMBISON_PROCESS, GBIF, ENCODING, EXTRA_CSV_FIELD, LOG,
     REGION, REPORT, RIIS_DATA)
 from bison.common.util import (
-    BisonKey, BisonNameOp, Chunker, delete_file, get_csv_dict_reader)
+    BisonNameOp, Chunker, delete_file, get_csv_dict_reader)
 from bison.process.aggregate import Aggregator
 from bison.process.annotate import (Annotator, parallel_annotate)
 from bison.process.geoindex import (GeoResolver, GeoException)
@@ -306,27 +306,32 @@ def d_aggregate_summary_by_region(
 
 # .............................................................................
 def e_county_heatmap_pam(
-        full_summary_filename, geo_path, process_path, logger, overwrite=True):
+        full_summary_filename, geo_path, heatmatrix_filename, logger, overwrite=True):
     """Annotate GBIF records with census state and county, and RIIS key and assessment.
 
     Args:
         full_summary_filename (str): Full filename containing summarized
             GBIF data by region for RIIS assessment of records.
         geo_path (str): Base directory containing geospatial region files
-        process_path (str): Destination directory for output files.
+        heatmatrix_filename (str): Full filename for output pandas.DataFrame.
         logger (object): logger for saving relevant processing messages
         overwrite (bool): Flag indicating whether to overwrite existing matrix file(s).
 
     Returns:
-        annotated_filenames: full filenames for GBIF data newly annotated with state,
-            county, RIIS assessment, and RIIS key.  If a file exists, do not annotate.
+        report (dict): dictionary summarizing metadata about the processes and
+            output files.
     """
-    report = {}
     region_type = "county"
     # from common.constants.REGION.COUNTY["map"]
     county_fldname = "NAME"
     state_fldname = "STUSPS"
     county_filename = os.path.join(geo_path, REGION.COUNTY["file"])
+
+    report = {
+        REPORT.INFILE: full_summary_filename,
+        REPORT.REGION: region_type,
+        REPORT.PROCESS: LMBISON_PROCESS.HEATMATRIX
+    }
 
     # Create a new Aggregator, ignore file used for construction,
     agg = Aggregator(logger)
@@ -343,23 +348,32 @@ def e_county_heatmap_pam(
     county_matrix = PolygonMatrix(
         county_filename, county_fldname, parent_fldname=state_fldname, logger=logger,
         is_disjoint=False)
-    location_lookup = county_matrix.cell_attribute_lookup
+    location_fid = county_matrix.cell_attribute_lookup
 
     region_names = agg.get_locations_for_region_type(region_type)
     # for each cell (county) in the county matrix
     for reg_name in region_names:
-        fid = location_lookup[reg_name]
+        fid = location_fid[reg_name]
         species_counts = agg.get_species_counts_for_location(region_type, reg_name)
-        for rr_species_key, sp_count in species_counts:
-            # acc_sciname, sciname = agg.get_species_from_key(rr_species_key)
-            species_fids[rr_species_key][fid] = sp_count
+        # Fill species_fids with species = {fid: count}
+        for rr_species_key, sp_count in species_counts.items():
+            if rr_species_key != "na":
+                species_fids[rr_species_key][fid] = sp_count
 
+    species_columns = {}
     for rr_species_key, fid_count in species_fids.items():
-        county_matrix.add_column_for_species(rr_species_key, fid_count)
+        species_columns[rr_species_key] = county_matrix.create_column_for_species(
+            fid_count)
+    county_matrix.create_dataframe_from_cols(species_columns)
+    county_matrix.write_matrix(heatmatrix_filename)
 
-    matrix = county_matrix.matrix
-    print(matrix.columns)
-    print(matrix.index)
+    report[REPORT.OUTFILE] = heatmatrix_filename
+    report[REPORT.HEATMATRIX] = {
+        REPORT.ROWS: county_matrix.row_count,
+        REPORT.COLUMNS: county_matrix.columns
+    }
+    return report
+
 
 # .............................................................................
 def z_test(summary_filenames, full_summary_filename, output_path, logger):
@@ -595,10 +609,14 @@ def _prepare_args(config):
         infile, outpath=config["process_path"],
         step_or_process=LMBISON_PROCESS.SUMMARIZE)
 
+    heatmatrix_filename = BisonNameOp.get_process_outfilename(
+            infile, outpath=config["process_path"],
+            step_or_process=LMBISON_PROCESS.HEATMATRIX)
+
     return (
         annotated_riis_filename, out_path,
         raw_filenames, annotated_filenames, summary_filenames,
-        full_summary_filename
+        full_summary_filename, heatmatrix_filename
     )
 
 
@@ -620,7 +638,7 @@ def execute_command(config, logger):
     step_or_process = None
     (annotated_riis_filename, out_path,
         raw_filenames, annotated_filenames, summary_filenames,
-        full_summary_filename) = _prepare_args(config)
+        full_summary_filename, heatmatrix_filename) = _prepare_args(config)
 
     # Make sure input files exist
     for csv_fname in raw_filenames:
@@ -674,9 +692,9 @@ def execute_command(config, logger):
         report = z_test(summary_filenames, full_summary_filename, out_path, logger)
 
     elif config["command"] == "heat_matrix":
-        step_or_process = LMBISON_PROCESS.PAM
+        step_or_process = LMBISON_PROCESS.HEATMATRIX
         report = e_county_heatmap_pam(
-            full_summary_filename, config["geo_path"], config["process_path"], logger,
+            full_summary_filename, config["geo_path"], heatmatrix_filename, logger,
             overwrite=True)
 
     elif config["command"] == "test_bad_data" and config["gbif_id"] is not None:
