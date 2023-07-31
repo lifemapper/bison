@@ -1,5 +1,5 @@
 """Class for a spatial index and tools for intersecting with a point and extracting attributes."""
-import lmpy
+# import lmpy
 import numpy
 import os
 import pandas
@@ -26,10 +26,13 @@ class PolygonMatrix(object):
             logger (object): logger for saving relevant processing messages
 
         Raises:
-            FileNotFoundError: if spatial_fname does not exist on the file system
+            FileNotFoundError: if spatial_filename does not exist on the file system
+            FileNotFoundError: if matrix_filename does not exist on the file system
+            Exception: on neither spatiol_filename or matrix_filename provided.
         """
         self._log = logger
-        self._row_values = None
+        # Dictionary with FID (index): a string/list of additional row names
+        self._row_indices = {}
 
         if matrix_filename:
             if os.path.exists(matrix_filename):
@@ -57,7 +60,7 @@ class PolygonMatrix(object):
 
     # ...............................................
     def _initialize_geospatial_data(self, spatial_filename, fieldname, parent_fieldname):
-        """Init a lookup table for polygon features in the file and their attributes."""
+        # Init a lookup table for polygon features in the file and their attributes.
         driver = ogr.GetDriverByName("ESRI Shapefile")
 
         dataset = driver.Open(spatial_filename, 0)
@@ -69,12 +72,12 @@ class PolygonMatrix(object):
                 feat = lyr.GetFeature(fid)
             except Exception as e:
                 self._log.log(
-                    f"Warning, unable to add FID {fid} for {self._spatial_filename}:"
+                    f"Warning, unable to add FID {fid} for {spatial_filename}:"
                     f" {e}", refname=self.__class__.__name__
                 )
             else:
                 loc_key = self._get_location_key(feat, fieldname, parent_fieldname)
-                self._row_values[fid] = loc_key
+                self._row_indices[fid] = loc_key
         self._dataframe = None
 
     # ...............................................
@@ -87,7 +90,7 @@ class PolygonMatrix(object):
         Returns:
             column (list): ordered list of counts for each row index (fid).
         """
-        counts = numpy.zeros(self.cell_count, dtype=numpy.int32)
+        counts = numpy.zeros(self.row_count, dtype=numpy.int32)
         for fid, count in fid_count.items():
             counts[fid] = count
         return list(counts)
@@ -103,7 +106,7 @@ class PolygonMatrix(object):
         self._dataframe = pandas.DataFrame(species_cols)
         row_value_index = []
         for fid in range(self._dataframe.shape[0]):
-            row_value_index.append(self._row_values[fid])
+            row_value_index.append(self._row_indices[fid])
         # Convert the original index to a MultiIndex with the new_index as the second level
         self._dataframe.index = pandas.MultiIndex.from_arrays(
             [self._dataframe.index, row_value_index]
@@ -161,26 +164,15 @@ class PolygonMatrix(object):
 
     # ...............................................
     @property
-    def cell_count(self):
-        """Return the number of cells/polygons (rows in the dataframe) in this instance.
-
-        Returns:
-            The count of cells/rows for this instance.
-        """
-        if self._cells is not None:
-            count = len(self._cells)
-        return count
-
-    # ...............................................
-    @property
-    def cell_attribute_lookup(self):
+    def row_attribute_lookup(self):
         """Return a dictionary of the spatial cells/polygons with unique_attribute: fid.
 
         Returns:
-            Dictionary of the spatial cells/polygons, with the key as a unique feature
-                attribute, and the value as the FID.
+            Dictionary of the spatial cells/polygons, with the key as the FID, and the
+                value as a single or list of feature attributes used as additional
+                row indices.
         """
-        return self._cells
+        return self._row_indices
 
     # ...............................................
     def write_matrix(self, heatmatrix_filename, overwrite=True):
@@ -206,9 +198,13 @@ class PolygonMatrix(object):
 
     # ...............................................
     def read_matrix(self, matrix_filename):
+        """Read a matrix into this datastructure from a CSV file.
+
+        Args:
+            matrix_filename (str): full filename for pandas Dataframe.
+        """
         self._dataframe = pandas.read_csv(
             matrix_filename, sep=",", header=0, index_col=0, memory_map=True)
-
 
 
 # .............................................................................

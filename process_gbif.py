@@ -346,9 +346,9 @@ def e_county_heatmap(
         species_fids[rr_species_key] = {}
 
     county_matrix = PolygonMatrix(
-        county_filename, county_fldname, parent_fldname=state_fldname, logger=logger,
-        is_disjoint=False)
-    location_fid = county_matrix.cell_attribute_lookup
+        spatial_filename=county_filename, fieldname=county_fldname,
+        parent_fieldname=state_fldname, logger=logger)
+    location_fid = county_matrix.row_attribute_lookup
 
     region_names = agg.get_locations_for_region_type(region_type)
     # for each cell (county) in the county matrix
@@ -362,7 +362,7 @@ def e_county_heatmap(
 
     species_columns = {}
     for rr_species_key, fid_count in species_fids.items():
-        species_columns[rr_species_key] = county_matrix.create_column_for_species(
+        species_columns[rr_species_key] = county_matrix.create_data_column(
             fid_count)
     county_matrix.create_dataframe_from_cols(species_columns)
     county_matrix.write_matrix(heatmatrix_filename, overwrite=overwrite)
@@ -381,9 +381,6 @@ def f_county_pam(
     """Annotate GBIF records with census state and county, and RIIS key and assessment.
 
     Args:
-        full_summary_filename (str): Full filename containing summarized
-            GBIF data by region for RIIS assessment of records.
-        geo_path (str): Base directory containing geospatial region files
         heatmatrix_filename (str): Full filename for output pandas.DataFrame.
         logger (object): logger for saving relevant processing messages
         overwrite (bool): Flag indicating whether to overwrite existing matrix file(s).
@@ -399,14 +396,11 @@ def f_county_pam(
         REPORT.PROCESS: LMBISON_PROCESS.PAM
     }
 
-    # county_matrix = PolygonMatrix(
-    #     county_filename, county_fldname, parent_fldname=state_fldname, logger=logger,
-    #     is_disjoint=False)
-    # location_fid = county_matrix.cell_attribute_lookup
-
+    county_matrix = PolygonMatrix(matrix_filename=heatmatrix_filename, logger=logger)
+    fid_attributes = county_matrix.row_attribute_lookup
 
     report[REPORT.OUTFILE] = heatmatrix_filename
-    report[REPORT.PAM] = {}
+    report[REPORT.HEATMATRIX] = {"cells": fid_attributes}
     return report
 
 
