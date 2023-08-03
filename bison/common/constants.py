@@ -500,7 +500,7 @@ class REGION:
                     summarize_by_fields[prefix] = flds
                 else:
                     raise Exception(f"Bad metadata for {prefix} summary fields")
-            summarize_by_fields[LMBISON.SUMMARY_FILTER_HEADING] = APPEND_TO_DWC.FILTER_FLAG
+            # summarize_by_fields[LMBISON.SUMMARY_FILTER_HEADING] = APPEND_TO_DWC.FILTER_FLAG
         return summarize_by_fields
 
     @staticmethod
@@ -515,7 +515,7 @@ class REGION:
         for reg in regions:
             for prefix, _ in reg["summary"]:
                 region_disjoint[prefix] = reg["is_disjoint"]
-        region_disjoint[LMBISON.SUMMARY_FILTER_HEADING] = False
+        # region_disjoint[LMBISON.SUMMARY_FILTER_HEADING] = False
         return region_disjoint
 
     @staticmethod

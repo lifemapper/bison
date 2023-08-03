@@ -66,7 +66,8 @@ class Counter():
         """
         # Count each record for every assessment from annotated occurrences file.
         # Filtered records are retained, but have assessment = ""
-        assessments = {LMBISON.SUMMARY_FILTER_HEADING: 0}
+        # assessments = {LMBISON.SUMMARY_FILTER_HEADING: 0}
+        assessments = {}
         for val in LMBISON.assess_values():
             assessments[val] = 0
 
@@ -78,10 +79,10 @@ class Counter():
             rec = dwcdata.get_record()
             while rec is not None:
                 ass = rec[APPEND_TO_DWC.RIIS_ASSESSMENT]
-                if not ass:
-                    assessments[LMBISON.SUMMARY_FILTER_HEADING] += 1
-                else:
-                    assessments[ass] += 1
+                # if not ass:
+                #     assessments[LMBISON.SUMMARY_FILTER_HEADING] += 1
+                # else:
+                assessments[ass] += 1
                 rec = dwcdata.get_record()
         except Exception as e:
             raise Exception(f"Unknown exception {e} on file {annotated_occ_filename}")

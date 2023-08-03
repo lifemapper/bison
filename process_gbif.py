@@ -13,7 +13,7 @@ from bison.common.util import (
 from bison.process.aggregate import Aggregator
 from bison.process.annotate import (Annotator, parallel_annotate)
 from bison.process.geoindex import (GeoResolver, GeoException)
-from bison.process.poly_matrix import PolygonMatrix
+from bison.process.geo_matrix import GeoMatrix
 from bison.process.sanity_check import Counter
 from bison.provider.riis_data import RIIS
 from bison.tools._config_parser import get_common_arguments
@@ -345,10 +345,10 @@ def e_county_heatmap(
     for rr_species_key in species_lookup.keys():
         species_fids[rr_species_key] = {}
 
-    county_matrix = PolygonMatrix(
-        spatial_filename=county_filename, fieldname=county_fldname,
-        parent_fieldname=state_fldname, logger=logger)
-    location_fid = county_matrix.row_attribute_lookup
+    county_matrix = GeoMatrix(
+        spatial_filename=county_filename, fieldnames=[state_fldname, county_fldname],
+        logger=logger)
+    location_fid = county_matrix.row_lookup_by_attribute()
 
     region_names = agg.get_locations_for_region_type(region_type)
     # for each cell (county) in the county matrix
@@ -359,6 +359,8 @@ def e_county_heatmap(
         for rr_species_key, sp_count in species_counts.items():
             if rr_species_key != "na":
                 species_fids[rr_species_key][fid] = sp_count
+            else:
+                pass
 
     species_columns = {}
     for rr_species_key, fid_count in species_fids.items():
@@ -396,8 +398,8 @@ def f_county_pam(
         REPORT.PROCESS: LMBISON_PROCESS.PAM
     }
 
-    county_matrix = PolygonMatrix(matrix_filename=heatmatrix_filename, logger=logger)
-    fid_attributes = county_matrix.row_attribute_lookup
+    county_matrix = GeoMatrix(matrix_filename=heatmatrix_filename, logger=logger)
+    fid_attributes = county_matrix.row_lookup_by_attribute()
 
     report[REPORT.OUTFILE] = heatmatrix_filename
     report[REPORT.HEATMATRIX] = {"cells": fid_attributes}

@@ -274,7 +274,8 @@ Annotate GBIF occurrence records (each subset file) with:
 ## Summarize annotations
 
 Summarize annotated GBIF occurrence records (each subset file), by:
-   * location type (state, county, AIANNH, PAD)
+   * location type (state, county, American Indian, Alaskan Native, and Native Hawaiian 
+     lands (AIANNH), and US-Protected Areas Database (PAD)).
    * location value
    * combined RIIS region and taxon key (RIIS region: AK, HI, L48)
    * scientific name, species name (for convenience in final aggregation outputs)

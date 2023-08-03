@@ -9,20 +9,18 @@ from bison.common.util import BisonKey, ready_filename
 
 
 # .............................................................................
-class PolygonMatrix(object):
+class GeoMatrix(object):
     """Object for intersecting coordinates with a polygon shapefile."""
     def __init__(
-            self, matrix_filename=None, spatial_filename=None, fieldname=None,
-            parent_fieldname=None, logger=None):
+            self, matrix_filename=None, spatial_filename=None, fieldnames=(),
+            logger=None):
         """Construct a pandas.Dataframe from a matrix file, or a shapefile of polygons.
 
         Args:
             matrix_filename (str): full filename for a zipped CSV file containing a
                 pandas.DataFrame,
             spatial_filename (str): full filename for a shapefile to construct index
-            fieldname (str): fieldname for polygon attribute of interest
-            parent_fieldname (dict): fieldname for parent name attribute of interest,
-                ex: state name for county
+            fieldnames (iterable): lisf of fieldname for polygon attributes of interest
             logger (object): logger for saving relevant processing messages
 
         Raises:
@@ -41,25 +39,20 @@ class PolygonMatrix(object):
                 raise FileNotFoundError(f"{spatial_filename}")
         elif spatial_filename:
             if os.path.exists(spatial_filename):
-                self._initialize_geospatial_data(
-                    spatial_filename, fieldname, parent_fieldname)
+                self._initialize_geospatial_data(spatial_filename, fieldnames)
             else:
                 raise FileNotFoundError(f"{spatial_filename}")
         else:
             raise Exception("Must provide either spatial_filename or matrix_filename.")
 
     # ...............................................
-    def _get_location_key(self, feat, fieldname, parent_fieldname):
-        name = feat.GetField(fieldname)
-        if parent_fieldname is not None:
-            parent = feat.GetField(parent_fieldname)
-            key = BisonKey.get_compound_key(parent, name)
-        else:
-            key = name
+    def _get_location_key(self, feat, fieldnames):
+        values = [feat.GetField(fn) for fn in fieldnames]
+        key = BisonKey.get_compound_key(*values)
         return key
 
     # ...............................................
-    def _initialize_geospatial_data(self, spatial_filename, fieldname, parent_fieldname):
+    def _initialize_geospatial_data(self, spatial_filename, fieldnames):
         # Init a lookup table for polygon features in the file and their attributes.
         driver = ogr.GetDriverByName("ESRI Shapefile")
 
@@ -76,7 +69,7 @@ class PolygonMatrix(object):
                     f" {e}", refname=self.__class__.__name__
                 )
             else:
-                loc_key = self._get_location_key(feat, fieldname, parent_fieldname)
+                loc_key = self._get_location_key(feat, fieldnames)
                 self._row_indices[fid] = loc_key
         self._dataframe = None
 
@@ -130,7 +123,7 @@ class PolygonMatrix(object):
         Returns:
             The count of rows for the DataFrame instance.
         """
-        return self._dataframe.shape[0]
+        return len(self._row_indices)
 
     # ...............................................
     @property
@@ -140,7 +133,9 @@ class PolygonMatrix(object):
         Returns:
             The row indexes for the DataFrame instance.
         """
-        return self._dataframe.index.to_list()
+        if self._dataframe is not None:
+            return self._dataframe.index.to_list()
+        return []
 
     # ...............................................
     @property
@@ -150,7 +145,9 @@ class PolygonMatrix(object):
         Returns:
             The count of columns for the DataFrame instance.
         """
-        return self._dataframe.shape[1]
+        if self._dataframe is not None:
+            return self._dataframe.shape[1]
+        return 0
 
     # ...............................................
     @property
@@ -160,19 +157,32 @@ class PolygonMatrix(object):
         Returns:
             list of column names for the dataframe.
         """
-        return self._dataframe.columns.to_list()
+        if self._dataframe is not None:
+            return self._dataframe.columns.to_list()
+        return []
 
     # ...............................................
-    @property
-    def row_attribute_lookup(self):
-        """Return a dictionary of the spatial cells/polygons with unique_attribute: fid.
+    def row_lookup_by_fid(self):
+        """Return a dictionary of the spatial cells/polygons with fid: attributes.
 
         Returns:
-            Dictionary of the spatial cells/polygons, with the key as the FID, and the
-                value as a single or list of feature attributes used as additional
-                row indices.
+            Dictionary of the spatial cells, with the key as geospatial FID, and the
+                value the concatenated attributes (used as additional row indices).
         """
         return self._row_indices
+
+    # ...............................................
+    def row_lookup_by_attribute(self):
+        """Return a dictionary of the spatial cells with concatenated attributes: fid.
+
+        Returns:
+            Dictionary of the spatial cells, with the key as the concatenated
+                attributes (used as additional row indices), and the value as FID.
+        """
+        lookup = {}
+        for fid, attribute in self._row_indices.items():
+            lookup[attribute] = fid
+        return lookup
 
     # ...............................................
     def write_matrix(self, heatmatrix_filename, overwrite=True):

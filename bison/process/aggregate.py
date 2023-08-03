@@ -150,6 +150,8 @@ class RIIS_Counts():
             pct_str = f"{self.percent_introduced:.3f}"
         except SyntaxError:
             return self.percent_introduced
+        except ValueError:
+            pass
         return pct_str
 
     # .............................................................................
@@ -386,7 +388,7 @@ class Aggregator():
         # in each state
         if prefix == "county":
             try:
-                state, county = BisonKey.parse_compound_key(location)
+                (state, county) = BisonKey.parse_compound_key(location)
             except ValueError:
                 raise
             else:
@@ -504,39 +506,30 @@ class Aggregator():
                 # State can be assigned to all records, empty if record is filtered out
                 if rec[APPEND_TO_DWC.FILTER_FLAG] == "True":
                     filtered_count += 1
-                    self._add_record_to_location_summaries(
-                        LMBISON.SUMMARY_FILTER_HEADING, False, LMBISON.NOT_APPLICABLE,
-                        LMBISON.NOT_APPLICABLE)
                 else:
-                    # # Use combo key-name to track species
-                    # species_key = self._get_compound_key(
-                    #     rec[GBIF.ACC_TAXON_FLD], rec[GBIF.ACC_NAME_FLD])
-                    # Use combo state-taxonkey-spname to track species and riis region for assessment
+                    # Use combo key-name to track species
                     riis_region = self._get_riis_region(rec[APPEND_TO_DWC.RESOLVED_ST])
                     rr_species_key = BisonKey.get_compound_key(
                         riis_region, rec[GBIF.ACC_TAXON_FLD])
-                    # rec[GBIF.ACC_NAME_FLD])
-                    # self.canonicals = {rr_species_key: species_name,  ... }
                     # Save with accepted name and species name in case accepted name
                     # is for sub-species
                     self._acc_species_name[rr_species_key] = (
                         rec[GBIF.ACC_NAME_FLD], rec[GBIF.SPECIES_NAME_FLD])
-                    # self._save_key_canonical(rr_species_key, rec[GBIF.SPECIES_NAME_FLD])
 
                     # regions to summarize
                     for prefix, fld in REGION.summary_fields().items():
-                        if prefix != LMBISON.SUMMARY_FILTER_HEADING:
-                            is_disjoint = region_disjoint[prefix]
-                            if isinstance(fld, str):
-                                location = rec[fld]
-                            elif isinstance(fld, tuple) and len(fld) == 2:
-                                location = BisonKey.get_compound_key(
-                                    rec[fld[0]], rec[fld[1]])
-                            else:
-                                raise Exception(f"Bad summary fields {fld}")
+                        # if prefix != LMBISON.SUMMARY_FILTER_HEADING:
+                        is_disjoint = region_disjoint[prefix]
+                        if isinstance(fld, str):
+                            location = rec[fld]
+                        elif isinstance(fld, tuple) and len(fld) == 2:
+                            location = BisonKey.get_compound_key(
+                                rec[fld[0]], rec[fld[1]])
+                        else:
+                            raise Exception(f"Bad summary fields {fld}")
 
-                            self._add_record_to_location_summaries(
-                                prefix, is_disjoint, location, rr_species_key)
+                        self._add_record_to_location_summaries(
+                            prefix, is_disjoint, location, rr_species_key)
 
         except csv.Error as ce:
             self._log.log(
@@ -795,28 +788,30 @@ class Aggregator():
         rr_species_counts = self._locations[region_type][region_value]
         try:
             for rr_species_key, count in rr_species_counts.items():
-                riis_region, gbif_taxon_key = BisonKey.parse_compound_key(rr_species_key)
+                if rr_species_key != "na":
+                    (riis_region, gbif_taxon_key) = BisonKey.parse_compound_key(
+                        rr_species_key)
+                    # Include species name along with internal code
+                    try:
+                        (accepted_name, species_name) = self._acc_species_name[
+                            rr_species_key]
+                    except KeyError:
+                        raise Exception(f"Missing species name for {rr_species_key}")
+                    # Include assessment
+                    assessments = riis.get_assessments_for_gbif_taxonkey(gbif_taxon_key)
+                    try:
+                        assess = assessments[riis_region].lower()
+                    except KeyError:
+                        assess = "presumed_native"
 
-                try:
-                    (accepted_name,
-                     species_name) = self._acc_species_name[rr_species_key]
-                except KeyError:
-                    raise Exception(f"Missing species name for key {rr_species_key}")
-
-                assessments = riis.get_assessments_for_gbif_taxonkey(gbif_taxon_key)
-                try:
-                    assess = assessments[riis_region].lower()
-                except KeyError:
-                    assess = "presumed_native"
-
-                try:
-                    # Record contents: LMBISON.region_summary_header()
-                    csv_wtr.writerow(
-                        [rr_species_key, accepted_name, species_name, count, assess])
-                except Exception as e:
-                    self._log.log(
-                        f"Unknown write error on {rr_species_key}: {e}",
-                        refname=self.__class__.__name__, log_level=logging.ERROR)
+                    try:
+                        # Record contents: LMBISON.region_summary_header()
+                        csv_wtr.writerow(
+                            [rr_species_key, accepted_name, species_name, count, assess])
+                    except Exception as e:
+                        self._log.log(
+                            f"Unknown write error on {rr_species_key}: {e}",
+                            refname=self.__class__.__name__, log_level=logging.ERROR)
         except Exception as e:
             raise Exception(f"Unknown error with {rr_species_key}: {e}")
         finally:
@@ -1034,6 +1029,7 @@ class Aggregator():
                 report[region_type][REPORT.OUTFILE].append(agg_fname)
                 # Write one line for region to summary of occurrence/species counts
                 # and percentages
+                # if region_type != LMBISON.SUMMARY_FILTER_HEADING:
                 self._summarize_region_by_riis(
                     ass_csv_writer, agg_fname, region_type, region_value)
         return report

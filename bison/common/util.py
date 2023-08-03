@@ -164,11 +164,11 @@ def get_csv_dict_writer(
         csv.field_size_limit(sys.maxsize)
         try:
             f = open(csvfile, fmode, newline="", encoding=encoding)
-            writer = csv.DictWriter(
-                f, fieldnames=header, delimiter=delimiter, extrasaction=extrasaction)
         except Exception as e:
             raise e
         else:
+            writer = csv.DictWriter(
+                f, fieldnames=header, delimiter=delimiter, extrasaction=extrasaction)
             writer.writeheader()
         return writer, f
     else:
@@ -399,7 +399,8 @@ def count_lines_with_cat(filename_or_pattern):
     cmd = f"cat -n {filename_or_pattern} | tail -n1"
 
     # Run command in a shell
-    sp = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    sp = subprocess.Popen(
+        cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     sp_outs = sp.communicate()
 
     # Retrieve the total count
@@ -501,17 +502,25 @@ def get_fields_from_header(csvfile, delimiter=GBIF.DWCA_DELIMITER, encoding="utf
 class BisonKey():
     # ...............................................
     @staticmethod
-    def get_compound_key(part1, part2):
+    def get_compound_key(*values):
         """Construct a compound key for dictionaries.
 
         Args:
-            part1 (str): first element of compound key.
-            part2 (str): second element of compound key.
+            values (list): values for a compound key.
 
         Returns:
              str combining part1 and part2 to use as a dictionary key.
         """
-        return f"{part1}{AGGREGATOR_DELIMITER}{part2}"
+        key = None
+        for val in values:
+            if val != "na":
+                if key is None:
+                    key = val
+                else:
+                    key += f"{AGGREGATOR_DELIMITER}{val}"
+            else:
+                pass
+        return key
 
     # ...............................................
     @staticmethod
@@ -519,24 +528,13 @@ class BisonKey():
         """Parse a compound key into its elements.
 
         Args:
-             compound_key (str): key combining 2 elements.
+            compound_key (str): key combining one or more elements.
 
         Returns:
-            part1 (str): first element of compound key.
-            second (str): first element of compound key.
-
-        Raises:
-            ValueError: on unexpected input
+            values (list): list of elements of compound key.
         """
         parts = compound_key.split(AGGREGATOR_DELIMITER)
-        part1 = parts[0]
-        if len(parts) == 2:
-            part2 = parts[1]
-        elif len(parts) == 1:
-            part2 = None
-        else:
-            raise ValueError(f"Unexpected compound_key {compound_key}")
-        return part1, part2
+        return parts
 
 
 # .............................................................................
