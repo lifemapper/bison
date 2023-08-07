@@ -8,7 +8,7 @@ from bison.common.log import Logger
 
 COMMANDS = (
     "resolve", "split", "annotate", "summarize", "aggregate", "check_counts",
-    "heat_matrix")
+    "heat_matrix", "pam_stats")
 
 
 # .....................................................................................
@@ -169,6 +169,8 @@ def get_common_arguments(script_name, description, parameters):
     """
     parser = _build_parser(script_name, description)
     command, config_filename = _get_command_config_file_arguments(parser)
+    if command not in COMMANDS:
+        raise Exception(f"{command} is not in valid commands: {COMMANDS}")
     if not config_filename:
         raise Exception(f"Script {script_name} requires value for config_file")
     config = process_arguments_from_file(config_filename, parameters)

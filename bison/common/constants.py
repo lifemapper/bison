@@ -104,6 +104,8 @@ class REPORT:
     REPORTFILE = "report_filename"
     SUMMARY = "summary"
     REGION = "region"
+    MIN_VAL = "min_val_for_presence"
+    MAX_VAL = "min_val_for_presence"
     LOCATION = "locations"
     AGGREGATION = "riis_assessments_by_location"
     SPECIES = "species"
@@ -128,7 +130,7 @@ class LMBISON_PROCESS:
     AGGREGATE = {"step": 5, "postfix": "aggregate"}
     CHECK_COUNTS = {"step": 6, "postfix": "check_counts"}
     HEATMATRIX = {"step": 7, "postfix": "heatmatrix"}
-    PAM = {"step": 8, "postfix": "pam"}
+    PAM = {"step": 8, "postfix": "mtx"}
 
     @staticmethod
     def process_types():

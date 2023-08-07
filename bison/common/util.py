@@ -780,12 +780,14 @@ class BisonNameOp():
 
     # .............................................................................
     @staticmethod
-    def get_process_outfilename(in_filename, outpath=None, step_or_process=None):
+    def get_process_outfilename(
+            in_filename, outpath=None, postfix=None, step_or_process=None):
         """Construct output filename for the next processing step of the given file.
 
         Args:
             in_filename (str): base or full filename of CSV data.
             outpath (str): destination directory for output filename
+            postfix (str): final string for a filename, indicating the data type.
             step_or_process (int or lmbison.common.constants.DWC_PROCESS):
                 stage of processing completed on the output file.
 
@@ -805,28 +807,22 @@ class BisonNameOp():
                 followed by process step completed (if any)
         """
         sep = BisonNameOp.separator
-        pth, basename, orig_ext, chunk, postfix = BisonNameOp.parse_process_filename(
+        pth, basename, orig_ext, chunk, old_postfix = BisonNameOp.parse_process_filename(
             in_filename)
-        # If step is not provided, get the step after that of the input file.
-        if step_or_process is None:
-            step_or_process = LMBISON_PROCESS.get_next_process(postfix=postfix)
         if chunk is not None:
             basename = f"{basename}{sep}{chunk}"
-        new_postfix = step_or_process["postfix"]
-        if new_postfix is None:
-            raise Exception(
-                f"No next step for {in_filename} or processing step for "
-                f"{step_or_process}")
-        else:
-            # all outputs are CSV files except heatmatrix, which is a zipped CSV file.
-            ext = ".csv"
-            # if step_or_process == LMBISON_PROCESS.HEATMATRIX:
-            #     ext = ".zip"
-            outbasename = f"{basename}{sep}{new_postfix}{ext}"
-            # If outpath is not provided, use the same path as the input file.
-            if outpath is None:
-                outpath = pth
-            outfname = os.path.join(outpath, outbasename)
+        # If step is not provided, get the step after that of the input file.
+        if postfix is None:
+            if step_or_process is None:
+                step_or_process = LMBISON_PROCESS.get_next_process(postfix=old_postfix)
+            postfix = step_or_process["postfix"]
+        # all outputs are CSV files
+        ext = ".csv"
+        outbasename = f"{basename}{sep}{postfix}{ext}"
+        # If outpath is not provided, use the same path as the input file.
+        if outpath is None:
+            outpath = pth
+        outfname = os.path.join(outpath, outbasename)
         return outfname
 
     # .............................................................................

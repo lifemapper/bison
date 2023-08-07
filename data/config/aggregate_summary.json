@@ -1,7 +1,0 @@
-{
-    "log_filename": "/volumes/bison/big_data/output/aggregate_summary.log",
-    "report_filename": "/volumes/bison/big_data/output/aggregate_summary.rpt",
-    "combined_summary_filename": "/volumes/bison/big_data/process/gbif-2023-01-26-10k_combine.csv",
-    "riis_with_gbif_taxa_filename": "/volumes/bison/big_data/process/US-RIIS_MasterList_2021_annotated.csv",
-    "output_path": "/volumes/bison/big_data/output"
-}

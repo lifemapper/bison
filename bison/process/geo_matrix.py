@@ -105,7 +105,7 @@ class GeoMatrix(object):
             row_value_index.append(self._row_indices[fid])
         # Convert the original index to a MultiIndex with the new_index as the second level
         self._dataframe.index = pandas.MultiIndex.from_arrays(
-            [self._dataframe.index, row_value_index]
+            [self._dataframe.index, row_value_index], names=["fid", "region"]
         )
 
     # ...............................................
@@ -226,7 +226,8 @@ class GeoMatrix(object):
             try:
                 self._dataframe.to_csv(
                     path_or_buf=heatmatrix_filename, sep=",", header=True, index=True,
-                    index_label=False, mode='w', encoding="utf-8", compression="zip"
+                    # index_label=("fid", "region"),
+                    mode='w', encoding="utf-8"
                 )
             except Exception:
                 raise
@@ -241,7 +242,10 @@ class GeoMatrix(object):
             matrix_filename (str): full filename for pandas Dataframe.
         """
         self._dataframe = pandas.read_csv(
-            matrix_filename, sep=",", header=0, index_col=0, memory_map=True)
+            matrix_filename, sep=",", index=True, #index_label=["fid", "region"],
+            header=True, memory_map=True)
+            #index_col=0,
+
 
 
 # .............................................................................

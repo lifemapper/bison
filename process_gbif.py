@@ -2,6 +2,7 @@
 import csv
 from logging import DEBUG, ERROR, INFO
 import json
+from lmpy.statistics.pam_stats import PamStats
 import os
 import time
 
@@ -378,14 +379,13 @@ def e_county_heatmap(
 
 
 # .............................................................................
-def f_county_pam(
-        heatmatrix_filename, logger, overwrite=True):
+def f_calculate_pam_stats(heatmatrix_filename, min_val, logger):
     """Annotate GBIF records with census state and county, and RIIS key and assessment.
 
     Args:
         heatmatrix_filename (str): Full filename for output pandas.DataFrame.
+        min_val (numeric): minimum value for which to code a cell 1.
         logger (object): logger for saving relevant processing messages
-        overwrite (bool): Flag indicating whether to overwrite existing matrix file(s).
 
     Returns:
         report (dict): dictionary summarizing metadata about the processes and
@@ -395,10 +395,53 @@ def f_county_pam(
     report = {
         REPORT.INFILE: heatmatrix_filename,
         REPORT.REGION: region_type,
+        REPORT.MIN_VAL: min_val,
         REPORT.PROCESS: LMBISON_PROCESS.PAM
     }
 
     county_matrix = GeoMatrix(matrix_filename=heatmatrix_filename, logger=logger)
+    df = county_matrix.convert_to_binary(min_val)
+
+    stats = PamStats(df, logger=logger)
+    # Get output filenames
+    cov_matrix_filename = BisonNameOp.get_process_outfilename(
+        heatmatrix_filename, outpath=config["outpath"], postfix="covariance")
+    div_matrix_filename = BisonNameOp.get_process_outfilename(
+        heatmatrix_filename, outpath=config["outpath"], postfix="diversity")
+    sites_matrix_filename = BisonNameOp.get_process_outfilename(
+        heatmatrix_filename, outpath=config["outpath"], postfix="sites")
+    species_matrix_filename = BisonNameOp.get_process_outfilename(
+        heatmatrix_filename, outpath=config["outpath"], postfix="species")
+
+    # Write requested stats
+    pth, fname = os.path.basename(cov_matrix_filename)
+    basename, ext = os.path.splitext(fname)
+    covariance_stats = stats.calculate_covariance_statistics()
+    for name, mtx in covariance_stats:
+        fn = os.path.join(pth, f"{basename}_{name.replace(' ', '_')}{ext}")
+        mtx.write(fn)
+        logger.log(
+            f"Wrote covariance {name} statistics to {fn}.", refname=script_name)
+        report[f"output covariance matrix {name}"] = fn
+
+    diversity_stats = stats.calculate_diversity_statistics()
+    diversity_stats.write(div_matrix_filename)
+    logger.log(
+        f"Wrote diversity statistics to {div_matrix_filename}.",
+        refname=script_name)
+    report["output diversity_matrix"] = div_matrix_filename
+
+
+    species_stats = stats.calculate_species_statistics()
+    species_stats.write(species_matrix_filename)
+    logger.log(
+        f"Wrote species statistics to {species_matrix_filename}.",
+        refname=script_name)
+    report["output species_stats_matrix"] = species_matrix_filename
+
+    mtx_rpt = stats.get_report()
+    report.update(mtx_rpt)
+
     attribute_fid = county_matrix.row_lookup_by_attribute()
 
     report[REPORT.OUTFILE] = heatmatrix_filename
@@ -728,9 +771,9 @@ def execute_command(config, logger):
             full_summary_filename, config["geo_path"], heatmatrix_filename, logger,
             overwrite=True)
 
-    elif config["command"] == "county_pam":
+    elif config["command"] == "pam_stats":
         step_or_process = LMBISON_PROCESS.PAM
-        report = f_county_pam(heatmatrix_filename, logger, overwrite=True)
+        report = f_calculate_pam_stats(heatmatrix_filename, 1, logger)
 
     elif config["command"] == "test_bad_data" and config["gbif_id"] is not None:
         test_bad_line(
