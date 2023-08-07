@@ -399,10 +399,10 @@ def f_county_pam(
     }
 
     county_matrix = GeoMatrix(matrix_filename=heatmatrix_filename, logger=logger)
-    fid_attributes = county_matrix.row_lookup_by_attribute()
+    attribute_fid = county_matrix.row_lookup_by_attribute()
 
     report[REPORT.OUTFILE] = heatmatrix_filename
-    report[REPORT.HEATMATRIX] = {"cells": fid_attributes}
+    report[REPORT.HEATMATRIX] = {"cells": attribute_fid}
     return report
 
 

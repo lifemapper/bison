@@ -14,12 +14,15 @@ class GeoMatrix(object):
     def __init__(
             self, matrix_filename=None, spatial_filename=None, fieldnames=(),
             logger=None):
-        """Construct a pandas.Dataframe from a matrix file, or a shapefile of polygons.
+        """Construct a Dataframe containing counts from a shapefile or matrix file.
 
         Args:
             matrix_filename (str): full filename for a zipped CSV file containing a
                 pandas.DataFrame,
-            spatial_filename (str): full filename for a shapefile to construct index
+            spatial_filename (str): full filename for a shapefile of polygons to
+                construct a matrix defined by one row per polygon, identified by a
+                feature identifier (FID), and optionally, a string of one or more
+                concatenated attributes, unique to that polygon.
             fieldnames (iterable): lisf of fieldname for polygon attributes of interest
             logger (object): logger for saving relevant processing messages
 
@@ -183,6 +186,30 @@ class GeoMatrix(object):
         for fid, attribute in self._row_indices.items():
             lookup[attribute] = fid
         return lookup
+
+    # ...............................................
+    def _binary_range(self, x, min_val, max_val):
+        if x >= min_val:
+            if max_val is not None:
+                if x <= max_val:
+                    return 1
+            else:
+                return 1
+        return 0
+
+    # ...............................................
+    def convert_to_binary(self, min_val, max_val=None):
+        """Convert the matrix of counts into a binary matrix based on a value range.
+
+        Args:
+            min_val (numeric): minimum value for which to code a cell 1.
+            max_val (numeric): maximum value for which to code a cell 1.
+
+        Returns:
+            df (GeoMatrix): a new GeoMatrix with a binary DataFrame.
+        """
+        df = self._dataframe.applymap(self._binary_range)
+        return df
 
     # ...............................................
     def write_matrix(self, heatmatrix_filename, overwrite=True):
