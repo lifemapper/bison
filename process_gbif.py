@@ -342,6 +342,8 @@ def e_county_heatmap(
 
     # Initialize dictionary for species in counties structure
     # Species may be different RIIS region (AK, HI, L48), each as a different key
+    # Do not include counts for species "na"
+    species_lookup.pop("na")
     species_fids = {}
     for rr_species_key in species_lookup.keys():
         species_fids[rr_species_key] = {}

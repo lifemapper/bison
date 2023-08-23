@@ -1,5 +1,5 @@
 """Class for a spatial index and tools for intersecting with a point and extracting attributes."""
-# import lmpy
+import lmpy
 import numpy
 import os
 import pandas
@@ -74,7 +74,12 @@ class GeoMatrix(object):
             else:
                 loc_key = self._get_location_key(feat, fieldnames)
                 self._row_indices[fid] = loc_key
-        self._dataframe = None
+        self._df = None
+
+    # ...............................................
+    @property
+    def dataframe(self):
+        return self._df
 
     # ...............................................
     def create_data_column(self, fid_count):
@@ -99,13 +104,13 @@ class GeoMatrix(object):
             species_cols (dict): keys contain species(column) name, with
                 a value of a list of counts for each row index (fid).
         """
-        self._dataframe = pandas.DataFrame(species_cols)
+        self._df = pandas.DataFrame(species_cols)
         row_value_index = []
-        for fid in range(self._dataframe.shape[0]):
+        for fid in range(self._df.shape[0]):
             row_value_index.append(self._row_indices[fid])
         # Convert the original index to a MultiIndex with the new_index as the second level
-        self._dataframe.index = pandas.MultiIndex.from_arrays(
-            [self._dataframe.index, row_value_index], names=["fid", "region"]
+        self._df.index = pandas.MultiIndex.from_arrays(
+            [self._df.index, row_value_index], names=["fid", "region"]
         )
 
     # ...............................................
@@ -116,7 +121,7 @@ class GeoMatrix(object):
         Returns:
             The pandas.DataFrame for this instance.
         """
-        return self._dataframe
+        return self._df
 
     # ...............................................
     @property
@@ -136,8 +141,8 @@ class GeoMatrix(object):
         Returns:
             The row indexes for the DataFrame instance.
         """
-        if self._dataframe is not None:
-            return self._dataframe.index.to_list()
+        if self._df is not None:
+            return self._df.index.to_list()
         return []
 
     # ...............................................
@@ -148,9 +153,21 @@ class GeoMatrix(object):
         Returns:
             The count of columns for the DataFrame instance.
         """
-        if self._dataframe is not None:
-            return self._dataframe.shape[1]
+        if self._df is not None:
+            return self._df.shape[1]
         return 0
+
+    # ...............................................
+    @property
+    def data(self):
+        """Return the data of the dataframe.
+
+        Returns:
+            The ndarray data for the DataFrame instance.
+        """
+        if self._df is not None:
+            return self._df.data
+        return None
 
     # ...............................................
     @property
@@ -160,8 +177,8 @@ class GeoMatrix(object):
         Returns:
             list of column names for the dataframe.
         """
-        if self._dataframe is not None:
-            return self._dataframe.columns.to_list()
+        if self._df is not None:
+            return self._df.columns.to_list()
         return []
 
     # ...............................................
@@ -208,7 +225,7 @@ class GeoMatrix(object):
         Returns:
             df (GeoMatrix): a new GeoMatrix with a binary DataFrame.
         """
-        df = self._dataframe.applymap(self._binary_range)
+        df = self._df.applymap(self._binary_range)
         return df
 
     # ...............................................
@@ -224,9 +241,8 @@ class GeoMatrix(object):
         """
         if ready_filename(heatmatrix_filename, overwrite=overwrite):
             try:
-                self._dataframe.to_csv(
+                self._df.to_csv(
                     path_or_buf=heatmatrix_filename, sep=",", header=True, index=True,
-                    # index_label=("fid", "region"),
                     mode='w', encoding="utf-8"
                 )
             except Exception:
@@ -241,11 +257,73 @@ class GeoMatrix(object):
         Args:
             matrix_filename (str): full filename for pandas Dataframe.
         """
-        self._dataframe = pandas.read_csv(
-            matrix_filename, sep=",", index=True, #index_label=["fid", "region"],
+        self._df = pandas.read_csv(
+            matrix_filename, sep=",", index_col=["fid", "region"],
             header=True, memory_map=True)
-            #index_col=0,
 
+    # ...............................................
+    @property
+    def num_species(self):
+        count = 0
+        if self._df is not None:
+            count = int(pandas.sum(pandas.any(self._df, axis=0)))
+        return count
+
+    # ...............................................
+    def num_sites(self):
+        """Get the number of sites with presences.
+
+        Args:
+            pam (Matrix): The presence-absence matrix to use for the computation.
+
+        Returns:
+            int: The number of sites that have present species.
+        """
+        count = 0
+        if self._df is not None:
+            count = int(self._df.sum(pandas.any(self._df, axis=1)))
+        return count
+
+
+    # ...............................................
+    def alpha(self):
+        """Calculate alpha diversity, the number of species in each site.
+
+        Returns:
+            A series of alpha diversity values for each site in the dataframe.
+        """
+        alpha_series = None
+        if self._df is not None:
+            alpha_series = self._df.sum(axis=1).astype(float) / self.num_species()
+        return alpha_series
+
+    # ...............................................
+    def alpha_proportional(self):
+        """Calculate proportional alpha diversity, the percentage of species in each site.
+
+        Returns:
+            A series of proportional alpha diversity values for each site in the dataframe.
+        """
+        alpha_pr_series = None
+        if self._df is not None:
+            alpha_pr_series = self._df.sum(axis=1).astype(float) / self.num_species()
+        return alpha_pr_series
+
+# .............................................................................
+def _convert_to_lmpy(geomatrix):
+    lmpy_mtx = lmpy.matrix.Matrix(geomatrix.data, headers=[])
+    return lmpy_mtx
+
+def compute_stats(filename=None, geomatrix=None):
+    if geomatrix is None:
+        if filename is not None:
+            geomatrix = GeoMatrix(matrix_filename=filename)
+        else:
+            raise Exception(
+                "Must provide either a geomatrix or a filename containing a dataframe")
+    df = geomatrix.dataframe
+
+    alpha_series = df.sum(axis=1)
 
 
 # .............................................................................
@@ -253,3 +331,29 @@ class GeoMatrix(object):
 if __name__ == '__main__':
     """Main script to execute all elements of the summarize-GBIF BISON workflow."""
     pass
+
+import lmpy
+import pandas
+from bison.process.geo_matrix import GeoMatrix
+
+matrix_filename = "/volumes/bison/big_data/process/gbif_2023-01-26_10k_summary.csv"
+df = pandas.read_csv(matrix_filename, sep=",", index_col=["fid", "region"],memory_map=True)
+
+"""
+# diversity stats
+metrics = [
+            ('c-score', stats.c_score),
+            ('lande', stats.lande),
+            ('legendre', stats.legendre),
+            ('num sites', stats.num_sites),
+            ('num species', stats.num_species),
+            ('whittaker', stats.whittaker),
+        ]
+# site stats
+metrics = [
+            ('alpha', stats.alpha),
+            ('alpha proportional', stats.alpha_proportional),
+            ('phi', stats.phi),
+            ('phi average proportional', stats.phi_average_proportional),
+        ]
+"""
