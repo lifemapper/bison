@@ -1,6 +1,5 @@
 """Class for a spatial index and tools for intersecting with a point and extracting attributes."""
-import lmpy
-import numpy
+import logging
 import os
 import pandas
 from osgeo import ogr
@@ -9,14 +8,19 @@ from bison.common.util import BisonKey, ready_filename
 
 
 # .............................................................................
-class GeoMatrix(object):
+class SiteMatrix(object):
     """Object for intersecting coordinates with a polygon shapefile."""
     def __init__(
-            self, matrix_filename=None, spatial_filename=None, fieldnames=(),
-            logger=None):
+            self, dataframe=None, matrix_filename=None, spatial_filename=None,
+            fieldnames=None, logger=None):
         """Construct a Dataframe containing counts from a shapefile or matrix file.
 
         Args:
+            dataframe (pandas.DataFrame): dataframe for this object, where rows
+                represent sites and columns represent species.  The dataframe must have
+                a MultiIndex for rows containing fid and location, and an Index for
+                columns.  Species names or codes for column headers are optional but
+                preferred.
             matrix_filename (str): full filename for a zipped CSV file containing a
                 pandas.DataFrame,
             spatial_filename (str): full filename for a shapefile of polygons to
@@ -27,26 +31,53 @@ class GeoMatrix(object):
             logger (object): logger for saving relevant processing messages
 
         Raises:
-            FileNotFoundError: if spatial_filename does not exist on the file system
+            Exception: on dataframe without a MultiIndex of length 2.
             FileNotFoundError: if matrix_filename does not exist on the file system
-            Exception: on neither spatiol_filename or matrix_filename provided.
+            FileNotFoundError: if spatial_filename does not exist on the file system
+            Exception: if no fieldnames accompanying a spatial_filename.
+            Exception: if none of spatiol_filename, matrix_filename, or dataframe
+                provided.
         """
         self._log = logger
-        # Dictionary with FID (index): a string/list of additional row names
-        self._row_indices = {}
+        # # Dictionary with FID (index): a string/list of additional row names
+        # self._row_indices = {}
+        self._df = None
+        self._matrix_filename = matrix_filename
+        self._spatial_filename = spatial_filename
+        self._fieldnames = fieldnames
+        self._min_presence = 0
+        self._max_presence = None
 
-        if matrix_filename:
+        if dataframe:
+            if not (
+                    type(dataframe.index) is pandas.core.indexes.multi.MultiIndex and
+                    len(dataframe.index.names()) == 2
+            ):
+                raise Exception(
+                    "SiteMatrix expects a row MultiIndex with FID and location")
+            if type(dataframe.columns) is pandas.core.indexes.range.RangeIndex:
+                self._log.log(
+                    "Species columns contain a RangeIndex, not species names.",
+                    refname=self.__class__.__name__, log_level=logging.WARNING)
+            self._df = dataframe
+        elif matrix_filename:
             if os.path.exists(matrix_filename):
                 self.read_matrix(matrix_filename)
             else:
                 raise FileNotFoundError(f"{spatial_filename}")
         elif spatial_filename:
             if os.path.exists(spatial_filename):
-                self._initialize_geospatial_data(spatial_filename, fieldnames)
+                if fieldnames is None:
+                    raise Exception(
+                        "SiteMatrix expects fieldnames with a spatial dataset")
+                # Save a dictionary of rows/sites - {fid: location_name}
+                self._row_indices = self._get_row_indices(spatial_filename, fieldnames)
             else:
                 raise FileNotFoundError(f"{spatial_filename}")
         else:
-            raise Exception("Must provide either spatial_filename or matrix_filename.")
+            raise Exception(
+                "Must provide either spatial_filename and fieldnames, matrix_filename, "
+                "or dataframe.")
 
     # ...............................................
     def _get_location_key(self, feat, fieldnames):
@@ -55,7 +86,8 @@ class GeoMatrix(object):
         return key
 
     # ...............................................
-    def _initialize_geospatial_data(self, spatial_filename, fieldnames):
+    def _get_row_indices(self, spatial_filename, fieldnames):
+        row_indices = {}
         # Init a lookup table for polygon features in the file and their attributes.
         driver = ogr.GetDriverByName("ESRI Shapefile")
 
@@ -73,12 +105,17 @@ class GeoMatrix(object):
                 )
             else:
                 loc_key = self._get_location_key(feat, fieldnames)
-                self._row_indices[fid] = loc_key
-        self._df = None
+                row_indices[fid] = loc_key
+        return row_indices
 
     # ...............................................
     @property
     def dataframe(self):
+        """Get the data in this object.
+
+        Returns:
+            (pandas.DataFrame) in this object.
+        """
         return self._df
 
     # ...............................................
@@ -91,10 +128,12 @@ class GeoMatrix(object):
         Returns:
             column (list): ordered list of counts for each row index (fid).
         """
-        counts = numpy.zeros(self.row_count, dtype=numpy.int32)
-        for fid, count in fid_count.items():
-            counts[fid] = count
-        return list(counts)
+        counts = []
+        fids = list(fid_count.keys())
+        fids.sort()
+        for fid in fids:
+            counts.append(fid_count[fid])
+        return counts
 
     # ...............................................
     def create_dataframe_from_cols(self, species_cols):
@@ -103,7 +142,19 @@ class GeoMatrix(object):
         Args:
             species_cols (dict): keys contain species(column) name, with
                 a value of a list of counts for each row index (fid).
+
+        Raises:
+            Exception: on self not containing row indices defining site FIDs and
+                locations.
+
+        Note:
+            Function assumes that the object has been initialized with spatial data
+                defining the rows (sites) with FIDs and locations from a vector dataset.
         """
+        if not self._row_indices:
+            raise Exception(
+                "SiteMatrix must first be initialized with a vector dataset "
+                "to define rows indices as FIDs and location_names.")
         self._df = pandas.DataFrame(species_cols)
         row_value_index = []
         for fid in range(self._df.shape[0]):
@@ -205,50 +256,72 @@ class GeoMatrix(object):
         return lookup
 
     # ...............................................
-    def _binary_range(self, x, min_val, max_val):
-        if x >= min_val:
-            if max_val is not None:
-                if x <= max_val:
+    def _binary_range(self, x):
+        # Note: min_val < x <= max_val
+        if x > self._min_presence:
+            if self._max_presence is not None:
+                if x <= self._max_presence:
                     return 1
             else:
                 return 1
         return 0
 
     # ...............................................
-    def convert_to_binary(self, min_val, max_val=None):
+    def convert_to_binary(self, min_val=0, max_val=None):
         """Convert the matrix of counts into a binary matrix based on a value range.
 
         Args:
-            min_val (numeric): minimum value for which to code a cell 1.
-            max_val (numeric): maximum value for which to code a cell 1.
+            min_val (numeric): value must be > min_val to code a cell 1.
+            max_val (numeric): value must be <= to max_val to code a cell 1.
+
+        Note: min_val < x <= max_val
 
         Returns:
-            df (GeoMatrix): a new GeoMatrix with a binary DataFrame.
+            mtx (SiteMatrix): a new SiteMatrix with a binary DataFrame.
         """
-        df = self._df.applymap(self._binary_range)
-        return df
+        self._min_presence = min_val
+        self._max_presence = max_val
+        bin_df = self._df.applymap(self._binary_range)
+        mtx = SiteMatrix(dataframe=bin_df)
+        return mtx
 
     # ...............................................
-    def write_matrix(self, heatmatrix_filename, overwrite=True):
-        """Write the matrix to a zipped CSV file.
+    @classmethod
+    def concat_columns(series_list):
+        """Concatenate multiple columns of values for sites into a matrix.
+
+        Note:
+            series_list (list of pandas.Series): Sequence of series representing values
+                for sites.
+
+        Returns:
+            mtx (SiteMatrix): containing one or more columns.
+        """
+        df = pandas.concat(series_list, axis=1)
+        mtx = SiteMatrix(dataframe=df)
+        return mtx
+
+    # ...............................................
+    def write_matrix(self, filename, overwrite=True):
+        """Write the matrix to a CSV file.
 
         Args:
-            heatmatrix_filename (str): Full filename for output pandas.DataFrame.
+            filename (str): Full filename for output pandas.DataFrame.
             overwrite (bool): Flag indicating whether to overwrite existing matrix file(s).
 
         Raises:
             Exception: on failure to write matrix.
         """
-        if ready_filename(heatmatrix_filename, overwrite=overwrite):
+        if ready_filename(filename, overwrite=overwrite):
             try:
                 self._df.to_csv(
-                    path_or_buf=heatmatrix_filename, sep=",", header=True, index=True,
+                    path_or_buf=filename, sep=",", header=True, index=True,
                     mode='w', encoding="utf-8"
                 )
             except Exception:
                 raise
         else:
-            self._log.log(f"File {heatmatrix_filename} already exists.")
+            self._log.log(f"File {filename} already exists.")
 
     # ...............................................
     def read_matrix(self, matrix_filename):
@@ -264,6 +337,14 @@ class GeoMatrix(object):
     # ...............................................
     @property
     def num_species(self):
+        """Get the number of species with at least one site present.
+
+        Returns:
+            int: The number of species that are present somewhere.
+
+        Note:
+            Also used as gamma diversity (species richness over entire landscape)
+        """
         count = 0
         if self._df is not None:
             count = int(pandas.sum(pandas.any(self._df, axis=0)))
@@ -273,9 +354,6 @@ class GeoMatrix(object):
     def num_sites(self):
         """Get the number of sites with presences.
 
-        Args:
-            pam (Matrix): The presence-absence matrix to use for the computation.
-
         Returns:
             int: The number of sites that have present species.
         """
@@ -284,46 +362,71 @@ class GeoMatrix(object):
             count = int(self._df.sum(pandas.any(self._df, axis=1)))
         return count
 
-
     # ...............................................
     def alpha(self):
         """Calculate alpha diversity, the number of species in each site.
 
         Returns:
-            A series of alpha diversity values for each site in the dataframe.
+            A series of alpha diversity values for each site.
         """
         alpha_series = None
         if self._df is not None:
-            alpha_series = self._df.sum(axis=1).astype(float) / self.num_species()
+            alpha_series = self._df.sum(axis=1)
+            alpha_series.name = "alpha_diversity"
         return alpha_series
 
     # ...............................................
     def alpha_proportional(self):
-        """Calculate proportional alpha diversity, the percentage of species in each site.
+        """Calculate proportional alpha diversity - percentage of species in each site.
 
         Returns:
-            A series of proportional alpha diversity values for each site in the dataframe.
+            A series of proportional alpha diversity values for each site.
         """
         alpha_pr_series = None
         if self._df is not None:
-            alpha_pr_series = self._df.sum(axis=1).astype(float) / self.num_species()
+            alpha_pr_series = self._df.sum(axis=1) / float(self.num_species)
+            alpha_pr_series.name = "alpha_proportional_diversity"
         return alpha_pr_series
 
-# .............................................................................
-def _convert_to_lmpy(geomatrix):
-    lmpy_mtx = lmpy.matrix.Matrix(geomatrix.data, headers=[])
-    return lmpy_mtx
+    # ...............................................
+    def beta(self):
+        """Calculate beta diversity for each site, Whitaker's ratio: gamma/alpha.
 
-def compute_stats(filename=None, geomatrix=None):
-    if geomatrix is None:
-        if filename is not None:
-            geomatrix = GeoMatrix(matrix_filename=filename)
-        else:
-            raise Exception(
-                "Must provide either a geomatrix or a filename containing a dataframe")
-    df = geomatrix.dataframe
+        Returns:
+            beta_series (pandas.Series): ratio of gamma to alpha for each site.
+        """
+        beta_series = None
+        if self._df is not None:
+            beta_series = float(self.num_species) / self._df.sum(axis=1)
+            beta_series.name = "beta_diversity"
+        return beta_series
 
-    alpha_series = df.sum(axis=1)
+    # ...............................................
+    def omega(self):
+        """Calculate the range size (number of counties) per species.
+
+        Returns:
+            omega_series (pandas.Series): A row of range sizes for each species.
+        """
+        omega_series = None
+        if self._df is not None:
+            omega_series = self._df.sum(axis=0)
+            omega_series.name = "omega"
+        return omega_series
+
+    # ...............................................
+    def omega_proportional(self):
+        """Calculate the mean proportional range size of each species.
+
+        Returns:
+            beta_series (pandas.Series): A row of the proportional range sizes for
+                each species.
+        """
+        omega_pr_series = None
+        if self._df is not None:
+            omega_pr_series = self._df.sum(axis=0) / float(self.num_sites())
+        omega_pr_series.name = "omega_proportional"
+        return omega_pr_series
 
 
 # .............................................................................
@@ -332,12 +435,9 @@ if __name__ == '__main__':
     """Main script to execute all elements of the summarize-GBIF BISON workflow."""
     pass
 
-import lmpy
-import pandas
-from bison.process.geo_matrix import GeoMatrix
-
-matrix_filename = "/volumes/bison/big_data/process/gbif_2023-01-26_10k_summary.csv"
-df = pandas.read_csv(matrix_filename, sep=",", index_col=["fid", "region"],memory_map=True)
+matrix_filename = "/volumes/bison/big_data/process/gbif_2023-01-26_10k_heatmatrix.csv"
+df = pandas.read_csv(
+    matrix_filename, sep=",", index_col=["fid", "region"], memory_map=True)
 
 """
 # diversity stats

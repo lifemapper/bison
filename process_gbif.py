@@ -2,7 +2,6 @@
 import csv
 from logging import DEBUG, ERROR, INFO
 import json
-from lmpy.statistics.pam_stats import PamStats
 import os
 import time
 
@@ -14,7 +13,7 @@ from bison.common.util import (
 from bison.process.aggregate import Aggregator
 from bison.process.annotate import (Annotator, parallel_annotate)
 from bison.process.geoindex import (GeoResolver, GeoException)
-from bison.process.geo_matrix import GeoMatrix
+from bison.process.geo_matrix import SiteMatrix
 from bison.process.sanity_check import Counter
 from bison.provider.riis_data import RIIS
 from bison.tools._config_parser import get_common_arguments
@@ -348,7 +347,7 @@ def e_county_heatmap(
     for rr_species_key in species_lookup.keys():
         species_fids[rr_species_key] = {}
 
-    county_matrix = GeoMatrix(
+    county_matrix = SiteMatrix(
         spatial_filename=county_filename, fieldnames=[state_fldname, county_fldname],
         logger=logger)
     location_fid = county_matrix.row_lookup_by_attribute()
@@ -398,56 +397,38 @@ def f_calculate_pam_stats(heatmatrix_filename, min_val, logger):
         REPORT.INFILE: heatmatrix_filename,
         REPORT.REGION: region_type,
         REPORT.MIN_VAL: min_val,
-        REPORT.PROCESS: LMBISON_PROCESS.PAM
+        REPORT.PROCESS: LMBISON_PROCESS.PAM,
     }
 
-    county_matrix = GeoMatrix(matrix_filename=heatmatrix_filename, logger=logger)
-    df = county_matrix.convert_to_binary(min_val)
+    heatmatrix = SiteMatrix(matrix_filename=heatmatrix_filename, logger=logger)
+    report[REPORT.HEATMATRIX] = {"cells": heatmatrix.row_lookup_by_attribute()}
+    report["total_species"] = heatmatrix.column_count
+    # aka Gamma diversity
+    gamma_diversity = heatmatrix.num_species
+    report["present_species"] = gamma_diversity
+    report["total_sites"] = heatmatrix.row_count
+    report["present_sites"] = heatmatrix.num_sites
 
-    stats = PamStats(df, logger=logger)
-    # Get output filenames
-    cov_matrix_filename = BisonNameOp.get_process_outfilename(
-        heatmatrix_filename, outpath=config["outpath"], postfix="covariance")
-    div_matrix_filename = BisonNameOp.get_process_outfilename(
+    pam = heatmatrix.convert_to_binary(min_val)
+
+    # .....................................
+    # County level diversity
+    # .....................................
+    # Alpha diversity (species richness) for each site (county)
+    alpha_series = pam.alpha()
+    # Beta diversity (gamma/alpha) for each site (county)
+    beta_series = pam.beta()
+
+    # Combine alpha and beta diversities to a matrix and write
+    site_diversity_mtx = SiteMatrix([alpha_series, beta_series])
+    diversity_filename = BisonNameOp.get_process_outfilename(
         heatmatrix_filename, outpath=config["outpath"], postfix="diversity")
-    sites_matrix_filename = BisonNameOp.get_process_outfilename(
-        heatmatrix_filename, outpath=config["outpath"], postfix="sites")
-    species_matrix_filename = BisonNameOp.get_process_outfilename(
-        heatmatrix_filename, outpath=config["outpath"], postfix="species")
-
-    # Write requested stats
-    pth, fname = os.path.basename(cov_matrix_filename)
-    basename, ext = os.path.splitext(fname)
-    covariance_stats = stats.calculate_covariance_statistics()
-    for name, mtx in covariance_stats:
-        fn = os.path.join(pth, f"{basename}_{name.replace(' ', '_')}{ext}")
-        mtx.write(fn)
-        logger.log(
-            f"Wrote covariance {name} statistics to {fn}.", refname=script_name)
-        report[f"output covariance matrix {name}"] = fn
-
-    diversity_stats = stats.calculate_diversity_statistics()
-    diversity_stats.write(div_matrix_filename)
+    site_diversity_mtx.write_matrix(diversity_filename)
     logger.log(
-        f"Wrote diversity statistics to {div_matrix_filename}.",
+        f"Wrote diversity statistics to {site_diversity_mtx}.",
         refname=script_name)
-    report["output diversity_matrix"] = div_matrix_filename
+    report["output diversity_matrix"] = site_diversity_mtx
 
-
-    species_stats = stats.calculate_species_statistics()
-    species_stats.write(species_matrix_filename)
-    logger.log(
-        f"Wrote species statistics to {species_matrix_filename}.",
-        refname=script_name)
-    report["output species_stats_matrix"] = species_matrix_filename
-
-    mtx_rpt = stats.get_report()
-    report.update(mtx_rpt)
-
-    attribute_fid = county_matrix.row_lookup_by_attribute()
-
-    report[REPORT.OUTFILE] = heatmatrix_filename
-    report[REPORT.HEATMATRIX] = {"cells": attribute_fid}
     return report
 
 

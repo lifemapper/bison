@@ -796,9 +796,6 @@ class BisonNameOp():
                 If the input filename reflects the final processing step, the method
                 returns None
 
-        Raises:
-            Exception: on illegal step or final process as input filename
-
         Note:
             The input filename is parsed for process step, and the output filename will
             be constructed for the next step.
