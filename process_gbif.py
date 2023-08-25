@@ -380,11 +380,12 @@ def e_county_heatmap(
 
 
 # .............................................................................
-def f_calculate_pam_stats(heatmatrix_filename, min_val, logger):
+def f_calculate_pam_stats(heatmatrix_filename, output_path, min_val, logger):
     """Annotate GBIF records with census state and county, and RIIS key and assessment.
 
     Args:
         heatmatrix_filename (str): Full filename for output pandas.DataFrame.
+        output_path (str): Destination directory for output files.
         min_val (numeric): minimum value for which to code a cell 1.
         logger (object): logger for saving relevant processing messages
 
@@ -393,8 +394,17 @@ def f_calculate_pam_stats(heatmatrix_filename, min_val, logger):
             output files.
     """
     region_type = "county"
+    sites_diversity_filename = BisonNameOp.get_process_outfilename(
+        heatmatrix_filename, outpath=output_path, postfix="sites")
+    species_diversity_filename = BisonNameOp.get_process_outfilename(
+        heatmatrix_filename, outpath=output_path, postfix="species")
+    stats_filename = BisonNameOp.get_process_outfilename(
+        heatmatrix_filename, outpath=output_path, postfix="stats")
     report = {
         REPORT.INFILE: heatmatrix_filename,
+        REPORT.OUTFILE: [
+            sites_diversity_filename, species_diversity_filename, stats_filename
+        ],
         REPORT.REGION: region_type,
         REPORT.MIN_VAL: min_val,
         REPORT.PROCESS: LMBISON_PROCESS.PAM,
@@ -403,31 +413,44 @@ def f_calculate_pam_stats(heatmatrix_filename, min_val, logger):
     heatmatrix = SiteMatrix(matrix_filename=heatmatrix_filename, logger=logger)
     report[REPORT.HEATMATRIX] = {"cells": heatmatrix.row_lookup_by_attribute()}
     report["total_species"] = heatmatrix.column_count
+    report["present_species"] = heatmatrix.num_species
     # aka Gamma diversity
-    gamma_diversity = heatmatrix.num_species
-    report["present_species"] = gamma_diversity
     report["total_sites"] = heatmatrix.row_count
     report["present_sites"] = heatmatrix.num_sites
 
     pam = heatmatrix.convert_to_binary(min_val)
 
     # .....................................
-    # County level diversity
+    # Sites/County diversity
     # .....................................
     # Alpha diversity (species richness) for each site (county)
     alpha_series = pam.alpha()
     # Beta diversity (gamma/alpha) for each site (county)
     beta_series = pam.beta()
-
     # Combine alpha and beta diversities to a matrix and write
-    site_diversity_mtx = SiteMatrix([alpha_series, beta_series])
-    diversity_filename = BisonNameOp.get_process_outfilename(
-        heatmatrix_filename, outpath=config["outpath"], postfix="diversity")
-    site_diversity_mtx.write_matrix(diversity_filename)
+    site_diversity_mtx = SiteMatrix.concat_columns((alpha_series, beta_series))
+    site_diversity_mtx.write_matrix(sites_diversity_filename)
     logger.log(
-        f"Wrote diversity statistics to {site_diversity_mtx}.",
+        f"Wrote site statistics to {sites_diversity_filename}.",
         refname=script_name)
-    report["output diversity_matrix"] = site_diversity_mtx
+
+    # .....................................
+    # Species diversity
+    # .....................................
+    # Omega (range size) for each species
+    omega_series = pam.omega()
+    # Omega proportional (mean proportional range size) for each species
+    omega_pr_series = pam.omega_proportional()
+    omega_mtx = SiteMatrix.concat_columns((omega_series, omega_pr_series))
+    omega_mtx.write_matrix(species_diversity_filename)
+    logger.log(
+        f"Wrote species statistics to {species_diversity_filename}.",
+        refname=script_name)
+
+    # .....................................
+    # PAM (landscape) diversity measures
+    # .....................................
+    pam.calc_write_pam_measures(stats_filename, overwrite=True)
 
     return report
 
@@ -756,7 +779,9 @@ def execute_command(config, logger):
 
     elif config["command"] == "pam_stats":
         step_or_process = LMBISON_PROCESS.PAM
-        report = f_calculate_pam_stats(heatmatrix_filename, 1, logger)
+        min_presence = 1
+        report = f_calculate_pam_stats(
+            heatmatrix_filename, out_path, min_presence, logger)
 
     elif config["command"] == "test_bad_data" and config["gbif_id"] is not None:
         test_bad_line(

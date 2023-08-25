@@ -1,8 +1,10 @@
 """Class for a spatial index and tools for intersecting with a point and extracting attributes."""
 import logging
+import csv
 import os
 import pandas
 from osgeo import ogr
+import sys
 
 from bison.common.util import BisonKey, ready_filename
 
@@ -47,6 +49,7 @@ class SiteMatrix(object):
         self._fieldnames = fieldnames
         self._min_presence = 0
         self._max_presence = None
+        self._row_indices = {}
 
         if dataframe:
             if not (
@@ -62,7 +65,7 @@ class SiteMatrix(object):
             self._df = dataframe
         elif matrix_filename:
             if os.path.exists(matrix_filename):
-                self.read_matrix(matrix_filename)
+                self._read_matrix(matrix_filename)
             else:
                 raise FileNotFoundError(f"{spatial_filename}")
         elif spatial_filename:
@@ -287,10 +290,10 @@ class SiteMatrix(object):
 
     # ...............................................
     @classmethod
-    def concat_columns(series_list):
+    def concat_columns(cls, series_list):
         """Concatenate multiple columns of values for sites into a matrix.
 
-        Note:
+        Args:
             series_list (list of pandas.Series): Sequence of series representing values
                 for sites.
 
@@ -324,7 +327,7 @@ class SiteMatrix(object):
             self._log.log(f"File {filename} already exists.")
 
     # ...............................................
-    def read_matrix(self, matrix_filename):
+    def _read_matrix(self, matrix_filename):
         """Read a matrix into this datastructure from a CSV file.
 
         Args:
@@ -332,7 +335,9 @@ class SiteMatrix(object):
         """
         self._df = pandas.read_csv(
             matrix_filename, sep=",", index_col=["fid", "region"],
-            header=True, memory_map=True)
+            memory_map=True)
+        for fid, loc_key in self._df.index:
+            self._row_indices[fid] = loc_key
 
     # ...............................................
     @property
@@ -347,7 +352,7 @@ class SiteMatrix(object):
         """
         count = 0
         if self._df is not None:
-            count = int(pandas.sum(pandas.any(self._df, axis=0)))
+            count = int(self._df.sum(self._df.any(axis=0)))
         return count
 
     # ...............................................
@@ -359,7 +364,7 @@ class SiteMatrix(object):
         """
         count = 0
         if self._df is not None:
-            count = int(self._df.sum(pandas.any(self._df, axis=1)))
+            count = int(self._df.sum(self._df.any(axis=1)))
         return count
 
     # ...............................................
@@ -427,6 +432,123 @@ class SiteMatrix(object):
             omega_pr_series = self._df.sum(axis=0) / float(self.num_sites())
         omega_pr_series.name = "omega_proportional"
         return omega_pr_series
+
+    # # ...............................................
+    # def schluter_species_variance_ratio(self):
+    #     """Calculate Schluter's species variance ratio.
+    #
+    #     Returns:
+    #         float: The Schluter species variance ratio for the PAM.
+    #     """
+    #     sigma_species_, _hdrs = sigma_species(pam)
+    #     return float(sigma_species_.sum() / sigma_species_.trace())
+
+    # ...............................................
+    # def schluter_site_variance_ratio(self):
+    #     """Calculate Schluter's site variance ratio.
+    #
+    #     Returns:
+    #         float: The Schluter site variance ratio for the PAM.
+    #     """
+    #     sigma_sites_, _hdrs = sigma_sites(pam)
+    #     return float(sigma_sites_.sum() / sigma_sites_.trace())
+
+    # ...............................................
+    def whittaker(self):
+        """Calculate Whittaker's beta diversity metric for a PAM.
+
+        Returns:
+            float: Whittaker's beta diversity for the PAM.
+        """
+        val = float(self.num_species / self.omega_proportional().sum())
+        return "whittaker_beta_diversity", val
+
+    # ...............................................
+    def lande(self):
+        """Calculate Lande's beta diversity metric for a PAM.
+
+        Returns:
+            float: Lande's beta diversity for the PAM.
+        """
+        val = float(
+            self.num_species
+            - (self._df.sum(axis=0).astype(float) / self.num_sites()).sum()
+        )
+        return "Lande_beta_diversity", val
+
+    # ...............................................
+    def legendre(self):
+        """Calculate Legendre's beta diversity metric for a PAM.
+
+        Returns:
+            float: Legendre's beta diversity for the PAM.
+        """
+        val = float(
+            self.omega().sum() - (float((self.omega() ** 2).sum()) / self.num_sites())
+        )
+        return "Legendre_beta_diversity", val
+
+    # ...............................................
+    def c_score(self):
+        """Calculate the checker board score for the PAM.
+
+        Returns:
+            float: The checkerboard score for the PAM.
+        """
+        temp = 0.0
+        # Cache these so we don't recompute
+        omega_ = self.omega()  # Cache so we don't waste computations
+        num_species_ = self.num_species
+
+        for i in range(num_species_):
+            for j in range(i, num_species_):
+                num_shared = len(
+                    pandas.where(self._df.sum(self._df[:, [i, j]], axis=1) == 2)[0]
+                )
+                p_1 = omega_[i] - num_shared
+                p_2 = omega_[j] - num_shared
+                temp += p_1 * p_2
+        val = 2 * temp / (num_species_ * (num_species_ - 1))
+        return "checker_board_score", val
+
+    # ...............................................
+    def calc_write_pam_measures(self, filename, overwrite=True):
+        """Calculate all matrix-level measures for the PAM and write to file.
+
+        Args:
+            filename (str): Full filename for output pandas.DataFrame.
+            overwrite (bool): Flag indicating whether to overwrite existing file.
+
+        Raises:
+            Exception: on failure to open file.
+            Exception: on failure to get CSVWriter or write a row.
+        """
+        stats = []
+        stats.append(("gamma_diversity", self.num_species))
+        stats.append(self._df.whittaker())
+        stats.append(self._df.lande())
+        stats.append(self._df.legendre())
+        stats.append(self._df.c_score())
+        columns = [stat[0] for stat in stats]
+        vals = [stat[1] for stat in stats]
+
+        if ready_filename(filename, overwrite=overwrite):
+            csv.field_size_limit(sys.maxsize)
+            try:
+                f = open(filename, "w", newline="", encoding="utf-8")
+            except Exception:
+                raise
+            else:
+                try:
+                    writer = csv.writer(f, delimiter="\t", quoting=csv.QUOTE_MINIMAL)
+                    writer.writerow(columns)
+                    writer.writerow(vals)
+                except Exception:
+                    raise
+                finally:
+                    f.close()
+        else:
+            self._log.log(f"File {filename} already exists.")
 
 
 # .............................................................................
