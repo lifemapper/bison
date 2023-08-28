@@ -5,15 +5,19 @@ ARG BIG_DATA=/
 RUN apt-get update
 RUN apt-get install -y git
 RUN apt-get install -y vim
+RUN apt-get install -y python3-numpy
+#RUN apt-get install -y python3-pandas
+RUN apt-get install -y python3-requests
 RUN apt-get install -y python3-rtree
-# RUN apt-get install python3-requests
 RUN apt-get install -y python3-pip
 
 # .....................................................................................
 # Install lmbison projects for system
 
 # Remove when this has been added to lmpy requirements
-# RUN pip3 install requests
+#RUN pip3 install requests
+#RUN pip3 install numpy
+RUN pip3 install pandas
 
 RUN mkdir git
 

@@ -576,15 +576,12 @@ class SiteMatrix(object):
             self._log.log(f"File {filename} already exists.")
 
 
-# .............................................................................
-# Press the green button in the gutter to run the script.
-if __name__ == '__main__':
-    """Main script to execute all elements of the summarize-GBIF BISON workflow."""
-    pass
-
-matrix_filename = "/volumes/bison/big_data/process/gbif_2023-01-26_10k_heatmatrix.csv"
-df = pandas.read_csv(
-    matrix_filename, sep=",", index_col=["fid", "region"], memory_map=True)
+# # .............................................................................
+# # Press the green button in the gutter to run the script.
+# if __name__ == '__main__':
+#     """Main script to execute all elements of the summarize-GBIF BISON workflow."""
+#     pass
+#
 
 """
 # diversity stats
