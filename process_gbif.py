@@ -411,7 +411,7 @@ def f_calculate_pam_stats(heatmatrix_filename, output_path, min_val, logger):
     }
 
     heatmatrix = SiteMatrix(matrix_filename=heatmatrix_filename, logger=logger)
-    report[REPORT.HEATMATRIX] = {"cells": heatmatrix.row_lookup_by_attribute()}
+    # report[REPORT.HEATMATRIX] = {"cells": heatmatrix.row_lookup_by_attribute()}
     report["total_species"] = heatmatrix.column_count
     report["present_species"] = heatmatrix.num_species
     # aka Gamma diversity
@@ -441,7 +441,7 @@ def f_calculate_pam_stats(heatmatrix_filename, output_path, min_val, logger):
     omega_series = pam.omega()
     # Omega proportional (mean proportional range size) for each species
     omega_pr_series = pam.omega_proportional()
-    omega_mtx = SiteMatrix.concat_columns((omega_series, omega_pr_series))
+    omega_mtx = SiteMatrix.concat_rows((omega_series, omega_pr_series))
     omega_mtx.write_matrix(species_diversity_filename)
     logger.log(
         f"Wrote species statistics to {species_diversity_filename}.",
@@ -724,7 +724,7 @@ def execute_command(config, logger):
     for csv_fname in raw_filenames:
         if not os.path.exists(csv_fname):
             raise FileNotFoundError(f"Expected file {csv_fname} does not exist")
-    log_list(logger, "Input filenames:", raw_filenames)
+    # log_list(logger, "Input filenames:", raw_filenames)
 
     if config["command"] == "resolve":
         step_or_process = LMBISON_PROCESS.RESOLVE
@@ -833,3 +833,47 @@ if __name__ == '__main__':
             f"Wrote report file to {report[REPORT.REPORTFILE]}", refname=script_name)
 
     logger.log(f"main end time: {time.asctime()}", refname=script_name)
+
+# logger = None
+# output_path = "/volumes/bison/big_data/process"
+# heatmatrix_filename = f"{output_path}/gbif_2023-01-26_10k_heatmatrix.csv"
+# sites_diversity_filename = BisonNameOp.get_process_outfilename(
+#     heatmatrix_filename, outpath=output_path, postfix="sites")
+# species_diversity_filename = BisonNameOp.get_process_outfilename(
+#     heatmatrix_filename, outpath=output_path, postfix="species")
+# stats_filename = BisonNameOp.get_process_outfilename(
+#     heatmatrix_filename, outpath=output_path, postfix="stats")
+#
+# heatmatrix = SiteMatrix(matrix_filename=heatmatrix_filename, logger=logger)
+# report[REPORT.HEATMATRIX] = {"cells": heatmatrix.row_lookup_by_attribute()}
+# report["total_species"] = heatmatrix.column_count
+# report["present_species"] = heatmatrix.num_species
+# # aka Gamma diversity
+# report["total_sites"] = heatmatrix.row_count
+# report["present_sites"] = heatmatrix.num_sites
+#
+# pam = heatmatrix.convert_to_binary()
+#
+# # .....................................
+# # Sites/County diversity
+# # .....................................
+# # Alpha diversity (species richness) for each site (county)
+# alpha_series = pam.alpha()
+# # Beta diversity (gamma/alpha) for each site (county)
+# beta_series = pam.beta()
+# # Combine alpha and beta diversities to a matrix and write
+# site_diversity_mtx = SiteMatrix.concat_columns((alpha_series, beta_series))
+# site_diversity_mtx.write_matrix(sites_diversity_filename)
+# logger.log(
+#     f"Wrote site statistics to {sites_diversity_filename}.",
+#     refname=script_name)
+#
+# # .....................................
+# # Species diversity
+# # .....................................
+# # Omega (range size) for each species
+# omega_series = pam.omega()
+# # Omega proportional (mean proportional range size) for each species
+# omega_pr_series = pam.omega_proportional()
+# omega_mtx = SiteMatrix.concat_columns((omega_series, omega_pr_series))
+# omega_mtx.write_matrix(species_diversity_filename)

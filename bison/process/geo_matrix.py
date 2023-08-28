@@ -6,6 +6,7 @@ import pandas
 from osgeo import ogr
 import sys
 
+from bison.common.log import Logger
 from bison.common.util import BisonKey, ready_filename
 
 
@@ -40,6 +41,8 @@ class SiteMatrix(object):
             Exception: if none of spatiol_filename, matrix_filename, or dataframe
                 provided.
         """
+        if logger is None:
+            logger = Logger(os.path.splitext(os.path.basename(__file__))[0])
         self._log = logger
         # # Dictionary with FID (index): a string/list of additional row names
         # self._row_indices = {}
@@ -51,13 +54,13 @@ class SiteMatrix(object):
         self._max_presence = None
         self._row_indices = {}
 
-        if dataframe:
+        if dataframe is not None:
             if not (
                     type(dataframe.index) is pandas.core.indexes.multi.MultiIndex and
-                    len(dataframe.index.names()) == 2
+                    len(dataframe.index.names) == 2
             ):
-                raise Exception(
-                    "SiteMatrix expects a row MultiIndex with FID and location")
+                self._log.log(
+                    "Site index expects a row MultiIndex with FID and location")
             if type(dataframe.columns) is pandas.core.indexes.range.RangeIndex:
                 self._log.log(
                     "Species columns contain a RangeIndex, not species names.",
@@ -286,6 +289,7 @@ class SiteMatrix(object):
         self._max_presence = max_val
         bin_df = self._df.applymap(self._binary_range)
         mtx = SiteMatrix(dataframe=bin_df)
+
         return mtx
 
     # ...............................................
@@ -302,6 +306,22 @@ class SiteMatrix(object):
         """
         df = pandas.concat(series_list, axis=1)
         mtx = SiteMatrix(dataframe=df)
+        return mtx
+
+    # ...............................................
+    @classmethod
+    def concat_rows(cls, series_list):
+        """Concatenate multiple columns of values for sites into a matrix.
+
+        Args:
+            series_list (list of pandas.Series): Sequence of series representing values
+                for species.
+
+        Returns:
+            mtx (SiteMatrix): containing one or more rows.
+        """
+        df = pandas.concat(series_list, axis=1)
+        mtx = SiteMatrix(dataframe=df.T)
         return mtx
 
     # ...............................................
@@ -352,10 +372,11 @@ class SiteMatrix(object):
         """
         count = 0
         if self._df is not None:
-            count = int(self._df.sum(self._df.any(axis=0)))
+            count = int(self._df.any(axis=0).sum())
         return count
 
     # ...............................................
+    @property
     def num_sites(self):
         """Get the number of sites with presences.
 
@@ -364,7 +385,7 @@ class SiteMatrix(object):
         """
         count = 0
         if self._df is not None:
-            count = int(self._df.sum(self._df.any(axis=1)))
+            count = int(self._df.any(axis=1).sum())
         return count
 
     # ...............................................
@@ -429,7 +450,7 @@ class SiteMatrix(object):
         """
         omega_pr_series = None
         if self._df is not None:
-            omega_pr_series = self._df.sum(axis=0) / float(self.num_sites())
+            omega_pr_series = self._df.sum(axis=0) / float(self.num_sites)
         omega_pr_series.name = "omega_proportional"
         return omega_pr_series
 
@@ -472,7 +493,7 @@ class SiteMatrix(object):
         """
         val = float(
             self.num_species
-            - (self._df.sum(axis=0).astype(float) / self.num_sites()).sum()
+            - (self._df.sum(axis=0).astype(float) / self.num_sites).sum()
         )
         return "Lande_beta_diversity", val
 
@@ -484,32 +505,32 @@ class SiteMatrix(object):
             float: Legendre's beta diversity for the PAM.
         """
         val = float(
-            self.omega().sum() - (float((self.omega() ** 2).sum()) / self.num_sites())
+            self.omega().sum() - (float((self.omega() ** 2).sum()) / self.num_sites)
         )
         return "Legendre_beta_diversity", val
 
-    # ...............................................
-    def c_score(self):
-        """Calculate the checker board score for the PAM.
-
-        Returns:
-            float: The checkerboard score for the PAM.
-        """
-        temp = 0.0
-        # Cache these so we don't recompute
-        omega_ = self.omega()  # Cache so we don't waste computations
-        num_species_ = self.num_species
-
-        for i in range(num_species_):
-            for j in range(i, num_species_):
-                num_shared = len(
-                    pandas.where(self._df.sum(self._df[:, [i, j]], axis=1) == 2)[0]
-                )
-                p_1 = omega_[i] - num_shared
-                p_2 = omega_[j] - num_shared
-                temp += p_1 * p_2
-        val = 2 * temp / (num_species_ * (num_species_ - 1))
-        return "checker_board_score", val
+    # # ...............................................
+    # def c_score(self):
+    #     """Calculate the checker board score for the PAM.
+    #
+    #     Returns:
+    #         float: The checkerboard score for the PAM.
+    #     """
+    #     temp = 0.0
+    #     # Cache these so we don't recompute
+    #     omega_ = self.omega()  # Cache so we don't waste computations
+    #     num_species_ = self.num_species
+    #
+    #     for i in range(num_species_):
+    #         for j in range(i, num_species_):
+    #             num_shared = len(
+    #                 pandas.where(self._df.sum(self._df[:, [i, j]], axis=1) == 2)[0]
+    #             )
+    #             p_1 = omega_[i] - num_shared
+    #             p_2 = omega_[j] - num_shared
+    #             temp += p_1 * p_2
+    #     val = 2 * temp / (num_species_ * (num_species_ - 1))
+    #     return "checker_board_score", val
 
     # ...............................................
     def calc_write_pam_measures(self, filename, overwrite=True):
@@ -525,10 +546,10 @@ class SiteMatrix(object):
         """
         stats = []
         stats.append(("gamma_diversity", self.num_species))
-        stats.append(self._df.whittaker())
-        stats.append(self._df.lande())
-        stats.append(self._df.legendre())
-        stats.append(self._df.c_score())
+        stats.append(self.whittaker())
+        stats.append(self.lande())
+        stats.append(self.legendre())
+        # stats.append(self.c_score())
         columns = [stat[0] for stat in stats]
         vals = [stat[1] for stat in stats]
 
