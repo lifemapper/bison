@@ -2,6 +2,7 @@
 import logging
 import csv
 import os
+import numpy
 import pandas
 from osgeo import ogr
 import sys
@@ -59,9 +60,11 @@ class SiteMatrix(object):
                     type(dataframe.index) is pandas.core.indexes.multi.MultiIndex and
                     len(dataframe.index.names) == 2
             ):
+                # output matrix may only contain species columns
                 self._log.log(
-                    "Site index expects a row MultiIndex with FID and location")
+                    "Site index does not contain a MultiIndex with FID and location")
             if type(dataframe.columns) is pandas.core.indexes.range.RangeIndex:
+                # output matrix may only contain site rows
                 self._log.log(
                     "Species columns contain a RangeIndex, not species names.",
                     refname=self.__class__.__name__, log_level=logging.WARNING)
@@ -424,6 +427,7 @@ class SiteMatrix(object):
         beta_series = None
         if self._df is not None:
             beta_series = float(self.num_species) / self._df.sum(axis=1)
+            beta_series.replace([numpy.inf, -numpy.inf], 0, inplace=True)
             beta_series.name = "beta_diversity"
         return beta_series
 

@@ -130,7 +130,7 @@ class LMBISON_PROCESS:
     AGGREGATE = {"step": 5, "postfix": "aggregate"}
     CHECK_COUNTS = {"step": 6, "postfix": "check_counts"}
     HEATMATRIX = {"step": 7, "postfix": "heatmatrix"}
-    PAM = {"step": 8, "postfix": "mtx"}
+    PAM = {"step": 8, "postfix": "pam"}
 
     @staticmethod
     def process_types():

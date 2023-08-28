@@ -18,13 +18,14 @@ usage ()
     # Commands that are substrings of other commands will match the superstring and
     # possibly print the wrong Usage string.
     config_required=(
-        "annotate_riis"
+        "resolve"
         "chunk_large_file"
-        "annotate_gbif"
-        "summarize_annotations"
-        "combine_summaries"
-        "count_summaries"
-        "aggregate_summary"
+        "annotate"
+        "summarize"
+        "aggregate"
+        "check_counts"
+        "heat_matrix"
+        "pam_stats"
     )
     echo ""
     echo "Usage: $0 <cmd> "
@@ -255,13 +256,14 @@ COMMANDS=(
 "build_all"  "cleanup"  "cleanup_all"
 "list_commands" "list_outputs"  "list_volumes"
 # Need configuration file parameter
-"annotate_riis",
-"chunk_large_file",
-"annotate_gbif",
-"summarize_annotations"
-"combine_summaries",
-"count_summaries",
-"aggregate_summary",
+"resolve"
+"chunk_large_file"
+"annotate"
+"summarize"
+"aggregate"
+"check_counts"
+"heat_matrix"
+"pam_stats"
 )
 
 
