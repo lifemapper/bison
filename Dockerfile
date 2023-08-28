@@ -24,12 +24,10 @@ RUN cd git &&  \
     && pip install .
 
 # specify-lmpy latest from Github
-RUN cd /git &&  \
-    git clone https://github.com/specifysystems/lmpy.git &&  \
-    cd lmpy \
-    && pip install .
-# specify-lmpy from pypi
-#RUN pip install specify-lmpy
+#RUN cd /git &&  \
+#    git clone https://github.com/specifysystems/lmpy.git &&  \
+#    cd lmpy \
+#    && pip install .
 
 ENV MAXENT_VERSION=3.4.4
 ENV MAXENT_JAR=/git/Maxent/ArchivedReleases/$MAXENT_VERSION/maxent.jar

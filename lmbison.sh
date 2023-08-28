@@ -149,7 +149,7 @@ start_container() {
 execute_process() {
     start_container
     # Command to execute in container; tools installed as executables in /usr/local/bin
-    command="${CMD} --config_file=${CONTAINER_CONFIG_FILE}"
+#    command="python3 ${command_path}/process_gbif.py ${CMD} --config_file=${CONTAINER_CONFIG_FILE}"
 #    # or run python command from downloaded repo
 #    command="python3 ${command_path}/${CMD}.py --config_file=${CONTAINER_CONFIG_FILE}"
     echo " - Execute '${command}' on container $CONTAINER_NAME" | tee -a "$LOG"
@@ -270,7 +270,7 @@ COMMANDS=(
 CMD=$1
 HOST_CONFIG_FILE=$2
 arg_count=$#
-command_path=/git/bison/bison/tools
+command_path=/git/bison/
 
 set_defaults
 time_stamp "# Start"
