@@ -6,7 +6,6 @@ RUN apt-get update
 RUN apt-get install -y git
 RUN apt-get install -y vim
 RUN apt-get install -y python3-numpy
-#RUN apt-get install -y python3-pandas
 RUN apt-get install -y python3-requests
 RUN apt-get install -y python3-rtree
 RUN apt-get install -y python3-pip
@@ -39,7 +38,7 @@ ENV MAXENT_JAR=/git/Maxent/ArchivedReleases/$MAXENT_VERSION/maxent.jar
 # .....................................................................................
 
 # .....................................................................................
-# Populate volumes with small input data
+# Populate volumes with small, static input data
 COPY ./data/input     /volumes/bison/input
 COPY ./data/config    /volumes/bison/config
 # For large input data, the user must identify a large disk on the host machine to

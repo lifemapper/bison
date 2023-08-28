@@ -670,34 +670,27 @@ def _prepare_args(config):
     else:
         raw_filenames = [infile]
 
-    annotated_riis_filename = BisonNameOp.get_annotated_riis_filename(
-        config["riis_filename"])
+    # annotated_filenames = [
+    #     BisonNameOp.get_process_outfilename(
+    #         csvfile, outpath=config["process_path"],
+    #         step_or_process=LMBISON_PROCESS.ANNOTATE)
+    #     for csvfile in raw_filenames]
+    #
+    # summary_filenames = [
+    #     BisonNameOp.get_process_outfilename(
+    #         csvfile, outpath=config["process_path"],
+    #         step_or_process=LMBISON_PROCESS.SUMMARIZE)
+    #     for csvfile in raw_filenames]
+    #
+    # full_summary_filename = BisonNameOp.get_process_outfilename(
+    #     infile, outpath=config["process_path"],
+    #     step_or_process=LMBISON_PROCESS.SUMMARIZE)
+    #
+    # heatmatrix_filename = BisonNameOp.get_process_outfilename(
+    #         infile, outpath=config["process_path"],
+    #         step_or_process=LMBISON_PROCESS.HEATMATRIX)
 
-    annotated_filenames = [
-        BisonNameOp.get_process_outfilename(
-            csvfile, outpath=config["process_path"],
-            step_or_process=LMBISON_PROCESS.ANNOTATE)
-        for csvfile in raw_filenames]
-
-    summary_filenames = [
-        BisonNameOp.get_process_outfilename(
-            csvfile, outpath=config["process_path"],
-            step_or_process=LMBISON_PROCESS.SUMMARIZE)
-        for csvfile in raw_filenames]
-
-    full_summary_filename = BisonNameOp.get_process_outfilename(
-        infile, outpath=config["process_path"],
-        step_or_process=LMBISON_PROCESS.SUMMARIZE)
-
-    heatmatrix_filename = BisonNameOp.get_process_outfilename(
-            infile, outpath=config["process_path"],
-            step_or_process=LMBISON_PROCESS.HEATMATRIX)
-
-    return (
-        annotated_riis_filename, out_path,
-        raw_filenames, annotated_filenames, summary_filenames,
-        full_summary_filename, heatmatrix_filename
-    )
+    return (infile, raw_filenames, out_path)
 
 
 # .............................................................................
@@ -716,9 +709,26 @@ def execute_command(config, logger):
     """
     report = {}
     step_or_process = None
-    (annotated_riis_filename, out_path,
-        raw_filenames, annotated_filenames, summary_filenames,
-        full_summary_filename, heatmatrix_filename) = _prepare_args(config)
+    (infile, raw_filenames, out_path) = _prepare_args(config)
+
+    annotated_riis_filename = BisonNameOp.get_annotated_riis_filename(
+        config["riis_filename"])
+    annotated_filenames = [
+        BisonNameOp.get_process_outfilename(
+            csvfile, outpath=config["process_path"],
+            step_or_process=LMBISON_PROCESS.ANNOTATE)
+        for csvfile in raw_filenames]
+    summary_filenames = [
+        BisonNameOp.get_process_outfilename(
+            csvfile, outpath=config["process_path"],
+            step_or_process=LMBISON_PROCESS.SUMMARIZE)
+        for csvfile in raw_filenames]
+    full_summary_filename = BisonNameOp.get_process_outfilename(
+        config["gbif_filename"], outpath=config["process_path"],
+        step_or_process=LMBISON_PROCESS.SUMMARIZE)
+    heatmatrix_filename = BisonNameOp.get_process_outfilename(
+            infile, outpath=config["process_path"],
+            step_or_process=LMBISON_PROCESS.HEATMATRIX)
 
     # Make sure input files exist
     for csv_fname in raw_filenames:
@@ -740,12 +750,9 @@ def execute_command(config, logger):
             raw_filenames, annotated_riis_filename, config["geo_path"],
             config["process_path"], logger, run_parallel=True, overwrite=True)
 
-        # log_list(
-        #     logger, "Newly annotated filenames:",
-        #     [rpt[REPORT.OUTFILE] for rpt in report["reports"]])
-
     elif config["command"] == "summarize":
         step_or_process = LMBISON_PROCESS.SUMMARIZE
+
         # Summarize each annotated file by region, write summary to a file
         report = c_summarize_combine_annotated_files(
             annotated_filenames, full_summary_filename, config["output_path"], logger,
