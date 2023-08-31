@@ -2,8 +2,8 @@
 Lifemapper-BISON processing
 ===============
 
-Every unique step in the process has a command line interface (CLI) that accepts a
-configuration file of arguments.  These tools are in the bison/tools directory.
+Processing consists of 6 unique steps, each initiated with the process_gbif.py script
+and 2 arguments: command and a parameter file.
 
 Step 1: Annotate RIIS with GBIF Taxa
 __________________

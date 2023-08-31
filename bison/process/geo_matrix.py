@@ -423,10 +423,14 @@ class SiteMatrix(object):
 
         Returns:
             beta_series (pandas.Series): ratio of gamma to alpha for each site.
+
+        TODO: revisit this definition, also consider beta diversity region compared
+            to region
         """
         beta_series = None
         if self._df is not None:
             beta_series = float(self.num_species) / self._df.sum(axis=1)
+            # beta_series = float(self.num_species) / self.omega_proportional()
             beta_series.replace([numpy.inf, -numpy.inf], 0, inplace=True)
             beta_series.name = "beta_diversity"
         return beta_series
@@ -457,6 +461,39 @@ class SiteMatrix(object):
             omega_pr_series = self._df.sum(axis=0) / float(self.num_sites)
         omega_pr_series.name = "omega_proportional"
         return omega_pr_series
+
+    # .............................................................................
+    def psi(self):
+        """Calculate the range richness of each species.
+
+        Returns:
+            psi_df (pandas.DataFrame): A 2d matrix of range richness for the sites that
+                each species is present in.
+
+        TODO: revisit this
+        """
+        psi_df = None
+        if self._df is not None:
+            psi_df = self._df.sum(axis=1).dot(self._df)
+        return psi_df
+
+    # .............................................................................
+    def psi_average_proportional(self):
+        """Calculate the mean proportional species diversity.
+
+        Returns:
+            psi_avg_df (pandas.DataFrame): A 2d matrix of proportional range richness
+                for the sites that each species in the PAM is present.
+
+        TODO: revisit this
+        """
+        psi_avg_df = None
+        if self._df is not None:
+            psi_avg_df = (
+                    self.alpha().dot(self._df).astype(float)
+                    / (self.num_species * self.omega())
+            )
+        return psi_avg_df
 
     # # ...............................................
     # def schluter_species_variance_ratio(self):

@@ -1,4 +1,6 @@
 ::
+:: Obsolete.  Docker implementation is inadequate for geospatial intersection of
+:: large datasets.
 :: This script calls docker commands to create an image, volumes, start a container from
 :: the image, execute commands in that container, then copy outputs to the local
 :: filesystem.

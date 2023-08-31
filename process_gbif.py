@@ -398,6 +398,10 @@ def f_calculate_pam_stats(heatmatrix_filename, output_path, min_val, logger):
         heatmatrix_filename, outpath=output_path, postfix="sites")
     species_diversity_filename = BisonNameOp.get_process_outfilename(
         heatmatrix_filename, outpath=output_path, postfix="species")
+    psi_filename = BisonNameOp.get_process_outfilename(
+        heatmatrix_filename, outpath=output_path, postfix="psi")
+    psi_avg_proportional_filename = BisonNameOp.get_process_outfilename(
+        heatmatrix_filename, outpath=output_path, postfix="psi_avg_proportional")
     stats_filename = BisonNameOp.get_process_outfilename(
         heatmatrix_filename, outpath=output_path, postfix="stats")
     report = {
@@ -445,6 +449,19 @@ def f_calculate_pam_stats(heatmatrix_filename, output_path, min_val, logger):
     omega_mtx.write_matrix(species_diversity_filename)
     logger.log(
         f"Wrote species statistics to {species_diversity_filename}.",
+        refname=script_name)
+
+    # .....................................
+    # Range richness by species and site
+    # .....................................
+    # mean proportional species diversity by county
+    psi_mtx = pam.psi()
+    psi_mtx.write_matrix(psi_filename)
+    # Range richness of each species in each county
+    psi_average_proportional_mtx = pam.psi_average_proportional()
+    psi_average_proportional_mtx.write_matrix(psi_avg_proportional_filename)
+    logger.log(
+        f"Wrote psi statistics to {psi_filename} and {psi_avg_proportional_filename}.",
         refname=script_name)
 
     # .....................................
@@ -736,7 +753,10 @@ def execute_command(config, logger):
             raise FileNotFoundError(f"Expected file {csv_fname} does not exist")
     # log_list(logger, "Input filenames:", raw_filenames)
 
-    if config["command"] == "resolve":
+    if config["command"] == "chunk":
+        _, report = Chunker.chunk_files(infile, out_path, logger)
+
+    elif config["command"] == "resolve":
         step_or_process = LMBISON_PROCESS.RESOLVE
         report = a_resolve_riis_taxa(
             config["riis_filename"], logger, overwrite=False)

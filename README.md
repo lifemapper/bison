@@ -2,42 +2,40 @@
 
 # 2023 Data processing
 
-## Data Inputs
+## GBIF Input
 
-### GBIF
 
 * Download GBIF data, query
   https://www.gbif.org/occurrence/search?country=US&has_coordinate=true&has_geospatial_issue=false&occurrence_status=present
 * Download option Darwin Core Archive (The taxonKey and scientific name in Simple CSV
   option is not always the accepted version).
-* Initial test data
-  GBIF.org (26 January 2023) GBIF Occurrence Download https://doi.org/10.15468/dl.epwzn6
-  Download Information
-  DOI: https://doi.org/10.15468/dl.epwzn6
-  Creation Date: 15:04:20 26 January 2023
-  Records included: 24309003 records from 1433 published datasets
-  Compressed data size: 12.3 GB
-  Download format: DWCA
-  Filter used:
-  {
-    "and" : [
-      "BasisOfRecord is Specimen",
-      "Continent is North America",
-      "Country is United States of America",
-      "HasCoordinate is true",
-      "HasGeospatialIssue is false",
-      "OccurrenceStatus is Present"
-    ]
-  }
+  * Final dataset for processing
+    DOI: https://doi.org/10.15468/dl.vg6gg4 (may take some hours before being active)
+    Creation Date: 15:01:13 23 August 2023
+    Records included: 904377770 records from 3757 published datasets
+    Compressed data size: 311.9 GB
+    Download format: DWCA
+    Filter used:
+      GBIF.org (23 August 2023) GBIF Occurrence Download https://doi.org/10.15468/dl.epwzn6
+    {
+      "and" : [
+        "Country is United States of America",
+        "HasCoordinate is true",
+        "HasGeospatialIssue is false",
+        "OccurrenceStatus is Present"
+      ]
+    }
 
 
-### USGS RIIS
+## USGS RIIS Input
 
 * Year 4 data: United States Register of Introduced and Invasive Species (US-RIIS)
   https://doi.org/10.5066/P95XL09Q
 * Year 5 data: TBA
 
-### Census data for determining point county/state
+## Geospatial input for region aggregation
+
+### Census data for county/state
 
 * US Census 2021 cartographic boundaries from
 https://www.census.gov/geographies/mapping-files/time-series/geo/cartographic-boundary.2021.html#list-tab-B7KHMTDJCFECH4SSL2
@@ -53,7 +51,24 @@ Occasionally a point would intersect with a county envelope (created for a spati
 index) but not be contained within the returned geometry.  In that case, I returned the
 values from the geometry nearest to the point.
 
-### Census data for determining point county/state
+### US Protected Areas (US-PAD)
+
+We annotate points with US-PAD regions for aggregation by species and
+RIIS status.  US Protected Areas are split into files by Department of Interior regions,
+so to efficiently
+intersect points with US-PAD, we intersect for the correct DOI region with
+DOI_12_Unified_Regions, then intersect with the US-PAD file for that DOI region.
+
+Data:
+  * https://www.doi.gov/employees/reorg/unified-regional-boundaries
+  * https://www.usgs.gov/programs/gap-analysis-project/science/pad-us-data-download
+
+### American Indian/Alaska Native/Native Hawaiian Lands (AIANNH)
+
+We annotate points with AIANNH regions for aggregation by species and RIIS status.
+
+Data:
+  * https://catalog.data.gov/dataset/tiger-line-shapefile-2019-nation-u-s-current-american-indian-alaska-native-native-hawaiian-area
 
 # Project setup
 
@@ -248,7 +263,7 @@ head -n 10001 occurrence.txt > gbif_2023-01-26_10k.csv
 Chunk the large GBIF occurrence data file into smaller subsets:
 
 ```commandline
-./lmbison.sh chunk_large_file data/config/chunk_large_file.json
+python process_gbif.py chunk data/config/process_gbif.json
 ```
 
 ## Annotate RIIS with GBIF Taxa
@@ -257,7 +272,7 @@ Annotate USGS RIIS records with GBIF Accepted Taxa, in order to link GBIF occurr
    records with RIIS records using taxon and location.
 
 ```commandline
-./lmbison.sh annotate_riis data/config/annotate_riis.json
+python process_gbif.py resolve data/config/process_gbif.json
 ```
 
 ## Annotate GBIF with RIIS and locations
@@ -268,7 +283,7 @@ Annotate GBIF occurrence records (each subset file) with:
    * RIIS determinations using state and taxon contained in both GBIF and RIIS records
 
 ```commandline
-./lmbison.sh annotate_gbif data/config/annotate_gbif.json
+python process_gbif.py annotate data/config/process_gbif.json
 ```
 
 ## Summarize annotations
@@ -281,44 +296,40 @@ Summarize annotated GBIF occurrence records (each subset file), by:
    * scientific name, species name (for convenience in final aggregation outputs)
    * count
 
-```commandline
-./lmbison.sh summarize_annotations data/config/summarize_annotations.json
-```
-
-## Combine summaries
-
-Summarize summaries (each subset file) into a single summary:
+Then summarize the summaries into a single file, and aggregate summary into files of
+species and counts for each region:
 
 ```commandline
-./lmbison.sh combine_summaries data/config/combine_summaries.json
+python process_gbif.py summarize data/config/process_gbif.json
 ```
 
-## Aggregate summary
+## Create a heat matrix
 
-Aggregate summary into files of species and counts for each region:
+Create a 2d matrix of counties (rows) by species (columns) with a count for each species
+found at that location.
 
 ```commandline
-./lmbison.sh aggregate_summary data/config/aggregate_summary.json
+python process_gbif.py heat_matrix data/config/process_gbif.json
 ```
 
-## Split annotated records by taxon
+## Create a Presence-Absence Matrix (PAM) for counties x species, then compute statistics
 
-Split the annotated records into CSV files for each species.  Annotation identifies (and
-flags and reports) records with rank higher than species, so tested the number of
-records and unique taxa when grouping by `acceptedScientificName` and `species`.
-Grouping by species filters out the same number of records filtered in the annotation
-step, and simplifies the file/species name.
+Convert the heat matrix into a binary PAM, and compute diversity statistics: overall
+diversity of the entire region (gamma), county diversities (alpha) and county
+diversities (alpha) and total diversity to county diversities (beta).  In addition,
+compute species statistics: range size (omega) and mean proportional range size
+(omega_proportional).
 
 ```commandline
-./lmbison.sh split_annotated_gbif data/config/split_annotated_gbif.json
+python process_gbif.py pam_stats data/config/process_gbif.json
 ```
 
+## Compute heatmatrix, PAM, stats
 
-# species: 10784 lines, 2127 headers/files = 8657 records (will leave out rank > species)
-# acceptedKey: 12290 lines, 2300 header/file = 9990 records
-# 9990 - 8657 = 1343 dropped, annotate_gbif.rpt totals the same
-
-
+Stats references for alpha, beta, gamma diversity:
+* https://www.frontiersin.org/articles/10.3389/fpls.2022.839407/full
+* https://specifydev.slack.com/archives/DQSAVMMHN/p1693260539704259
+* https://bio.libretexts.org/Bookshelves/Ecology/Biodiversity_(Bynum)/7%3A_Alpha_Beta_and_Gamma_Diversity
 
 # Documentation
 

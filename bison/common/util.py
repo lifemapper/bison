@@ -562,7 +562,7 @@ class Chunker():
         # in_base_filename, ext = os.path.splitext(big_csv_filename)
         if big_csv_filename.endswith(GBIF.INPUT_DATA):
             # shortcut
-            rec_count = GBIF.INPUT_RECORD_COUNT
+            rec_count = GBIF.INPUT_LINE_COUNT - 1
         else:
             rec_count = count_lines(big_csv_filename) - 1
         chunk_size = math.ceil(rec_count / chunk_count)
@@ -728,7 +728,7 @@ class Chunker():
             "chunk_size": chunk_size
         }
 
-        return chunk_filenames, report
+        return report
 
 
 # .............................................................................

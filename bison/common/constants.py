@@ -586,9 +586,9 @@ class ITIS:
 # .............................................................................
 class GBIF:
     """Constants for GBIF DWCA fields, APIs, and their request and response objects."""
-    INPUT_DATA = "gbif_2023-01-26.csv"
-    # 730772042 lines, 1st is header + 730772041 records
-    INPUT_RECORD_COUNT = 730772042
+    INPUT_DATA = "gbif_2023-08-23.csv"
+    INPUT_LINE_COUNT = 904441801        # from wc -l
+    # REPORTED_RECORD_COUNT = 904377770   # in GBIF metadata
     URL = "http://api.gbif.org/v1"
     UUID_KEY = "key"
     ID_FLD = "gbifID"
