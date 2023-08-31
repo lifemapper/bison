@@ -158,10 +158,6 @@ def a_resolve_riis_taxa(riis_filename, logger, overwrite=False):
             step_or_process=LMBISON_PROCESS.RESOLVE)
         report[REPORT.REPORTFILE] = report_filename
 
-        if report[REPORT.SUMMARY][REPORT.RECORDS_OUTPUT] != RIIS_DATA.SPECIES_GEO_DATA_COUNT:
-            logger.log(
-                f"Wrote {report[REPORT.SUMMARY][REPORT.RECORDS_OUTPUT]} RIIS records, "
-                f"expecting {RIIS_DATA.SPECIES_GEO_DATA_COUNT}", refname=script_name)
     return report
 
 

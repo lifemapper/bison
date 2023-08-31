@@ -775,9 +775,7 @@ def resolve_riis_taxa(riis_filename, logger, overwrite=True):
     """
     refname = "resolve_riis_taxa"
     report = {
-        refname: {
-            "expected_count": RIIS_DATA.SPECIES_GEO_DATA_COUNT
-        }
+        refname: {}
     }
     riis = RIIS(riis_filename, logger)
     # Update species data
@@ -806,10 +804,6 @@ def resolve_riis_taxa(riis_filename, logger, overwrite=True):
     logger.log(
         f"by_taxon {len(riis.by_taxon)} ?= {name_count} names resolved.",
         refname=refname, log_level=DEBUG)
-
-    logger.log(
-        f"output recs {out_rec_count} ?= {RIIS_DATA.SPECIES_GEO_DATA_COUNT} expected.",
-        refname=refname, log_level=ERROR)
 
     return report
 

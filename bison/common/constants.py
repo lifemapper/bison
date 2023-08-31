@@ -767,8 +767,6 @@ class RIIS_DATA:
     ]
     # Introduced or Invasive Species List.
     SPECIES_GEO_FNAME = "US-RIIS_MasterList.csv"
-    SPECIES_GEO_TEST_FNAME = "US-RIIS_MasterList_100.csv"
-    SPECIES_GEO_DATA_COUNT = 15264
     SPECIES_GEO_KEY = "occurrenceID"
     GBIF_KEY = "GBIF taxonKey"
     ITIS_KEY = "ITIS TSN"
@@ -807,85 +805,3 @@ class RIIS_DATA:
         "occurrenceRemarks",
         "occurrenceID",
     ]
-
-
-# # .............................................................................
-# class RIIS:
-#     """Constants for the US Register of Introduced and Invasive Species, RIIS."""
-#     DATA_DIR = "data"
-#     DATA_EXT = "csv"
-#     DELIMITER = ","
-#     QUOTECHAR = '"'
-#     # Metadata about fields
-#     DATA_DICT_FNAME = "US_RIIS_DataDictionary"
-#
-#
-# # .............................................................................
-# class RIIS_AUTHORITY:
-#     """Authority References Metadata."""
-#     FNAME = "US-RIIS_AuthorityReferences"
-#     KEY = "Authority"
-#     DATA_COUNT = 5951
-#     HEADER = [
-#         "Authority",
-#         "associatedReferences",
-#         "Source Type",
-#         "Source",
-#         "Version",
-#         "Reference Author",
-#         "Title",
-#         "Publication Name",
-#         "Listed Publication Date",
-#         "Publisher",
-#         "Publication Place",
-#         "ISBN",
-#         "ISSN",
-#         "Pages",
-#         "Publication Remarks",
-#     ]
-#
-#
-# # .............................................................................
-# class RIIS_SPECIES:
-#     """Introduced or Invasive Species List."""
-#     FNAME = "US-RIIS_MasterList.csv"
-#     TEST_FNAME = "US-RIIS_MasterList_100.csv"
-#     DATA_COUNT = 15264
-#     KEY = "occurrenceID"
-#     GBIF_KEY = "GBIF taxonKey"
-#     ITIS_KEY = "ITIS TSN"
-#     LOCALITY_FLD = "locality"
-#     KINGDOM_FLD = "kingdom"
-#     SCINAME_FLD = "scientificName"
-#     SCIAUTHOR_FLD = "scientificNameAuthorship"
-#     RANK_FLD = "taxonRank"
-#     ASSESSMENT_FLD = "Introduced or Invasive"
-#     TAXON_AUTHORITY_FLD = "taxonomicStatus"
-#     HEADER = [
-#         "locality",
-#         "scientificName",
-#         "scientificNameAuthorship",
-#         "vernacularName",
-#         "taxonRank",
-#         "Introduced or Invasive",
-#         "Biocontrol",
-#         "associatedTaxa",
-#         "Approximate Introduction Date",
-#         "IntroDateNumber",
-#         "Other Names",
-#         "kingdom",
-#         "phylum",
-#         "class",
-#         "order",
-#         "family",
-#         "taxonomicStatus",
-#         "ITIS TSN",
-#         "GBIF taxonKey",
-#         "Authority",
-#         "associatedReferences",
-#         "Acquisition Date",
-#         "modified",
-#         "Update Remarks",
-#         "occurrenceRemarks",
-#         "occurrenceID",
-#     ]

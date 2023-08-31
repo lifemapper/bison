@@ -1,5 +1,5 @@
 ==================
-Year 5, 2022-2023
+Year 4, 2022-2023
 ==================
 
 Test dataset, about  24 million records:
@@ -12,6 +12,7 @@ Proposal specifies:
   * US Census state and county boundaries
   * American Indian and Alaskan Native Land Area Representations (AIAN‐LAR)
   * US Federal Protected Areas (US‐PAD)
+  * Summarize regions by species name/RIIS/count
 
 Data found:
   * Census, Cartographic Boundary Files, 2021
@@ -19,7 +20,7 @@ Data found:
       Cartographic Boundary Files by Geography
         * **American Indian/Alaska Native Areas/Hawaiian Home Lands**, 1:500,000,
           cb_2021_us_aiannh_500k.zip
-        * **Counties**, 1:500,000, cb_2021_us_aiannh_500k.zip
+        * **Counties**, 1:500,000, cb_2021_us_county_500k.zip
           * Other  county options:
             * from year 4, have 2020 county boundaries
             * from ArcHub
