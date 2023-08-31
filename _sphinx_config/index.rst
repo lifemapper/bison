@@ -11,6 +11,7 @@ with information regarding geographic location and USGS RIIS status of the recor
     pages/about
     pages/installation
     pages/quickstart
+    pages/data_process
 
 * :ref:`genindex`
 * :ref:`modindex`

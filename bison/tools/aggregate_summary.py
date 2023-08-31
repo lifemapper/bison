@@ -25,18 +25,6 @@ PARAMETERS = {
                     CONFIG_PARAM.IS_OUPUT_DIR: True,
                     CONFIG_PARAM.HELP: "Destination directory for output data."
                 }
-        },
-    "optional":
-        {
-            "log_filename":
-                {
-                    CONFIG_PARAM.TYPE: str,
-                    CONFIG_PARAM.HELP: "Filename to write logging data."},
-            "report_filename":
-                {
-                    CONFIG_PARAM.TYPE: str,
-                    CONFIG_PARAM.HELP: "Filename to write summary metadata."}
-
         }
 }
 
@@ -50,28 +38,25 @@ def cli():
         IOError: on failure to write to report_filename.
     """
     script_name = os.path.splitext(os.path.basename(__file__))[0]
-    config, logger, report_filename = get_common_arguments(
+    config, logger = get_common_arguments(
         script_name, DESCRIPTION, PARAMETERS)
 
     logger.log(f"Start Time : {datetime.now()}", refname=script_name)
     agg = Aggregator(logger)
-    report = agg.aggregate_summary_for_regions(
+    report = agg.aggregate_summary_for_regions_assessments(
         config["combined_summary_filename"], config["riis_with_gbif_taxa_filename"],
         config["output_path"])
     logger.log(f"End Time : {datetime.now()}", refname=script_name)
 
-    # If the output report was requested, write it
-    report_filename = config["report_filename"]
-    if report_filename is not None:
-        try:
-            with open(report_filename, mode='wt') as out_file:
-                json.dump(report, out_file, indent=4)
-        except OSError:
-            raise
-        except IOError:
-            raise
-        logger.log(
-            f"Wrote report file to {report_filename}", refname=script_name)
+    try:
+        with open(config["report_filename"], mode='wt') as out_file:
+            json.dump(report, out_file, indent=4)
+    except OSError:
+        raise
+    except IOError:
+        raise
+    logger.log(
+        f"Wrote report file to {config['report_filename']}", refname=script_name)
 
 
 # .....................................................................................

@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools", "wheel"]  # PEP 508 specifications.
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lifemapper-bison"
+version = "0.4.0"
+description = "Aggregate and analyze Darwin Core occurrence data with USGS RIIS data."
+readme = "README.md"
+authors = [{ name = "Specify Collection Consortium", email = "aimee.stewart@ku.edu" }]
+license = { file = "LICENSE" }
+classifiers = [
+    "License :: GNU GPL :: 3",
+    "Programming Language :: Python :: 3",
+]
+keywords = ["Darwin Core", "USGS", "multi-species analysis", "introduced", "invasive"]
+dependencies = [
+    "gdal >= 3.0.0",
+    "requests",
+    "rtree >= 0.9.7",
+]
+requires-python = ">=3.8"
+
+[project.optional-dependencies]
+dev = [
+    "black", "flake8", "isort", "pylint", "pydocstyle", "darglint", "pyupgrade",
+    "forbid-tabs", "setup-cfg-fmt", "pytest", "pip-tools"
+]
+
+[tool.vulture]
+#exclude = ["_version.py"]
+paths = ["bison", "tests"]
+ignore_names = ["__module__", "__new__"]
+# make_whitelist = true
+min_confidence = 80
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    "ignore::RuntimeWarning",
+    "ignore::DeprecationWarning",
+    # note the use of single quote below to denote "raw" strings in TOML
+    'ignore:Mean of empty slice:RuntimeWarning',
+    'ignore:the imp module is deprecated in favour of importlib:DeprecationWarning'
+]

@@ -18,18 +18,6 @@ PARAMETERS = {
                     CONFIG_PARAM.IS_INPUT_FILE: True,
                     CONFIG_PARAM.HELP: "CSV file summarizing all annotation summaries."
                 },
-        },
-    "optional":
-        {
-            "log_filename":
-                {
-                    CONFIG_PARAM.TYPE: str,
-                    CONFIG_PARAM.HELP: "Filename to write logging data."},
-            "report_filename":
-                {
-                    CONFIG_PARAM.TYPE: str,
-                    CONFIG_PARAM.HELP: "Filename to write summary metadata."}
-
         }
 }
 
@@ -43,24 +31,21 @@ def cli():
         IOError: on failure to write to report_filename.
     """
     script_name = os.path.splitext(os.path.basename(__file__))[0]
-    config, logger, report_filename = get_common_arguments(
+    config, logger = get_common_arguments(
         script_name, DESCRIPTION, PARAMETERS)
 
     report = Counter.compare_location_species_counts(
         config["summary_filenames"], config["combined_summary_filename"], logger)
 
-    # If the output report was requested, write it
-    report_filename = config["report_filename"]
-    if report_filename is not None:
-        try:
-            with open(report_filename, mode='wt') as out_file:
-                json.dump(report, out_file, indent=4)
-        except OSError:
-            raise
-        except IOError:
-            raise
-        logger.log(
-            f"Wrote report file to {report_filename}", refname=script_name)
+    try:
+        with open(config["report_filename"], mode='wt') as out_file:
+            json.dump(report, out_file, indent=4)
+    except OSError:
+        raise
+    except IOError:
+        raise
+    logger.log(
+        f"Wrote report file to {config['report_filename']}", refname=script_name)
 
 
 # .....................................................................................

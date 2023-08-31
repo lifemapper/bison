@@ -66,7 +66,8 @@ class Counter():
         """
         # Count each record for every assessment from annotated occurrences file.
         # Filtered records are retained, but have assessment = ""
-        assessments = {LMBISON.SUMMARY_FILTER_HEADING: 0}
+        # assessments = {LMBISON.SUMMARY_FILTER_HEADING: 0}
+        assessments = {}
         for val in LMBISON.assess_values():
             assessments[val] = 0
 
@@ -78,10 +79,10 @@ class Counter():
             rec = dwcdata.get_record()
             while rec is not None:
                 ass = rec[APPEND_TO_DWC.RIIS_ASSESSMENT]
-                if not ass:
-                    assessments[LMBISON.SUMMARY_FILTER_HEADING] += 1
-                else:
-                    assessments[ass] += 1
+                # if not ass:
+                #     assessments[LMBISON.SUMMARY_FILTER_HEADING] += 1
+                # else:
+                assessments[ass] += 1
                 rec = dwcdata.get_record()
         except Exception as e:
             raise Exception(f"Unknown exception {e} on file {annotated_occ_filename}")
@@ -92,13 +93,32 @@ class Counter():
 
     # .............................................................................
     @classmethod
-    def compare_location_species_counts(
-            cls, summary_filenames, combined_summary_filename, logger):
-        """Count records for each of the valid assessments in a file.
+    def compare_assessment_counts(
+            cls, subset_summary_filenames, combined_summary_filename, logger):
+        """Compare record counts in subset summaries to counts in the combined summary.
 
         Args:
-            summary_filenames (list): full filename of summary files to compare with
-                combined summary file.
+            subset_summary_filenames (list): full filename of summary files of
+                individual subsets to compare with combined summary file.
+            combined_summary_filename (str): full filename of combined summaries.
+            logger (object): logger for saving relevant processing messages
+
+        Returns:
+            report (dict): dictionary with summaries of count comparisons and lists of
+                .error types.
+        """
+        report = {}
+        return report
+
+    # .............................................................................
+    @classmethod
+    def compare_location_species_counts(
+            cls, subset_summary_filenames, combined_summary_filename, logger):
+        """Compare record counts in subset summaries to counts in the combined summary.
+
+        Args:
+            subset_summary_filenames (list): full filename of summary files of
+                individual subsets to compare with combined summary file.
             combined_summary_filename (str): full filename of combined summaries.
             logger (object): logger for saving relevant processing messages
 
@@ -115,7 +135,7 @@ class Counter():
         for prefix in REGION.summary_fields().keys():
             sum_locations[prefix] = {}
 
-        for sum_fname in summary_filenames:
+        for sum_fname in subset_summary_filenames:
             sum_locations, sum_species_keys = cls.count_locations_species(
                 sum_fname, locations=sum_locations, species_keys=sum_species_keys)
 
@@ -134,10 +154,10 @@ class Counter():
             if sum_location_num == cmb_location_num:
                 counts["unique locations"] = sum_location_num
             else:
-                msg = (
-                    f"{prefix}: {sum_location_num} <> {cmb_location_num}")
+                msg = (f"{prefix}: {sum_location_num} <> {cmb_location_num}")
                 logger.log(
-                    f"{unique_loc_key}: {msg}", refname=cls.__name__, log_level=logging.ERROR)
+                    f"{unique_loc_key}: {msg}", refname=cls.__name__,
+                    log_level=logging.ERROR)
                 unique_loc_count_errs.append(msg)
                 inconsistencies[unique_loc_key] = unique_loc_count_errs
 

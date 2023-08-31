@@ -1,4 +1,6 @@
 # Python3.8
+numpy
+pandas
 requests
 # gdal (must be in system python, fails in virtenv)
 rtree

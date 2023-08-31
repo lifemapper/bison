@@ -89,14 +89,48 @@ US_STATES = {
 
 
 # .............................................................................
-class DWC_PROCESS:
+class REPORT:
+    """Common keys for process report dictionary."""
+    PROCESS = "process"
+    RIIS_IDENTIFIER = "riis_ids"
+    RIIS_TAXA = "riis_taxa"
+    RIIS_RESOLVE_FAIL = "riis_bad_species"
+    TAXA_RESOLVED = "names_resolved"
+    RECORDS_UPDATED = "records_updated"
+    RECORDS_OUTPUT = "records_output"
+    INFILE = "input_filename"
+    OUTFILE = "output_filename"
+    LOGFILE = "log_filename"
+    REPORTFILE = "report_filename"
+    SUMMARY = "summary"
+    REGION = "region"
+    MIN_VAL = "min_val_for_presence"
+    MAX_VAL = "min_val_for_presence"
+    LOCATION = "locations"
+    AGGREGATION = "riis_assessments_by_location"
+    SPECIES = "species"
+    OCCURRENCE = "occurrences"
+    HEATMATRIX = "heatmatrix"
+    ROWS = "rows"
+    COLUMNS = "columns"
+    ANNOTATE_FAIL = "annotate_gbifid_failed"
+    ANNOTATE_FAIL_COUNT = "records_failed_annotate"
+    RANK_FAIL = "rank_failed"
+    RANK_FAIL_COUNT = "records_failed_rank"
+
+
+# .............................................................................
+class LMBISON_PROCESS:
     """Process steps and associated filename postfixes indicating completion."""
-    CHUNK = {"step": 0, "postfix": "raw", "prefix": "chunk"}
-    ANNOTATE = {"step": 1, "postfix": "georiis"}
-    SUMMARIZE = {"step": 2, "postfix": "summary"}
-    COMBINE = {"step": 3, "postfix": "combine"}
-    AGGREGATE = {"step": 4, "postfix": "aggregate"}
-    SEP = "_"
+    RESOLVE = {"step": 0, "postfix": "resolve"}
+    CHUNK = {"step": 1, "postfix": "raw", "prefix": "chunk"}
+    ANNOTATE = {"step": 2, "postfix": "annotate"}
+    SUMMARIZE = {"step": 3, "postfix": "summary"}
+    COMBINE = {"step": 4, "postfix": "combine"}
+    AGGREGATE = {"step": 5, "postfix": "aggregate"}
+    CHECK_COUNTS = {"step": 6, "postfix": "check_counts"}
+    HEATMATRIX = {"step": 7, "postfix": "heatmatrix"}
+    PAM = {"step": 8, "postfix": "pam"}
 
     @staticmethod
     def process_types():
@@ -106,9 +140,26 @@ class DWC_PROCESS:
             List of all DWC_Process types.
         """
         return (
-            DWC_PROCESS.CHUNK, DWC_PROCESS.ANNOTATE,
-            DWC_PROCESS.SUMMARIZE, DWC_PROCESS.COMBINE, DWC_PROCESS.AGGREGATE
+            LMBISON_PROCESS.CHUNK, LMBISON_PROCESS.ANNOTATE,
+            LMBISON_PROCESS.SUMMARIZE, LMBISON_PROCESS.COMBINE,
+            LMBISON_PROCESS.AGGREGATE, LMBISON_PROCESS.HEATMATRIX,
+            LMBISON_PROCESS.PAM
         )
+
+    @staticmethod
+    def postfixes():
+        """Return all DWC Process types.
+
+        Returns:
+            List of all DWC_Process types.
+        """
+        postfixes = []
+        for p in LMBISON_PROCESS.process_types():
+            try:
+                postfixes.append(p["postfix"])
+            except KeyError:
+                pass
+        return postfixes
 
     @staticmethod
     def _is_instance(obj):
@@ -131,8 +182,8 @@ class DWC_PROCESS:
         Returns:
             String for filename postfix for the given step.
         """
-        is_dp_obj = DWC_PROCESS._is_instance(step_or_process)
-        for pt in DWC_PROCESS.process_types():
+        is_dp_obj = LMBISON_PROCESS._is_instance(step_or_process)
+        for pt in LMBISON_PROCESS.process_types():
             if ((isinstance(step_or_process, int) and pt["postfix"] == step_or_process)
                     or is_dp_obj and pt == step_or_process):
                 return pt["postfix"]
@@ -143,15 +194,15 @@ class DWC_PROCESS:
         """For a given postfix or DWC_PROCESS, return the step number.
 
         Args:
-            postfix_or_process (str or DWC_PROCESS): String appended to the end of a
+            postfix_or_process (str or LMBISON_PROCESS): String appended to the end of a
                 filename (before the extension) to indicate the stage of processing
                 completed, or DWC_PROCESS.
 
         Returns:
             Integer for step corresponding to the given filename postfix.
         """
-        is_dp_obj = DWC_PROCESS._is_instance(postfix_or_process)
-        for pt in DWC_PROCESS.process_types():
+        is_dp_obj = LMBISON_PROCESS._is_instance(postfix_or_process)
+        for pt in LMBISON_PROCESS.process_types():
             if ((isinstance(postfix_or_process, str) and
                  pt["postfix"] == postfix_or_process)
                     or is_dp_obj and pt == postfix_or_process):
@@ -169,12 +220,48 @@ class DWC_PROCESS:
 
         Returns:
             DWC_Process type for the given filename postfix or step.
+
+        Raises:
+            Exception: if neither postfix, not step is provided.
         """
-        for pt in DWC_PROCESS.process_types():
+        if postfix is None and step is None:
+            raise Exception("Must provide either prefix or step for process.")
+        for pt in LMBISON_PROCESS.process_types():
             if postfix is not None and pt["postfix"] == postfix:
                 return pt
             elif step is not None and pt["step"] == step:
                 return pt
+        return None
+
+    @staticmethod
+    def get_next_process(postfix=None, step=None):
+        """For a given postfix or step number, return the DWC_PROCESS object.
+
+        Args:
+            postfix (str): String appended to the end of a filename (before the
+                extension) to indicate the stage of processing completed.
+            step (int): Numerical stage of processing completed.
+
+        Returns:
+            DWC_Process type for the given filename postfix or step.
+
+        Raises:
+            Exception: if neither postfix, not step is provided.
+        """
+        # If nothing provided, return the first
+        if postfix is None and step is None:
+            raise Exception("Must provide either prefix or step for next process.")
+
+        for pt in LMBISON_PROCESS.process_types():
+            if postfix is not None and pt["postfix"] == postfix:
+                this_process = pt
+            elif step is not None and pt["step"] == step:
+                this_process = pt
+        if this_process is not None:
+            next_step = this_process["step"] + 1
+            next_process = LMBISON_PROCESS.get_process(step=next_step)
+            return next_process
+
         return None
 
 
@@ -182,9 +269,11 @@ class DWC_PROCESS:
 class CONFIG_PARAM:
     """Parameter keys for CLI tool configuration files."""
     FILE = "config_file"
+    COMMAND = "command"
     IS_INPUT_DIR = "is_input_dir"
     IS_OUPUT_DIR = "is_output_dir"
     IS_INPUT_FILE = "is_input_file"
+    CHOICES = "choices"
     HELP = "help"
     TYPE = "type"
 
@@ -413,7 +502,7 @@ class REGION:
                     summarize_by_fields[prefix] = flds
                 else:
                     raise Exception(f"Bad metadata for {prefix} summary fields")
-            summarize_by_fields[LMBISON.SUMMARY_FILTER_HEADING] = APPEND_TO_DWC.FILTER_FLAG
+            # summarize_by_fields[LMBISON.SUMMARY_FILTER_HEADING] = APPEND_TO_DWC.FILTER_FLAG
         return summarize_by_fields
 
     @staticmethod
@@ -428,7 +517,7 @@ class REGION:
         for reg in regions:
             for prefix, _ in reg["summary"]:
                 region_disjoint[prefix] = reg["is_disjoint"]
-        region_disjoint[LMBISON.SUMMARY_FILTER_HEADING] = False
+        # region_disjoint[LMBISON.SUMMARY_FILTER_HEADING] = False
         return region_disjoint
 
     @staticmethod
@@ -497,9 +586,9 @@ class ITIS:
 # .............................................................................
 class GBIF:
     """Constants for GBIF DWCA fields, APIs, and their request and response objects."""
-    INPUT_DATA = "gbif_2023-01-26.csv"
-    # 730772042 lines, 1st is header + 730772041 records
-    INPUT_RECORD_COUNT = 730772042
+    INPUT_DATA = "gbif_2023-08-23.csv"
+    INPUT_LINE_COUNT = 904441801        # from wc -l
+    # REPORTED_RECORD_COUNT = 904377770   # in GBIF metadata
     URL = "http://api.gbif.org/v1"
     UUID_KEY = "key"
     ID_FLD = "gbifID"

@@ -1,15 +1,16 @@
 """Common classes for adding USGS RIIS info to GBIF occurrences."""
+from concurrent.futures import as_completed, ProcessPoolExecutor
 import logging
-import multiprocessing
 import os
-from datetime import datetime
 from logging import ERROR
+import time
 
 from bison.common.constants import (
-    APPEND_TO_DWC, DWC_PROCESS, ENCODING, GBIF, LOG, REGION)
+    APPEND_TO_DWC, LMBISON_PROCESS, ENCODING, GBIF, LOG, REGION, REPORT)
 from bison.common.log import Logger
 from bison.common.util import (available_cpu_count, BisonNameOp, get_csv_dict_writer)
-from bison.process.geoindex import GeoResolver
+from bison.process.geoindex import (
+    get_full_coverage_resolvers, get_subsets_of_one_coverage_resolvers)
 from bison.provider.gbif_data import DwcData
 from bison.provider.riis_data import RIIS
 
@@ -17,14 +18,13 @@ from bison.provider.riis_data import RIIS
 # .............................................................................
 class Annotator():
     """Class for adding USGS RIIS info to GBIF occurrences."""
-    def __init__(
-            self, geo_input_path, logger, riis_with_gbif_filename=None, riis=None):
+    def __init__(self, logger, geo_path, annotated_riis_filename=None, riis=None):
         """Constructor.
 
         Args:
-            geo_input_path (str): input path for geospatial files to intersect points
             logger (object): logger for saving relevant processing messages
-            riis_with_gbif_filename (str): full filename of RIIS data annotated with
+            geo_path (str): input path for geospatial files to intersect points
+            annotated_riis_filename (str): full filename of RIIS data annotated with
                 GBIF accepted taxon names.
             riis (bison.common.riis.RIIS): object containing USGS RIIS data for
                 annotating records
@@ -54,37 +54,26 @@ class Annotator():
         if riis is not None:
             self.riis = riis
             if self.riis.is_annotated is False:
-                if riis_with_gbif_filename is None:
+                if annotated_riis_filename is None:
                     raise Exception(
                         "RIIS data does not contain GBIF accepted taxa, needed for "
                         "annotating GBIF occurrence data.")
                 else:
                     self.riis.resolve_riis_to_gbif_taxa(
-                        riis_with_gbif_filename, overwrite=True)
-        elif riis_with_gbif_filename is not None:
-            self.riis = RIIS(riis_with_gbif_filename, logger)
+                        annotated_riis_filename, overwrite=True)
+        elif annotated_riis_filename is not None:
+            self.riis = RIIS(annotated_riis_filename, logger)
             self.riis.read_riis()
         else:
             raise Exception(
-                "Must provide either RIIS with annotations or riis_with_gbif_filename")
+                "Must provide either RIIS with annotations or annotated_riis_filename")
 
         # Geospatial indexes for regional attributes to add to records
-        self._geo_fulls = []
-        for region in REGION.full_region():
-            fn = os.path.join(geo_input_path, region["file"])
-            self._geo_fulls.append(GeoResolver(
-                fn, region["map"], self._log, is_disjoint=region["is_disjoint"],
-                buffer_vals=region["buffer"]))
+        self._geo_fulls = get_full_coverage_resolvers(geo_path, self._log)
 
-        # Geospatial indexes for subset regions of a whole, all with same
-        # attributes to add
-        self._geo_partials = {}
-        region = REGION.combine_to_region()
-        for filter_val, rel_fn in region["files"]:
-            fn = os.path.join(geo_input_path, rel_fn)
-            self._geo_partials[filter_val] = GeoResolver(
-                fn, region["map"], self._log, is_disjoint=region["is_disjoint"],
-                buffer_vals=region["buffer"])
+        # Geospatial indexes for subset regions of a whole, with identical attributes
+        self._geo_partials = get_subsets_of_one_coverage_resolvers(
+            geo_path, self._log)
 
     # ...............................................
     def initialize_occurrences_io(self, gbif_occ_filename, output_occ_filename):
@@ -198,81 +187,6 @@ class Annotator():
 
         return taxkeys
 
-    # # ...............................................
-    # def old_annotate_one_record(self, dwcrec):
-    #     """Append fields to GBIF record, then write to file.
-    #
-    #     Args:
-    #         dwcrec: one original GBIF DwC record
-    #
-    #     Returns:
-    #         dwcrec: one GBIF DwC record, if it is not filtered out, values are added
-    #             to calculated fields: APPEND_TO_DWC, otherwise these fields are
-    #             None.
-    #     """
-    #     gbif_id = dwcrec[GBIF.ID_FLD]
-    #     if (self._dwcdata.recno % LOG.INTERVAL) == 0:
-    #         self._log.log(
-    #             f"*** Record number {self._dwcdata.recno}, gbifID: {gbif_id} ***",
-    #             refname=self.__class__.__name__)
-    #
-    #     # Leave these fields None if the record is filtered out (rank above species)
-    #     filtered_taxkeys = self._filter_find_taxon_keys(dwcrec)
-    #
-    #     # Only append additional values to records that pass the filter tests.
-    #     if filtered_taxkeys:
-    #         lon = dwcrec[GBIF.LON_FLD]
-    #         lat = dwcrec[GBIF.LAT_FLD]
-    #
-    #         for georesolver, buffers in (
-    #                 (self._geo_county, POINT_BUFFER_RANGE),
-    #                 (self._geo_aianhh, ()),
-    #                 (self._geo_doi, ())
-    #         ):
-    #             # Find enclosing region and its attributes
-    #             try:
-    #                 fldvals = georesolver.find_enclosing_polygon_attributes(lon, lat)
-    #             except ValueError as e:
-    #                 self._log.log(
-    #                     f"Record gbifID: {gbif_id}: {e}",
-    #                     refname=self.__class__.__name__, log_level=logging.ERROR)
-    #             else:
-    #                 # Add values to record
-    #                 for fld, val in fldvals.items():
-    #                     dwcrec[fld] = val
-    #
-    #         # Find RIIS region from resolved state
-    #         state = dwcrec[APPEND_TO_DWC.RESOLVED_ST]
-    #         riis_region = "L48"
-    #         if state in ("AK", "HI"):
-    #             riis_region = state
-    #
-    #         # Find any RIIS records for these acceptedTaxonKeys and region.
-    #         (riis_assessment,
-    #          riis_key) = self.riis.get_assessment_for_gbif_taxonkeys_region(
-    #             filtered_taxkeys, riis_region)
-    #         dwcrec[APPEND_TO_DWC.RIIS_ASSESSMENT] = riis_assessment
-    #         dwcrec[APPEND_TO_DWC.RIIS_KEY] = riis_key
-    #
-    #         # Find PAD area from PAD data for the DOI region
-    #         doi_region = dwcrec[APPEND_TO_DWC.DOI_REGION]
-    #         try:
-    #             pad_resolver = self._geo_pads[doi_region]
-    #         except KeyError:
-    #             self._log.log(f"No PAD datafile exists for DOI region {doi_region}")
-    #         else:
-    #             # Find enclosing PAD if exists, and its attributes
-    #             try:
-    #                 fldvals = pad_resolver.find_enclosing_polygon_attributes(lon, lat)
-    #             except ValueError as e:
-    #                 self._log.error(f"Record gbifID: {gbif_id}: {e}")
-    #             else:
-    #                 # Add values to record
-    #                 for fld, val in fldvals.items():
-    #                     dwcrec[fld] = val
-    #
-    #     return dwcrec
-
     # ...............................................
     def _annotate_one_record(self, dwcrec):
         """Append fields to GBIF record, then write to file.
@@ -286,10 +200,6 @@ class Annotator():
                 None.
         """
         gbif_id = dwcrec[GBIF.ID_FLD]
-        if (self._dwcdata.recno % LOG.INTERVAL) == 0:
-            self._log.log(
-                f"*** Record number {self._dwcdata.recno}, gbifID: {gbif_id} ***",
-                refname=self.__class__.__name__)
 
         # Leave these fields None if the record is filtered out (rank above species)
         filtered_taxkeys = self._filter_find_taxon_keys(dwcrec)
@@ -334,13 +244,17 @@ class Annotator():
             try:
                 sub_resolver = self._geo_partials[filter]
             except KeyError:
-                self._log.log(f"No datafile exists for partial region {filter}")
+                self._log.log(
+                    f"No datafile exists for partial region {filter}", refname=self.__class__.__name__,
+                    log_level=logging.ERROR)
             else:
                 # Find enclosing PAD if exists, and its attributes
                 try:
                     fldvals = sub_resolver.find_enclosing_polygon_attributes(lon, lat)
                 except ValueError as e:
-                    self._log.error(f"Record gbifID: {gbif_id}: {e}")
+                    self._log.log(
+                        f"Record gbifID: {gbif_id}: {e}",
+                        refname=self.__class__.__name__, log_level=logging.ERROR)
                 else:
                     # Add values to record
                     for fld, val in fldvals.items():
@@ -349,13 +263,14 @@ class Annotator():
         return dwcrec
 
     # ...............................................
-    def annotate_dwca_records(self, dwc_filename, output_occ_filename):
+    def annotate_dwca_records(self, dwc_filename, output_path, overwrite=False):
         """Resolve and append state, county, RIIS assessment and key to GBIF records.
 
         Args:
             dwc_filename: full filename of input file of DWC records.
-            output_occ_filename: full filename for writing DWC records with
-                RIIS appended fields.
+            output_path (str): destination directory for annotated occurrence file.
+            overwrite (bool): Flag indicating whether to overwrite existing annotated
+                file.
 
         Returns:
             report: dictionary of metadata about the data and process
@@ -364,141 +279,167 @@ class Annotator():
             Exception: on failure to open input or output data.
             Exception: on unexpected failure to read or write data.
         """
-        report = {
-            "dwc_filename": dwc_filename,
-            "dwc_with_geo_and_riis_filename": output_occ_filename,
-            "record_failed_gbifids": []
-        }
-        self.initialize_occurrences_io(dwc_filename, output_occ_filename)
+        start = time.perf_counter()
         self._log.log(
-            f"Annotating {dwc_filename} to create {output_occ_filename}",
+            f"Start Annotator.annotate_dwca_records: {time.asctime()}",
             refname=self.__class__.__name__)
-        try:
-            # iterate over DwC records
-            dwcrec = self._dwcdata.get_record()
-            while dwcrec is not None:
-                # Annotate
-                dwcrec_ann = self._annotate_one_record(dwcrec)
-                # Write
-                try:
-                    self._csv_writer.writerow(dwcrec_ann)
-                except Exception as e:
-                    self._log.log(
-                        f"Error {e} record, gbifID {dwcrec[GBIF.ID_FLD]}",
-                        refname=self.__class__.__name__, log_level=ERROR)
-                    report["record_failed_gbifids"].append(dwcrec[GBIF.ID_FLD])
-                # Get next
-                dwcrec = self._dwcdata.get_record()
-        except Exception as e:
-            raise Exception(
-                f"Unexpected error {e} reading {self._dwcdata.input_file} or "
-                + f"writing {output_occ_filename}")
 
-        report["bad_ranks_filtered"] = list(self.bad_ranks)
-        report["records_filtered_by_rank"] = self.rank_filtered_records
-        self._log.log(
-            f"Annotate records filtered out {self.rank_filtered_records} " +
-            f"records with {self.bad_ranks} ranks", refname=self.__class__.__name__)
+        out_filename = BisonNameOp.get_process_outfilename(
+            dwc_filename, outpath=output_path, step_or_process=LMBISON_PROCESS.ANNOTATE)
+        report = {
+            REPORT.INFILE: dwc_filename,
+            REPORT.OUTFILE: out_filename
+        }
+        if not os.path.exists(out_filename) or overwrite is True:
+            self.initialize_occurrences_io(dwc_filename, out_filename)
+            self._log.log(
+                f"Annotate {dwc_filename} to {out_filename}",
+                refname=self.__class__.__name__)
+            summary = {REPORT.ANNOTATE_FAIL: []}
+            try:
+                # iterate over DwC records
+                dwcrec = self._dwcdata.get_record()
+                while dwcrec is not None:
+                    # Annotate
+                    dwcrec_ann = self._annotate_one_record(dwcrec)
+                    # Write
+                    try:
+                        self._csv_writer.writerow(dwcrec_ann)
+                    except Exception as e:
+                        self._log.log(
+                            f"Error {e} record, gbifID {dwcrec[GBIF.ID_FLD]}",
+                            refname=self.__class__.__name__, log_level=ERROR)
+                        summary[REPORT.ANNOTATE_FAIL].append(dwcrec[GBIF.ID_FLD])
+
+                    if (self._dwcdata.recno % LOG.INTERVAL) == 0:
+                        self._log.log(
+                            f"*** Record number {self._dwcdata.recno}, gbifID: "
+                            f"{dwcrec[GBIF.ID_FLD]} ***", refname=self.__class__.__name__)
+
+                    # Get next
+                    dwcrec = self._dwcdata.get_record()
+            except Exception as e:
+                raise Exception(
+                    f"Unexpected error {e} reading {self._dwcdata.input_file} or "
+                    + f"writing {out_filename}")
+            else:
+                end = time.perf_counter()
+                summary[REPORT.RANK_FAIL] = list(self.bad_ranks)
+                summary[REPORT.RANK_FAIL_COUNT] = self.rank_filtered_records
+                report[REPORT.SUMMARY] = summary
+
+                self._log.log(
+                    f"End Annotator.annotate_dwca_records: {time.asctime()}, {end - start} "
+                    f"seconds elapsed", refname=self.__class__.__name__)
+                self._log.log(
+                    f"Filtered out {self.rank_filtered_records} records of {self.bad_ranks}",
+                    refname=self.__class__.__name__)
+
         return report
 
 
 # .............................................................................
 def annotate_occurrence_file(
-        dwc_filename, riis_with_gbif_filename, geo_path, output_path, log_path=None):
+        dwc_filename, annotated_riis_filename, geo_path, output_path, log_path):
     """Annotate GBIF records with census state and county, and RIIS key and assessment.
 
     Args:
         dwc_filename (str): full filename containing GBIF data for annotation.
-        riis_with_gbif_filename (str): full filename with RIIS records annotated with
+        annotated_riis_filename (str): full filename with RIIS records annotated with
             gbif accepted taxa
-        log_path (str): destination directory for logfiles
-        geo_path (str): input directory containing geospatial files for
-            geo-referencing occurrence points.
+        geo_path (str): Base directory containing geospatial region files
         output_path (str): destination directory for output annotated occurrence files.
+        log_path (object): destination directory for logging processing messages.
 
     Returns:
         report (dict): metadata for the occurrence annotation data and process.
 
     Raises:
         FileNotFoundError: on missing input file
+        OSError: on failure to write JSON report file
+        IOError: on failure to write JSON report file
     """
     if not os.path.exists(dwc_filename):
         raise FileNotFoundError(dwc_filename)
 
-    _, basefname = os.path.split(dwc_filename)
+    rpt_filename = BisonNameOp.get_process_report_filename(
+        dwc_filename, output_path=output_path, step_or_process=LMBISON_PROCESS.ANNOTATE)
+    logname, log_fname = BisonNameOp.get_process_logfilename(
+        dwc_filename, log_path=log_path, step_or_process=LMBISON_PROCESS.ANNOTATE)
+    logger = Logger(logname, log_filename=log_fname, log_console=False)
 
-    logname = f"annotate_{basefname}"
-    log_filename = None
-    if log_path is not None:
-        log_filename = os.path.join(log_path, f"{logname}.log")
-    logger = Logger(
-        logname, log_filename=log_filename, log_console=False)
+    ant = Annotator(logger, geo_path, annotated_riis_filename=annotated_riis_filename)
+    report = ant.annotate_dwca_records(dwc_filename, output_path)
 
+    # Write individual output report
+    import json
+    try:
+        with open(rpt_filename, mode='wt') as out_file:
+            json.dump(report, out_file, indent=4)
+    except OSError:
+        raise
+    except IOError:
+        raise
     logger.log(
-        f"Submit {basefname} for annotation {datetime.now()}",
-        refname="annotate_occurrence_file")
+        f"Wrote report file to {rpt_filename}", refname="annotate_occurrence_file")
 
-    ant = Annotator(
-        geo_path, logger, riis_with_gbif_filename=riis_with_gbif_filename)
-
-    out_fname = BisonNameOp.get_out_process_filename(
-        dwc_filename, outpath=output_path, step_or_process=DWC_PROCESS.ANNOTATE)
-    report = ant.annotate_dwca_records(dwc_filename, out_fname)
-
-    logger.log(
-        "End Time : {}".format(datetime.now()), refname="annotate_occurrence_file")
     return report
 
 
 # .............................................................................
 def parallel_annotate(
-        dwc_filenames, riis_with_gbif_filename, main_logger, geo_path, output_path):
+        dwc_filenames, annotated_riis_filename, geo_path, output_path, main_logger,
+        overwrite):
     """Main method for parallel execution of DwC annotation script.
 
     Args:
         dwc_filenames (list): list of full filenames containing GBIF data for
             annotation.
-        riis_with_gbif_filename (str): full filename with RIIS records annotated with
+        annotated_riis_filename (str): full filename with RIIS records annotated with
             gbif accepted taxa
-        main_logger (logger): logger for the process that calls this function,
-            initiating subprocesses
         geo_path (str): input directory containing geospatial files for
             geo-referencing occurrence points.
         output_path (str): destination directory for output annotated occurrence files.
+        main_logger (logger): logger for the process that calls this function,
+            initiating subprocesses
+        overwrite (bool): Flag indicating whether to overwrite existing annotated file.
 
     Returns:
-        reports (list of dict): metadata for the occurrence annotation data and process.
+        reports (dict): metadata for each subset file annotated by the process.
     """
     refname = "parallel_annotate"
-    inputs = []
+    reports = []
     if output_path is None:
         output_path = os.path.dirname(dwc_filenames[0])
     log_path = main_logger.log_directory
 
-    # Process only needed files
-    for dwc_fname in dwc_filenames:
-        out_fname = BisonNameOp.get_out_process_filename(
-            dwc_fname, outpath=output_path, step_or_process=DWC_PROCESS.ANNOTATE)
-        if os.path.exists(out_fname):
-            main_logger.log(
-                f"Annotations exist in {out_fname}, moving on.", refname=refname)
+    main_logger.log(
+        f"Parallel Annotation Start Time : {time.asctime()}", refname=refname)
+
+    files_to_annotate = []
+    for fn in dwc_filenames:
+        out_fname = BisonNameOp.get_process_outfilename(
+            fn, outpath=output_path, step_or_process=LMBISON_PROCESS.ANNOTATE)
+        if os.path.exists(out_fname) and overwrite is False:
+            main_logger.log(f"Annotations exist in {out_fname}.", refname=refname)
         else:
-            inputs.append(
-                (dwc_fname, riis_with_gbif_filename, geo_path, log_path, output_path))
+            files_to_annotate.append(fn)
+
+    with ProcessPoolExecutor(max_workers=available_cpu_count()-2) as executor:
+        futures = []
+        for dwc_fname in files_to_annotate:
+            future = executor.submit(
+                annotate_occurrence_file, dwc_fname, annotated_riis_filename,
+                geo_path, output_path, log_path)
+            futures.append(future)
+
+    # iterate over all submitted tasks and get results as they are available
+    for future in as_completed(futures):
+        # get the result for the next completed task
+        reports.append(future.result())
 
     main_logger.log(
-        "Parallel Annotation Start Time : {}".format(datetime.now()), refname=refname)
-
-    # Do not use all CPUs
-    pool = multiprocessing.Pool(available_cpu_count() - 2)
-    # Map input files asynchronously onto function
-    map_result = pool.starmap_async(annotate_occurrence_file, inputs)
-    # Wait for results
-    map_result.wait()
-    reports = map_result.get()
-
-    main_logger.log(
-        "Parallel Annotation End Time : {}".format(datetime.now()), refname=refname)
+        f"Parallel Annotation End Time : {time.asctime()}", refname=refname)
 
     return reports
 

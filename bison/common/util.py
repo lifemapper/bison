@@ -4,10 +4,12 @@ import glob
 import logging
 import math
 import os
+from osgeo import ogr
 import subprocess
 import sys
 
-from bison.common.constants import (DWC_PROCESS, ENCODING, EXTRA_CSV_FIELD, GBIF)
+from bison.common.constants import (
+    AGGREGATOR_DELIMITER, LMBISON_PROCESS, ENCODING, EXTRA_CSV_FIELD, GBIF)
 
 
 # ...............................................
@@ -19,7 +21,9 @@ def delete_file(file_name, delete_dir=False):
         delete_dir (bool): flag - True to delete parent directory if it becomes empty
 
     Returns:
-        True if file was not found, or file (and optional newly-empty parent directories) was successfully deleted.
+        True if file was not found, or file was successfully deleted.  If
+            file deletion results in an empty parent directory, directory is also
+            successfully deleted.
         False if failed to delete file (and parent directories).
     """
     success = True
@@ -49,10 +53,12 @@ def ready_filename(fullfilename, overwrite=True):
 
     Args:
         fullfilename (str): full path of the file to check
-        overwrite (bool): flag indicating whether to delete the file if it already exists
+        overwrite (bool): flag indicating to delete the file if it already exists
 
     Returns:
-        True if file was not found, or file (and optional newly-empty parent directories) was successfully deleted.
+        boolean: True if file does not yet exist, or file was successfully deleted.  If
+            file deletion results in an empty parent directory, directory is also
+            successfully deleted.
         False if failed to delete file (and parent directories).
 
     Raises:
@@ -128,7 +134,9 @@ def get_csv_writer(datafile, delimiter, header=None, fmode="w", overwrite=True):
 
 
 # .............................................................................
-def get_csv_dict_writer(csvfile, header, delimiter, fmode="w", encoding=ENCODING, extrasaction="ignore", overwrite=True):
+def get_csv_dict_writer(
+        csvfile, header, delimiter, fmode="w", encoding=ENCODING, extrasaction="ignore",
+        overwrite=True):
     """Create a CSV dictionary writer and write the header.
 
     Args:
@@ -137,7 +145,8 @@ def get_csv_dict_writer(csvfile, header, delimiter, fmode="w", encoding=ENCODING
         delimiter (str): field separator
         fmode (str): Write ('w') or append ('a')
         encoding (str): Encoding for output file
-        extrasaction (str): Action to take if there are fields in a record dictionary not present in fieldnames
+        extrasaction (str): Action to take if there are fields in a record dictionary
+            not present in fieldnames
         overwrite (bool): True to delete an existing file before write
 
     Returns:
@@ -155,10 +164,11 @@ def get_csv_dict_writer(csvfile, header, delimiter, fmode="w", encoding=ENCODING
         csv.field_size_limit(sys.maxsize)
         try:
             f = open(csvfile, fmode, newline="", encoding=encoding)
-            writer = csv.DictWriter(f, fieldnames=header, delimiter=delimiter, extrasaction=extrasaction)
         except Exception as e:
             raise e
         else:
+            writer = csv.DictWriter(
+                f, fieldnames=header, delimiter=delimiter, extrasaction=extrasaction)
             writer.writeheader()
         return writer, f
     else:
@@ -169,14 +179,16 @@ def get_csv_dict_writer(csvfile, header, delimiter, fmode="w", encoding=ENCODING
 def get_csv_dict_reader(
         csvfile, delimiter, fieldnames=None, encoding=ENCODING, quote_none=False,
         restkey=EXTRA_CSV_FIELD):
-    """Create a CSV dictionary reader from a file with the first line containing fieldnames.
+    """Create a CSV dictionary reader from a file with a fieldname header.
 
     Args:
         csvfile (str): output CSV file for reading
         delimiter (char): delimiter between fields
-        fieldnames (list): strings with corrected fieldnames, cleaned of illegal characters, for use with records.
+        fieldnames (list): strings with corrected fieldnames, cleaned of illegal
+            characters, for use with records.
         encoding (str): type of encoding
-        quote_none (bool): True opens csvfile with QUOTE_NONE, False opens with QUOTE_MINIMAL
+        quote_none (bool): True opens csvfile with QUOTE_NONE, False opens with
+            QUOTE_MINIMAL
         restkey (str): fieldname for extra fields in a record not present in header
 
     Returns:
@@ -203,7 +215,9 @@ def get_csv_dict_reader(
         raise
 
     if fieldnames is not None:
-        rdr = csv.DictReader(f, fieldnames=fieldnames, quoting=quoting, delimiter=delimiter, restkey=restkey)
+        rdr = csv.DictReader(
+            f, fieldnames=fieldnames, quoting=quoting, delimiter=delimiter,
+            restkey=restkey)
     else:
         rdr = csv.DictReader(f, quoting=quoting, delimiter=delimiter, restkey=restkey)
 
@@ -335,6 +349,31 @@ def count_lines(filename_or_pattern, grep_strings=None):
 
 
 # .............................................................................
+def get_site_headers_from_shapefile(site_id_fld, x_fld, y_fld, shape_filename):
+    site_headers = []
+    driver = ogr.GetDriverByName("ESRI Shapefile")
+    data_src = driver.Open(shape_filename, 0)
+    lyr = data_src.GetLayer()
+    feat_count = lyr.GetFeatureCount()
+    print(f"Opened {shape_filename} with {feat_count} features")
+    lyr_def = lyr.GetLayerDefn()
+    site_id_idx = lyr_def.GetFieldIndex(site_id_fld)
+    x_idx = lyr_def.GetFieldIndex(x_fld)
+    y_idx = lyr_def.GetFieldIndex(y_fld)
+    for fid in range(0, feat_count):
+        try:
+            feat = lyr.GetFeature(fid)
+            site_id = int(feat.GetFieldAsString(site_id_idx))
+            x = float(feat.GetFieldAsString(x_idx))
+            y = float(feat.GetFieldAsString(y_idx))
+            site_headers.append((site_id, x, y))
+        except Exception as e:
+            raise Exception(
+                f"Error, failed to read features in {shape_filename}: {e}")
+    return site_headers
+
+
+# .............................................................................
 def count_lines_with_cat(filename_or_pattern):
     """Find total number of lines in a file.
 
@@ -360,7 +399,8 @@ def count_lines_with_cat(filename_or_pattern):
     cmd = f"cat -n {filename_or_pattern} | tail -n1"
 
     # Run command in a shell
-    sp = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    sp = subprocess.Popen(
+        cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     sp_outs = sp.communicate()
 
     # Retrieve the total count
@@ -459,6 +499,44 @@ def get_fields_from_header(csvfile, delimiter=GBIF.DWCA_DELIMITER, encoding="utf
     return fields
 
 
+class BisonKey():
+    # ...............................................
+    @staticmethod
+    def get_compound_key(*values):
+        """Construct a compound key for dictionaries.
+
+        Args:
+            values (list): values for a compound key.
+
+        Returns:
+             str combining part1 and part2 to use as a dictionary key.
+        """
+        key = None
+        for val in values:
+            if val != "na":
+                if key is None:
+                    key = val
+                else:
+                    key += f"{AGGREGATOR_DELIMITER}{val}"
+            else:
+                pass
+        return key
+
+    # ...............................................
+    @staticmethod
+    def parse_compound_key(compound_key):
+        """Parse a compound key into its elements.
+
+        Args:
+            compound_key (str): key combining one or more elements.
+
+        Returns:
+            values (list): list of elements of compound key.
+        """
+        parts = compound_key.split(AGGREGATOR_DELIMITER)
+        return parts
+
+
 # .............................................................................
 class Chunker():
     @classmethod
@@ -484,7 +562,7 @@ class Chunker():
         # in_base_filename, ext = os.path.splitext(big_csv_filename)
         if big_csv_filename.endswith(GBIF.INPUT_DATA):
             # shortcut
-            rec_count = GBIF.INPUT_RECORD_COUNT
+            rec_count = GBIF.INPUT_LINE_COUNT - 1
         else:
             rec_count = count_lines(big_csv_filename) - 1
         chunk_size = math.ceil(rec_count / chunk_count)
@@ -505,11 +583,12 @@ class Chunker():
 
     # .............................................................................
     @classmethod
-    def identify_chunk_files(cls, big_csv_filename, chunk_count=0):
+    def identify_chunk_files(cls, big_csv_filename, output_path, chunk_count=0):
         """Construct filenames for smaller files subset from a large file.
 
         Args:
             big_csv_filename (str): Full path to the original large CSV file of records
+            output_path (str): Destination directory for subset files.
             chunk_count (int): Number of smaller files to split large file into.  Defaults
                 to the number of available CPUs minus 2.
 
@@ -517,18 +596,50 @@ class Chunker():
             chunk_filenames: a list of chunk filenames
         """
         chunk_filenames = []
-        in_base_filename, ext = os.path.splitext(big_csv_filename)
+        basename, ext = os.path.splitext(os.path.basename(big_csv_filename))
         boundary_pairs, _rec_count, _chunk_size = cls.identify_chunks(
             big_csv_filename, chunk_count=chunk_count)
         for (start, stop) in boundary_pairs:
             chunk_fname = BisonNameOp.get_chunk_filename(
-                in_base_filename, ext, start, stop)
-            chunk_filenames.append(chunk_fname)
+                basename, ext, start, stop)
+            chunk_filenames.append(os.path.join(output_path, chunk_fname))
         return chunk_filenames
 
     # .............................................................................
     @classmethod
-    def chunk_files(cls, big_csv_filename, output_path, logger, chunk_count=0):
+    def cleanup_obsolete_chunks(
+            self, boundary_pairs, output_path, basename, ext, overwrite):
+        """Delete existing chunk files if any are missing or if overwrite is True.
+
+        Args:
+            boundary_pairs (list): List of pairs of record numbers corresponding
+                to the first and last record in a subset chunk of the original data.
+            output_path (str): Destination directory for chunk files.
+            basename (str): Base filename for chunk files.
+            ext (str): File extension for chunk files.
+            overwrite (bool): Flag indicating whether to overwrite existing chunked
+                files. If only some of the chunk files exist, delete them all before
+                writing new files, regardless of this flag.
+        """
+        # Check if rewrite needed
+        missing_chunks = []
+        existing_chunks = []
+        for (start, stop) in boundary_pairs:
+            chunk_basefilename = BisonNameOp.get_chunk_filename(
+                basename, ext, start, stop)
+            chunk_fname = os.path.join(output_path, chunk_basefilename)
+            if os.path.exists(chunk_fname):
+                existing_chunks.append(chunk_fname)
+            else:
+                missing_chunks.append(chunk_fname)
+        if overwrite is True or len(missing_chunks) > 0:
+            for fn in existing_chunks:
+                delete_file(fn)
+
+    # .............................................................................
+    @classmethod
+    def chunk_files(
+            cls, big_csv_filename, output_path, logger, chunk_count=0, overwrite=False):
         """Split a large input csv file into multiple smaller input csv files.
 
         Args:
@@ -537,6 +648,9 @@ class Chunker():
             logger (object): logger for writing messages to file and console
             chunk_count (int): Number of smaller files to split large file into.  Defaults
                 to the number of available CPUs minus 2.
+            overwrite (bool): Flag indicating whether to overwrite existing chunked
+                files. If only some of the chunk files exist, delete them all before
+                writing new files, regardless of this flag.
 
         Returns:
             chunk_filenames: a list of chunk filenames
@@ -554,6 +668,8 @@ class Chunker():
         chunk_filenames = []
         boundary_pairs, rec_count, chunk_size = cls.identify_chunks(
             big_csv_filename, chunk_count=chunk_count)
+        cls.cleanup_obsolete_chunks(
+            boundary_pairs, output_path, basename, ext, overwrite)
 
         try:
             bigf = open(big_csv_filename, 'r', newline="", encoding='utf-8')
@@ -612,11 +728,13 @@ class Chunker():
             "chunk_size": chunk_size
         }
 
-        return chunk_filenames, report
+        return report
 
 
 # .............................................................................
 class BisonNameOp():
+
+    separator = "_"
 
     @staticmethod
     def get_annotated_riis_filename(input_riis_filename, outpath=None):
@@ -630,7 +748,10 @@ class BisonNameOp():
         Returns:
             out_filename: full filename for the output file.
         """
-        basename, ext = os.path.splitext(os.path.split(input_riis_filename)[1])
+        inpath, fname = os.path.split(input_riis_filename)
+        if outpath is None:
+            outpath = inpath
+        basename, _ = os.path.splitext(fname)
         out_filename = os.path.join(outpath, f"{basename}_annotated.csv")
         return out_filename
 
@@ -652,19 +773,21 @@ class BisonNameOp():
             followed by chunk
             followed by process step completed (if any)
         """
-        postfix = DWC_PROCESS.CHUNK['postfix']
-        sep = DWC_PROCESS.SEP
-        chunkfix = f"{DWC_PROCESS.CHUNK['prefix']}-{start}-{stop}"
+        postfix = LMBISON_PROCESS.CHUNK['postfix']
+        sep = BisonNameOp.separator
+        chunkfix = f"{LMBISON_PROCESS.CHUNK['prefix']}-{start}-{stop}"
         return f"{basename}{sep}{chunkfix}{sep}{postfix}{ext}"
 
     # .............................................................................
     @staticmethod
-    def get_out_process_filename(in_filename, outpath=None, step_or_process=None):
+    def get_process_outfilename(
+            in_filename, outpath=None, postfix=None, step_or_process=None):
         """Construct output filename for the next processing step of the given file.
 
         Args:
             in_filename (str): base or full filename of CSV data.
             outpath (str): destination directory for output filename
+            postfix (str): final string for a filename, indicating the data type.
             step_or_process (int or lmbison.common.constants.DWC_PROCESS):
                 stage of processing completed on the output file.
 
@@ -673,9 +796,6 @@ class BisonNameOp():
                 If the input filename reflects the final processing step, the method
                 returns None
 
-        Raises:
-            Exception: on illegal step or final process as input filename
-
         Note:
             The input filename is parsed for process step, and the output filename will
             be constructed for the next step.
@@ -683,26 +803,112 @@ class BisonNameOp():
             File will always start with basename, followed by chunk,
                 followed by process step completed (if any)
         """
-        outfname = None
-        path, basename, ext, chunk, postfix = BisonNameOp.parse_process_filename(
+        sep = BisonNameOp.separator
+        pth, basename, orig_ext, chunk, old_postfix = BisonNameOp.parse_process_filename(
             in_filename)
         if chunk is not None:
-            basename = f"{basename}{DWC_PROCESS.SEP}{chunk}"
+            basename = f"{basename}{sep}{chunk}"
         # If step is not provided, get the step after that of the input file.
-        if step_or_process is None:
-            step_or_process = DWC_PROCESS.get_step(postfix) + 1
-        new_postfix = DWC_PROCESS.get_postfix(step_or_process)
-        if new_postfix is None:
-            raise Exception(
-                f"No next step for {in_filename} or processing step for "
-                f"{step_or_process}")
-        else:
-            outbasename = f"{basename}{DWC_PROCESS.SEP}{new_postfix}{ext}"
-            # If outpath is not provided, use the same path as the input file.
-            if outpath is None:
-                outpath = path
-            outfname = os.path.join(outpath, outbasename)
+        if postfix is None:
+            if step_or_process is None:
+                step_or_process = LMBISON_PROCESS.get_next_process(postfix=old_postfix)
+            postfix = step_or_process["postfix"]
+        # all outputs are CSV files
+        ext = ".csv"
+        outbasename = f"{basename}{sep}{postfix}{ext}"
+        # If outpath is not provided, use the same path as the input file.
+        if outpath is None:
+            outpath = pth
+        outfname = os.path.join(outpath, outbasename)
         return outfname
+
+    # .............................................................................
+    @staticmethod
+    def _get_process_base_filename(in_filename, step_or_process=None):
+        """Construct output base filename for this processing step of the given file.
+
+        Args:
+            in_filename (str): base or full filename of CSV data.
+            step_or_process (int or lmbison.common.constants.DWC_PROCESS):
+                stage of processing completed on the output file.
+
+        Returns:
+            base_filename: base filename without path or extension.
+
+        Note:
+            The input filename is parsed for process step.
+
+            File will always start with basename, followed by chunk,
+                followed by process step completed (if any)
+        """
+        sep = BisonNameOp.separator
+        pth, basename, ext, chunk, postfix = BisonNameOp.parse_process_filename(
+            in_filename)
+
+        # If step is not provided, get the step of the input file.
+        if step_or_process is None:
+            step_or_process = LMBISON_PROCESS.get_process(postfix=postfix)
+        if chunk is not None:
+            basename = f"{basename}{sep}{chunk}"
+
+        pname = step_or_process["postfix"]
+        base_filename = f"{basename}{sep}{pname}"
+
+        return base_filename
+
+    # .............................................................................
+    @staticmethod
+    def get_process_logfilename(in_filename, log_path=None, step_or_process=None):
+        """Construct output filename for the next processing step of the given file.
+
+        Args:
+            in_filename (str): base or full filename of CSV data.
+            log_path (str): Destination directory for log files.
+            step_or_process (int or lmbison.common.constants.DWC_PROCESS):
+                stage of processing completed on the output file.
+
+        Returns:
+            logname: name for logger
+            log_filename: full filename for logging output
+
+        Note:
+            The input filename is parsed for process step.
+
+            File will always start with basename, followed by chunk,
+                followed by process step completed (if any)
+        """
+        base_filename = BisonNameOp._get_process_base_filename(
+            in_filename, step_or_process=step_or_process)
+        log_fname = os.path.join(log_path, f"{base_filename}.log")
+
+        return base_filename, log_fname
+
+    # .............................................................................
+    @staticmethod
+    def get_process_report_filename(in_filename, output_path=None, step_or_process=None):
+        """Construct output filename for the next processing step of the given file.
+
+        Args:
+            in_filename (str): base or full filename of CSV data.
+            output_path (str): Destination directory for report files.
+            step_or_process (int or lmbison.common.constants.DWC_PROCESS):
+                stage of processing completed on the output file.
+
+        Returns:
+            logname: name for logger
+            log_filename: full filename for logging output
+
+        Note:
+            The input filename is parsed for process step.
+
+            File will always start with basename, followed by chunk,
+                followed by process step completed (if any)
+        """
+        base_filename = BisonNameOp._get_process_base_filename(
+            in_filename, step_or_process=step_or_process)
+        rpt_fname = os.path.join(output_path, f"{base_filename}.rpt")
+
+        return rpt_fname
 
     # .............................................................................
     @staticmethod
@@ -722,62 +928,52 @@ class BisonNameOp():
                 processing has been completed.
 
         Note:
-            File will always start with basename,
-            followed by chunk (if chunked)
-            followed by process step completed (if any)
+            Filename will contain, in this order:
+                1. basename (>= 1 parts)
+                2. chunk (if chunked)
+                3. process step completed
         """
         chunk = None
         process_postfix = None
+        sep = BisonNameOp.separator
+        poss_postfixes = LMBISON_PROCESS.postfixes()
         # path will be None if filename is basefilename
         path, fname = os.path.split(filename)
         basefname, ext = os.path.splitext(fname)
-        parts = basefname.split(DWC_PROCESS.SEP)
+        parts = basefname.split(sep)
         # File will always start with basename
         basename = parts.pop(0)
-        if len(parts) >= 1:
-            p = parts.pop(0)
-            # if chunk exists
-            if not p.startswith(DWC_PROCESS.CHUNK["prefix"]):
-                process_postfix = p
-            else:
+        for p in parts:
+            # if still part of basename
+            if p.startswith(LMBISON_PROCESS.CHUNK["prefix"]):
                 chunk = p
-                if len(parts) >= 1:
-                    process_postfix = parts.pop(0)
+            else:
+                if p in poss_postfixes:
+                    process_postfix = p
+                else:
+                    # Add to basename
+                    basename = f"{basename}{sep}{p}"
         return path, basename, ext, chunk, process_postfix
 
     # ...............................................
     @classmethod
-    def get_raw_summary_name(cls, csvfile):
+    def get_combined_summary_name(cls, summary_filename_list, outpath=None):
         """Construct a filename for the summarized version of annotated csvfile.
 
         Args:
-            csvfile (str): full filename used to construct an annotated filename for
-                this data.
-
-        Returns:
-            outfname: output filename derived from the annotated GBIF DWC filename
-        """
-        basename, ext = os.path.splitext(csvfile)
-        outfname = f"{basename}_summary{ext}"
-        return outfname
-
-    # ...............................................
-    @classmethod
-    def get_combined_summary_name(cls, csvfile, outpath=None):
-        """Construct a filename for the summarized version of annotated csvfile.
-
-        Args:
-            csvfile (str): full filename of one subset summary file (of one or more) for
+            summary_filename_list (list): full filename(s) of subset summary files for
                 this data.
             outpath (str): full directory path for output filename.
 
         Returns:
             outfname: output filename derived from the summarized GBIF DWC filename
         """
+        sep = BisonNameOp.separator
         path, basename, ext, chunk, postfix = BisonNameOp.parse_process_filename(
-            csvfile)
-        postfix = DWC_PROCESS.COMBINE["postfix"]
-        outbasename = f"{basename}{DWC_PROCESS.SEP}{postfix}{ext}"
+            summary_filename_list[0]
+        )
+        postfix = LMBISON_PROCESS.COMBINE["postfix"]
+        outbasename = f"{basename}{sep}{postfix}{ext}"
         # If outpath is not provided, use the same path as the input file.
         if outpath is None:
             outpath = path
@@ -819,32 +1015,21 @@ class BisonNameOp():
         outfname = os.path.join(outpath, f"{basename}_riis_summary{ext}")
         return outfname
 
-    # # ...............................................
-    # @staticmethod
-    # def parse_location_summary_name(csvfile):
-    #     """Construct a filename for the summarized version of csvfile.
-    #
-    #     Args:
-    #         csvfile (str): full filename used to construct an annotated filename
-    #             for this data.
-    #
-    #     Returns:
-    #         outfname: output filename derived from the annotated GBIF DWC filename
-    #
-    #     Raises:
-    #         Exception: on filename does not start with "state_" or "county_"
-    #     """
-    #     county = None
-    #     _, basefilename = os.path.split(csvfile)
-    #     basename, ext = os.path.splitext(basefilename)
-    #     if basename.startswith("state_"):
-    #         _, state = basename.split("_")
-    #     elif basename.startswith("county_"):
-    #         _, state, county = basename.split("_")
-    #     else:
-    #         raise Exception(
-    #             f"Filename {csvfile} cannot be parsed into location elements")
-    #     return state, county
+    # ...............................................
+    @staticmethod
+    def get_grid_filename(basename, resolution, outpath):
+        """Construct a filename for the summarized version of csvfile.
+
+        Args:
+            basename (str): basefilename for output grid shapefile.
+            resolution (float): cellsize for output grid.
+            outpath (str): destination directory for output grid
+
+        Returns:
+            grid_fname: output filename for the gridded shapefile.
+        """
+        grid_fname = os.path.join(outpath, f"grid_{basename}_{resolution}.shp")
+        return grid_fname
 
 
 # .............................................................................

@@ -1,9 +1,14 @@
 """Module containing a tool for parsing a configuration file for argparse."""
 import argparse
 import json
+import os
 
 from bison.common.constants import CONFIG_PARAM
 from bison.common.log import Logger
+
+COMMANDS = (
+    "resolve", "split", "annotate", "summarize", "aggregate", "check_counts",
+    "heat_matrix", "pam_stats")
 
 
 # .....................................................................................
@@ -20,11 +25,14 @@ def _build_parser(command, description):
     parser = argparse.ArgumentParser(prog=command, description=description)
     parser.add_argument(
         f"--{CONFIG_PARAM.FILE}", type=str, help='Path to configuration file.')
+    parser.add_argument(
+        "command", type=str, choices=COMMANDS, help="Process to execute on data."
+    )
     return parser
 
 
 # .....................................................................................
-def _get_config_file_argument(parser):
+def _get_command_config_file_arguments(parser):
     """Retrieve the configuration file argument passed through a ArgumentParser.
 
     Args:
@@ -37,7 +45,20 @@ def _get_config_file_argument(parser):
     args = parser.parse_args()
     if hasattr(args, CONFIG_PARAM.FILE):
         config_filename = getattr(args, CONFIG_PARAM.FILE)
-    return config_filename
+    cmd = getattr(args, CONFIG_PARAM.COMMAND)
+    return cmd, config_filename
+
+
+# .....................................................................................
+def _test_choices(key, val, paramdict):
+    try:
+        options = paramdict[CONFIG_PARAM.CHOICES]
+    except KeyError:
+        pass
+    else:
+        if val not in options:
+            raise Exception(
+                f"Value {val} is not in valid options {options} for {key}.")
 
 
 # .....................................................................................
@@ -54,36 +75,51 @@ def process_arguments_from_file(config_filename, parameters):
             configuration file.
 
     Raises:
-        FileNotFoundError: on non-existent config_file.
+        Exception: on config_filename is None.
+        FileNotFoundError: on missing config_filename.
         json.decoder.JSONDecodeError: on badly constructed JSON file
         Exception: on missing configuration file argument.
         Exception: on missing required parameter in configuration file.
     """
     # Retrieve arguments from configuration file
-    if config_filename is not None:
-        try:
-            with open(config_filename, mode='rt') as in_json:
-                config = json.load(in_json)
-        except FileNotFoundError:
-            raise
-        except json.decoder.JSONDecodeError:
-            raise
+    if config_filename is None:
+        raise Exception("Missing required configuration file")
+
+    try:
+        with open(config_filename, mode='rt') as in_json:
+            config = json.load(in_json)
+    except FileNotFoundError:
+        raise
+    except json.decoder.JSONDecodeError:
+        raise
 
     # Test that required arguments are present in configuration file
     try:
         params = parameters["required"]
     except Exception:
         params = {}
-    for key, _paramdict in params.items():
+    for key, paramdict in params.items():
         try:
-            _ = config[key]
+            val = config[key]
+            _test_choices(key, val, paramdict)
         except Exception:
             raise Exception(f"Missing required argument {key} in {config_filename}")
 
     try:
         opt_args = parameters["optional"]
+        _test_choices(key, val, paramdict)
     except Exception:
         opt_args = {}
+    for okey, paramdict in opt_args.items():
+        try:
+            val = config[okey]
+            _test_choices(okey, val, paramdict)
+        except Exception:
+            # Add optional argument with value None to config dictionary
+            if paramdict[CONFIG_PARAM.TYPE] is list:
+                config[okey] = []
+            else:
+                config[okey] = None
     params.update(opt_args)
 
     # # Test some arguments for existence
@@ -125,24 +161,30 @@ def get_common_arguments(script_name, description, parameters):
         config: A parameter/argument dictionary contained in the config_filename.
         logger: logger for saving relevant processing messages
         report_filename: optional filename for saving summary process information.
+
+    Raises:
+        Exception: on missing --config_file argument
+
+    TODO: make config_file required or accept other parameters from the command line.
     """
     parser = _build_parser(script_name, description)
-    config_filename = _get_config_file_argument(parser)
+    command, config_filename = _get_command_config_file_arguments(parser)
+    if command not in COMMANDS:
+        raise Exception(f"{command} is not in valid commands: {COMMANDS}")
+    if not config_filename:
+        raise Exception(f"Script {script_name} requires value for config_file")
     config = process_arguments_from_file(config_filename, parameters)
+    config["command"] = command
+    meta_basename = f"{script_name}_{command}"
 
-    try:
-        log_filename = config["log_filename"]
-    except KeyError:
-        log_filename = None
+    config["report_filename"] = os.path.join(
+        config["output_path"], f"{meta_basename}.rpt")
+    log_filename = os.path.join(
+        config["process_path"], f"{meta_basename}.log")
+
     logger = Logger(script_name, log_filename=log_filename)
 
-    # If the output report was requested, write it
-    try:
-        report_filename = config["report_filename"]
-    except KeyError:
-        report_filename = None
-
-    return config, logger, report_filename
+    return config, logger
 
 
 # .....................................................................................

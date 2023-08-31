@@ -1,12 +1,12 @@
 """Common classes for BISON RIIS data processing."""
 import csv
-import logging
+from logging import DEBUG, ERROR, WARNING
 import os
 
 from bison.common.constants import (
-    APPEND_TO_RIIS, ERR_SEPARATOR, GBIF, LINENO_FLD, RIIS_DATA)
+    APPEND_TO_RIIS, LMBISON_PROCESS, ERR_SEPARATOR, GBIF, LINENO_FLD, REPORT, RIIS_DATA)
 from bison.common.util import (
-    get_csv_dict_reader, get_csv_dict_writer, get_fields_from_header)
+    BisonNameOp, get_csv_dict_reader, get_csv_dict_writer, get_fields_from_header)
 from bison.provider.gbif_api import GbifSvc
 
 
@@ -399,8 +399,7 @@ class RIIS:
             self._riis_filename, RIIS_DATA.DELIMITER, fieldnames=good_header,
             quote_none=False)
         self._log.log(
-            f"Reading RIIS from {self._riis_filename}", refname=self.__class__.__name__,
-            log_level=logging.INFO)
+            f"Reading RIIS from {self._riis_filename}", refname=self.__class__.__name__)
         try:
             for row in rdr:
                 lineno = rdr.line_num
@@ -435,15 +434,15 @@ class RIIS:
                     # Also index on RIIS occurrenceID
                     riis_id = row[RIIS_DATA.SPECIES_GEO_KEY]
                     self.by_riis_id[riis_id] = rec
-
-            print(f"Finished at linenum {lineno} with {len(self.by_riis_id)} unique records")
-
         except Exception:
             raise
         finally:
             inf.close()
+        self._log.log(
+            f"Read {lineno} lines from RIIS with {len(self.by_riis_id)} unique records",
+            refname=self.__class__.__name__)
 
-    # ...............................................
+        # ...............................................
     def _get_alternatives(self, gbifrec):
         name = None
         key = None
@@ -459,7 +458,7 @@ class RIIS:
                 except KeyError:
                     self._log.log(
                         f"Failed to get status from alternative {alt}",
-                        refname=self.__class__.__name__, log_level=logging.WARNING)
+                        refname=self.__class__.__name__, log_level=WARNING)
                 else:
                     if status == "accepted":
                         key = alt["usageKey"]
@@ -481,7 +480,7 @@ class RIIS:
         except KeyError:
             self._log.log(
                 f"Failed to get matchType from {gbifrec}",
-                refname=self.__class__.__name__, log_level=logging.ERROR)
+                refname=self.__class__.__name__, log_level=ERROR)
         else:
             if match_type != 'NONE':
                 try:
@@ -490,7 +489,7 @@ class RIIS:
                 except KeyError:
                     self._log.log(
                         f"Failed to get status from {gbifrec}",
-                        refname=self.__class__.__name__, log_level=logging.ERROR)
+                        refname=self.__class__.__name__, log_level=ERROR)
                 else:
                     if status == "accepted":
                         key = gbifrec["usageKey"]
@@ -512,7 +511,7 @@ class RIIS:
         except KeyError:
             self._log.log(
                 f"Failed to get status from {gbifrec}", refname=self.__class__.__name__,
-                log_level=logging.ERROR)
+                log_level=ERROR)
         else:
             if status == "accepted":
                 key = gbifrec["key"]
@@ -548,13 +547,11 @@ class RIIS:
         return new_key, new_name
 
     # ...............................................
-    def resolve_riis_to_gbif_taxa(self, outfname, overwrite=True):
+    def resolve_riis_to_gbif_taxa(self, overwrite=False):
         """Annotate RIIS records with GBIF accepted taxon name/key, write to file.
 
         Args:
-            outfname: full filename of an output file for the RIIS data annotated with
-                GBIF accepted taxon name and key
-            overwrite (bool): True to delete an existing updated RIIS file.
+            overwrite (bool): Flag indicating to overwrite existing resolved file.
 
         Returns:
             name_count (int): count of updated records
@@ -563,62 +560,86 @@ class RIIS:
         Raises:
             Exception: on unknown error in resolution
         """
+        report = {}
         msgdict = {}
 
         if not self.by_taxon:
             self.read_riis()
+        # Summary of inputs
+        report[REPORT.INFILE] = self._riis_filename
+        report[REPORT.RIIS_IDENTIFIER] = len(self.by_riis_id)
+        report[REPORT.RIIS_TAXA] = len(self.by_taxon)
 
-        name_count = 0
-        rec_count = 0
-        gbif_svc = GbifSvc()
-        # TODO: does resolution replace the key in by_taxon dictionary from USGS
-        #  sciname with GBIF sciname?
-        try:
-            for name, reclist in self.by_taxon.items():
-                # Resolve each name, update each record (1-3) for that name
-                # Try to match, if match is not 'accepted', repeat with returned
-                # accepted keys
-                data = reclist[0].data
-                try:
-                    new_key, new_name = self._find_current_accepted_taxon(
-                        gbif_svc, data[RIIS_DATA.SCINAME_FLD],
-                        data[RIIS_DATA.KINGDOM_FLD],
-                        data[RIIS_DATA.GBIF_KEY])
-                except Exception as e:
-                    err = f"Failed to get GBIF accepted taxon for" \
-                          f" {data[RIIS_DATA.SCINAME_FLD]}, {e}"
-                    self._add_msg(msgdict, name, err)
-                    self._log.log(
-                        err, refname=self.__class__.__name__, log_level=logging.ERROR)
-                else:
-                    name_count += 1
-                    # Annotate all records for this name with GBIF accepted key/sciname
-                    for rec in reclist:
-                        # Update record in dictionary riis_by_species with name keys
-                        rec.update_data(new_key, new_name)
-                        # Update dictionary riis_by_id with Occid keys
-                        self.by_riis_id[rec.data[RIIS_DATA.SPECIES_GEO_KEY]] = rec
-                        rec_count += 1
+        out_filename = BisonNameOp.get_annotated_riis_filename(self._riis_filename)
+        report[REPORT.OUTFILE] = out_filename
 
-                    # self._log.log(f"Updated {len(reclist)} records with {new_name}",
-                    #     refname=self.__class__.__name__)
-                    if (name_count % 1000) == 0:
+        name_count = rec_count = out_rec_count = 0
+        if overwrite is True or not os.path.exists(out_filename):
+            gbif_svc = GbifSvc()
+            # TODO: does resolution replace the key in by_taxon dictionary from USGS
+            #  sciname with GBIF sciname?
+            try:
+                for name, reclist in self.by_taxon.items():
+                    # Resolve each name, update each record (1-3) for that name
+                    # Try to match, if match is not 'accepted', repeat with returned
+                    # accepted keys
+                    data = reclist[0].data
+                    try:
+                        new_key, new_name = self._find_current_accepted_taxon(
+                            gbif_svc, data[RIIS_DATA.SCINAME_FLD],
+                            data[RIIS_DATA.KINGDOM_FLD],
+                            data[RIIS_DATA.GBIF_KEY])
+                    except Exception as e:
+                        err = f"Failed to get GBIF accepted taxon for" \
+                              f" {data[RIIS_DATA.SCINAME_FLD]}, {e}"
+                        self._add_msg(msgdict, name, err)
                         self._log.log(
-                            f"*** RIIS Name {name_count} ***",
-                            refname=self.__class__.__name__)
+                            err, refname=self.__class__.__name__, log_level=ERROR)
+                    else:
+                        name_count += 1
+                        # Annotate all records for this name with GBIF accepted key/sciname
+                        for rec in reclist:
+                            # Update record in dictionary riis_by_species with name keys
+                            rec.update_data(new_key, new_name)
+                            # Update dictionary riis_by_id with Occid keys
+                            self.by_riis_id[rec.data[RIIS_DATA.SPECIES_GEO_KEY]] = rec
+                            rec_count += 1
 
-        except Exception as e:
-            self._add_msg(msgdict, "unknown_error", f"{e}")
-            raise
+                        if (name_count % 1000) == 0:
+                            self._log.log(
+                                f"*** RIIS Name {name_count} ***",
+                                refname=self.__class__.__name__)
+            except Exception as e:
+                self._add_msg(msgdict, "unknown_error", f"{e}")
+                raise
 
-        return name_count, rec_count
+            out_rec_count = self._write_resolved_riis(out_filename, overwrite=overwrite)
+
+        # Use pre-resolved data
+        else:
+            self.__init__(out_filename, self._log)
+            self.read_riis()
+
+        # Report new or existing contents
+        report[REPORT.PROCESS] = LMBISON_PROCESS.RESOLVE["postfix"]
+        # Summary of outputs
+        report[REPORT.SUMMARY] = {
+            REPORT.RIIS_IDENTIFIER: len(self.by_riis_id),
+            REPORT.RIIS_TAXA: len(self.by_taxon),
+            REPORT.RIIS_RESOLVE_FAIL: len(self.bad_species),
+            REPORT.TAXA_RESOLVED: name_count,
+            REPORT.RECORDS_UPDATED: rec_count,
+            REPORT.RECORDS_OUTPUT: out_rec_count
+        }
+
+        return report
 
     # ...............................................
-    def write_resolved_riis(self, outfname, overwrite=True):
+    def _write_resolved_riis(self, out_filename, overwrite=True):
         """Write RIIS records to file.
 
         Args:
-            outfname (str): Full path and filename for updated RIIS records.
+            out_filename (str): Full path and output filename for annotated records.
             overwrite (bool): True to delete an existing updated RIIS file.
 
         Raises:
@@ -630,6 +651,7 @@ class RIIS:
         Returns:
             count of successfully written records
         """
+        # outfname = BisonNameOp.get_annotated_riis_filename(self._riis_filename)
         msgdict = {}
         # Make sure data is present
         if not self.by_riis_id:
@@ -646,12 +668,13 @@ class RIIS:
         new_header = self.annotated_riis_header
         try:
             writer, outf = get_csv_dict_writer(
-                outfname, new_header, RIIS_DATA.DELIMITER, fmode="w", overwrite=overwrite)
+                out_filename, new_header, RIIS_DATA.DELIMITER, fmode="w",
+                overwrite=overwrite)
         except Exception:
             raise
 
         self._log.log(
-            f"Writing resolved RIIS to {outfname}", refname=self.__class__.__name__)
+            f"Writing resolved RIIS to {out_filename}", refname=self.__class__.__name__)
         rec_count = 0
         try:
             for name, rec in self.by_riis_id.items():
@@ -662,7 +685,7 @@ class RIIS:
                 except Exception as e:
                     msg = f"Failed to write {rec.data}, {e}"
                     self._log.log(
-                        msg, refname=self.__class__.__name__, log_level=logging.ERROR)
+                        msg, refname=self.__class__.__name__, log_level=ERROR)
                     self._add_msg(msgdict, name, msg)
                     raise
 
@@ -714,10 +737,10 @@ class RIIS:
         fld_count = len(header)
         if fld_count != len(expected_header):
             self._log.log(
-                ERR_SEPARATOR, refname=self.__class__.__name__, log_level=logging.ERROR)
+                ERR_SEPARATOR, refname=self.__class__.__name__, log_level=ERROR)
             self._log.log(
                 f"[Error] Header has {fld_count} fields, != {len(expected_header)} " +
-                "expected", refname=self.__class__.__name__, log_level=logging.ERROR)
+                "expected", refname=self.__class__.__name__, log_level=ERROR)
 
         good_header = []
         for i in range(len(header)):
@@ -727,22 +750,20 @@ class RIIS:
 
             if good_fieldname != expected_header[i]:
                 self._log.log(
-                    ERR_SEPARATOR, refname=self.__class__.__name__,
-                    log_level=logging.ERROR)
-                self._log.error(
+                    ERR_SEPARATOR, refname=self.__class__.__name__, log_level=ERROR)
+                self._log.log(
                     f"[Error] Header {header[i]} != {expected_header[i]} expected",
-                    refname=self.__class__.__name__, log_level=logging.ERROR)
+                    refname=self.__class__.__name__, log_level=ERROR)
                 good_header = None
         return good_header
 
 
 # .............................................................................
-def resolve_riis_taxa(riis_filename, annotated_riis_filename, logger, overwrite=True):
+def resolve_riis_taxa(riis_filename, logger, overwrite=True):
     """Resolve and write GBIF accepted names and taxonKeys in RIIS records.
 
     Args:
         riis_filename (str): full filename for original RIIS data records.
-        annotated_riis_filename (str): full filename for output RIIS data records.
         logger (object): logger for saving relevant processing messages
         overwrite (bool): True to delete an existing updated RIIS file.
 
@@ -755,55 +776,40 @@ def resolve_riis_taxa(riis_filename, annotated_riis_filename, logger, overwrite=
     refname = "resolve_riis_taxa"
     report = {
         refname: {
-            "riis_filename": riis_filename,
-            "annotated_riis_filename": annotated_riis_filename,
             "expected_count": RIIS_DATA.SPECIES_GEO_DATA_COUNT
         }
     }
     riis = RIIS(riis_filename, logger)
     # Update species data
     try:
-        name_count, rec_count = riis.resolve_riis_to_gbif_taxa(
-            annotated_riis_filename, overwrite=True)
-        report[refname]["riis_record_count"] = rec_count
-        report[refname]["unique_name_count"] = name_count
-        logger.log(
-            f"Resolved {len(riis.by_riis_id)} taxa in {riis_filename}, next, write.",
-            refname=refname)
+        report = riis.resolve_riis_to_gbif_taxa(overwrite=overwrite)
+        rec_count = report[REPORT.RECORDS_UPDATED]
+        name_count = report[REPORT.TAXA_RESOLVED]
+        out_rec_count = report[REPORT.RECORDS_OUTPUT]
     except Exception as e:
         report[refname]["error"] = f"Failed to resolve {refname}: {e}"
         logger.log(
             f"Unexpected failure {e} in resolve_riis_taxa", refname=refname,
-            log_level=logging.ERROR)
+            log_level=ERROR)
         raise
 
-    # Debug statements for inconsistent counts
-    if len(riis.by_riis_id) != rec_count:
-        logger.log(
-            f"Records in RIIS {len(riis.by_riis_id)} != {rec_count} records read "
-            f"from {riis_filename} by RIIS", refname=refname, log_level=logging.DEBUG)
-    if len(riis.by_taxon) != name_count:
-        logger.log(
-            f"Taxa in RIIS {len(riis.by_taxon)} != {rec_count} names resolved "
-            f"from {riis_filename} by RIIS", refname=refname, log_level=logging.DEBUG)
+    logger.log(
+        f"Resolved {name_count} taxa in {rec_count} records in {riis_filename} to "
+        f"{out_rec_count} in {report[REPORT.OUTFILE]}.",
+        refname=refname)
 
-    # Write, always replace
-    try:
-        count = riis.write_resolved_riis(annotated_riis_filename, overwrite=overwrite)
-        report[refname]["annotated_count"] = count
-        logger.log(
-            f"Wrote {count} records to {annotated_riis_filename}.", refname=refname)
-    except Exception as e:
-        report[refname]["error"] = f"Failed to write {refname}: {e}"
-        logger.log(
-            f"Unexpected failure {e} in resolve_riis_taxa", refname=refname,
-            log_level=logging.ERROR)
-    else:
-        if count != RIIS_DATA.SPECIES_GEO_DATA_COUNT:
-            logger.log(
-                f"Resolved {count} RIIS records, expecting " +
-                f"{RIIS_DATA.SPECIES_GEO_DATA_COUNT}", refname=refname,
-                log_level=logging.ERROR)
+    # Debug statements for inconsistent counts
+    logger.log(
+        f"by_riis_id {len(riis.by_riis_id)} ?= {rec_count} records read",
+        refname=refname, log_level=DEBUG)
+
+    logger.log(
+        f"by_taxon {len(riis.by_taxon)} ?= {name_count} names resolved.",
+        refname=refname, log_level=DEBUG)
+
+    logger.log(
+        f"output recs {out_rec_count} ?= {RIIS_DATA.SPECIES_GEO_DATA_COUNT} expected.",
+        refname=refname, log_level=ERROR)
 
     return report
 

@@ -3,7 +3,7 @@ import json
 import os
 from datetime import datetime
 
-from bison.common.constants import CONFIG_PARAM, DWC_PROCESS
+from bison.common.constants import CONFIG_PARAM, LMBISON_PROCESS
 from bison.common.util import BisonNameOp
 from bison.process.annotate import Annotator
 from bison.tools._config_parser import get_common_arguments
@@ -48,30 +48,18 @@ PARAMETERS = {
                     CONFIG_PARAM.IS_OUPUT_DIR: True,
                     CONFIG_PARAM.HELP: "Destination directory for output data."
                 },
-        },
-    "optional":
-        {
-            "log_filename":
-                {
-                    CONFIG_PARAM.TYPE: str,
-                    CONFIG_PARAM.HELP: "Filename to write logging data."},
-            "report_filename":
-                {
-                    CONFIG_PARAM.TYPE: str,
-                    CONFIG_PARAM.HELP: "Filename to write summary metadata."}
-
         }
 }
 
 
 # .............................................................................
 def annotate_occurrence_files(
-        dwc_filenames, riis_w_gbif_taxa_filename, geo_path, output_path, logger):
+        dwc_filenames, annotated_riis_filename, geo_path, output_path, logger):
     """Annotate GBIF records with geographic areas, and RIIS key and assessment.
 
     Args:
         dwc_filenames (list): full filenames containing GBIF data for annotation.
-        riis_w_gbif_taxa_filename (str): filename containing RIIS data annotated with
+        annotated_riis_filename (str): filename containing RIIS data annotated with
              GBIF accepted taxon name and ID.
         geo_path (str): Base directory containing geospatial data inputs.
         output_path: destination directory for output files of annotated records
@@ -85,22 +73,22 @@ def annotate_occurrence_files(
         FileNotFoundError: on missing DWC input file(s).
     """
     report = {
-        "riis_w_gbif_taxa_filename": riis_w_gbif_taxa_filename,
+        "annotated_riis_filename": annotated_riis_filename,
         "geospatial_data_dir": geo_path,
         "dwc_inputs": [],
     }
-    if not os.path.exists(riis_w_gbif_taxa_filename):
+    if not os.path.exists(annotated_riis_filename):
         raise FileNotFoundError(
-            f"Missing annotated RIIS file {riis_w_gbif_taxa_filename}.")
+            f"Missing annotated RIIS file {annotated_riis_filename}.")
     for dwc_fname in dwc_filenames:
         if not os.path.exists(dwc_fname):
             raise FileNotFoundError(f"Missing input DWC occurrence file {dwc_fname}.")
 
     ant = Annotator(
-        geo_path, logger, riis_with_gbif_filename=riis_w_gbif_taxa_filename)
+        logger, geo_path, annotated_riis_filename=annotated_riis_filename)
     for dwc_fname in dwc_filenames:
-        out_fname = BisonNameOp.get_out_process_filename(
-            dwc_fname, outpath=output_path, step_or_process=DWC_PROCESS.ANNOTATE)
+        out_fname = BisonNameOp.get_process_outfilename(
+            dwc_fname, outpath=output_path, step_or_process=LMBISON_PROCESS.ANNOTATE)
 
         logger.log(
             f"Start Time: {datetime.now()}: Submit {dwc_fname} for annotation "
@@ -124,26 +112,24 @@ def cli():
         Exception: on unknown JSON write error.
     """
     script_name = os.path.splitext(os.path.basename(__file__))[0]
-    config, logger, report_filename = get_common_arguments(
+    config, logger = get_common_arguments(
         script_name, DESCRIPTION, PARAMETERS)
 
     report = annotate_occurrence_files(
         config["dwc_filenames"], config["riis_with_gbif_taxa_filename"],
         config["geoinput_path"], config["output_path"], logger)
 
-    # If the output report was requested, write it
-    if report_filename:
-        try:
-            with open(report_filename, mode='wt') as out_file:
-                json.dump(report, out_file, indent=4)
-        except OSError:
-            raise
-        except IOError:
-            raise
-        except Exception:
-            raise
-        logger.log(
-            f"Wrote report file to {report_filename}", refname=script_name)
+    try:
+        with open(config["report_filename"], mode='wt') as out_file:
+            json.dump(report, out_file, indent=4)
+    except OSError:
+        raise
+    except IOError:
+        raise
+    except Exception:
+        raise
+    logger.log(
+        f"Wrote report file to {config['report_filename']}", refname=script_name)
 
 
 # .....................................................................................
