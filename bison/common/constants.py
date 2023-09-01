@@ -611,7 +611,7 @@ class GBIF:
     DWCA_INTERPRETED = "occurrence"
     DWCA_VERBATIM = "verbatim"
     DWCA_DELIMITER = "\t"
-    NAMEKEY_FIELD = "taxonKey"
+    NAMEKEY_FLD = "taxonKey"
     ORG_KEYS = {
         "apitype": "organization",
         "saveme": ["key", "title", "description", "created", "modified", "homepage"],
@@ -766,7 +766,6 @@ class RIIS_DATA:
         "Publication Remarks",
     ]
     # Introduced or Invasive Species List.
-    SPECIES_GEO_FNAME = "US-RIIS_MasterList.csv"
     SPECIES_GEO_KEY = "occurrenceID"
     GBIF_KEY = "GBIF taxonKey"
     ITIS_KEY = "ITIS TSN"
