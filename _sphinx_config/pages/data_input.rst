@@ -3,7 +3,7 @@ Input data
 -----------------------
 
 2023, Year 4 SOW specifies:
-  * US Regristry of Introduced and Invasive Species
+  * US Registry of Introduced and Invasive Species
   * GBIF occurrence data from the US with coordinates
   * US Census state and county boundaries
   * American Indian and Alaskan Native Land Area Representations (AIAN‐LAR)
@@ -13,6 +13,13 @@ Input data
 Data inputs may be updated regularly, so constants in some files may change with the
 updates.  Below are constants and their file locations that should be checked and
 possibly modified anytime input data is updated.
+
+USGS may choose to change the geospatial regions for aggregation.  If so, the REGION
+class in `constants.py
+<https://github.com/lifemapper/bison/tree/main/bison/common/constants.py>`_
+must be changed, and code changed slightly.  Only the county/state data is required for
+matching RIIS records to occurrence records.
+
 
 RIIS data
 ***********
@@ -40,6 +47,8 @@ To get a current version of GBIF data:
   * Create a user account on the GBIF website, then login and
   * request the data by putting the following URL in a browser:
     https://www.gbif.org/occurrence/search?country=US&has_coordinate=true&has_geospatial_issue=false&occurrence_status=present
+  * adding a restriction to occurrence data identified to species or a lower rank
+    will reduce the amount of data that will be filtered out.
 
 The query will request a download, which will take some time for GBIF to assemble.
 GBIF will send an email with a link for downloading the Darwin Core Archive, a
@@ -65,19 +74,25 @@ Check/modify attributes in the GBIF class in the `constants.py
 * Verify that the DWCA_META_FNAME is still the correct file for field definitions.
 
 
-Census data
-***********
+Geographic Data for aggregation
+********************************
 
+Census data
+----------------
 Up-to-date census data, including state and county boundaries, and American Indian,
 Alaska Native, and Native Hawaiian, are available at:
 https://www.census.gov/geographies/mapping-files/time-series/geo/cartographic-boundary.html
 
 Shapefiles used for 2023 processing (2022 was not yet available at time of download):
-* state and county boundaries:  cb_2021_us_county_500k
-* AIANNH boundaries: cb_2021_us_aiannh_500kCensus data
+Census, Cartographic Boundary Files, 2021
+* https://www.census.gov/geographies/mapping-files/time-series/geo/cartographic-boundary.html
+
 
 State and County
-----------------
+.................
+
+**Counties**
+* 1:500,000, cb_2021_us_county_500k.zip
 
 Check/modify attributes in the REGION class in the `constants.py
 <https://github.com/lifemapper/bison/tree/main/bison/common/constants.py>`_ file:
@@ -85,7 +100,10 @@ including:  COUNTY["file"] for the filename and the keys in COUNTY["map"] for
 fieldnames within that shapefile.
 
 AIANNH
-----------------
+.........
+
+**American Indian/Alaska Native Areas/Hawaiian Home Lands**, AIANNH
+* 1:500,000, cb_2021_us_aiannh_500k.zip
 
 Check/modify attributes in the REGION class in the `constants.py
 <https://github.com/lifemapper/bison/tree/main/bison/common/constants.py>`_ file:
@@ -93,17 +111,33 @@ including:  AIANNH["file"] for the filename and the keys in AIANNH["map"] for
 fieldnames within that shapefile.
 
 Protected Areas Database
-***********
+------------------------
 
+DOI
+....
+
+Because the PAD data is divided into datasets by Department of Interior (DOI) region,
+we intersect first with DOI to identify which PAD dataset to search.
+
+* DOI regions
+    * https://www.doi.gov/employees/reorg/unified-regional-boundaries
+
+US-PAD
+........
 U.S. Geological Survey (USGS) Gap Analysis Project (GAP), 2022, Protected Areas Database of the United States (PAD-US) 3.0: U.S. Geological Survey data release, https://doi.org/10.5066/P9Q9LQ4B.
 
-
-* US_PAD from DOI regions 1-12
-  * Geographic areas for Designation, Easement, Fee, Proclamation, Marine
-  * target GAP status 1-3
-    * 1 - managed for biodiversity - disturbance events proceed or are mimicked
-    * 2 - managed for biodiversity - disturbance events suppressed
-    * 3 - managed for multiple uses - subject to extractive (e.g. mining or logging) or OHV use
-    * 4 - no known mandate for biodiversity protection
+* US_PAD for DOI regions 1-12
+    * https://www.usgs.gov/programs/gap-analysis-project/science/pad-us-data-download
+    * Metadata: https://www.sciencebase.gov/catalog/item/622262c8d34ee0c6b38b6bcf
+    * Citation:
+        U.S. Geological Survey (USGS) Gap Analysis Project (GAP), 2022,
+        Protected Areas Database of the United States (PAD-US) 3.0:
+        U.S. Geological Survey data release, https://doi.org/10.5066/P9Q9LQ4B.
+    * Geographic areas for Designation, Easement, Fee, Proclamation, Marine
+    * target GAP status 1-3
+        * 1 - managed for biodiversity - disturbance events proceed or are mimicked
+        * 2 - managed for biodiversity - disturbance events suppressed
+        * 3 - managed for multiple uses - subject to extractive (e.g. mining or logging) or OHV use
+        * 4 - no known mandate for biodiversity protection
 
 

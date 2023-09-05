@@ -2,7 +2,6 @@
 LMBison Preparation
 ===============
 
------------------------
 Hardware requirements
 -----------------------
 
@@ -17,7 +16,6 @@ These processes are all written in Python, and the implementation has been teste
 on a machine running Ubuntu Linux.  Scripts will need minimal modification to run
 on Windows or OSX successfully.
 
------------------------
 Download this Repository
 -----------------------
 
@@ -40,3 +38,26 @@ All hands-on commands will be executed in a command prompt window from this
 directory location.  In Linux or OSX, open a Terminal
 window.
 
+Download Large Data
+-----------------------
+
+Download newest versions of geospatial data.  Links and more information at `Input Data
+<data_input>`_ .  In each case, new versions of the data might have different
+fieldnames which are used as constants in the project.  Fields and their meaning/use
+are identified in the same file, along with the constants that may need editing.  If
+no new version is available, constants and fieldnames do not have to be checked.
+
+Required Data not included in Github repo:
+
+* US-RIIS data should be provided by the USGS.
+* GBIF data may be downloaded at any time.  Fieldnames should remain constant.
+* Census data:
+  * county (includes state field)
+  * American Indian/Alaska Native Areas/Hawaiian Home Lands (AIANNH)
+* Protected Areas Database (US-PAD)
+  * split into datasets by Dept of Interior region
+* Department of Interior (DOI)
+  * used to identify which US-PAD dataset to intersect
+
+Create expected file structure
+-----------------------
