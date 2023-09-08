@@ -242,12 +242,13 @@ class GeoResolver(object):
         return fldvals
 
     # ...............................................
-    def find_enclosing_polygon_attributes(self, lon, lat):
+    def find_enclosing_polygon_attributes(self, lon, lat, buffer=None):
         """Return attributes of polygon enclosing these coordinates.
 
         Args:
             lon (str or double): longitude value
             lat (str or double): latitude value
+            buffer (numeric): single value for buffering a geometry before intersection.
 
         Returns:
             fldvals (dict): of fieldnames and values
@@ -265,12 +266,14 @@ class GeoResolver(object):
 
         start = time.time()
         # Construct point
-        pt = ogr.Geometry(ogr.wkbPoint)
-        pt.AddPoint(lon, lat)
+        geom = ogr.Geometry(ogr.wkbPoint)
+        geom.AddPoint(lon, lat)
+        if buffer is not None:
+            geom = geom.Buffer(buffer)
         # Intersect with spatial index to get ID (fid) of intersecting features,
         # buffer if necessary
         try:
-            fldvals = self._find_intersecting_feature_values(pt)
+            fldvals = self._find_intersecting_feature_values(geom)
         except ValueError:
             raise
         except GeoException as e:
@@ -282,9 +285,9 @@ class GeoResolver(object):
 
         # Elapsed time
         ogr_seconds = time.time()-start
-        if ogr_seconds > 0.75:
+        if ogr_seconds > 1:
             self.logit(
-                f"Intersect point {lon}, {lat}; OGR time {ogr_seconds}",
+                f"Intersect geom OGR time {ogr_seconds}",
                 refname=self.__class__.__name__, log_level=DEBUG)
 
         return fldvals
@@ -298,44 +301,36 @@ class GeoResolver(object):
 
 
 # .............................................................................
-def get_full_coverage_resolvers(geo_input_path, logger=None):
+def get_geo_resolvers(geo_input_path, regions, logger=None):
     """Get geospatial indexes for regions in the area of interest.
 
     Args:
         geo_input_path (str): input path for geospatial files to intersect points
+        regions (sequence of common.constants.REGION): list of REGION members for
+            to retrieve spatial index resolvers for.
         logger (object): logger for saving relevant processing messages
 
     Returns:
-        geo_partials: list of spatial indexes.
+        geo_fulls: list of spatial indexes that each cover a region.
+        geo_subsets: dictionary of spatial indexes that together comprise a region.
     """
     geo_fulls = []
-    for region in REGION.full_region():
-        fn = os.path.join(geo_input_path, region["file"])
-        geo_fulls.append(GeoResolver(
-            fn, region["map"], logger=logger, is_disjoint=region["is_disjoint"],
-            buffer_vals=region["buffer"]))
-    return geo_fulls
+    geo_subsets = {}
+    for region in regions:
+        if region in REGION.full_region():
+            fn = os.path.join(geo_input_path, region["file"])
+            geo_fulls.append(GeoResolver(
+                fn, region["map"], logger=logger, is_disjoint=region["is_disjoint"],
+                buffer_vals=region["buffer"]))
 
+        elif region == REGION.combine_to_region():
+            for subset, rel_fn in region["files"]:
+                fn = os.path.join(geo_input_path, rel_fn)
+                geo_subsets[subset] = GeoResolver(
+                    fn, REGION.PAD["map"], logger=logger, is_disjoint=REGION.PAD["is_disjoint"],
+                    buffer_vals=REGION.PAD["buffer"])
 
-# .............................................................................
-def get_subsets_of_one_coverage_resolvers(geo_input_path, logger=None):
-    """Get geospatial indexes for subset regions of a whole.
-
-    Args:
-        geo_input_path (str): input path for geospatial files to intersect points
-        logger (object): logger for saving relevant processing messages
-
-    Returns:
-        geo_partials: dictionary of subset name and spatial index.
-    """
-    geo_partials = {}
-    region = REGION.combine_to_region()
-    for subset, rel_fn in region["files"]:
-        fn = os.path.join(geo_input_path, rel_fn)
-        geo_partials[subset] = GeoResolver(
-            fn, region["map"], logger=logger, is_disjoint=region["is_disjoint"],
-            buffer_vals=region["buffer"])
-    return geo_partials
+    return geo_fulls, geo_subsets
 
 
 # .............................................................................
@@ -352,6 +347,5 @@ class GeoException(Exception):
 
 # .............................................................................
 __all__ = [
-    "get_full_coverage_resolvers",
-    "get_subsets_of_one_coverage_resolvers"
+    "get_geo_resolvers"
 ]

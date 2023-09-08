@@ -14,14 +14,23 @@ Data inputs may be updated regularly, so constants in some files may change with
 updates.  Below are constants and their file locations that should be checked and
 possibly modified anytime input data is updated.
 
+Pre-Processing
+************
+
+Currently, much of our input data (GBIF, census county/state and AIANNH) are in
+EPSG:4326, using decimal degrees.  The DOI dataset is in NAD_1983_Albers/EPSG:6269, and
+the PAD datasets are in USA_Contiguous_Albers_Equal_Area_Conic_USGS_version/EPSG:9822.
+These, and possibly other updated datasets must be projected to EPSG:4326 before
+intersecting points and annotating records.  A sample script is in `project_doi_pad.sh
+<https://github.com/lifemapper/bison/tree/main/bison/data/project_doi_pad.sh>`_
+
 USGS may choose to change the geospatial regions for aggregation.  If so, the REGION
 class in `constants.py
 <https://github.com/lifemapper/bison/tree/main/bison/common/constants.py>`_
 must be changed, and code changed slightly.  Only the county/state data is required for
 matching RIIS records to occurrence records.
 
-
-RIIS data
+USGS RIIS data
 ***********
 
 US-RIIS V2.0, November 2022, available at https://doi.org/10.5066/P9KFFTOD
@@ -139,5 +148,3 @@ U.S. Geological Survey (USGS) Gap Analysis Project (GAP), 2022, Protected Areas 
         * 2 - managed for biodiversity - disturbance events suppressed
         * 3 - managed for multiple uses - subject to extractive (e.g. mining or logging) or OHV use
         * 4 - no known mandate for biodiversity protection
-
-

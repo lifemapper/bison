@@ -824,6 +824,30 @@ class BisonNameOp():
 
     # .............................................................................
     @staticmethod
+    def get_update_outfilename(in_filename, version="2"):
+        """Construct output filename for the next processing step of the given file.
+
+        Args:
+            in_filename (str): full filename of CSV data.
+            version (str): version number to append to filename
+
+        Returns:
+            out_fname: base or full filename of output file, given the input filename.
+                If the input filename reflects the final processing step, the method
+                returns None
+        """
+        sep = BisonNameOp.separator
+        pth, basename, orig_ext, chunk, old_postfix = BisonNameOp.parse_process_filename(
+            in_filename)
+        if chunk is not None:
+            basename = f"{basename}{sep}{chunk}"
+
+        fname = f"{basename}{sep}{old_postfix}{version}{orig_ext}"
+        outfname = os.path.join(pth, fname)
+        return outfname
+
+    # .............................................................................
+    @staticmethod
     def _get_process_base_filename(in_filename, step_or_process=None):
         """Construct output base filename for this processing step of the given file.
 

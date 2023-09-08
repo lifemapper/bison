@@ -7,11 +7,11 @@ import time
 
 from bison.common.constants import (
     APPEND_TO_DWC, CONFIG_PARAM, LMBISON_PROCESS, GBIF, ENCODING, EXTRA_CSV_FIELD, LOG,
-    REGION, REPORT, RIIS_DATA)
+    REGION, REPORT)
 from bison.common.util import (
     BisonNameOp, Chunker, delete_file, get_csv_dict_reader)
 from bison.process.aggregate import Aggregator
-from bison.process.annotate import (Annotator, parallel_annotate)
+from bison.process.annotate import (Annotator, parallel_annotate, parallel_annotate_update)
 from bison.process.geoindex import (GeoResolver, GeoException)
 from bison.process.geo_matrix import SiteMatrix
 from bison.process.sanity_check import Counter
@@ -103,9 +103,8 @@ def a_find_or_create_subset_files(gbif_filename, output_path, logger):
         logger (object): logger for saving relevant processing messages
 
     Returns:
-        raw_filenames (list): full filenames for subset files created from large
+        chunk_filenames (list): full filenames for subset files created from large
             input file.
-        output_path (str): Destination directory for subset files.
     """
     chunk_filenames = Chunker.identify_chunk_files(gbif_filename, output_path)
     # If any are missing, delete them all and split
@@ -134,8 +133,8 @@ def a_resolve_riis_taxa(riis_filename, logger, overwrite=False):
         overwrite (bool): Flag indicating whether to overwrite existing resolved file.
 
     Returns:
-        riis_resolved_filename: output file containing RIIS records annotated with GBIF
-            accepted names.
+        report (dict): dictionary summarizing metadata about the processes and
+            output files.
     """
     nnsl = RIIS(riis_filename, logger=logger)
     # Update species data
@@ -159,6 +158,65 @@ def a_resolve_riis_taxa(riis_filename, logger, overwrite=False):
         report[REPORT.REPORTFILE] = report_filename
 
     return report
+
+
+# .............................................................................
+def bb_annotate_pad_occurrence_files(
+        annotated_filenames, annotated_riis_filename, geo_path, process_path, logger,
+        run_parallel=True, overwrite=False):
+    """Annotate GBIF records with PAD, after DOI annotation.
+
+    Args:
+        annotated_filenames (list): list of full filenames containing
+            partially-annotated GBIF data for PAD annotation.
+        annotated_riis_filename (str): Full path to RIIS data annotated with GBIF names.
+        geo_path (str): Base directory containing geospatial region files
+        process_path (str): Destination directory for output files.
+        logger (object): logger for saving relevant processing messages
+        run_parallel (bool): Flag indicating whether to process subset files in parallel
+        overwrite (bool): Flag indicating whether to overwrite existing annotated file(s).
+
+    Returns:
+        report: full filenames for GBIF data newly annotated with state,
+            county, RIIS assessment, and RIIS key.  If a file exists, do not annotate.
+    """
+    if run_parallel and len(annotated_filenames) > 1:
+        rpts = parallel_annotate_update(
+            annotated_filenames, annotated_riis_filename, geo_path, process_path, logger,
+            overwrite, [REGION.DOI, REGION.PAD])
+        reports = {"reports": rpts}
+
+    else:
+        reports = {"reports": []}
+        # Compare with serial execution
+        all_start = time.perf_counter()
+        # Use the same RIIS for all Annotators
+        riis = RIIS(annotated_riis_filename, logger)
+        riis.read_riis()
+
+        logger.log(
+            f"Annotate files with PAD: {time.asctime()}", refname=script_name)
+        for part_ann_fname in annotated_filenames:
+            # Add locality-intersections for DOI and PAD to GBIF DwC records
+            start = time.perf_counter()
+            ant = Annotator(
+                logger, geo_path, riis=riis, regions=[REGION.DOI, REGION.PAD])
+            rpt = ant.annotate_dwca_records_update(
+                part_ann_fname, version=2, overwrite=overwrite)
+
+            end = time.perf_counter()
+
+            reports["reports"].append(rpt)
+            logger.log(
+                f"Elapsed time: {end-start} seconds",
+                refname=script_name)
+
+        all_end = time.perf_counter()
+        logger.log(
+            f"PAD Annotation End Time: {time.asctime()}, {all_end-all_start} "
+            f"seconds elapsed", refname=script_name)
+
+    return reports
 
 
 # .............................................................................
@@ -667,6 +725,7 @@ def _prepare_args(config):
     # Process entire GBIF file, or do it in chunks
     booltmp = str(config["do_split"]).lower()
     # First determine whether to process one file or smaller subsets
+    do_split = False
     if (booltmp in ("yes", "y", "true", "1")) or config["command"] == "split":
         do_split = True
 
@@ -764,6 +823,13 @@ def execute_command(config, logger):
         # Annotate DwC records with regions, and if found, RIIS determination
         report = b_annotate_occurrence_files(
             raw_filenames, annotated_riis_filename, config["geo_path"],
+            config["process_path"], logger, run_parallel=True, overwrite=True)
+
+    elif config["command"] == "update_doi_pad":
+        step_or_process = LMBISON_PROCESS.UPDATE
+        # Annotate DwC records with regions, and if found, RIIS determination
+        report = bb_annotate_pad_occurrence_files(
+            annotated_filenames, annotated_riis_filename, config["geo_path"],
             config["process_path"], logger, run_parallel=True, overwrite=True)
 
     elif config["command"] == "summarize":

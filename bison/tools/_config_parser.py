@@ -7,8 +7,8 @@ from bison.common.constants import CONFIG_PARAM
 from bison.common.log import Logger
 
 COMMANDS = (
-    "resolve", "split", "annotate", "summarize", "aggregate", "check_counts",
-    "heat_matrix", "pam_stats")
+    "resolve", "split", "annotate", "update_doi_pad", "summarize", "aggregate",
+    "check_counts", "heat_matrix", "pam_stats")
 
 
 # .....................................................................................

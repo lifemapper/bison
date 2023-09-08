@@ -125,6 +125,7 @@ class LMBISON_PROCESS:
     RESOLVE = {"step": 0, "postfix": "resolve"}
     CHUNK = {"step": 1, "postfix": "raw", "prefix": "chunk"}
     ANNOTATE = {"step": 2, "postfix": "annotate"}
+    UPDATE = {"step": 2, "postfix": "update"}
     SUMMARIZE = {"step": 3, "postfix": "summary"}
     COMBINE = {"step": 4, "postfix": "combine"}
     AGGREGATE = {"step": 5, "postfix": "aggregate"}
@@ -386,24 +387,24 @@ class APPEND_TO_DWC:
     FILTER_FLAG = "filter_out"
     # FILTER_FLAG = "do_summarize"
 
-    @staticmethod
-    def region_fields():
-        """Fields containing a region. to summarize RIIS status of occurrence records.
-
-        Returns:
-            list of all fields used to summarize RIIS determination of records.
-        """
-        return (
-            APPEND_TO_DWC.RESOLVED_CTY, APPEND_TO_DWC.RESOLVED_ST,
-            # APPEND_TO_DWC.AIANNH_GEOID,
-            APPEND_TO_DWC.AIANNH_NAME,
-            APPEND_TO_DWC.PAD_NAME,
-            # APPEND_TO_DWC.PAD_MGMT,
-            # APPEND_TO_DWC.PAD_GAP_STATUS,
-            # APPEND_TO_DWC.PAD_GAP_STATUS_DESC,
-            # APPEND_TO_DWC.DOI_REGION,
-            # APPEND_TO_DWC.FILTER_FLAG
-        )
+    # @staticmethod
+    # def region_fields():
+    #     """Fields containing a region. to summarize RIIS status of occurrence records.
+    #
+    #     Returns:
+    #         list of all fields used to summarize RIIS determination of records.
+    #     """
+    #     return (
+    #         APPEND_TO_DWC.RESOLVED_CTY, APPEND_TO_DWC.RESOLVED_ST,
+    #         # APPEND_TO_DWC.AIANNH_GEOID,
+    #         APPEND_TO_DWC.AIANNH_NAME,
+    #         APPEND_TO_DWC.PAD_NAME,
+    #         # APPEND_TO_DWC.PAD_MGMT,
+    #         # APPEND_TO_DWC.PAD_GAP_STATUS,
+    #         # APPEND_TO_DWC.PAD_GAP_STATUS_DESC,
+    #         # APPEND_TO_DWC.DOI_REGION,
+    #         # APPEND_TO_DWC.FILTER_FLAG
+    #     )
 
     @staticmethod
     def annotation_fields():
@@ -413,12 +414,18 @@ class APPEND_TO_DWC:
             list of all the fields to be added to the annotated Dwc occurrence file.
         """
         return (
-            APPEND_TO_DWC.RESOLVED_CTY, APPEND_TO_DWC.RESOLVED_ST,
-            APPEND_TO_DWC.RIIS_KEY, APPEND_TO_DWC.RIIS_ASSESSMENT,
-            APPEND_TO_DWC.AIANNH_GEOID, APPEND_TO_DWC.AIANNH_NAME,
-            APPEND_TO_DWC.PAD_NAME, APPEND_TO_DWC.PAD_MGMT,
-            APPEND_TO_DWC.PAD_GAP_STATUS, APPEND_TO_DWC.PAD_GAP_STATUS_DESC,
-            APPEND_TO_DWC.DOI_REGION, APPEND_TO_DWC.FILTER_FLAG
+            APPEND_TO_DWC.RESOLVED_CTY,
+            APPEND_TO_DWC.RESOLVED_ST,
+            APPEND_TO_DWC.RIIS_KEY,
+            APPEND_TO_DWC.RIIS_ASSESSMENT,
+            APPEND_TO_DWC.AIANNH_GEOID,
+            APPEND_TO_DWC.AIANNH_NAME,
+            APPEND_TO_DWC.PAD_NAME,
+            # APPEND_TO_DWC.PAD_MGMT,
+            APPEND_TO_DWC.PAD_GAP_STATUS,
+            # APPEND_TO_DWC.PAD_GAP_STATUS_DESC,
+            APPEND_TO_DWC.DOI_REGION,
+            # APPEND_TO_DWC.FILTER_FLAG
         )
 
 
@@ -448,36 +455,36 @@ class REGION:
         }
     }
     DOI = {
-        "file": "DOI_12_Unified_Regions_20180801.shp",
+        "file": "doi_pad/DOI_12_Unified_Regions_20180801_4326.shp",
         "buffer": COARSE_BUFFER_RANGE,
         "is_disjoint": False,
-        "summary": [],
+        "summary": [("doi", APPEND_TO_DWC.DOI_REGION)],
         "map": {"REG_NUM": APPEND_TO_DWC.DOI_REGION}
     }
     PAD = {
         "files": [
-            ("1", "PADUS3_0_Region_1_SHP/PADUS3_0Combined_Region1.shp"),
-            ("2", "PADUS3_0_Region_2_SHP/PADUS3_0Combined_Region2.shp"),
-            ("3", "PADUS3_0_Region_3_SHP/PADUS3_0Combined_Region3.shp"),
-            ("4", "PADUS3_0_Region_4_SHP/PADUS3_0Combined_Region4.shp"),
-            ("5", "PADUS3_0_Region_5_SHP/PADUS3_0Combined_Region5.shp"),
-            ("6", "PADUS3_0_Region_6_SHP/PADUS3_0Combined_Region6.shp"),
-            ("7", "PADUS3_0_Region_7_SHP/PADUS3_0Combined_Region7.shp"),
-            ("8", "PADUS3_0_Region_8_SHP/PADUS3_0Combined_Region8.shp"),
-            ("9", "PADUS3_0_Region_9_SHP/PADUS3_0Combined_Region9.shp"),
-            ("10", "PADUS3_0_Region_10_SHP/PADUS3_0Combined_Region10.shp"),
-            ("11", "PADUS3_0_Region_11_SHP/PADUS3_0Combined_Region11.shp"),
-            ("12", "PADUS3_0_Region_12_SHP/PADUS3_0Combined_Region12.shp")],
+            ("1", "doi_pad/PADUS3_0Combined_Region1_4326.shp"),
+            ("2", "doi_pad/PADUS3_0Combined_Region2_4326.shp"),
+            ("3", "doi_pad/PADUS3_0Combined_Region3_4326.shp"),
+            ("4", "doi_pad/PADUS3_0Combined_Region4_4326.shp"),
+            ("5", "doi_pad/PADUS3_0Combined_Region5_4326.shp"),
+            ("6", "doi_pad/PADUS3_0Combined_Region6_4326.shp"),
+            ("7", "doi_pad/PADUS3_0Combined_Region7_4326.shp"),
+            ("8", "doi_pad/PADUS3_0Combined_Region8_4326.shp"),
+            ("9", "doi_pad/PADUS3_0Combined_Region9_4326.shp"),
+            ("10", "doi_pad/PADUS3_0Combined_Region10_4326.shp"),
+            ("11", "doi_pad/PADUS3_0Combined_Region11_4326.shp"),
+            ("12", "doi_pad/PADUS3_0Combined_Region12_4326.shp")],
         "buffer": (),
         "is_disjoint": True,
-        "filter_field": APPEND_TO_DWC.DOI_REGION,
+        "subset_field": APPEND_TO_DWC.DOI_REGION,
         # file prefix, field name
         "summary": [("pad", APPEND_TO_DWC.PAD_NAME)],
         "map": {
             "Unit_Nm": APPEND_TO_DWC.PAD_NAME,
-            "d_Mang_Nam": APPEND_TO_DWC.PAD_MGMT,
+            # "d_Mang_Nam": APPEND_TO_DWC.PAD_MGMT,
             "GAP_Sts": APPEND_TO_DWC.PAD_GAP_STATUS,
-            "d_GAP_Sts": APPEND_TO_DWC.PAD_GAP_STATUS_DESC
+            # "d_GAP_Sts": APPEND_TO_DWC.PAD_GAP_STATUS_DESC
             }
         }
 
@@ -525,9 +532,7 @@ class REGION:
         """Return all REGION types to use to annotate records.
 
         Returns:
-            List of all REGION types.
-
-        Note: the
+            sequence of all REGION types.
         """
         return (REGION.COUNTY, REGION.AIANNH, REGION.DOI, REGION.PAD)
 
@@ -551,13 +556,11 @@ class REGION:
 
     @staticmethod
     def combine_to_region():
-        """Return all REGION types that, when joined together, cover the entire US.
+        """Return the REGION type that has multiple files comprising a full area.
 
         Returns:
-            List of all REGION types that together enclose the entire region.
-
-        Note:
-            After resolving to the filter_with,
+            single REGION type that has multiple datasets that together enclose the
+                entire region.
         """
         return REGION.PAD
 
