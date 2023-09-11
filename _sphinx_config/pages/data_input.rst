@@ -131,9 +131,26 @@ we intersect first with DOI to identify which PAD dataset to search.
 * DOI regions
     * https://www.doi.gov/employees/reorg/unified-regional-boundaries
 
+Project the data from the original projection to EPSG:4326 with
+
+```
+ogr2ogr   -t_srs EPSG:4326  <new 4326 datast>.shp   <original dataset>.shp
+```
+
 US-PAD
 ........
-U.S. Geological Survey (USGS) Gap Analysis Project (GAP), 2022, Protected Areas Database of the United States (PAD-US) 3.0: U.S. Geological Survey data release, https://doi.org/10.5066/P9Q9LQ4B.
+U.S. Geological Survey (USGS) Gap Analysis Project (GAP), 2022, Protected Areas Database
+of the United States (PAD-US) 3.0: U.S. Geological Survey data release,
+https://doi.org/10.5066/P9Q9LQ4B.
+
+Project the dataset to EPSG:4326 with commands like A sample script is in `project_doi_pad.sh
+<https://github.com/lifemapper/bison/tree/main/bison/data/project_doi_pad.sh>`_
+
+Problems with projected dataset:
+* TopologyException: side location conflict
+* Invalid polygon with 3 points instead of 0 or >= 4
+
+
 
 * US_PAD for DOI regions 1-12
     * https://www.usgs.gov/programs/gap-analysis-project/science/pad-us-data-download

@@ -183,7 +183,7 @@ def bb_annotate_pad_occurrence_files(
     if run_parallel and len(annotated_filenames) > 1:
         rpts = parallel_annotate_update(
             annotated_filenames, annotated_riis_filename, geo_path, process_path, logger,
-            overwrite, [REGION.DOI, REGION.PAD])
+            overwrite, [REGION.DOI])
         reports = {"reports": rpts}
 
     else:
