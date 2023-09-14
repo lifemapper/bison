@@ -39,6 +39,7 @@ class Annotator():
             Exception: on RIIS without annotations provided, and no
                 annotated_riis_filename for writing an annotated RIIS file.
             Exception: on neither annotated_riis_filename nor RIIS provided
+            Exception: on not returning the requested georesolvers.
 
         Notes:
             constructor creates spatial indices for the geospatial files for
@@ -61,7 +62,11 @@ class Annotator():
         if regions is None:
             self._regions = REGION.for_resolve()
         self._geo_fulls, self._geo_subsets = get_geo_resolvers(
-            geo_path, regions, self._log)
+            geo_path, self._regions, self._log)
+        if len(self._geo_fulls) + len(self._geo_subsets) != len(self._regions):
+            raise Exception(
+                f"Found {len(self._geo_fulls) + len(self._geo_subsets)} georesolvers"
+                f"does not equal requested georesolvers ({len(self._regions)})")
 
         if riis is not None:
             self.riis = riis
@@ -433,14 +438,16 @@ class Annotator():
 
 # .............................................................................
 def annotate_occurrence_file_update(
-        part_ann_filename, annotated_riis_filename, geo_path, output_path, log_path,
-        regions=None):
+        part_ann_filename, annotated_riis_filename, regions, geo_path, output_path,
+        log_path):
     """Annotate GBIF records with census state and county, and RIIS key and assessment.
 
     Args:
         part_ann_filename (str): full filename containing GBIF data for annotation.
         annotated_riis_filename (str): full filename with RIIS records annotated with
             gbif accepted taxa
+        regions (list of common.constants.REGION): sequence of REGION members for
+            intersection.  If None, use all.
         geo_path (str): Base directory containing geospatial region files
         output_path (str): destination directory for output annotated occurrence files.
         log_path (object): destination directory for logging processing messages.
@@ -459,7 +466,8 @@ def annotate_occurrence_file_update(
         raise FileNotFoundError(part_ann_filename)
 
     rpt_filename = BisonNameOp.get_process_report_filename(
-        part_ann_filename, output_path=output_path, step_or_process=LMBISON_PROCESS.UPDATE)
+        part_ann_filename, output_path=output_path,
+        step_or_process=LMBISON_PROCESS.UPDATE)
     logname, log_fname = BisonNameOp.get_process_logfilename(
         part_ann_filename, log_path=log_path, step_or_process=LMBISON_PROCESS.UPDATE)
     logger = Logger(logname, log_filename=log_fname, log_console=False)
@@ -467,7 +475,8 @@ def annotate_occurrence_file_update(
     ant = Annotator(
         logger, geo_path, annotated_riis_filename=annotated_riis_filename,
         regions=regions)
-    report = ant.annotate_dwca_records_update(part_ann_filename, version="2", overwrite=True)
+    report = ant.annotate_dwca_records_update(
+        part_ann_filename, version="2", overwrite=True)
 
     # Write individual output report
     import json
@@ -486,19 +495,19 @@ def annotate_occurrence_file_update(
 
 # .............................................................................
 def annotate_occurrence_file(
-        dwc_filename, annotated_riis_filename, geo_path, output_path, log_path,
-        regions=None):
+        dwc_filename, annotated_riis_filename, regions, geo_path, output_path,
+        log_path):
     """Annotate GBIF records with census state and county, and RIIS key and assessment.
 
     Args:
         dwc_filename (str): full filename containing GBIF data for annotation.
         annotated_riis_filename (str): full filename with RIIS records annotated with
             gbif accepted taxa
+        regions (list of common.constants.REGION): sequence of REGION members for
+            intersection.  If None, use all.
         geo_path (str): Base directory containing geospatial region files
         output_path (str): destination directory for output annotated occurrence files.
         log_path (object): destination directory for logging processing messages.
-        regions (list of common.constants.REGION): sequence of REGION members for
-            intersection.  If None, use all.
 
     Returns:
         report (dict): metadata for the occurrence annotation data and process.
@@ -539,7 +548,7 @@ def annotate_occurrence_file(
 
 # .............................................................................
 def parallel_annotate(
-        dwc_filenames, annotated_riis_filename, geo_path, output_path, main_logger,
+        dwc_filenames, annotated_riis_filename, regions, geo_path, output_path, main_logger,
         overwrite):
     """Main method for parallel execution of DwC annotation script.
 
@@ -548,6 +557,8 @@ def parallel_annotate(
             annotation.
         annotated_riis_filename (str): full filename with RIIS records annotated with
             gbif accepted taxa
+        regions (list of common.constants.REGION): sequence of REGION members for
+            intersection.  If None, use all.
         geo_path (str): input directory containing geospatial files for
             geo-referencing occurrence points.
         output_path (str): destination directory for output annotated occurrence files.
@@ -581,7 +592,7 @@ def parallel_annotate(
         for dwc_fname in files_to_annotate:
             future = executor.submit(
                 annotate_occurrence_file, dwc_fname, annotated_riis_filename,
-                geo_path, output_path, log_path)
+                regions, geo_path, output_path, log_path)
             futures.append(future)
 
     # iterate over all submitted tasks and get results as they are available

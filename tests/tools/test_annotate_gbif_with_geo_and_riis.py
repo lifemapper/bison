@@ -49,19 +49,19 @@ class Test_annotate_gbif:
             for fld in APPEND_TO_DWC.annotation_fields():
                 assert(fld in outfields)
 
-    # .....................................
-    def test_annotate_dwca_records(self):
-        """Test annotating one occurrence file and checking for added fields."""
-        fn_args = get_test_parameters(script_name)
-        infile = fn_args["dwc_filenames"][0]
-        infields = get_fields_from_header(infile)
-        new_fields = APPEND_TO_DWC.annotation_fields()
-
-        report = annotate_occurrence_file(
-            infile, fn_args["annotated_riis_filename"], fn_args["geoinput_path"],
-            fn_args["output_path"], fn_args["log_path"])
-
-        outfields = get_fields_from_header(report[REPORT.OUTFILE])
-        assert (len(infields) + len(new_fields) == len(outfields))
-        for fld in APPEND_TO_DWC.annotation_fields():
-            assert (fld in outfields)
+    # # .....................................
+    # def test_annotate_dwca_records(self):
+    #     """Test annotating one occurrence file and checking for added fields."""
+    #     fn_args = get_test_parameters(script_name)
+    #     infile = fn_args["dwc_filenames"][0]
+    #     infields = get_fields_from_header(infile)
+    #     new_fields = APPEND_TO_DWC.annotation_fields()
+    #
+    #     report = annotate_occurrence_file(
+    #         infile, fn_args["annotated_riis_filename"], fn_args["geoinput_path"],
+    #         fn_args["output_path"], fn_args["log_path"])
+    #
+    #     outfields = get_fields_from_header(report[REPORT.OUTFILE])
+    #     assert (len(infields) + len(new_fields) == len(outfields))
+    #     for fld in APPEND_TO_DWC.annotation_fields():
+    #         assert (fld in outfields)

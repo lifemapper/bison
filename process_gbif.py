@@ -161,14 +161,14 @@ def a_resolve_riis_taxa(riis_filename, logger, overwrite=False):
 
 
 # .............................................................................
-def bb_annotate_pad_occurrence_files(
-        annotated_filenames, annotated_riis_filename, geo_path, process_path, logger,
+def yy_update_state_grouped_occurrence_files_with_pad(
+        state_grouped_filenames, annotated_riis_filename, geo_path, process_path, logger,
         run_parallel=True, overwrite=False):
     """Annotate GBIF records with PAD, after DOI annotation.
 
     Args:
-        annotated_filenames (list): list of full filenames containing
-            partially-annotated GBIF data for PAD annotation.
+        state_grouped_filenames (list): list of full filenames containing
+            partially-annotated GBIF data, grouped by state, for PAD annotation.
         annotated_riis_filename (str): Full path to RIIS data annotated with GBIF names.
         geo_path (str): Base directory containing geospatial region files
         process_path (str): Destination directory for output files.
@@ -180,10 +180,10 @@ def bb_annotate_pad_occurrence_files(
         report: full filenames for GBIF data newly annotated with state,
             county, RIIS assessment, and RIIS key.  If a file exists, do not annotate.
     """
-    if run_parallel and len(annotated_filenames) > 1:
+    if run_parallel and len(state_grouped_filenames) > 1:
         rpts = parallel_annotate_update(
-            annotated_filenames, annotated_riis_filename, geo_path, process_path, logger,
-            overwrite, [REGION.DOI])
+            state_grouped_filenames, annotated_riis_filename, geo_path, process_path,
+            logger, overwrite, [REGION.PAD])
         reports = {"reports": rpts}
 
     else:
@@ -196,13 +196,13 @@ def bb_annotate_pad_occurrence_files(
 
         logger.log(
             f"Annotate files with PAD: {time.asctime()}", refname=script_name)
-        for part_ann_fname in annotated_filenames:
+        for st_ann_fname in state_grouped_filenames:
             # Add locality-intersections for DOI and PAD to GBIF DwC records
             start = time.perf_counter()
             ant = Annotator(
-                logger, geo_path, riis=riis, regions=[REGION.DOI, REGION.PAD])
+                logger, geo_path, riis=riis, regions=[REGION.PAD])
             rpt = ant.annotate_dwca_records_update(
-                part_ann_fname, version=2, overwrite=overwrite)
+                st_ann_fname, version=2, overwrite=overwrite)
 
             end = time.perf_counter()
 
@@ -222,7 +222,7 @@ def bb_annotate_pad_occurrence_files(
 # .............................................................................
 def b_annotate_occurrence_files(
         occ_filenames, annotated_riis_filename, geo_path, process_path, logger,
-        run_parallel=True, overwrite=False):
+        run_parallel=True, overwrite=False, regions=None):
     """Annotate GBIF records with census state and county, and RIIS key and assessment.
 
     Args:
@@ -234,6 +234,8 @@ def b_annotate_occurrence_files(
         logger (object): logger for saving relevant processing messages
         run_parallel (bool): Flag indicating whether to process subset files in parallel
         overwrite (bool): Flag indicating whether to overwrite existing annotated file(s).
+        regions (list of common.constants.REGION): sequence of REGION members for
+            intersection.  If None, use all.
 
     Returns:
         annotated_filenames: full filenames for GBIF data newly annotated with state,
@@ -241,8 +243,8 @@ def b_annotate_occurrence_files(
     """
     if run_parallel and len(occ_filenames) > 1:
         rpts = parallel_annotate(
-            occ_filenames, annotated_riis_filename, geo_path, process_path, logger,
-            overwrite)
+            occ_filenames, annotated_riis_filename, regions, geo_path, process_path,
+            logger, overwrite)
         reports = {"reports": rpts}
 
     else:
@@ -258,7 +260,7 @@ def b_annotate_occurrence_files(
         for occ_fname in occ_filenames:
             # Add locality-intersections and RIIS determinations to GBIF DwC records
             start = time.perf_counter()
-            ant = Annotator(logger, geo_path, riis=riis)
+            ant = Annotator(logger, geo_path, riis=riis, regions=regions)
             rpt = ant.annotate_dwca_records(occ_fname, process_path, overwrite=overwrite)
             end = time.perf_counter()
 
@@ -527,6 +529,40 @@ def f_calculate_pam_stats(heatmatrix_filename, output_path, min_val, logger):
 
 
 # .............................................................................
+def xx_group_records_by_state(
+        annotated_filenames: object, output_path: object, logger: object, overwrite: object = True) -> object:
+    """Annotate GBIF records with census state and county, and RIIS key and assessment.
+
+    Args:
+        annotated_filenames (list): full filenames containing annotated GBIF data.
+        output_path (str): Destination directory for log, report, and final output files.
+        logger (bison.common.log.Logger): logger for saving relevant processing messages
+        overwrite (bool): Flag indicating whether to overwrite existing summarized and
+            combined files.
+
+    Returns:
+        report (dict): dictionary summarizing metadata about the processes and
+            output files.
+
+    Note:
+        This process is fast, and need not be performed in parallel
+    """
+    report = {
+        REPORT.INFILE: annotated_filenames,
+        REPORT.PROCESS: "aggregate_by_state",
+    }
+    process_path, _ = os.path.split(annotated_filenames[0])
+    agg = Aggregator(logger)
+
+    # Summarize each annotated file
+    outfilenames = agg.aggregate_files_by_fieldval(
+        annotated_filenames, APPEND_TO_DWC.RESOLVED_ST, overwrite=overwrite)
+    report[REPORT.OUTFILE] = outfilenames
+
+    return report
+
+
+# .............................................................................
 def z_test(summary_filenames, full_summary_filename, output_path, logger):
     """Test the outputs to make sure counts are in sync.
 
@@ -771,7 +807,8 @@ def execute_command(config, logger):
 
     Args:
         config (dict): dictionary of keyword parameters and values for current process.
-        logger (obj): logger for writing messages to file and processing window.
+        logger (bison.common.log.Logger): logger for writing messages to file and
+            processing window.
 
     Returns:
         report: dictionary of metadata for process.
@@ -821,20 +858,28 @@ def execute_command(config, logger):
     elif config["command"] == "annotate":
         step_or_process = LMBISON_PROCESS.ANNOTATE
         # Annotate DwC records with regions, and if found, RIIS determination
+        # TODO: This leaves out PAD annotations for another step
         report = b_annotate_occurrence_files(
             raw_filenames, annotated_riis_filename, config["geo_path"],
-            config["process_path"], logger, run_parallel=True, overwrite=True)
+            config["process_path"], logger, run_parallel=True, overwrite=True,
+            regions=(REGION.COUNTY, REGION.AIANNH))
 
-    elif config["command"] == "update_doi_pad":
-        step_or_process = LMBISON_PROCESS.UPDATE
+    elif config["command"] == "group_by_state":
+        step_or_process = LMBISON_PROCESS.GROUP_BY
         # Annotate DwC records with regions, and if found, RIIS determination
-        report = bb_annotate_pad_occurrence_files(
-            annotated_filenames, annotated_riis_filename, config["geo_path"],
+        report = xx_group_records_by_state(
+            annotated_filenames, config["process_path"], logger, overwrite=True)
+
+    elif config["command"] == "update_pad":
+        step_or_process = LMBISON_PROCESS.UPDATE
+        state_grouped_filenames = []
+        # Annotate DwC records with regions, and if found, RIIS determination
+        report = yy_update_state_grouped_occurrence_files_with_pad(
+            state_grouped_filenames, annotated_riis_filename, config["geo_path"],
             config["process_path"], logger, run_parallel=True, overwrite=True)
 
     elif config["command"] == "summarize":
         step_or_process = LMBISON_PROCESS.SUMMARIZE
-
         # Summarize each annotated file by region, write summary to a file
         report = c_summarize_combine_annotated_files(
             annotated_filenames, full_summary_filename, config["output_path"], logger,

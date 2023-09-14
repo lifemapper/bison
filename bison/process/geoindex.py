@@ -1,4 +1,5 @@
 """Class for a spatial index and tools for intersecting with a point and extracting attributes."""
+import glob
 import os
 import time
 from logging import INFO, DEBUG, ERROR
@@ -323,11 +324,12 @@ def get_geo_resolvers(geo_input_path, regions, logger=None):
                 fn, region["map"], logger=logger, is_disjoint=region["is_disjoint"],
                 buffer_vals=region["buffer"]))
 
-        elif region == REGION.combine_to_region():
-            for subset, rel_fn in region["files"]:
-                fn = os.path.join(geo_input_path, rel_fn)
+        elif region == REGION.PAD:
+            state_file = REGION.get_state_files_from_pattern(geo_input_path)
+            for subset, full_fn in state_file.items():
                 geo_subsets[subset] = GeoResolver(
-                    fn, REGION.PAD["map"], logger=logger, is_disjoint=REGION.PAD["is_disjoint"],
+                    full_fn, REGION.PAD["map"], logger=logger,
+                    is_disjoint=REGION.PAD["is_disjoint"],
                     buffer_vals=REGION.PAD["buffer"])
 
     return geo_fulls, geo_subsets
@@ -347,5 +349,5 @@ class GeoException(Exception):
 
 # .............................................................................
 __all__ = [
-    "get_geo_resolvers"
+    "get_geo_resolvers",
 ]

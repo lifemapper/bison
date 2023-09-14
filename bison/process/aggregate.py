@@ -10,8 +10,9 @@ from bison.common.constants import (
     REPORT, US_STATES)
 from bison.common.log import Logger
 from bison.common.util import (
-    available_cpu_count, BisonKey, BisonNameOp, get_csv_dict_reader, get_csv_writer,
-    ready_filename)
+    available_cpu_count, BisonKey, BisonNameOp, get_csv_dict_reader,
+    get_csv_dict_writer, get_csv_writer, get_fields_from_header, ready_filename)
+from bison.provider.gbif_data import DwcData
 from bison.provider.riis_data import RIIS
 
 
@@ -751,6 +752,114 @@ class Aggregator():
             f"Summarized species by all regions from {annotated_filename} to "
             f"{summary_filename}", refname=self.__class__.__name__)
         return report
+
+    # ...............................................
+    def _get_outwriter(self, annotated_filename, value, overwrite):
+        recsbyval_filename = BisonNameOp.get_recsbyval_outfilename(
+            annotated_filename, value)
+
+        header = get_fields_from_header(annotated_filename)
+        try:
+            csv_writer, outf = get_csv_dict_writer(
+                recsbyval_filename, header, GBIF.DWCA_DELIMITER, fmode="w",
+                encoding=ENCODING, overwrite=overwrite)
+        except Exception as e:
+            raise Exception(
+                f"Failed to open file or csv_writer for {recsbyval_filename}, {e}")
+        return csv_writer, outf, recsbyval_filename
+
+    # ...............................................
+    def aggregate_files_by_fieldval(
+            self, annotated_filenames, fieldname, overwrite=True):
+        """Read an annotated file, group records by value in csvfiles.
+
+        Args:
+            annotated_filenames (list): list of full filename input annotated DwC
+                occurrence file.
+            fieldname (str): fieldname for value used for aggregation.
+            overwrite (bool): Flag indicating whether to overwrite existing files.
+
+        Returns:
+            report (dict): Summary of the number of locations, species, and occurrences
+                for each type of region for summary (state, county, aiannh, PAD).
+
+        Note:
+            used for aggregating by a value, for streamlining additional annotation
+            based on that value.
+        """
+        # Output files {ST: (csvwriter, outfile, outfilename)}
+        outfiles = {}
+
+        for ann_filename in annotated_filenames:
+            # Input reader
+            dwcdata = DwcData(ann_filename, logger=self._log)
+            try:
+                dwcdata.open()
+            except Exception:
+                raise
+
+            self._aggregate_annotated_recs_by_fieldval(
+                dwcdata, fieldname, outfiles, overwrite=True)
+
+            # Summarize and write
+            self._log.log(
+                f"Aggregated records from {ann_filename} by value from {fieldname}",
+                refname=self.__class__.__name__)
+        outfilenames = [fn for _, _, fn in outfiles.values()]
+        return outfilenames
+
+    # ...............................................
+    def _aggregate_annotated_recs_by_fieldval(
+            self, dwcdata, fieldname, outfiles, overwrite=True):
+        """Read an annotated file, group records by value in csvfiles.
+
+        Args:
+            dwcdata (bison.provider.gbif_data.DwcData):  input reader for annotated DwC
+                occurrence records.
+            fieldname (str): fieldname for value used for aggregation.
+            outfiles (dict): dictionary of keys == value of interest,
+                values == tuple of (csv_dict_writer, out_file, out_filename)
+            overwrite (bool): Flag indicating whether to overwrite existing files.
+
+        Returns:
+            report (dict): Summary of the number of locations, species, and occurrences
+                for each type of region for summary (state, county, aiannh, PAD).
+
+        Note:
+            used for aggregating by a value, for streamlining additional annotation
+            based on that value.
+        """
+        try:
+            # iterate over DwC records
+            dwcrec = dwcdata.get_record()
+
+            # Only append additional values to records that pass the filter tests.
+            while dwcrec is not None:
+                # TODO: Skip if the record is filtered out (rank above species)
+                val = dwcrec[fieldname]
+                try:
+                    # Find correct csvwriter
+                    (csv_dict_writer, _, out_filename) = outfiles[val]
+                except KeyError:
+                    # Or create new csvwriter
+                    csv_dict_writer, out_file, out_filename = self._get_outwriter(
+                        dwcdata.input_file, val, overwrite)
+                    outfiles[val] = (csv_dict_writer, out_file, out_filename)
+
+                try:
+                    csv_dict_writer.writerow(dwcrec)
+                except Exception as e:
+                    self._log.log(
+                        f"Error {e} record, gbifID {dwcrec[GBIF.ID_FLD]}, value {val}",
+                        refname=self.__class__.__name__, log_level=logging.ERROR)
+
+                # Get next
+                dwcrec = dwcdata.get_record()
+
+        except Exception as e:
+            raise Exception(
+                f"Unexpected error {e} reading {dwcdata.input_file}, line "
+                f"{dwcdata.recno} or writing {out_filename}")
 
     # ...............................................
     def _write_region_aggregate(

@@ -1,6 +1,6 @@
 {
     "riis_filename": "/volumes/bison/input/US-RIIS_MasterList_2021.csv",
-    "gbif_filename": "/volumes/bison/big_data/gbif/gbif_2023-08-23.csv",
+    "gbif_filename": "/volumes/bison/big_data/gbif/gbif_2023-01-26_10k.csv",
     "do_split": true,
     "geo_path": "/volumes/bison/big_data/geodata",
     "process_path": "/volumes/bison/big_data/process",

@@ -125,6 +125,7 @@ class LMBISON_PROCESS:
     RESOLVE = {"step": 0, "postfix": "resolve"}
     CHUNK = {"step": 1, "postfix": "raw", "prefix": "chunk"}
     ANNOTATE = {"step": 2, "postfix": "annotate"}
+    GROUP_BY = {"step": 2, "postfix": "group"}
     UPDATE = {"step": 2, "postfix": "update"}
     SUMMARIZE = {"step": 3, "postfix": "summary"}
     COMBINE = {"step": 4, "postfix": "combine"}
@@ -462,19 +463,20 @@ class REGION:
         "map": {"REG_NUM": APPEND_TO_DWC.DOI_REGION}
     }
     PAD = {
-        "files": [
-            ("1", "doi_pad/PADUS3_0Designation_Region1_4326.shp"),
-            ("2", "doi_pad/PADUS3_0Designation_Region2_4326.shp"),
-            ("3", "doi_pad/PADUS3_0Designation_Region3_4326.shp"),
-            ("4", "doi_pad/PADUS3_0Designation_Region4_4326.shp"),
-            ("5", "doi_pad/PADUS3_0Designation_Region5_4326.shp"),
-            ("6", "doi_pad/PADUS3_0Designation_Region6_4326.shp"),
-            ("7", "doi_pad/PADUS3_0Designation_Region7_4326.shp"),
-            ("8", "doi_pad/PADUS3_0Designation_Region8_4326.shp"),
-            ("9", "doi_pad/PADUS3_0Designation_Region9_4326.shp"),
-            ("10", "doi_pad/PADUS3_0Designation_Region10_4326.shp"),
-            ("11", "doi_pad/PADUS3_0Designation_Region11_4326.shp"),
-            ("12", "doi_pad/PADUS3_0Designation_Region12_4326.shp")],
+        "filepattern": "pad_st/PADUS3_0Designation_State??_4326.shp",
+        # "files": [
+        #     ("1", "doi_pad/PADUS3_0Designation_Region1_4326.shp"),
+        #     ("2", "doi_pad/PADUS3_0Designation_Region2_4326.shp"),
+        #     ("3", "doi_pad/PADUS3_0Designation_Region3_4326.shp"),
+        #     ("4", "doi_pad/PADUS3_0Designation_Region4_4326.shp"),
+        #     ("5", "doi_pad/PADUS3_0Designation_Region5_4326.shp"),
+        #     ("6", "doi_pad/PADUS3_0Designation_Region6_4326.shp"),
+        #     ("7", "doi_pad/PADUS3_0Designation_Region7_4326.shp"),
+        #     ("8", "doi_pad/PADUS3_0Designation_Region8_4326.shp"),
+        #     ("9", "doi_pad/PADUS3_0Designation_Region9_4326.shp"),
+        #     ("10", "doi_pad/PADUS3_0Designation_Region10_4326.shp"),
+        #     ("11", "doi_pad/PADUS3_0Designation_Region11_4326.shp"),
+        #     ("12", "doi_pad/PADUS3_0Designation_Region12_4326.shp")],
         "buffer": (),
         "is_disjoint": True,
         "subset_field": APPEND_TO_DWC.DOI_REGION,
@@ -572,6 +574,19 @@ class REGION:
             List of all REGION types that together enclose the entire region.
         """
         return (REGION.COUNTY, REGION.AIANNH, REGION.PAD)
+
+    # .............................................................................
+    @staticmethod
+    def get_state_files_from_pattern(geo_path):
+        import os
+        import glob
+        st_files = {}
+        geo_pattern = os.path.join(geo_path, REGION.PAD["filepattern"])
+        geo_files = glob.glob(geo_pattern)
+        for gfname in geo_files:
+            st = gfname.split("_")[3]
+            st_files[st] = gfname
+        return st_files
 
 
 # .............................................................................

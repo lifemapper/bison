@@ -7,8 +7,8 @@ from bison.common.constants import CONFIG_PARAM
 from bison.common.log import Logger
 
 COMMANDS = (
-    "resolve", "split", "annotate", "update_doi_pad", "summarize", "aggregate",
-    "check_counts", "heat_matrix", "pam_stats")
+    "resolve", "split", "annotate", "group_by_state", "update_pad", "summarize",
+    "aggregate", "check_counts", "heat_matrix", "pam_stats")
 
 
 # .....................................................................................
@@ -159,7 +159,7 @@ def get_common_arguments(script_name, description, parameters):
 
     Returns:
         config: A parameter/argument dictionary contained in the config_filename.
-        logger: logger for saving relevant processing messages
+        logger (bison.common.log.Logger): logger for saving relevant processing messages
         report_filename: optional filename for saving summary process information.
 
     Raises:
