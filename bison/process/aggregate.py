@@ -783,6 +783,9 @@ class Aggregator():
             report (dict): Summary of the number of locations, species, and occurrences
                 for each type of region for summary (state, county, aiannh, PAD).
 
+        Raises:
+            Exception: on failure to open DwcData reader.
+
         Note:
             used for aggregating by a value, for streamlining additional annotation
             based on that value.
@@ -790,22 +793,35 @@ class Aggregator():
         # Output files {ST: (csvwriter, outfile, outfilename)}
         outfiles = {}
 
-        for ann_filename in annotated_filenames:
-            # Input reader
-            dwcdata = DwcData(ann_filename, logger=self._log)
-            try:
-                dwcdata.open()
-            except Exception:
-                raise
+        try:
+            for ann_filename in annotated_filenames:
+                # Input reader
+                dwcdata = DwcData(ann_filename, logger=self._log)
+                try:
+                    dwcdata.open()
+                except Exception:
+                    raise
+                # Read, annotate, write
+                try:
+                    written, total = self._aggregate_annotated_recs_by_fieldval(
+                        dwcdata, fieldname, outfiles, overwrite=True)
+                except Exception:
+                    raise
+                finally:
+                    # Close input
+                    dwcdata.close()
 
-            self._aggregate_annotated_recs_by_fieldval(
-                dwcdata, fieldname, outfiles, overwrite=True)
+                # Summarize and write
+                self._log.log(
+                    f"Aggregated {written} of {total} records from {ann_filename} by value "
+                    f"from {fieldname}", refname=self.__class__.__name__)
+        finally:
+            outfilenames = []
+            for _, out_file, out_fn in outfiles.values():
+                outfilenames.append(out_fn)
+                # Close output
+                out_file.close()
 
-            # Summarize and write
-            self._log.log(
-                f"Aggregated records from {ann_filename} by value from {fieldname}",
-                refname=self.__class__.__name__)
-        outfilenames = [fn for _, _, fn in outfiles.values()]
         return outfilenames
 
     # ...............................................
@@ -822,20 +838,25 @@ class Aggregator():
             overwrite (bool): Flag indicating whether to overwrite existing files.
 
         Returns:
-            report (dict): Summary of the number of locations, species, and occurrences
-                for each type of region for summary (state, county, aiannh, PAD).
+            written (int): Number of records successfully written to aggregated files.
+            total (int): Number of records read from file.
+
+        Raises:
+            Exception: on unforeseen error in loop.
 
         Note:
             used for aggregating by a value, for streamlining additional annotation
             based on that value.
         """
+        total = 0
+        written = 0
         try:
             # iterate over DwC records
             dwcrec = dwcdata.get_record()
 
             # Only append additional values to records that pass the filter tests.
             while dwcrec is not None:
-                # TODO: Skip if the record is filtered out (rank above species)
+                total += 1
                 val = dwcrec[fieldname]
                 try:
                     # Find correct csvwriter
@@ -848,18 +869,20 @@ class Aggregator():
 
                 try:
                     csv_dict_writer.writerow(dwcrec)
+                    written += 1
                 except Exception as e:
                     self._log.log(
                         f"Error {e} record, gbifID {dwcrec[GBIF.ID_FLD]}, value {val}",
                         refname=self.__class__.__name__, log_level=logging.ERROR)
-
                 # Get next
                 dwcrec = dwcdata.get_record()
 
         except Exception as e:
             raise Exception(
                 f"Unexpected error {e} reading {dwcdata.input_file}, line "
-                f"{dwcdata.recno} or writing {out_filename}")
+                f"{dwcdata.recno} or writing.")
+
+        return written, total
 
     # ...............................................
     def _write_region_aggregate(

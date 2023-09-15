@@ -848,12 +848,13 @@ class BisonNameOp():
 
     # .............................................................................
     @staticmethod
-    def get_recsbyval_outfilename(in_filename, value):
+    def get_recsbyval_outfilename(in_filename, value, outpath=None):
         """Construct output filename for the next processing step of the given file.
 
         Args:
             in_filename (str): full filename of CSV data.
-            version (str): version number to append to filename
+            value (str): value to append to filename
+            outpath (str): path for filename.  If None, input path is used.
 
         Returns:
             out_fname: base or full filename of output file, given the input filename.
@@ -863,9 +864,11 @@ class BisonNameOp():
         sep = BisonNameOp.separator
         pth, basename, orig_ext, chunk, old_postfix = BisonNameOp.parse_process_filename(
             in_filename)
+        if outpath is None:
+            outpath = pth
 
         fname = f"{basename}{sep}{value}{orig_ext}"
-        outfname = os.path.join(pth, fname)
+        outfname = os.path.join(outpath, fname)
         return outfname
 
     # .............................................................................

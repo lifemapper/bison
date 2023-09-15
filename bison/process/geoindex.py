@@ -1,5 +1,4 @@
 """Class for a spatial index and tools for intersecting with a point and extracting attributes."""
-import glob
 import os
 import time
 from logging import INFO, DEBUG, ERROR

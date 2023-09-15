@@ -578,13 +578,22 @@ class REGION:
     # .............................................................................
     @staticmethod
     def get_state_files_from_pattern(geo_path):
+        """Get state codes and full filenames for the PAD-by-state shapefiles.
+
+        Args:
+            geo_path (str): base path for geospatial data.
+
+        Returns:
+            st_files (dict): Dictionary of codes and absolute filenames.
+        """
         import os
         import glob
         st_files = {}
         geo_pattern = os.path.join(geo_path, REGION.PAD["filepattern"])
         geo_files = glob.glob(geo_pattern)
         for gfname in geo_files:
-            st = gfname.split("_")[3]
+            basename = os.path.basename(gfname)
+            st = basename.split("_")[2][-2:]
             st_files[st] = gfname
         return st_files
 

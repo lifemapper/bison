@@ -5,7 +5,7 @@ from rtree.index import Index as rtree_index
 from bison.common.constants import APPEND_TO_DWC, REPORT
 from bison.common.log import Logger
 from bison.common.util import get_fields_from_header
-from bison.process.annotate import Annotator, annotate_occurrence_file
+from bison.process.annotate import Annotator
 from tests.tools.test_setup import get_test_parameters
 
 script_name = os.path.splitext(os.path.basename(__file__))[0]
