@@ -652,7 +652,7 @@ def parallel_annotate_update(
         for dwc_fname in files_to_annotate:
             future = executor.submit(
                 annotate_occurrence_file_update, dwc_fname, annotated_riis_filename,
-                geo_path, output_path, log_path, regions)
+                regions, geo_path, output_path, log_path)
             futures.append(future)
 
     # iterate over all submitted tasks and get results as they are available
