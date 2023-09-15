@@ -160,6 +160,20 @@ def a_resolve_riis_taxa(riis_filename, logger, overwrite=False):
     return report
 
 
+def _get_state_grouped_filenames(infilename, process_path, geo_path, updated=False):
+    filenames = []
+    state_file = REGION.get_state_files_from_pattern(geo_path)
+    for st in state_file.keys():
+        st_grouped_fname = BisonNameOp.get_recsbyval_outfilename(
+            infilename, st, outpath=process_path)
+        if updated is False:
+            filenames.append(st_grouped_fname)
+        else:
+            updated_fname = BisonNameOp.get_update_outfilename(st_grouped_fname)
+            filenames.append(updated_fname)
+    return filenames
+
+
 # .............................................................................
 def yy_update_state_grouped_occurrence_files_with_pad(
         infilename, annotated_riis_filename, geo_path, process_path, logger,
@@ -180,11 +194,9 @@ def yy_update_state_grouped_occurrence_files_with_pad(
         report: full filenames for GBIF data newly annotated with state,
             county, RIIS assessment, and RIIS key.  If a file exists, do not annotate.
     """
-    state_grouped_filenames = []
-    state_file = REGION.get_state_files_from_pattern(geo_path)
-    for st in state_file.keys():
-        state_grouped_filenames.append(BisonNameOp.get_recsbyval_outfilename(
-            infilename, st, outpath=process_path))
+    state_grouped_filenames = _get_state_grouped_filenames(
+        infilename, process_path, geo_path, updated=False)
+
     if run_parallel and len(state_grouped_filenames) > 1:
         rpts = parallel_annotate_update(
             state_grouped_filenames, annotated_riis_filename, geo_path, process_path,
@@ -283,15 +295,18 @@ def b_annotate_occurrence_files(
 
 
 # .............................................................................
-def c_summarize_combine_annotated_files(
-        annotated_filenames, full_summary_filename, output_path, logger,
+def c_summarize_combine_state_grouped_annotated_files(
+        infilename, full_summary_filename, process_path, output_path, geo_path, logger,
         overwrite=True):
     """Annotate GBIF records with census state and county, and RIIS key and assessment.
 
     Args:
-        annotated_filenames (list): full filenames containing annotated GBIF data.
+        infilename (str): full filename for original input data (used for constructing
+            filenames with records aggregated by state)
         full_summary_filename (str): Full filename for output combined summary file.
+        process_path (str): Destination directory for non-final files.
         output_path (str): Destination directory for log, report, and final output files.
+        geo_path (str): Base directory containing geospatial region files
         logger (object): logger for saving relevant processing messages
         overwrite (bool): Flag indicating whether to overwrite existing summarized and
             combined files.
@@ -303,10 +318,12 @@ def c_summarize_combine_annotated_files(
     Note:
         This process is fast, and need not be performed in parallel
     """
+    annotated_state_grouped_filenames = _get_state_grouped_filenames(
+        infilename, process_path, geo_path, updated=True)
+
     summary_filenames = []
-    for ann_fname in annotated_filenames:
+    for ann_fname in annotated_state_grouped_filenames:
         agg = Aggregator(logger)
-        process_path, _ = os.path.split(ann_fname)
 
         # Summarize each annotated file
         rpt = agg.summarize_annotated_recs_by_location(
@@ -884,9 +901,9 @@ def execute_command(config, logger):
     elif config["command"] == "summarize":
         step_or_process = LMBISON_PROCESS.SUMMARIZE
         # Summarize each annotated file by region, write summary to a file
-        report = c_summarize_combine_annotated_files(
-            annotated_filenames, full_summary_filename, config["output_path"], logger,
-            overwrite=True)
+        report = c_summarize_combine_state_grouped_annotated_files(
+            infile, full_summary_filename, config["process_path"], out_path,
+            config["geo_path"], logger, overwrite=True)
         logger.log("Summary of annotations", report[REPORT.OUTFILE])
 
     elif config["command"] == "aggregate":
