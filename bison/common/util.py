@@ -824,7 +824,7 @@ class BisonNameOp():
 
     # .............................................................................
     @staticmethod
-    def get_update_outfilename(in_filename, version="2"):
+    def get_update_outfilename(in_filename, version=None):
         """Construct output filename for the next processing step of the given file.
 
         Args:
@@ -837,12 +837,14 @@ class BisonNameOp():
                 returns None
         """
         sep = BisonNameOp.separator
-        pth, basename, orig_ext, chunk, old_postfix = BisonNameOp.parse_process_filename(
+        pth, basename, orig_ext, chunk, _ = BisonNameOp.parse_process_filename(
             in_filename)
         if chunk is not None:
             basename = f"{basename}{sep}{chunk}"
-
-        fname = f"{basename}{sep}{old_postfix}{version}{orig_ext}"
+        basename = f"{basename}{sep}update"
+        if version is not None:
+            basename = f"{basename}{version}"
+        fname = f"{basename}{orig_ext}"
         outfname = os.path.join(pth, fname)
         return outfname
 

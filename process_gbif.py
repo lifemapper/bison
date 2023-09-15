@@ -207,7 +207,7 @@ def yy_update_state_grouped_occurrence_files_with_pad(
             ant = Annotator(
                 logger, geo_path, riis=riis, regions=[REGION.PAD])
             rpt = ant.annotate_dwca_records_update(
-                st_ann_fname, version=2, overwrite=overwrite)
+                st_ann_fname, None, overwrite=overwrite)
 
             end = time.perf_counter()
 

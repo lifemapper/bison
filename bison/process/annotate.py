@@ -63,7 +63,12 @@ class Annotator():
             self._regions = REGION.for_resolve()
         self._geo_fulls, self._geo_subsets = get_geo_resolvers(
             geo_path, self._regions, self._log)
-        if len(self._geo_fulls) + len(self._geo_subsets) != len(self._regions):
+
+        # Check # resolvers == # regions
+        subset_count = 0
+        if self._geo_subsets:
+            subset_count = 1
+        if len(self._geo_fulls) + subset_count != len(self._regions):
             raise Exception(
                 f"Found {len(self._geo_fulls) + len(self._geo_subsets)} georesolvers"
                 f"does not equal requested georesolvers ({len(self._regions)})")
@@ -352,7 +357,7 @@ class Annotator():
 
     # ...............................................
     def annotate_dwca_records_update(
-            self, part_ann_filename, version="2", overwrite=True):
+            self, part_ann_filename, version, overwrite=True):
         """Resolve and append geospatial attributes to GBIF records.
 
         Args:
@@ -476,7 +481,7 @@ def annotate_occurrence_file_update(
         logger, geo_path, annotated_riis_filename=annotated_riis_filename,
         regions=regions)
     report = ant.annotate_dwca_records_update(
-        part_ann_filename, version="2", overwrite=True)
+        part_ann_filename, None, overwrite=True)
 
     # Write individual output report
     import json
@@ -640,12 +645,16 @@ def parallel_annotate_update(
 
     files_to_annotate = []
     for fn in dwc_filenames:
-        out_fname = BisonNameOp.get_process_outfilename(
-            fn, outpath=output_path, step_or_process=LMBISON_PROCESS.ANNOTATE)
-        if os.path.exists(out_fname) and overwrite is False:
-            main_logger.log(f"Annotations exist in {out_fname}.", refname=refname)
+        # Not all subsets may contain records, so file may not exist
+        if not os.path.exists(fn):
+            main_logger.log(f"Skipping missing file {fn}.", refname=refname)
         else:
-            files_to_annotate.append(fn)
+            out_fname = BisonNameOp.get_process_outfilename(
+                fn, outpath=output_path, step_or_process=LMBISON_PROCESS.ANNOTATE)
+            if os.path.exists(out_fname) and overwrite is False:
+                main_logger.log(f"Annotations exist in {out_fname}.", refname=refname)
+            else:
+                files_to_annotate.append(fn)
 
     with ProcessPoolExecutor(max_workers=available_cpu_count()-2) as executor:
         futures = []
