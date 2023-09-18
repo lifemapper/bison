@@ -497,40 +497,35 @@ class Aggregator():
         # Reset summaries by location and species name lookup
         self._reset_summaries()
         region_disjoint = REGION.region_disjoint()
-        filtered_count = 0
 
         self._log.log(
             f"Summarizing annotations in {self._annotated_dwc_filename} by region",
             refname=self.__class__.__name__)
         try:
             for rec in self._csv_reader:
-                # State can be assigned to all records, empty if record is filtered out
-                if rec[APPEND_TO_DWC.FILTER_FLAG] == "True":
-                    filtered_count += 1
-                else:
-                    # Use combo key-name to track species
-                    riis_region = self._get_riis_region(rec[APPEND_TO_DWC.RESOLVED_ST])
-                    rr_species_key = BisonKey.get_compound_key(
-                        riis_region, rec[GBIF.ACC_TAXON_FLD])
-                    # Save with accepted name and species name in case accepted name
-                    # is for sub-species
-                    self._acc_species_name[rr_species_key] = (
-                        rec[GBIF.ACC_NAME_FLD], rec[GBIF.SPECIES_NAME_FLD])
+                # Use combo key-name to track species
+                riis_region = self._get_riis_region(rec[APPEND_TO_DWC.RESOLVED_ST])
+                rr_species_key = BisonKey.get_compound_key(
+                    riis_region, rec[GBIF.ACC_TAXON_FLD])
+                # Save with accepted name and species name in case accepted name
+                # is for sub-species
+                self._acc_species_name[rr_species_key] = (
+                    rec[GBIF.ACC_NAME_FLD], rec[GBIF.SPECIES_NAME_FLD])
 
-                    # regions to summarize
-                    for prefix, fld in REGION.summary_fields().items():
-                        # if prefix != LMBISON.SUMMARY_FILTER_HEADING:
-                        is_disjoint = region_disjoint[prefix]
-                        if isinstance(fld, str):
-                            location = rec[fld]
-                        elif isinstance(fld, tuple) and len(fld) == 2:
-                            location = BisonKey.get_compound_key(
-                                rec[fld[0]], rec[fld[1]])
-                        else:
-                            raise Exception(f"Bad summary fields {fld}")
+                # regions to summarize
+                for prefix, fld in REGION.summary_fields().items():
+                    # if prefix != LMBISON.SUMMARY_FILTER_HEADING:
+                    is_disjoint = region_disjoint[prefix]
+                    if isinstance(fld, str):
+                        location = rec[fld]
+                    elif isinstance(fld, tuple) and len(fld) == 2:
+                        location = BisonKey.get_compound_key(
+                            rec[fld[0]], rec[fld[1]])
+                    else:
+                        raise Exception(f"Bad summary fields {fld}")
 
-                        self._add_record_to_location_summaries(
-                            prefix, is_disjoint, location, rr_species_key)
+                    self._add_record_to_location_summaries(
+                        prefix, is_disjoint, location, rr_species_key)
 
         except csv.Error as ce:
             self._log.log(

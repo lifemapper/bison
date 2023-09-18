@@ -8,6 +8,7 @@ LINENO_FLD = "LINENO"
 ERR_SEPARATOR = "------------"
 # Geospatial data for intersecting with points to identify state and county for points
 COARSE_BUFFER_RANGE = [(i / 10.0) for i in range(1, 11)]
+PAD_BUFFER = COARSE_BUFFER_RANGE[0]
 FINE_BUFFER_RANGE = [(i / 20.0) for i in range(1, 3)]
 
 AGGREGATOR_DELIMITER = "__"
@@ -381,31 +382,8 @@ class APPEND_TO_DWC:
     AIANNH_NAME = "aiannh_name"
     AIANNH_GEOID = "aiannh_geoid"
     PAD_NAME = "pad_unit_name"
-    PAD_MGMT = "pad_mgmt_name"
     PAD_GAP_STATUS = "GAP_Sts"
     PAD_GAP_STATUS_DESC = "d_GAP_Sts"
-    DOI_REGION = "doi_region"
-    FILTER_FLAG = "filter_out"
-    # FILTER_FLAG = "do_summarize"
-
-    # @staticmethod
-    # def region_fields():
-    #     """Fields containing a region. to summarize RIIS status of occurrence records.
-    #
-    #     Returns:
-    #         list of all fields used to summarize RIIS determination of records.
-    #     """
-    #     return (
-    #         APPEND_TO_DWC.RESOLVED_CTY, APPEND_TO_DWC.RESOLVED_ST,
-    #         # APPEND_TO_DWC.AIANNH_GEOID,
-    #         APPEND_TO_DWC.AIANNH_NAME,
-    #         APPEND_TO_DWC.PAD_NAME,
-    #         # APPEND_TO_DWC.PAD_MGMT,
-    #         # APPEND_TO_DWC.PAD_GAP_STATUS,
-    #         # APPEND_TO_DWC.PAD_GAP_STATUS_DESC,
-    #         # APPEND_TO_DWC.DOI_REGION,
-    #         # APPEND_TO_DWC.FILTER_FLAG
-    #     )
 
     @staticmethod
     def annotation_fields():
@@ -422,11 +400,8 @@ class APPEND_TO_DWC:
             APPEND_TO_DWC.AIANNH_GEOID,
             APPEND_TO_DWC.AIANNH_NAME,
             APPEND_TO_DWC.PAD_NAME,
-            # APPEND_TO_DWC.PAD_MGMT,
             APPEND_TO_DWC.PAD_GAP_STATUS,
             # APPEND_TO_DWC.PAD_GAP_STATUS_DESC,
-            APPEND_TO_DWC.DOI_REGION,
-            # APPEND_TO_DWC.FILTER_FLAG
         )
 
 
@@ -455,36 +430,15 @@ class REGION:
             "GEOID": APPEND_TO_DWC.AIANNH_GEOID
         }
     }
-    DOI = {
-        "file": "doi_pad/DOI_12_Unified_Regions_20180801_4326.shp",
-        "buffer": COARSE_BUFFER_RANGE,
-        "is_disjoint": False,
-        "summary": [("doi", APPEND_TO_DWC.DOI_REGION)],
-        "map": {"REG_NUM": APPEND_TO_DWC.DOI_REGION}
-    }
     PAD = {
         "filepattern": "pad_st/PADUS3_0Designation_State??_4326.shp",
-        # "files": [
-        #     ("1", "doi_pad/PADUS3_0Designation_Region1_4326.shp"),
-        #     ("2", "doi_pad/PADUS3_0Designation_Region2_4326.shp"),
-        #     ("3", "doi_pad/PADUS3_0Designation_Region3_4326.shp"),
-        #     ("4", "doi_pad/PADUS3_0Designation_Region4_4326.shp"),
-        #     ("5", "doi_pad/PADUS3_0Designation_Region5_4326.shp"),
-        #     ("6", "doi_pad/PADUS3_0Designation_Region6_4326.shp"),
-        #     ("7", "doi_pad/PADUS3_0Designation_Region7_4326.shp"),
-        #     ("8", "doi_pad/PADUS3_0Designation_Region8_4326.shp"),
-        #     ("9", "doi_pad/PADUS3_0Designation_Region9_4326.shp"),
-        #     ("10", "doi_pad/PADUS3_0Designation_Region10_4326.shp"),
-        #     ("11", "doi_pad/PADUS3_0Designation_Region11_4326.shp"),
-        #     ("12", "doi_pad/PADUS3_0Designation_Region12_4326.shp")],
         "buffer": (),
         "is_disjoint": True,
-        "subset_field": APPEND_TO_DWC.DOI_REGION,
+        "subset_field": APPEND_TO_DWC.RESOLVED_ST,
         # file prefix, field name
         "summary": [("pad", APPEND_TO_DWC.PAD_NAME)],
         "map": {
             "Unit_Nm": APPEND_TO_DWC.PAD_NAME,
-            # "d_Mang_Nam": APPEND_TO_DWC.PAD_MGMT,
             "GAP_Sts": APPEND_TO_DWC.PAD_GAP_STATUS,
             # "d_GAP_Sts": APPEND_TO_DWC.PAD_GAP_STATUS_DESC
             }
@@ -511,7 +465,6 @@ class REGION:
                     summarize_by_fields[prefix] = flds
                 else:
                     raise Exception(f"Bad metadata for {prefix} summary fields")
-            # summarize_by_fields[LMBISON.SUMMARY_FILTER_HEADING] = APPEND_TO_DWC.FILTER_FLAG
         return summarize_by_fields
 
     @staticmethod
@@ -536,7 +489,7 @@ class REGION:
         Returns:
             sequence of all REGION types.
         """
-        return (REGION.COUNTY, REGION.AIANNH, REGION.DOI, REGION.PAD)
+        return (REGION.COUNTY, REGION.AIANNH, REGION.PAD)
 
     @staticmethod
     def full_region():
@@ -545,26 +498,7 @@ class REGION:
         Returns:
             List of all REGION types that enclose the entire region.
         """
-        return (REGION.COUNTY, REGION.AIANNH, REGION.DOI)
-
-    @staticmethod
-    def filter_with():
-        """Return the REGION types that narrows down the combine_to_region dataset.
-
-        Returns:
-            List of all REGION types that together enclose the entire region.
-        """
-        return REGION.DOI
-
-    @staticmethod
-    def combine_to_region():
-        """Return the REGION type that has multiple files comprising a full area.
-
-        Returns:
-            single REGION type that has multiple datasets that together enclose the
-                entire region.
-        """
-        return REGION.PAD
+        return (REGION.COUNTY, REGION.AIANNH)
 
     @staticmethod
     def for_summary():
