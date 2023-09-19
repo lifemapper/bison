@@ -222,9 +222,7 @@ class Annotator():
             do_riis (bool): flag indicating whether to annotate with RIIS assessment.
 
         Modifies:
-            dwcrec: one GBIF DwC record, if it is not filtered out, values are added
-                to calculated fields: APPEND_TO_DWC, otherwise these fields are
-                None.
+            dwcrec: adds fields to GBIF DwC record.
         """
         gbif_id = dwcrec[GBIF.ID_FLD]
         lon = dwcrec[GBIF.LON_FLD]
