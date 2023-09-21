@@ -227,12 +227,11 @@ class Annotator():
         gbif_id = dwcrec[GBIF.ID_FLD]
         lon = dwcrec[GBIF.LON_FLD]
         lat = dwcrec[GBIF.LAT_FLD]
-        if gbif_id in [
-            '1212531410',
-                # "1861183762", "2978848311", "1212531557", "1212531572", "1212531578"
-        ]:
-            self._log.log(
-                f"Test gbifID: {gbif_id}", refname=self.__class__.__name__)
+        # if gbif_id in [
+        #         "1861183762", "2978848311", "1212531557", "1212531572", "1212531578"
+        # ]:
+        #     self._log.log(
+        #         f"Test gbifID: {gbif_id}", refname=self.__class__.__name__)
 
         for georesolver in self._geo_fulls:
             # Find enclosing region and its attributes
@@ -254,7 +253,7 @@ class Annotator():
             # Find RIIS region from resolved state
             state = dwcrec[APPEND_TO_DWC.RESOLVED_ST]
             # TODO: When is state resolution failing??
-            if state == "":
+            if state is None or state == "":
                 self._log.log(
                     f"No state for gbifID: {gbif_id}:", refname=self.__class__.__name__,
                     log_level=logging.ERROR)

@@ -8,7 +8,7 @@ ENCODING = "utf-8"
 LINENO_FLD = "LINENO"
 ERR_SEPARATOR = "------------"
 # Geospatial data for intersecting with points to identify state and county for points
-COARSE_BUFFER_RANGE = [(i / 20.0) for i in range(1, 11)]
+COARSE_BUFFER_RANGE = [(i / 10.0) for i in range(1, 11)]
 PAD_BUFFER = COARSE_BUFFER_RANGE[0]
 
 AGGREGATOR_DELIMITER = "__"

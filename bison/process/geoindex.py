@@ -107,6 +107,7 @@ class GeoResolver(object):
             feature_geom = self.spatial_feats[fid]['geom']
             if geom.Intersects(feature_geom):
                 feature_distances[fid] = geom.Distance(feature_geom)
+        # Now choose the first, closest
         if feature_distances:
             shortest_distance = min(feature_distances.values())
             for fid, dist in feature_distances.items():
@@ -174,13 +175,15 @@ class GeoResolver(object):
             # (0.1 dd ~= 11.1 km, 1 dd ~= 111 km)
             for buffer in self._buffer_vals:
                 geom = geom.Buffer(buffer)
+                # If failed to intersect contiguous data, buffer and try again
                 fids = self._get_best_features(geom, intersect_fids)
                 if fids:
                     break
-            # if fids:
-            #     self.logit(
-            #         f"Found best features {fids} using buffer {buffer} dd",
-            #         refname=self.__class__.__name__)
+        if not fids and self._is_disjoint is False:
+            self.logit(
+                f"Intersected 0 of {len(intersect_fids)} features returned from "
+                f"spatial index for contiguous data {self.filename}, with buffers "
+                f"{self._buffer_vals}", log_level=DEBUG)
         return fids
 
     # ...............................................
@@ -271,9 +274,9 @@ class GeoResolver(object):
         return fldval_list
 
     # ...............................................
-    def logit(self, msg, refname=None, log_level=None):
+    def logit(self, msg, refname=None, log_level=INFO):
         if self._log is not None:
-            self._log.log(msg, refname=refname, log_level=INFO)
+            self._log.log(msg, refname=refname, log_level=log_level)
         else:
             print(msg)
 
