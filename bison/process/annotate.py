@@ -336,9 +336,13 @@ class Annotator():
             dwc_filename, outpath=output_path, step_or_process=LMBISON_PROCESS.ANNOTATE)
         report = {
             REPORT.INFILE: dwc_filename,
-            REPORT.OUTFILE: out_filename
         }
-        if not os.path.exists(out_filename) or overwrite is True:
+        if os.path.exists(out_filename) and overwrite is False:
+            msg = f"File {out_filename} exists and overwrite = False"
+            report[REPORT.MESSAGE] = msg
+            self._log.log(msg, refname=self.__class__.__name__)
+
+        else:
             self.initialize_occurrences_io(dwc_filename, out_filename)
             self._log.log(
                 f"Annotate {dwc_filename} to {out_filename}",
@@ -377,6 +381,7 @@ class Annotator():
                     + f"writing {out_filename}")
             else:
                 end = time.perf_counter()
+                report[REPORT.OUTFILE] = out_filename
                 summary[REPORT.RANK_FAIL] = list(self.bad_ranks)
                 summary[REPORT.RANK_FAIL_COUNT] = self.rank_filtered_records
                 report[REPORT.SUMMARY] = summary

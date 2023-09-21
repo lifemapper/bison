@@ -54,3 +54,5 @@ ogr2ogr -t_srs EPSG:4326  PADUS3_0Designation_StateWA_4326.shp  PADUS3_0Designat
 ogr2ogr -t_srs EPSG:4326  PADUS3_0Designation_StateWI_4326.shp  PADUS3_0Designation_StateWI.shp
 ogr2ogr -t_srs EPSG:4326  PADUS3_0Designation_StateWV_4326.shp  PADUS3_0Designation_StateWV.shp
 ogr2ogr -t_srs EPSG:4326  PADUS3_0Designation_StateWY_4326.shp  PADUS3_0Designation_StateWY.shp
+
+ogr2ogr -t_srs EPSG:4326 PADUS3_0Designation_StateDC_4326.shp  PADUS3_0Designation_StateDC.shp
