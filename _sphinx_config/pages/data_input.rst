@@ -122,28 +122,18 @@ fieldnames within that shapefile.
 Protected Areas Database
 ------------------------
 
-DOI
-....
-
-Because the PAD data is divided into datasets by Department of Interior (DOI) region,
-we intersect first with DOI to identify which PAD dataset to search.
-
-* DOI regions
-    * https://www.doi.gov/employees/reorg/unified-regional-boundaries
-
-Project the data from the original projection to EPSG:4326 with
-
-```
-ogr2ogr   -t_srs EPSG:4326  <new 4326 datast>.shp   <original dataset>.shp
-```
-
 US-PAD
 ........
 U.S. Geological Survey (USGS) Gap Analysis Project (GAP), 2022, Protected Areas Database
 of the United States (PAD-US) 3.0: U.S. Geological Survey data release,
 https://doi.org/10.5066/P9Q9LQ4B.
 
-Project the dataset to EPSG:4326 with commands like A sample script is in `project_doi_pad.sh
+The PAD data is divided into datasets by Department of Interior (DOI) region, but
+those datasets are still too large and complex.
+Download the PAD data for states, this also removes the need for another intersect.
+
+Project the dataset to EPSG:4326 with commands like A sample script is in
+`project_doi_pad.sh
 <https://github.com/lifemapper/bison/tree/main/bison/data/project_doi_pad.sh>`_
 
 Problems with projected dataset:
@@ -153,7 +143,7 @@ Problems with projected dataset:
 
 
 * US_PAD for DOI regions 1-12
-    * https://www.usgs.gov/programs/gap-analysis-project/science/pad-us-data-download
+    * https://www.sciencebase.gov/catalog/item/62226321d34ee0c6b38b6be3
     * Metadata: https://www.sciencebase.gov/catalog/item/622262c8d34ee0c6b38b6bcf
     * Citation:
         U.S. Geological Survey (USGS) Gap Analysis Project (GAP), 2022,

@@ -58,16 +58,16 @@ class Annotator():
         self._regions = regions
         if regions is None:
             self._regions = REGION.for_resolve()
-        self._geo_fulls, self._geo_subsets = get_geo_resolvers(
+        self._geo_fulls, self._pad_states = get_geo_resolvers(
             geo_path, self._regions, self._log)
 
         # Check # resolvers == # regions
         subset_count = 0
-        if self._geo_subsets:
+        if self._pad_states:
             subset_count = 1
         if len(self._geo_fulls) + subset_count != len(self._regions):
             raise Exception(
-                f"Found {len(self._geo_fulls) + len(self._geo_subsets)} georesolvers"
+                f"Found {len(self._geo_fulls) + len(self._pad_states)} georesolvers"
                 f"does not equal requested georesolvers ({len(self._regions)})")
 
         if riis is not None:
@@ -227,19 +227,28 @@ class Annotator():
         gbif_id = dwcrec[GBIF.ID_FLD]
         lon = dwcrec[GBIF.LON_FLD]
         lat = dwcrec[GBIF.LAT_FLD]
+        if gbif_id in [
+            '1212531410',
+                # "1861183762", "2978848311", "1212531557", "1212531572", "1212531578"
+        ]:
+            self._log.log(
+                f"Test gbifID: {gbif_id}", refname=self.__class__.__name__)
 
         for georesolver in self._geo_fulls:
             # Find enclosing region and its attributes
             try:
-                fldvals = georesolver.find_enclosing_polygon_attributes(lon, lat)
+                fldval_list = georesolver.find_enclosing_polygon_attributes(lon, lat)
             except ValueError as e:
                 self._log.log(
                     f"Record gbifID: {gbif_id}: {e}",
                     refname=self.__class__.__name__, log_level=logging.ERROR)
             else:
-                # Add values to record
-                for fld, val in fldvals.items():
-                    dwcrec[fld] = val
+                # These should only return values for one feature, take the first
+                if fldval_list:
+                    fldvals = fldval_list[0]
+                    # Add values to record
+                    for fld, val in fldvals.items():
+                        dwcrec[fld] = val
 
         if do_riis is True:
             # Find RIIS region from resolved state
@@ -260,13 +269,15 @@ class Annotator():
             dwcrec[APPEND_TO_DWC.RIIS_ASSESSMENT] = riis_assessment
             dwcrec[APPEND_TO_DWC.RIIS_KEY] = riis_key
 
+        # TODO: THIS IS PAD-SPECIFIC, b/c there may be more than one intersecting PAD
+        # polygon.  Choose the first one with the most protective GAP Status
         # Assume only ONE dataset, PAD, with subset components (geo_subsets)
-        if self._geo_subsets:
+        if self._pad_states:
             # Find subset area from partial data indicated by the filter index
             subset_field = REGION.PAD["subset_field"]
             filter = dwcrec[subset_field]
             try:
-                sub_resolver = self._geo_subsets[filter]
+                sub_resolver = self._pad_states[filter]
             except KeyError:
                 self._log.log(
                     f"No datafile exists for partial region {filter}",
@@ -275,19 +286,29 @@ class Annotator():
             else:
                 # Find enclosing PAD if exists, and its attributes
                 try:
-                    fldvals = sub_resolver.find_enclosing_polygon_attributes(
+                    fldval_list = sub_resolver.find_enclosing_polygon_attributes(
                         lon, lat, buffer=PAD_BUFFER)
                 except ValueError as e:
                     self._log.log(
                         f"Record gbifID: {gbif_id}: {e}",
                         refname=self.__class__.__name__, log_level=logging.ERROR)
                 else:
-                    # Add values to record
-                    for fld, val in fldvals.items():
-                        dwcrec[fld] = val
+                    if fldval_list:
+                        # May return many - get first feature with GAP status for most
+                        # protection (lowest val)
+                        retvals = fldval_list[0]
+                        if len(fldval_list) > 1:
+                            for fv in fldval_list:
+                                if (
+                                        fv[APPEND_TO_DWC.PAD_GAP_STATUS] <
+                                        retvals[APPEND_TO_DWC.PAD_GAP_STATUS]
+                                ):
+                                    retvals = fv
+                        # Add values to record
+                        for fld, val in retvals.items():
+                            dwcrec[fld] = val
         if state == "":
             self._log_rec_vals(dwcrec)
-        # return dwcrec
 
     # ...............................................
     def annotate_dwca_records(self, dwc_filename, output_path, overwrite=False):

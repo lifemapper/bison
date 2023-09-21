@@ -1,4 +1,5 @@
 """Constants for GBIF, BISON, RIIS, and processed outputs, used across modules."""
+
 BIG_DATA_PATH = "/home/astewart/git/bison/big_data"
 DATA_PATH = "/home/astewart/git/bison/data"
 INPUT_DIR = "input"
@@ -7,12 +8,15 @@ ENCODING = "utf-8"
 LINENO_FLD = "LINENO"
 ERR_SEPARATOR = "------------"
 # Geospatial data for intersecting with points to identify state and county for points
-COARSE_BUFFER_RANGE = [(i / 10.0) for i in range(1, 11)]
+COARSE_BUFFER_RANGE = [(i / 100.0) for i in range(1, 11)]
 PAD_BUFFER = COARSE_BUFFER_RANGE[0]
-FINE_BUFFER_RANGE = [(i / 20.0) for i in range(1, 3)]
 
 AGGREGATOR_DELIMITER = "__"
 EXTRA_CSV_FIELD = "rest_values"
+
+COMMANDS = (
+    "resolve", "split", "annotate", "summarize", "aggregate", "check_counts",
+    "heat_matrix", "pam_stats")
 
 RANKS = [
     "ABERRATION", "CLASS", "COHORT", "CONVARIETY", "CULTIVAR", "CULTIVAR_GROUP",

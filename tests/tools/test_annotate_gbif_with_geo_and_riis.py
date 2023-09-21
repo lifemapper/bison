@@ -26,7 +26,7 @@ class Test_annotate_gbif:
             self._logger, fn_args["geoinput_path"],
             annotated_riis_filename=fn_args["riis_with_gbif_taxa_filename"])
         spatial_idxs = ant._geo_fulls
-        spatial_idxs.extend(ant._geo_subsets.values())
+        spatial_idxs.extend(ant._pad_states.values())
 
         for geo_spidx in spatial_idxs:
             assert(isinstance(geo_spidx.spatial_index, rtree_index))

@@ -3,12 +3,8 @@ import argparse
 import json
 import os
 
-from bison.common.constants import CONFIG_PARAM
+from bison.common.constants import COMMANDS, CONFIG_PARAM
 from bison.common.log import Logger
-
-COMMANDS = (
-    "resolve", "split", "annotate", "group_by_state", "update_pad", "summarize",
-    "aggregate", "check_counts", "heat_matrix", "pam_stats")
 
 
 # .....................................................................................
@@ -50,15 +46,24 @@ def _get_command_config_file_arguments(parser):
 
 
 # .....................................................................................
-def _test_choices(key, val, paramdict):
-    try:
-        options = paramdict[CONFIG_PARAM.CHOICES]
-    except KeyError:
-        pass
+def _confirm_val(key, val, paramdict):
+    # First check for boolean values
+    expected_type = paramdict[CONFIG_PARAM.TYPE]
+    if expected_type is bool:
+        valtmp = str(val).lower()
+        val = False
+        if (valtmp in ("yes", "y", "true", "t", "1")):
+            val = True
     else:
-        if val not in options:
-            raise Exception(
-                f"Value {val} is not in valid options {options} for {key}.")
+        try:
+            options = paramdict[CONFIG_PARAM.CHOICES]
+        except KeyError:
+            pass
+        else:
+            if val not in options:
+                raise Exception(
+                    f"Value {val} is not in valid options {options} for {key}.")
+    return val
 
 
 # .....................................................................................
@@ -101,49 +106,27 @@ def process_arguments_from_file(config_filename, parameters):
     for key, paramdict in params.items():
         try:
             val = config[key]
-            _test_choices(key, val, paramdict)
+            config[key] = _confirm_val(key, val, paramdict)
         except Exception:
             raise Exception(f"Missing required argument {key} in {config_filename}")
 
     try:
         opt_args = parameters["optional"]
-        _test_choices(key, val, paramdict)
     except Exception:
         opt_args = {}
+
     for okey, paramdict in opt_args.items():
         try:
             val = config[okey]
-            _test_choices(okey, val, paramdict)
+            config[okey] = _confirm_val(okey, val, paramdict)
         except Exception:
             # Add optional argument with value None to config dictionary
             if paramdict[CONFIG_PARAM.TYPE] is list:
                 config[okey] = []
             else:
                 config[okey] = None
-    params.update(opt_args)
 
-    # # Test some arguments for existence
-    # for key, paramdict in params.items():
-    #     # Test existence of input directory
-    #     try:
-    #         test_in_dir = paramdict[CONFIG_PARAM.IS_INPUT_DIR]
-    #         inpath = config[key]
-    #     except KeyError:
-    #         test_in_dir = False
-    #     else:
-    #         # Test existence of input file
-    #         try:
-    #             test_file = paramdict[CONFIG_PARAM.IS_INPUT_FILE]
-    #             fname = config[key]
-    #         except KeyError:
-    #             test_file = False
-    #
-    #         if test_in_dir:
-    #             if not os.path.exists(inpath):
-    #                 raise Exception(f"Input path {inpath} does not exist")
-    #             in_fname = os.path.join(inpath, fname)
-    #             if test_file and not os.path.exists(in_fname):
-    #                 raise Exception(f"Input file {in_fname} does not exist")
+    params.update(opt_args)
     return config
 
 

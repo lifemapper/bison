@@ -46,6 +46,13 @@ PARAMETERS = {
                         "Flag indicating whether the GBIF data is to be (or has been) "
                         "split into smaller subsets."
                 },
+            "run_parallel":
+                {
+                    CONFIG_PARAM.TYPE: bool,
+                    CONFIG_PARAM.HELP:
+                        "Flag indicating whether the annotation process is to be "
+                        "run in parallel threads."
+                },
             "geo_path":
                 {
                     CONFIG_PARAM.TYPE: str,
@@ -124,7 +131,8 @@ def a_find_or_create_subset_files(gbif_filename, output_path, logger):
 
 
 # .............................................................................
-def a_resolve_riis_taxa(riis_filename, logger, overwrite=False):
+def a_resolve_riis_taxa(
+        riis_filename, logger, overwrite=False):
     """Resolve and write GBIF accepted names and taxonKeys in RIIS records.
 
     Args:
@@ -152,10 +160,6 @@ def a_resolve_riis_taxa(riis_filename, logger, overwrite=False):
             f"{report[REPORT.SUMMARY][REPORT.RECORDS_OUTPUT]} written "
             f"of total {report[REPORT.RIIS_IDENTIFIER]} from {riis_filename} "
             f"to {report[REPORT.OUTFILE]}.", refname=script_name)
-        report_filename = BisonNameOp.get_process_report_filename(
-            config["riis_filename"], output_path=config["output_path"],
-            step_or_process=LMBISON_PROCESS.RESOLVE)
-        report[REPORT.REPORTFILE] = report_filename
 
     return report
 
@@ -298,8 +302,7 @@ def b_annotate_occurrence_files(
 
 # .............................................................................
 def c_summarize_combine_annotated_files(
-        raw_filenames, full_summary_filename, process_path, output_path, geo_path, logger,
-        overwrite=True):
+        raw_filenames, full_summary_filename, process_path, logger, overwrite=True):
     """Annotate GBIF records with census state and county, and RIIS key and assessment.
 
     Args:
@@ -307,8 +310,6 @@ def c_summarize_combine_annotated_files(
             annotation.
         full_summary_filename (str): Full filename for output combined summary file.
         process_path (str): Destination directory for non-final files.
-        output_path (str): Destination directory for log, report, and final output files.
-        geo_path (str): Base directory containing geospatial region files
         logger (object): logger for saving relevant processing messages
         overwrite (bool): Flag indicating whether to overwrite existing summarized and
             combined files.
@@ -322,8 +323,7 @@ def c_summarize_combine_annotated_files(
     """
     annotated_filenames = [
         BisonNameOp.get_process_outfilename(
-            csvfile, outpath=config["process_path"],
-            step_or_process=LMBISON_PROCESS.ANNOTATE)
+            csvfile, outpath=process_path, step_or_process=LMBISON_PROCESS.ANNOTATE)
         for csvfile in raw_filenames]
 
     summary_filenames = []
@@ -342,17 +342,13 @@ def c_summarize_combine_annotated_files(
     else:
         report = rpt
 
-    report_filename = BisonNameOp.get_process_report_filename(
-        report[REPORT.OUTFILE], output_path=output_path,
-        step_or_process=LMBISON_PROCESS.SUMMARIZE)
-    report[REPORT.REPORTFILE] = report_filename
-
     return report
 
 
 # .............................................................................
 def d_aggregate_summary_by_region(
-        full_summary_filename, annotated_riis_filename, output_path, logger, overwrite=True):
+        full_summary_filename, annotated_riis_filename, output_path, logger,
+        overwrite=True):
     """Aggregate annotated GBIF records with region, and RIIS key and assessment.
 
     Args:
@@ -379,10 +375,6 @@ def d_aggregate_summary_by_region(
     # Aggregate to files
     report = agg.aggregate_summary_for_regions_assessments(
         full_summary_filename, annotated_riis_filename, output_path, overwrite=overwrite)
-    report_filename = BisonNameOp.get_process_report_filename(
-        full_summary_filename, output_path=output_path,
-        step_or_process=LMBISON_PROCESS.AGGREGATE)
-    report[REPORT.REPORTFILE] = report_filename
 
     return report
 
@@ -612,10 +604,7 @@ def z_test(raw_filenames, full_summary_filename, output_path, logger):
 
     report = Counter.compare_location_species_counts(
         summary_filenames, full_summary_filename, logger)
-    report_filename = BisonNameOp.get_process_report_filename(
-        full_summary_filename, output_path=output_path,
-        step_or_process=LMBISON_PROCESS.AGGREGATE)
-    report[REPORT.REPORTFILE] = report_filename
+
     return report
 
 
@@ -791,46 +780,19 @@ def _prepare_args(config):
     """
     # Geospatial/output/processing filenames will be generated, and located in paths
     # Process entire GBIF file, or do it in chunks
-    booltmp = str(config["do_split"]).lower()
-    # First determine whether to process one file or smaller subsets
-    do_split = False
-    if (booltmp in ("yes", "y", "true", "1")) or config["command"] == "split":
-        do_split = True
-
     infile = config["gbif_filename"]
     if not os.path.exists(infile):
         raise FileNotFoundError(f"Missing input file {infile}")
-    out_path = config["output_path"]
 
     # First determine whether to process one file or smaller subsets
-    if do_split is True:
+    if config["do_split"] is True:
         # Find existing or create subset files
         raw_filenames = a_find_or_create_subset_files(
             infile, config["process_path"], logger)
     else:
         raw_filenames = [infile]
 
-    # annotated_filenames = [
-    #     BisonNameOp.get_process_outfilename(
-    #         csvfile, outpath=config["process_path"],
-    #         step_or_process=LMBISON_PROCESS.ANNOTATE)
-    #     for csvfile in raw_filenames]
-    #
-    # summary_filenames = [
-    #     BisonNameOp.get_process_outfilename(
-    #         csvfile, outpath=config["process_path"],
-    #         step_or_process=LMBISON_PROCESS.SUMMARIZE)
-    #     for csvfile in raw_filenames]
-    #
-    # full_summary_filename = BisonNameOp.get_process_outfilename(
-    #     infile, outpath=config["process_path"],
-    #     step_or_process=LMBISON_PROCESS.SUMMARIZE)
-    #
-    # heatmatrix_filename = BisonNameOp.get_process_outfilename(
-    #         infile, outpath=config["process_path"],
-    #         step_or_process=LMBISON_PROCESS.HEATMATRIX)
-
-    return (infile, raw_filenames, out_path)
+    return (infile, raw_filenames)
 
 
 # .............................................................................
@@ -850,48 +812,48 @@ def execute_command(config, logger):
     """
     report = {}
     step_or_process = None
-    (infile, raw_filenames, out_path) = _prepare_args(config)
-
-    annotated_riis_filename = BisonNameOp.get_annotated_riis_filename(
-        config["riis_filename"])
-    full_summary_filename = BisonNameOp.get_process_outfilename(
-        config["gbif_filename"], outpath=config["process_path"],
-        step_or_process=LMBISON_PROCESS.SUMMARIZE)
-    heatmatrix_filename = BisonNameOp.get_process_outfilename(
-            infile, outpath=config["process_path"],
-            step_or_process=LMBISON_PROCESS.HEATMATRIX)
-
+    (infile, raw_filenames) = _prepare_args(config)
     # Make sure input files exist
     for csv_fname in raw_filenames:
         if not os.path.exists(csv_fname):
             raise FileNotFoundError(f"Expected file {csv_fname} does not exist")
-    # log_list(logger, "Input filenames:", raw_filenames)
+
+    geo_path = config["geo_path"]
+    process_path = config["process_path"]
+    out_path = config["output_path"]
+    orig_riis_filename = config["riis_filename"]
+    annotated_riis_filename = BisonNameOp.get_annotated_riis_filename(
+        orig_riis_filename)
+    full_summary_filename = BisonNameOp.get_process_outfilename(
+        infile, outpath=process_path, step_or_process=LMBISON_PROCESS.SUMMARIZE)
+    heatmatrix_filename = BisonNameOp.get_process_outfilename(
+        infile, outpath=process_path, step_or_process=LMBISON_PROCESS.HEATMATRIX)
 
     if config["command"] == "split":
-        _, report = Chunker.chunk_files(infile, out_path, logger)
+        report = Chunker.chunk_files(infile, process_path, logger, overwrite=False)
 
     elif config["command"] == "resolve":
         step_or_process = LMBISON_PROCESS.RESOLVE
+        orig_riis_filename = config["riis_filename"]
         report = a_resolve_riis_taxa(
-            config["riis_filename"], logger, overwrite=False)
+            orig_riis_filename, logger, overwrite=False)
         logger.log(
-            f"Resolved RIIS filename: {report[REPORT.OUTFILE]}", refname=script_name)
+            f"Resolved RIIS filename: {orig_riis_filename}", refname=script_name)
 
     elif config["command"] == "annotate":
         step_or_process = LMBISON_PROCESS.ANNOTATE
         # Annotate DwC records with regions, and if found, RIIS determination
         # TODO: This leaves out PAD annotations for another step
         report = b_annotate_occurrence_files(
-            raw_filenames, annotated_riis_filename, config["geo_path"],
-            config["process_path"], logger, run_parallel=True, overwrite=True,
-            regions=(REGION.COUNTY, REGION.AIANNH))
+            raw_filenames, annotated_riis_filename, geo_path, process_path, logger,
+            run_parallel=config["run_parallel"], overwrite=True,
+            regions=(REGION.COUNTY, REGION.AIANNH, REGION.PAD))
 
     elif config["command"] == "summarize":
         step_or_process = LMBISON_PROCESS.SUMMARIZE
         # Summarize each annotated file by region, write summary to a file
         report = c_summarize_combine_annotated_files(
-            raw_filenames, full_summary_filename, config["process_path"], out_path,
-            config["geo_path"], logger, overwrite=True)
+            raw_filenames, full_summary_filename, process_path, logger, overwrite=True)
         logger.log("Summary of annotations", report[REPORT.OUTFILE])
 
     elif config["command"] == "aggregate":
@@ -911,12 +873,13 @@ def execute_command(config, logger):
     elif config["command"] == "check_counts":
         step_or_process = LMBISON_PROCESS.CHECK_COUNTS
         # Test summarized summaries
-        report = z_test(raw_filenames, full_summary_filename, out_path, logger)
+        report = z_test(
+            raw_filenames, full_summary_filename, out_path, logger)
 
     elif config["command"] == "heat_matrix":
         step_or_process = LMBISON_PROCESS.HEATMATRIX
         report = e_county_heatmap(
-            full_summary_filename, config["geo_path"], heatmatrix_filename, logger,
+            full_summary_filename, geo_path, heatmatrix_filename, logger,
             overwrite=True)
 
     elif config["command"] == "pam_stats":
@@ -927,7 +890,7 @@ def execute_command(config, logger):
 
     elif config["command"] == "test_bad_data" and config["gbif_id"] is not None:
         test_bad_line(
-            config["gbif_id"], config["examine_filenames"], config["geo_path"], logger)
+            config["gbif_id"], config["examine_filenames"], geo_path, logger)
 
     elif config["command"] == "find_bad_record":
         # Should only be one file in the examine_filenames list
@@ -942,7 +905,7 @@ def execute_command(config, logger):
 
     if step_or_process is not None and report is not None:
         report_filename = BisonNameOp.get_process_report_filename(
-            config["gbif_filename"], output_path=config["output_path"],
+            infile, output_path=out_path,
             step_or_process=step_or_process)
         report[REPORT.REPORTFILE] = report_filename
 
