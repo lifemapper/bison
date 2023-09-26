@@ -824,6 +824,57 @@ class BisonNameOp():
 
     # .............................................................................
     @staticmethod
+    def get_update_outfilename(in_filename, version=None):
+        """Construct output filename for the next processing step of the given file.
+
+        Args:
+            in_filename (str): full filename of CSV data.
+            version (str): version number to append to filename
+
+        Returns:
+            out_fname: base or full filename of output file, given the input filename.
+                If the input filename reflects the final processing step, the method
+                returns None
+        """
+        sep = BisonNameOp.separator
+        pth, basename, orig_ext, chunk, _ = BisonNameOp.parse_process_filename(
+            in_filename)
+        if chunk is not None:
+            basename = f"{basename}{sep}{chunk}"
+        basename = f"{basename}{sep}update"
+        if version is not None:
+            basename = f"{basename}{version}"
+        fname = f"{basename}{orig_ext}"
+        outfname = os.path.join(pth, fname)
+        return outfname
+
+    # .............................................................................
+    @staticmethod
+    def get_recsbyval_outfilename(in_filename, value, outpath=None):
+        """Construct output filename for the next processing step of the given file.
+
+        Args:
+            in_filename (str): full filename of CSV data.
+            value (str): value to append to filename
+            outpath (str): path for filename.  If None, input path is used.
+
+        Returns:
+            out_fname: base or full filename of output file, given the input filename.
+                If the input filename reflects the final processing step, the method
+                returns None
+        """
+        sep = BisonNameOp.separator
+        pth, basename, orig_ext, chunk, old_postfix = BisonNameOp.parse_process_filename(
+            in_filename)
+        if outpath is None:
+            outpath = pth
+
+        fname = f"{basename}{sep}{value}{orig_ext}"
+        outfname = os.path.join(outpath, fname)
+        return outfname
+
+    # .............................................................................
+    @staticmethod
     def _get_process_base_filename(in_filename, step_or_process=None):
         """Construct output base filename for this processing step of the given file.
 

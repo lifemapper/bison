@@ -4,7 +4,6 @@
 
 ## GBIF Input
 
-
 * Download GBIF data, query
   https://www.gbif.org/occurrence/search?country=US&has_coordinate=true&has_geospatial_issue=false&occurrence_status=present
 * Download option Darwin Core Archive (The taxonKey and scientific name in Simple CSV
@@ -55,12 +54,11 @@ values from the geometry nearest to the point.
 
 We annotate points with US-PAD regions for aggregation by species and
 RIIS status.  US Protected Areas are split into files by Department of Interior regions,
-so to efficiently
-intersect points with US-PAD, we intersect for the correct DOI region with
-DOI_12_Unified_Regions, then intersect with the US-PAD file for that DOI region.
+and by state.  DOI region files are still very complex, and slow, so to efficiently
+intersect points with US-PAD, we intersect with census data for the correct state
+abbreviation, then intersect with the US-PAD file for that state.
 
 Data:
-  * https://www.doi.gov/employees/reorg/unified-regional-boundaries
   * https://www.usgs.gov/programs/gap-analysis-project/science/pad-us-data-download
 
 ### American Indian/Alaska Native/Native Hawaiian Lands (AIANNH)

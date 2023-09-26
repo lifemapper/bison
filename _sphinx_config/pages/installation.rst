@@ -1,21 +1,22 @@
 ===============
-Tutorial Preparation
+LMBison Preparation
 ===============
 
-All commands will be typed at a command prompt.
-
------------------------
-Download and Install Docker
+Hardware requirements
 -----------------------
 
-To run LmBISON tools on any OS, locally through :term:`Docker`, first download
-by following instructions for your operating system at
-`Get Docker <https://docs.docker.com/get-docker/>`_
+Data processing for BISON annotation, summary, and statistics requires a powerful
+machine with a large amount of available storage.  The most processing intensive
+step, annotate, intersects each record with 4 geospatial data files.  This
+implementation can run this process in parallel, and uses the number of CPUs on the
+machine minus 2.  In Aug 2023, using 18 (of 20) cores, on 904 million
+records, the process took 5 days.
 
-Then install `Docker <https://docs.docker.com/get-started/>`_.
+These processes are all written in Python, and the implementation has been tested
+on a machine running Ubuntu Linux.  Scripts will need minimal modification to run
+on Windows or OSX successfully.
 
------------------------
-Download this Reppository
+Download this Repository
 -----------------------
 
 The `LmBISON repository <https://github.com/lifemapper/bison>`_  can be installed by
@@ -35,5 +36,28 @@ the command line:
 When the clone is complete, move to the top directory of the repository, `bison`.
 All hands-on commands will be executed in a command prompt window from this
 directory location.  In Linux or OSX, open a Terminal
-window.  In Windows, go to the Start menu, and type **command** in the Search bar.  Open
-the Command Prompt application that appears.
+window.
+
+Download Large Data
+-----------------------
+
+Download newest versions of geospatial data.  Links and more information at `Input Data
+<data_input>`_ .  In each case, new versions of the data might have different
+fieldnames which are used as constants in the project.  Fields and their meaning/use
+are identified in the same file, along with the constants that may need editing.  If
+no new version is available, constants and fieldnames do not have to be checked.
+
+Required Data not included in Github repo:
+
+* US-RIIS data should be provided by the USGS.
+* GBIF data may be downloaded at any time.  Fieldnames should remain constant.
+* Census data:
+  * county (includes state field)
+  * American Indian/Alaska Native Areas/Hawaiian Home Lands (AIANNH)
+* Protected Areas Database (US-PAD)
+  * split into datasets by Dept of Interior region
+* Department of Interior (DOI)
+  * used to identify which US-PAD dataset to intersect
+
+Create expected file structure
+-----------------------

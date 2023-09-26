@@ -59,7 +59,8 @@ class DwcData(object):
         """
         try:
             self._csv_reader, self._inf = get_csv_dict_reader(
-                self._csvfile, GBIF.DWCA_DELIMITER, encoding=ENCODING, quote_none=True, restkey=EXTRA_CSV_FIELD)
+                self._csvfile, GBIF.DWCA_DELIMITER, encoding=ENCODING, quote_none=True,
+                restkey=EXTRA_CSV_FIELD)
         except FileNotFoundError:
             raise
         except PermissionError:

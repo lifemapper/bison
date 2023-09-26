@@ -1,4 +1,5 @@
 """Constants for GBIF, BISON, RIIS, and processed outputs, used across modules."""
+
 BIG_DATA_PATH = "/home/astewart/git/bison/big_data"
 DATA_PATH = "/home/astewart/git/bison/data"
 INPUT_DIR = "input"
@@ -8,10 +9,14 @@ LINENO_FLD = "LINENO"
 ERR_SEPARATOR = "------------"
 # Geospatial data for intersecting with points to identify state and county for points
 COARSE_BUFFER_RANGE = [(i / 10.0) for i in range(1, 11)]
-FINE_BUFFER_RANGE = [(i / 20.0) for i in range(1, 3)]
+PAD_BUFFER = COARSE_BUFFER_RANGE[0]
 
 AGGREGATOR_DELIMITER = "__"
 EXTRA_CSV_FIELD = "rest_values"
+
+COMMANDS = (
+    "resolve", "split", "annotate", "summarize", "aggregate", "check_counts",
+    "heat_matrix", "pam_stats")
 
 RANKS = [
     "ABERRATION", "CLASS", "COHORT", "CONVARIETY", "CULTIVAR", "CULTIVAR_GROUP",
@@ -117,6 +122,7 @@ class REPORT:
     ANNOTATE_FAIL_COUNT = "records_failed_annotate"
     RANK_FAIL = "rank_failed"
     RANK_FAIL_COUNT = "records_failed_rank"
+    MESSAGE = "message"
 
 
 # .............................................................................
@@ -125,6 +131,8 @@ class LMBISON_PROCESS:
     RESOLVE = {"step": 0, "postfix": "resolve"}
     CHUNK = {"step": 1, "postfix": "raw", "prefix": "chunk"}
     ANNOTATE = {"step": 2, "postfix": "annotate"}
+    GROUP_BY = {"step": 2, "postfix": "group"}
+    UPDATE = {"step": 2, "postfix": "update"}
     SUMMARIZE = {"step": 3, "postfix": "summary"}
     COMBINE = {"step": 4, "postfix": "combine"}
     AGGREGATE = {"step": 5, "postfix": "aggregate"}
@@ -379,31 +387,8 @@ class APPEND_TO_DWC:
     AIANNH_NAME = "aiannh_name"
     AIANNH_GEOID = "aiannh_geoid"
     PAD_NAME = "pad_unit_name"
-    PAD_MGMT = "pad_mgmt_name"
     PAD_GAP_STATUS = "GAP_Sts"
     PAD_GAP_STATUS_DESC = "d_GAP_Sts"
-    DOI_REGION = "doi_region"
-    FILTER_FLAG = "filter_out"
-    # FILTER_FLAG = "do_summarize"
-
-    @staticmethod
-    def region_fields():
-        """Fields containing a region. to summarize RIIS status of occurrence records.
-
-        Returns:
-            list of all fields used to summarize RIIS determination of records.
-        """
-        return (
-            APPEND_TO_DWC.RESOLVED_CTY, APPEND_TO_DWC.RESOLVED_ST,
-            # APPEND_TO_DWC.AIANNH_GEOID,
-            APPEND_TO_DWC.AIANNH_NAME,
-            APPEND_TO_DWC.PAD_NAME,
-            # APPEND_TO_DWC.PAD_MGMT,
-            # APPEND_TO_DWC.PAD_GAP_STATUS,
-            # APPEND_TO_DWC.PAD_GAP_STATUS_DESC,
-            # APPEND_TO_DWC.DOI_REGION,
-            # APPEND_TO_DWC.FILTER_FLAG
-        )
 
     @staticmethod
     def annotation_fields():
@@ -413,12 +398,15 @@ class APPEND_TO_DWC:
             list of all the fields to be added to the annotated Dwc occurrence file.
         """
         return (
-            APPEND_TO_DWC.RESOLVED_CTY, APPEND_TO_DWC.RESOLVED_ST,
-            APPEND_TO_DWC.RIIS_KEY, APPEND_TO_DWC.RIIS_ASSESSMENT,
-            APPEND_TO_DWC.AIANNH_GEOID, APPEND_TO_DWC.AIANNH_NAME,
-            APPEND_TO_DWC.PAD_NAME, APPEND_TO_DWC.PAD_MGMT,
-            APPEND_TO_DWC.PAD_GAP_STATUS, APPEND_TO_DWC.PAD_GAP_STATUS_DESC,
-            APPEND_TO_DWC.DOI_REGION, APPEND_TO_DWC.FILTER_FLAG
+            APPEND_TO_DWC.RESOLVED_CTY,
+            APPEND_TO_DWC.RESOLVED_ST,
+            APPEND_TO_DWC.RIIS_KEY,
+            APPEND_TO_DWC.RIIS_ASSESSMENT,
+            APPEND_TO_DWC.AIANNH_GEOID,
+            APPEND_TO_DWC.AIANNH_NAME,
+            APPEND_TO_DWC.PAD_NAME,
+            APPEND_TO_DWC.PAD_GAP_STATUS,
+            # APPEND_TO_DWC.PAD_GAP_STATUS_DESC,
         )
 
 
@@ -447,37 +435,17 @@ class REGION:
             "GEOID": APPEND_TO_DWC.AIANNH_GEOID
         }
     }
-    DOI = {
-        "file": "DOI_12_Unified_Regions_20180801.shp",
-        "buffer": COARSE_BUFFER_RANGE,
-        "is_disjoint": False,
-        "summary": [],
-        "map": {"REG_NUM": APPEND_TO_DWC.DOI_REGION}
-    }
     PAD = {
-        "files": [
-            ("1", "PADUS3_0_Region_1_SHP/PADUS3_0Combined_Region1.shp"),
-            ("2", "PADUS3_0_Region_2_SHP/PADUS3_0Combined_Region2.shp"),
-            ("3", "PADUS3_0_Region_3_SHP/PADUS3_0Combined_Region3.shp"),
-            ("4", "PADUS3_0_Region_4_SHP/PADUS3_0Combined_Region4.shp"),
-            ("5", "PADUS3_0_Region_5_SHP/PADUS3_0Combined_Region5.shp"),
-            ("6", "PADUS3_0_Region_6_SHP/PADUS3_0Combined_Region6.shp"),
-            ("7", "PADUS3_0_Region_7_SHP/PADUS3_0Combined_Region7.shp"),
-            ("8", "PADUS3_0_Region_8_SHP/PADUS3_0Combined_Region8.shp"),
-            ("9", "PADUS3_0_Region_9_SHP/PADUS3_0Combined_Region9.shp"),
-            ("10", "PADUS3_0_Region_10_SHP/PADUS3_0Combined_Region10.shp"),
-            ("11", "PADUS3_0_Region_11_SHP/PADUS3_0Combined_Region11.shp"),
-            ("12", "PADUS3_0_Region_12_SHP/PADUS3_0Combined_Region12.shp")],
+        "filepattern": "pad_st/PADUS3_0Designation_State??_4326.shp",
         "buffer": (),
         "is_disjoint": True,
-        "filter_field": APPEND_TO_DWC.DOI_REGION,
+        "subset_field": APPEND_TO_DWC.RESOLVED_ST,
         # file prefix, field name
         "summary": [("pad", APPEND_TO_DWC.PAD_NAME)],
         "map": {
             "Unit_Nm": APPEND_TO_DWC.PAD_NAME,
-            "d_Mang_Nam": APPEND_TO_DWC.PAD_MGMT,
             "GAP_Sts": APPEND_TO_DWC.PAD_GAP_STATUS,
-            "d_GAP_Sts": APPEND_TO_DWC.PAD_GAP_STATUS_DESC
+            # "d_GAP_Sts": APPEND_TO_DWC.PAD_GAP_STATUS_DESC
             }
         }
 
@@ -502,7 +470,6 @@ class REGION:
                     summarize_by_fields[prefix] = flds
                 else:
                     raise Exception(f"Bad metadata for {prefix} summary fields")
-            # summarize_by_fields[LMBISON.SUMMARY_FILTER_HEADING] = APPEND_TO_DWC.FILTER_FLAG
         return summarize_by_fields
 
     @staticmethod
@@ -525,11 +492,9 @@ class REGION:
         """Return all REGION types to use to annotate records.
 
         Returns:
-            List of all REGION types.
-
-        Note: the
+            sequence of all REGION types.
         """
-        return (REGION.COUNTY, REGION.AIANNH, REGION.DOI, REGION.PAD)
+        return (REGION.COUNTY, REGION.AIANNH, REGION.PAD)
 
     @staticmethod
     def full_region():
@@ -538,28 +503,7 @@ class REGION:
         Returns:
             List of all REGION types that enclose the entire region.
         """
-        return (REGION.COUNTY, REGION.AIANNH, REGION.DOI)
-
-    @staticmethod
-    def filter_with():
-        """Return the REGION types that narrows down the combine_to_region dataset.
-
-        Returns:
-            List of all REGION types that together enclose the entire region.
-        """
-        return REGION.DOI
-
-    @staticmethod
-    def combine_to_region():
-        """Return all REGION types that, when joined together, cover the entire US.
-
-        Returns:
-            List of all REGION types that together enclose the entire region.
-
-        Note:
-            After resolving to the filter_with,
-        """
-        return REGION.PAD
+        return (REGION.COUNTY, REGION.AIANNH)
 
     @staticmethod
     def for_summary():
@@ -569,6 +513,28 @@ class REGION:
             List of all REGION types that together enclose the entire region.
         """
         return (REGION.COUNTY, REGION.AIANNH, REGION.PAD)
+
+    # .............................................................................
+    @staticmethod
+    def get_state_files_from_pattern(geo_path):
+        """Get state codes and full filenames for the PAD-by-state shapefiles.
+
+        Args:
+            geo_path (str): base path for geospatial data.
+
+        Returns:
+            st_files (dict): Dictionary of codes and absolute filenames.
+        """
+        import os
+        import glob
+        st_files = {}
+        geo_pattern = os.path.join(geo_path, REGION.PAD["filepattern"])
+        geo_files = glob.glob(geo_pattern)
+        for gfname in geo_files:
+            basename = os.path.basename(gfname)
+            st = basename.split("_")[2][-2:]
+            st_files[st] = gfname
+        return st_files
 
 
 # .............................................................................
@@ -611,7 +577,7 @@ class GBIF:
     DWCA_INTERPRETED = "occurrence"
     DWCA_VERBATIM = "verbatim"
     DWCA_DELIMITER = "\t"
-    NAMEKEY_FIELD = "taxonKey"
+    NAMEKEY_FLD = "taxonKey"
     ORG_KEYS = {
         "apitype": "organization",
         "saveme": ["key", "title", "description", "created", "modified", "homepage"],
@@ -766,9 +732,6 @@ class RIIS_DATA:
         "Publication Remarks",
     ]
     # Introduced or Invasive Species List.
-    SPECIES_GEO_FNAME = "US-RIIS_MasterList.csv"
-    SPECIES_GEO_TEST_FNAME = "US-RIIS_MasterList_100.csv"
-    SPECIES_GEO_DATA_COUNT = 15264
     SPECIES_GEO_KEY = "occurrenceID"
     GBIF_KEY = "GBIF taxonKey"
     ITIS_KEY = "ITIS TSN"
@@ -807,85 +770,3 @@ class RIIS_DATA:
         "occurrenceRemarks",
         "occurrenceID",
     ]
-
-
-# # .............................................................................
-# class RIIS:
-#     """Constants for the US Register of Introduced and Invasive Species, RIIS."""
-#     DATA_DIR = "data"
-#     DATA_EXT = "csv"
-#     DELIMITER = ","
-#     QUOTECHAR = '"'
-#     # Metadata about fields
-#     DATA_DICT_FNAME = "US_RIIS_DataDictionary"
-#
-#
-# # .............................................................................
-# class RIIS_AUTHORITY:
-#     """Authority References Metadata."""
-#     FNAME = "US-RIIS_AuthorityReferences"
-#     KEY = "Authority"
-#     DATA_COUNT = 5951
-#     HEADER = [
-#         "Authority",
-#         "associatedReferences",
-#         "Source Type",
-#         "Source",
-#         "Version",
-#         "Reference Author",
-#         "Title",
-#         "Publication Name",
-#         "Listed Publication Date",
-#         "Publisher",
-#         "Publication Place",
-#         "ISBN",
-#         "ISSN",
-#         "Pages",
-#         "Publication Remarks",
-#     ]
-#
-#
-# # .............................................................................
-# class RIIS_SPECIES:
-#     """Introduced or Invasive Species List."""
-#     FNAME = "US-RIIS_MasterList.csv"
-#     TEST_FNAME = "US-RIIS_MasterList_100.csv"
-#     DATA_COUNT = 15264
-#     KEY = "occurrenceID"
-#     GBIF_KEY = "GBIF taxonKey"
-#     ITIS_KEY = "ITIS TSN"
-#     LOCALITY_FLD = "locality"
-#     KINGDOM_FLD = "kingdom"
-#     SCINAME_FLD = "scientificName"
-#     SCIAUTHOR_FLD = "scientificNameAuthorship"
-#     RANK_FLD = "taxonRank"
-#     ASSESSMENT_FLD = "Introduced or Invasive"
-#     TAXON_AUTHORITY_FLD = "taxonomicStatus"
-#     HEADER = [
-#         "locality",
-#         "scientificName",
-#         "scientificNameAuthorship",
-#         "vernacularName",
-#         "taxonRank",
-#         "Introduced or Invasive",
-#         "Biocontrol",
-#         "associatedTaxa",
-#         "Approximate Introduction Date",
-#         "IntroDateNumber",
-#         "Other Names",
-#         "kingdom",
-#         "phylum",
-#         "class",
-#         "order",
-#         "family",
-#         "taxonomicStatus",
-#         "ITIS TSN",
-#         "GBIF taxonKey",
-#         "Authority",
-#         "associatedReferences",
-#         "Acquisition Date",
-#         "modified",
-#         "Update Remarks",
-#         "occurrenceRemarks",
-#         "occurrenceID",
-#     ]
