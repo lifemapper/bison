@@ -24,7 +24,27 @@
         "OccurrenceStatus is Present"
       ]
     }
-
+  
+  * Test data 
+    
+    When using this dataset please use the following citation:
+    GBIF.org (25 September 2023) GBIF Occurrence Download https://doi.org/10.15468/dl.33f5eq
+    Download Information
+    DOI: https://doi.org/10.15468/dl.33f5eq (may take some hours before being active)
+    Creation Date: 16:16:09 25 September 2023
+    Records included: 1421243 records from 73 published datasets
+    Compressed data size: 257.2 MB
+    Download format: DWCA
+    Filter used:
+    {
+      "and" : [
+        "BasisOfRecord is Occurrence evidence",
+        "Country is United States of America",
+        "HasCoordinate is true",
+        "HasGeospatialIssue is false",
+        "OccurrenceStatus is Present"
+      ]
+    }
 
 ## USGS RIIS Input
 

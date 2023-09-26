@@ -1,0 +1,678 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: | 
+  This is an example workflow created to pull a large dataset from a third-party. It uses an EventBridge schedule to launch an EC2 
+  spot instance to download the archive, extract the main data set and save it to S3. This triggers another EventBridge rule to have Glue crawl the new data file. 
+  Old data is deleted and the table dropped. In this example, the original data file has 250+ columns. An Athena query creates a new subset of the data using only 22 columns, and storing it in Parquet with snappy compression. The data catalog is now updated for the new data to be queried by Athena (and QuickSight, if desired).
+
+# IT WORKS WITH THE DEFAULT VPC BUT IF NOT USING THE DEFAULT VPC, A NEW VPC HAS TO BE CREATED AND CONFIGURED
+# The Mappings point to the Amazon Linux 2023 AMI with the unique resource id for each region
+Mappings:
+  RegionMap:
+    us-east-1:
+      AMI: ami-0b9ce70cf1bc24fc3
+    us-east-2:
+      AMI: ami-0773d5f16c0189a6c
+    us-west-1:
+      AMI: ami-0c073ccd633399fdd
+    us-west-2:
+      AMI: ami-08f636ee366a58ec8
+
+Parameters:
+  VpcID:
+    Description: >
+      Enter the ID of the VPC in which the EC2 Spot instance will deploy in.
+      Example: vpc-{alphanumericvalues}
+    Type: String
+
+  CronExpression:
+    Description: >
+      Enter a valid cron expression to specify the schedule for the eventbridge to trigger a lambda that will launch an EC2 instance.
+      Example: cron(0 12 * * ? *) to run every day at noon UTC.
+    Type: String
+
+  EnableScheduledEventState:
+    Description: >
+      Set to 'true' to enable the rule and allow Eventbridge to schedule a trigger to invoke a Lambada function to launch the EC2 instance or 'false' to disable it.
+    Type: String
+    AllowedValues:
+      - "true"
+      - "false"
+    Default: "true"
+
+  EnableBucketEventState:
+    Description: >
+      Set to 'true' to enable the rule and allow Eventbridge to register S3 Put Events to trigger the step function workflow or 'false' to disable it.
+    Type: String
+    AllowedValues:
+      - "true"
+      - "false"
+    Default: "true"
+
+Conditions:
+  IsScheduled: !Equals [ !Ref EnableScheduledEventState, "true" ]
+  IsEnabled: !Equals [ !Ref EnableBucketEventState, "true" ]
+
+Resources:
+  # EC2 Spot Launch Template
+  LaunchTemplateEC2:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: LmBisonDataLoader
+      LaunchTemplateData:
+        InstanceType: r7g.medium
+        IamInstanceProfile:
+          Arn: !GetAtt EC2InstanceProfile.Arn
+        InstanceMarketOptions:
+          MarketType: spot
+        ImageId: !FindInMap [ RegionMap, !Ref AWS::Region, AMI ]
+        SecurityGroupIds:
+          - !Ref LmBisonNoIngressSG
+        BlockDeviceMappings:
+          - DeviceName: /dev/xvda
+            Ebs:
+              VolumeType: io2
+              VolumeSize: 700
+              Iops: 64000
+              DeleteOnTermination: true
+        Monitoring:
+          Enabled: true
+        UserData:
+          Fn::Base64:
+            !Sub |
+              #!/bin/bash
+              echo "Starting script..."
+              yum update -y
+              cd /root
+              echo "retrieving data..."
+              wget https://api.gbif.org/v1/occurrence/download/request/0028636-230810091245214.zip 
+              unzip 0028636-230810091245214.zip occurrence.txt
+              aws s3 cp occurrence.txt s3://${DataIngestionBucket}/rawdata/
+              echo "Copied to S3!"
+              shutdown now
+
+  # Security Group for Spot EC2 inatance
+  LmBisonNoIngressSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: LmBisonNoIngress
+      GroupDescription: Security Group for Spot EC2 instances that has no Ingress Rules
+      VpcId: !Ref VpcID
+
+  # EC2 IAM Role that allows the EC2 to access the Data Ingestion S3 Bucket and has other managed policies
+  EC2LmBisonRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Policies:
+        - PolicyName: LmBisonStoreDataInS3
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'S3:*'
+                Resource: !Sub 'arn:aws:s3:::${DataIngestionBucket}/*'
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/CloudWatchLogsFullAccess
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+
+  # Instance Profile which the EC2 instance will take on
+  EC2InstanceProfile:
+    Type: "AWS::IAM::InstanceProfile"
+    Properties:
+      Path: "/"
+      Roles:
+        - !Ref EC2LmBisonRole
+
+  # EventBridge Rule to trigger the workflow
+  ScheduledEventRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: "Scheduled Rule that triggers a Lambda Function based on cron job provided by user"
+      ScheduleExpression: !Ref CronExpression
+      State: !If [ IsScheduled, "ENABLED", "DISABLED" ]
+      Targets:
+        - Arn: !GetAtt LmBisonLaunchEC2Function.Arn
+          Id: "MyLambdaTarget"
+
+  # Lambda Permissions to be invoked by EventBridge Rule
+  PermissionForEventsToInvokeLambda:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref LmBisonLaunchEC2Function
+      Action: "lambda:InvokeFunction"
+      Principal: "events.amazonaws.com"
+      SourceArn:
+        !GetAtt ScheduledEventRule.Arn
+
+  # Event rule that triggers the Step Function workflow when new object placed in S3
+  LmBisonNewDataStartStateMachineRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: When new LmBison raw data hits S3 call the State Machine to process.
+      State: !If [ IsEnabled, "ENABLED", "DISABLED" ]
+      EventPattern:
+        source:
+          - aws.s3
+        detail-type:
+          - AWS API Call via CloudTrail
+        detail:
+          eventSource:
+            - s3.amazonaws.com
+          eventName:
+            - PutObject
+            - CompleteMultipartUpload
+          resources:
+            ARN:
+              - prefix: !Sub arn:aws:s3:::${DataIngestionBucket}/rawdata/
+      Targets:
+        - Arn: !GetAtt LmBisonNewDataStateMachine.Arn
+          Id: StartStepFunction
+          RoleArn: !GetAtt LmBisonEventBridgeInvokeStepFunctionsRole.Arn
+
+  # Permissions for Eventbridge rule to send event to trigger a Step Function Workflow
+  LmBisonEventBridgeInvokeStepFunctionsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Policies:
+        - PolicyName: LmBisonEventBridgeInvokeStepFunctionRole
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'states:StartExecution'
+                Resource:
+                  - !Sub ${LmBisonNewDataStateMachine}
+
+  # S3 Bucket to log CloudTrail Data Events
+  LmBisonCloudtrailBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "cloudtrail-logs-${AWS::AccountId}-${AWS::Region}"
+
+  # An S3 Bucket to hold the Data Ingestion
+  DataIngestionBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub  "data-ingestion-${AWS::AccountId}-${AWS::Region}/lmbison"
+      NotificationConfiguration:
+        EventBridgeConfiguration:
+          EventBridgeEnabled: true
+
+  # An S3 Bucket where the query result will be saved as an object.
+  WorkGroupQueryResultBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "athena-query-results-${AWS::AccountId}-${AWS::Region}"
+
+  # BucketPolicy to grant permissions for CloudTrail to write files to the logging bucket
+  LoggingBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref LmBisonCloudtrailBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Sid: "AWSCloudTrailAclCheck"
+            Effect: "Allow"
+            Principal:
+              Service: cloudtrail.amazonaws.com
+            Action: s3:GetBucketAcl
+            Resource: !Sub arn:aws:s3:::${LmBisonCloudtrailBucket}
+          -
+            Sid: "AWSCloudTrailWrite"
+            Effect: "Allow"
+            Principal:
+              Service: "cloudtrail.amazonaws.com"
+            Action: "s3:PutObject"
+            Resource: !Sub arn:aws:s3:::${LmBisonCloudtrailBucket}/*
+            Condition:
+              StringEquals:
+                s3:x-amz-acl: "bucket-owner-full-control"
+
+  # Cloudtrail to log S3 events for the Data Ingestion Bucket
+  LmBisonTrail:
+    Type: AWS::CloudTrail::Trail
+    DependsOn:
+      - LoggingBucketPolicy
+      - LmBisonCloudtrailBucket
+    Properties:
+      TrailName: LmBison-Trail
+      S3BucketName: !Ref LmBisonCloudtrailBucket
+      S3KeyPrefix: 'lmbison'
+      EnableLogFileValidation: true
+      IncludeGlobalServiceEvents: true
+      IsLogging: true
+      IsMultiRegionTrail: true
+      AdvancedEventSelectors:
+        - Name: LmBison-data-testing
+          FieldSelectors:
+            - Field: "eventCategory"
+              Equals:
+                - "Data"
+            - Field: "resources.type"
+              Equals:
+                - AWS::S3::Object
+            - Field: "resources.ARN"
+              StartsWith:
+                - !Sub arn:aws:s3:::${DataIngestionBucket}/
+
+  # Execution Role for LmBisonLaunchEC2 Lambda Function providing CloudWatch and EC2 Access
+  LmBisonLambdaLaunchEC2FromTemplateRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Policies:
+        - PolicyName: LmBisonAllowIAMPassRole
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'iam:PassRole'
+                Resource: '*'
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/CloudWatchLogsFullAccess
+        - arn:aws:iam::aws:policy/AmazonEC2FullAccess
+
+  # Execution Role for LmBison Delete Subset Function
+  LmBisonDeleteSubsetFromS3Role:
+      Type: AWS::IAM::Role
+      Properties:
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service: lambda.amazonaws.com
+              Action: 'sts:AssumeRole'
+        Policies:
+          - PolicyName: LmBisonDeleteSubsetFiles
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - 's3:*'
+                  Resource:
+                     - !Sub 'arn:aws:s3:::${DataIngestionBucket}*'
+                     - !Sub 'arn:aws:s3:::${DataIngestionBucket}/*'
+          - PolicyName: LambdaBasicExecutionRole
+            PolicyDocument:
+               Version: '2012-10-17'
+               Statement:
+                - Effect: Allow
+                  Action:
+                    - 'logs:CreateLogGroup'
+                  Resource:
+                     - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*
+                - Effect: Allow
+                  Action:
+                    - "logs:CreateLogStream"
+                    - "logs:PutLogEvents"
+                  Resource:
+                    - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/LmBisonDeleteSubsetFromS3:*
+
+
+  # Lambda Function to deploy a Spot instance using a launch template
+  LmBisonLaunchEC2Function:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: LmBisonLaunchEC2FromTemplate
+      Code:
+        ZipFile: !Sub |
+          import json
+          import boto3
+
+          def lambda_handler(event, context):
+            try:
+              # Create EC2 client and launch instance from template.
+              ec2=boto3.client('ec2')
+              instances=ec2.run_instances(
+                MaxCount=1,
+                MinCount=1,
+                LaunchTemplate={
+                  'LaunchTemplateId': '${LaunchTemplateEC2.LaunchTemplateId}',
+                  'Version': '${LaunchTemplateEC2.LatestVersionNumber}'
+                }
+              )
+              print(f"Instance launched: {response}")
+              return {
+                  'statusCode': 200,
+                  'body': json.dumps('Instance launched')
+              }
+            except Exception as e:
+              print(f"An error occurred: {e}")
+              return {
+                  'statusCode': 500,
+                  'body': json.dumps(f"An error occurred: {e}")
+              }
+
+      Role: !GetAtt  LmBisonLambdaLaunchEC2FromTemplateRole.Arn
+      Handler: index.lambda_handler
+      Runtime: python3.11
+
+  # Lambda Function to delete a subset of files within S3 (re-write code)
+  LmBisonDeleteSubsetFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: LmBisonDeleteSubsetFromS3
+      Code:
+        ZipFile: !Sub |
+          import json
+          import boto3
+
+          def lambda_handler(event, context):
+            s3 = boto3.client('s3')
+            bucket_name = "${DataIngestionBucket}"
+            prefix = "subset"
+            s3_result = s3.list_objects_v2(Bucket=bucket_name, Prefix=prefix)
+            print(s3_result)
+            
+            file_list = []
+            if 'Contents' in s3_result and s3_result['Contents']:
+              # There are objects available in the specified prefix in S3 returned so their keys are stored 
+              # before proceeding to delete each object
+              for key in s3_result['Contents']:   
+                file_list.append(key['Key'])
+
+                print(len(file_list))
+    
+              for key in file_list:
+                s3.delete_object(Bucket=bucket_name, Key=key)
+        
+              return {
+                  'statusCode': 200,
+                  'body': json.dumps('LmBison subset files deleted!')
+              }
+
+            # No objects were returned from the specified prefix in S3, so a message indicating that is returned
+            return {
+                'statusCode': 200,
+                'body': json.dumps('No object files present to delete!')
+            }
+
+      Role: !GetAtt LmBisonDeleteSubsetFromS3Role.Arn
+      Handler: index.lambda_handler
+      Runtime: python3.11
+
+  # Glue Role that allows the Crawler to crawl the Data Ingestion Bucket and prefix
+  LmBisonGlueRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: glue.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Policies:
+        - PolicyName: AWSGlueServiceRole-LmBisonDataCrawler
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 's3:GetObject'
+                  - 's3:PutObject'
+                Resource: !Sub arn:aws:s3:::${DataIngestionBucket}/rawdata/*
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole
+
+  # Glue database to store the metadata for the data in S3
+  GlueDatabase:
+    Type: 'AWS::Glue::Database'
+    Properties:
+      CatalogId: !Ref 'AWS::AccountId'
+      DatabaseInput:
+        Name: lmbison
+        Description: Holds data for LmBison analytics use.
+
+  # A Glue Crawler to crawl the Data Ingestion Bucket and generate a schema
+  LmBisonGlueCrawler:
+    Type: AWS::Glue::Crawler
+    Properties:
+      Name: LmBisonData
+      DatabaseName: !Ref GlueDatabase
+      Description: This is the full occurrence.txt data file that LmBison processes.
+      Role: !Ref LmBisonGlueRole
+      Targets:
+        S3Targets:
+          - Path: !Sub 's3://${DataIngestionBucket}/rawdata'
+
+  # State Machine IAM Role that has access Lambda and Full Athena Access
+  LmBisonNewDataStepFunctionRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - !Sub states.${AWS::Region}.amazonaws.com
+            Action: "sts:AssumeRole"
+      Policies:
+        - PolicyName: LmBisonRunGlueCrawler
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'glue:StartCrawler'
+                  - 'glue:GetCrawler'
+                Resource:
+                  - '*'
+        - PolicyName: LmBisonStepFunctionAthenaAllowS3
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 's3:*'
+                  - 's3-object-lambda:*'
+                Resource:
+                - !Sub arn:aws:s3:::${DataIngestionBucket}/*
+                - !Sub arn:aws:s3:::${WorkGroupQueryResultBucket}/*
+      Path: "/"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AWSLambdaRole"
+        - "arn:aws:iam::aws:policy/AmazonAthenaFullAccess"
+
+  # Step Function State Machine to crawl the S3 Bucket, inovke a lambda function, and then run Athena Queries
+  LmBisonNewDataStateMachine:
+    Type: AWS::StepFunctions::StateMachine
+    Properties:
+      RoleArn: !GetAtt LmBisonNewDataStepFunctionRole.Arn
+      DefinitionString: !Sub
+        - | 
+            {
+             "Comment": "Triggered by new LmBison raw data, run a crawler, and then run a query to create Parquet data set.",
+             "StartAt": "StartCrawler",
+              "States": {
+                "StartCrawler": {
+                  "Type": "Task",
+                  "Parameters": {
+                    "Name": "${LmBisonGlueCrawler}"
+                  },
+                  "Resource": "arn:aws:states:::aws-sdk:glue:startCrawler",
+                  "Next": "GetCrawler"
+                },
+                "GetCrawler": {
+                  "Type": "Task",
+                  "Parameters": {
+                    "Name": "${LmBisonGlueCrawler}"
+                  },
+                  "Resource": "arn:aws:states:::aws-sdk:glue:getCrawler",
+                  "OutputPath": "$.Crawler.State",
+                  "Next": "Choice"
+                },
+                "Choice": {
+                  "Type": "Choice",
+                  "Choices": [
+                    {
+                      "Variable": "$",
+                      "StringEquals": "READY",
+                      "Next": "Lambda Invoke Delete Files"
+                    }
+                  ],
+                  "Default": "Wait"
+                },
+                "Lambda Invoke Delete Files": {
+                  "Type": "Task",
+                  "Resource": "arn:aws:states:::lambda:invoke",
+                  "OutputPath": "$.Payload",
+                  "Parameters": {
+                    "FunctionName": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${LmBisonDeleteSubsetFunction}:$LATEST"
+                  },
+                  "Retry": [
+                    {
+                      "ErrorEquals": [
+                        "Lambda.ServiceException",
+                        "Lambda.AWSLambdaException",
+                        "Lambda.SdkClientException",
+                        "Lambda.TooManyRequestsException"
+                      ],
+                      "IntervalSeconds": 2,
+                      "MaxAttempts": 6,
+                      "BackoffRate": 2
+                    }
+                  ],
+                  "Next": "Athena StartQueryExecution DropTable"
+                },
+                "Athena StartQueryExecution DropTable": {
+                  "Type": "Task",
+                  "Resource": "arn:aws:states:::athena:startQueryExecution.sync",
+                  "Parameters": {
+                    "QueryString": "DROP TABLE IF EXISTS `${GlueDatabase}.subset`",
+                    "WorkGroup": "${AthenaWorkGroup}"
+                  },
+                  "Next": "Athena StartQueryExecution Create Table"
+                },
+                "Athena StartQueryExecution Create Table": {
+                  "Type": "Task",
+                  "Resource": "arn:aws:states:::athena:startQueryExecution.sync",
+                  "Parameters": {
+                    "QueryString": "EXECUTE ${StatementName}",
+                    "WorkGroup": "${AthenaWorkGroup}"
+                  },
+                  "Next": "Success"
+                },
+                "Success": {
+                  "Type": "Succeed"
+                },
+                "Wait": {
+                  "Type": "Wait",
+                  "Seconds": 30,
+                  "Next": "GetCrawler Check Status"
+                },
+                "GetCrawler Check Status": {
+                  "Type": "Task",
+                  "Next": "Choice",
+                  "Parameters": {
+                    "Name": "${LmBisonGlueCrawler}"
+                  },
+                  "Resource": "arn:aws:states:::aws-sdk:glue:getCrawler",
+                  "OutputPath": "$.Crawler.State"
+                }
+              }
+            }
+        - StatementName:
+            Fn::Select:
+              - 0
+              - Fn::Split:
+                - "|"
+                - !Ref PreparedQueryStatement
+
+  # Prepared Query Statement responsible for creating a table that represents the data in S3
+  PreparedQueryStatement:
+    Type: AWS::Athena::PreparedStatement
+    Properties:
+      Description: Retrieve data from specified subset
+      StatementName: LmBisonSubsetQuery
+      WorkGroup: !Ref AthenaWorkGroup
+      QueryStatement: !Sub
+        CREATE TABLE ${GlueDatabase}.subset
+        WITH
+        (
+                external_location = 's3://${DataIngestionBucket}/subset/',
+                format = 'parquet',
+                parquet_compression = 'snappy'
+        )
+        AS SELECT * FROM ${GlueDatabase}.rawdata OFFSET 0 LIMIT 10000;
+
+  # A workgroup to specify an S3 output for workgroup
+  AthenaWorkGroup:
+    Type: AWS::Athena::WorkGroup
+    Properties:
+      Name: data-ingestion-group
+      Description: A workgroup for the data ingestion process
+      State: ENABLED
+      WorkGroupConfiguration:
+        EnforceWorkGroupConfiguration: false
+        PublishCloudWatchMetricsEnabled: true
+        RequesterPaysEnabled: false
+        ResultConfiguration:
+          OutputLocation: !Sub s3://${WorkGroupQueryResultBucket}/athena-results/
+
+Outputs:
+  LaunchTemplate:
+    Description: The launch template for lambda to deploy the EC2 instance
+    Value: !GetAtt LaunchTemplateEC2.LaunchTemplateId
+
+  DataIngestionBucketARN:
+    Description: "S3 Bucket that holds the data sent from spot instance"
+    Value: !GetAtt DataIngestionBucket.Arn
+
+  DeployEC2Function:
+    Description: "The lambda function contains the launch template to deploy an EC2 instance"
+    Value: !GetAtt LmBisonLaunchEC2Function.Arn
+
+  SubsetDeleteFunction:
+    Description: "The lambda function will delete a subset of files in S3 Bucket"
+    Value: !GetAtt LmBisonDeleteSubsetFunction.Arn
+
+  ScheduledEventRule:
+    Description: "The ARN of the EventBridge rule for running scheduled cron job"
+    Value: !GetAtt ScheduledEventRule.Arn
+
+  BucketEventRule:
+    Description: "The ARN of the EventBridge rule for PUT OBJECT operations to the S3 bucket"
+    Value: !GetAtt LmBisonNewDataStartStateMachineRule.Arn
+
+  IngestionStateMachine:
+    Description: "The state machine workflow to create and run a crawler on S3 Bucket and use Athena"
+    Value: !GetAtt LmBisonNewDataStateMachine.Name
+
+  GlueCrawler:
+    Description: The glue crawler provisioned for the Data Ingestion Bucket
+    Value: !Ref LmBisonGlueCrawler
+
+  AthenaPreparedQuery:
+    Description: The prepared query statement for the glue database lmbison
+    Value: !Ref PreparedQueryStatement
+
+
+

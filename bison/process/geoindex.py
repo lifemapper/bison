@@ -54,6 +54,16 @@ class GeoResolver(object):
         return os.path.basename(self._spatial_filename)
 
     # ...............................................
+    @property
+    def fieldmap(self):
+        """Return a dictionary mapping original to bison fieldnames.
+
+        Returns:
+            Dictionary of keys of original fieldnames and values of bison fieldnames.
+        """
+        return self._spatial_fields
+
+    # ...............................................
     def _initialize_geospatial_data(self):
         """Create a spatial index for the features in self._spatial_filename."""
         driver = ogr.GetDriverByName("ESRI Shapefile")

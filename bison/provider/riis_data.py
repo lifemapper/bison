@@ -1,6 +1,6 @@
 """Common classes for BISON RIIS data processing."""
 import csv
-from logging import DEBUG, ERROR, WARNING
+from logging import INFO, DEBUG, ERROR, WARNING
 import os
 
 from bison.common.constants import (
@@ -247,7 +247,7 @@ class RIIS:
     """Class for reading, writing, comparing RIIS species data records."""
 
     # ...............................................
-    def __init__(self, riis_filename, logger):
+    def __init__(self, riis_filename, logger=None):
         """Set the authority and species files and headers expected for processing.
 
         Args:
@@ -266,6 +266,13 @@ class RIIS:
         self.by_taxon = None
         self.by_riis_id = None
         self.bad_species = None
+
+    # ...............................................
+    def logit(self, msg, refname=None, log_level=INFO):
+        if self._log is not None:
+            self._log.log(msg, refname=refname, log_level=log_level)
+        else:
+            print(msg)
 
     # ...............................................
     def _read_authorities(self) -> set:
