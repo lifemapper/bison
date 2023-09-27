@@ -100,11 +100,10 @@ def compute_values(
             gbif_id, taxon_keys, state, riis_lookup)
 
         # Update all new values
-        # TODO: make sure this updates the record!!
-        update_record(rec, APPEND_TO_DWC.RIIS_ASSESSMENT, riis_assessment)
-        update_record(rec, APPEND_TO_DWC.RIIS_KEY, riis_key)
+        rec[APPEND_TO_DWC.RIIS_ASSESSMENT] = riis_assessment
+        rec[APPEND_TO_DWC.RIIS_KEY] = riis_key
         for in_fld, bison_fld in fieldmap.items():
-            update_record(rec, bison_fld, fldvals[in_fld])
+            rec[bison_fld] = fldvals[in_fld]
 
 
 
@@ -201,14 +200,13 @@ def filter_find_taxon_keys(rank, acc_taxon_key, species_key):
         # Find RIIS records for this acceptedTaxonKey.
         taxkeys.append(acc_taxon_key)
         if (rank != "species" and acc_taxon_key != species_key):
-            # If acceptedTaxonKey is below species, find RIIS records for species
-            # key too.
+            # If acceptedTaxonKey is below species, also find RIIS records for species
             taxkeys.append(species_key)
     return taxkeys
 
 
 # .............................................................................
-def update_record(rec, fldname, value):
+
 
 
 # .....................................................................................

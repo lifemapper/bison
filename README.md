@@ -24,9 +24,9 @@
         "OccurrenceStatus is Present"
       ]
     }
-  
-  * Test data 
-    
+
+  * Test data
+
     When using this dataset please use the following citation:
     GBIF.org (25 September 2023) GBIF Occurrence Download https://doi.org/10.15468/dl.33f5eq
     Download Information

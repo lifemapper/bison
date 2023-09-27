@@ -1,7 +1,7 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: | 
-  This is an example workflow created to pull a large dataset from a third-party. It uses an EventBridge schedule to launch an EC2 
-  spot instance to download the archive, extract the main data set and save it to S3. This triggers another EventBridge rule to have Glue crawl the new data file. 
+Description: |
+  This is an example workflow created to pull a large dataset from a third-party. It uses an EventBridge schedule to launch an EC2
+  spot instance to download the archive, extract the main data set and save it to S3. This triggers another EventBridge rule to have Glue crawl the new data file.
   Old data is deleted and the table dropped. In this example, the original data file has 250+ columns. An Athena query creates a new subset of the data using only 22 columns, and storing it in Parquet with snappy compression. The data catalog is now updated for the new data to be queried by Athena (and QuickSight, if desired).
 
 # IT WORKS WITH THE DEFAULT VPC BUT IF NOT USING THE DEFAULT VPC, A NEW VPC HAS TO BE CREATED AND CONFIGURED
@@ -84,7 +84,7 @@ Resources:
               yum update -y
               cd /root
               echo "retrieving data..."
-              wget https://api.gbif.org/v1/occurrence/download/request/0028636-230810091245214.zip 
+              wget https://api.gbif.org/v1/occurrence/download/request/0028636-230810091245214.zip
               unzip 0028636-230810091245214.zip occurrence.txt
               aws s3 cp occurrence.txt s3://${DataIngestionBucket}/rawdata/
               echo "Copied to S3!"
@@ -389,19 +389,19 @@ Resources:
             prefix = "subset"
             s3_result = s3.list_objects_v2(Bucket=bucket_name, Prefix=prefix)
             print(s3_result)
-            
+
             file_list = []
             if 'Contents' in s3_result and s3_result['Contents']:
-              # There are objects available in the specified prefix in S3 returned so their keys are stored 
+              # There are objects available in the specified prefix in S3 returned so their keys are stored
               # before proceeding to delete each object
-              for key in s3_result['Contents']:   
+              for key in s3_result['Contents']:
                 file_list.append(key['Key'])
 
                 print(len(file_list))
-    
+
               for key in file_list:
                 s3.delete_object(Bucket=bucket_name, Key=key)
-        
+
               return {
                   'statusCode': 200,
                   'body': json.dumps('LmBison subset files deleted!')
@@ -507,7 +507,7 @@ Resources:
     Properties:
       RoleArn: !GetAtt LmBisonNewDataStepFunctionRole.Arn
       DefinitionString: !Sub
-        - | 
+        - |
             {
              "Comment": "Triggered by new LmBison raw data, run a crawler, and then run a query to create Parquet data set.",
              "StartAt": "StartCrawler",
@@ -673,6 +673,3 @@ Outputs:
   AthenaPreparedQuery:
     Description: The prepared query statement for the glue database lmbison
     Value: !Ref PreparedQueryStatement
-
-
-
