@@ -460,7 +460,7 @@ Resources:
       Role: !Ref LmBisonGlueRole
       Targets:
         S3Targets:
-          - Path: !Sub 's3://${DataIngestionBucket}/rawdata'
+          - Path: !Sub 's3://${DataIngestionBucket}/raw_data'
 
   # State Machine IAM Role that has access Lambda and Full Athena Access
   LmBisonNewDataStepFunctionRole:

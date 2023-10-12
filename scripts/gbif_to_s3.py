@@ -1,7 +1,13 @@
+"""Script to initiate AWS (EC2 Spot to S3) download of GBIF data."""
 import base64
 import boto3
+from botocore.exceptions import ClientError
 import csv
 import datetime
+import io
+import logging
+from logging.handlers import RotatingFileHandler
+import os
 import pandas
 
 # --------------------------------------------------------------------------------------
@@ -18,13 +24,19 @@ local_ec2_key = f"/home/astewart/.ssh/{key_name}.pem"
 # DWCA data for download from GBIF, retrieved and extracted to S3 by spot instance
 
 # S3
-bucket = "bison-321942852011-us-east-1"
-bucket_path = "dev_data"
+BUCKET = "bison-321942852011-us-east-1"
+ORIG_DATA_PATH = "orig_data"
+TRIGGER_FILENAME = "go.txt"
 
 # EC2 Spot Instance
 iam_user = "arn:aws:iam::321942852011:user/aimee.stewart"
 spot_template_name = "bison_launch_template"
+# List of instance types at https://aws.amazon.com/ec2/spot/pricing/
+instance_type = "a1.medium"
+# instance_type = "a1.large"
 instance_basename = "bison"
+# TODO: Define the GBIF download file as an environment variable in template
+#  instead of user_data script
 script_filename = "scripts/user_data_for_ec2spot.sh"
 
 # Spot instance specs
@@ -44,6 +56,36 @@ launch_template_config = {
     }
 }
 
+# Log processing progress
+LOGINTERVAL = 1000000
+LOG_FORMAT = " ".join(["%(asctime)s", "%(levelname)-8s", "%(message)s"])
+LOG_DATE_FORMAT = '%d %b %Y %H:%M'
+LOGFILE_MAX_BYTES = 52000000
+LOGFILE_BACKUP_COUNT = 5
+
+
+# ----------------------------------------------------
+def get_logger(log_directory, log_name, log_level=logging.INFO):
+    filename = f"{log_name}.log"
+    if log_directory is not None:
+        filename = os.path.join(log_directory, f"{filename}")
+        os.makedirs(log_directory, exist_ok=True)
+    # create file handler
+    handler = RotatingFileHandler(
+        filename, mode="w", maxBytes=LOGFILE_MAX_BYTES, backupCount=10,
+        encoding="utf-8"
+    )
+    formatter = logging.Formatter(LOG_FORMAT, LOG_DATE_FORMAT)
+    handler.setLevel(log_level)
+    handler.setFormatter(formatter)
+    # Get logger
+    logger = logging.getLogger(log_name)
+    logger.setLevel(logging.DEBUG)
+    # Add handler to logger
+    logger.addHandler(handler)
+    logger.propagate = False
+    return logger
+
 
 # --------------------------------------------------------------------------------------
 # Tools for experimentation
@@ -53,6 +95,16 @@ def get_launch_template_from_instance(instance_id):
     ec2_client = boto3.client("ec2")
     launch_template_data = ec2_client.get_launch_template_data(InstanceId=instance_id)
     return launch_template_data
+
+
+# ----------------------------------------------------
+def delete_launch_template(template_name):
+    response = None
+    ec2_client = boto3.client("ec2")
+    lnch_tmpl = _get_launch_template(template_name)
+    if lnch_tmpl is not None:
+        response = ec2_client.delete_launch_template(LaunchTemplateName=template_name)
+    return response
 
 
 # ----------------------------------------------------
@@ -80,9 +132,9 @@ def get_client(profile, service):
     return client
 
 
-# --------------------------------------------------------------------------------------
-# On local machine: Describe all instances with given key_name and/or launch_template_id
+# ----------------------------------------------------
 def find_instances(key_name, launch_template_name):
+    # Describe all instances with key_name or launch_template_id
     ec2_client = boto3.client("ec2")
     filters = []
     if launch_template_name is not None:
@@ -105,6 +157,40 @@ def find_instances(key_name, launch_template_name):
             _print_inst_info(res)
             instances.extend(res["Instances"])
     return instances
+
+
+# ----------------------------------------------------
+def write_dataframe_to_s3_parquet(df, bucket, parquet_path):
+    # Write DataFrame to Parquet format and upload to S3
+    s3_client = boto3.client("s3")
+    parquet_buffer = io.BytesIO()
+    df.to_parquet(parquet_buffer, engine="pyarrow")
+    parquet_buffer.seek(0)
+    s3_client.upload_fileobj(parquet_buffer, bucket, parquet_path)
+
+
+# ----------------------------------------------------
+def upload_to_s3(local_path, filename, bucket, s3_path):
+    s3_client = boto3.client("s3")
+    local_filename = os.path.join(local_path, filename)
+    s3_client.upload_file(local_filename, bucket, s3_path)
+    print(f"Successfully uploaded {filename} to s3://{bucket}/{s3_path}")
+
+
+# ----------------------------------------------------
+def get_instance(instance_id):
+    # Describe instance
+    ec2_client = boto3.client("ec2")
+    response = ec2_client.describe_instances(
+        InstanceIds=[instance_id],
+        DryRun=False,
+    )
+    try:
+        instance = response["Reservations"][0]["Instances"][0]
+    except:
+        instance = None
+    return instance
+
 
 
 # --------------------------------------------------------------------------------------
@@ -130,7 +216,7 @@ def _get_user_data(script_filename):
         return base64_script_text
 
 
-# ----------------------------------------------------
+# ----------------------------------------------------upload_to_s3
 def _print_inst_info(reservation):
     resid = reservation["ReservationId"]
     inst = reservation["Instances"][0]
@@ -153,7 +239,7 @@ def _print_inst_info(reservation):
 
 # ----------------------------------------------------
 def _define_spot_launch_template_data(
-        spot_template_name, security_group_id, script_filename, key_name):
+        spot_template_name, instance_type, security_group_id, script_filename, key_name):
     user_data_64 = _get_user_data(script_filename)
     launch_template_data = {
         "EbsOptimized": True,
@@ -258,13 +344,14 @@ def _get_launch_template(template_name):
 
 # ----------------------------------------------------
 def create_spot_launch_template(
-        spot_template_name, security_group_id, script_filename, key_name):
+        spot_template_name, instance_type, security_group_id, script_filename, key_name):
     template = _get_launch_template(spot_template_name)
     if template is not None:
         success = True
     else:
         spot_template_data = _define_spot_launch_template_data(
-            spot_template_name, security_group_id, script_filename, key_name)
+            spot_template_name, instance_type, security_group_id, script_filename,
+            key_name)
         template_token = _create_token("template")
         ec2_client = boto3.client("ec2")
         response = ec2_client.create_launch_template(
@@ -280,66 +367,51 @@ def create_spot_launch_template(
 
 # ----------------------------------------------------
 def run_instance_spot(instance_basename, spot_template_name):
+    instance_id = None
     ec2_client = boto3.client("ec2")
     spot_token = _create_token("spot")
     instance_name = _create_token(instance_basename)
-    response = ec2_client.run_instances(
-        # KeyName=key_name,
-        ClientToken=spot_token,
-        MinCount=1, MaxCount=1,
-        LaunchTemplate = {"LaunchTemplateName": spot_template_name, "Version": "1"},
-        TagSpecifications=[{
-            "ResourceType": "instance",
-            "Tags": [
-                {"Key": "Name", "Value": instance_name},
-                {"Key": "TemplateName", "Value": spot_template_name}
-            ]
-        }]
-    )
     try:
-        instance = response["Instances"][0]
-    except KeyError:
-        instance = None
-        print("No instance created")
-    return instance["InstanceId"]
+        response = ec2_client.run_instances(
+            # KeyName=key_name,
+            ClientToken=spot_token,
+            MinCount=1, MaxCount=1,
+            LaunchTemplate = {"LaunchTemplateName": spot_template_name, "Version": "1"},
+            TagSpecifications=[{
+                "ResourceType": "instance",
+                "Tags": [
+                    {"Key": "Name", "Value": instance_name},
+                    {"Key": "TemplateName", "Value": spot_template_name}
+                ]
+            }]
+        )
+    except ClientError as e:
+        print(f"Failed to instantiate Spot instance {spot_token}, ({e})")
+    else:
+        try:
+            instance = response["Instances"][0]
+        except KeyError:
+            print("No instance returned")
+        else:
+            instance_id = instance["InstanceId"]
+    return instance_id
 
 
-# # ----------------------------------------------------
-# def write_dataframe_to_s3_parquet(df, bucket, parquet_path):
-#     # Write DataFrame to Parquet format and upload to S3
-#     s3_client = boto3.client("s3")
-#     parquet_buffer = io.BytesIO()
-#     df.to_parquet(parquet_buffer, engine="pyarrow")
-#     parquet_buffer.seek(0)
-#     s3_client.upload_fileobj(parquet_buffer, bucket, parquet_path)
-#
-#
-# # --------------------------------------------------------------------------------------
-# # Run on EC2 or local: Upload file to S3
-# # --------------------------------------------------------------------------------------
-# def upload_to_s3(local_path, filename, dev_bucket, s3_path):
-#     s3_client = boto3.client("s3")
-#     local_filename = os.path.join(local_path, filename)
-#     s3_client.upload_file(local_filename, dev_bucket, s3_path)
-#     print(f"Successfully uploaded {filename} to s3://{dev_bucket}/{s3_path}")
-#
-#
-
-
-# --------------------------------------------------------------------------------------
-# On local machine: Describe the instance with the instance_id
-# --------------------------------------------------------------------------------------
-def get_instance(instance_id):
-    ec2_client = boto3.client("ec2")
-    response = ec2_client.describe_instances(
-        InstanceIds=[instance_id],
-        DryRun=False,
-    )
+# ----------------------------------------------------
+def upload_trigger_to_s3(filename, s3_bucket, s3_bucket_path):
+    with open(filename, "r") as f:
+        f.write("go!")
+    s3_client = boto3.client("s3")
+    obj_name = f"{s3_bucket_path}/{filename}"
     try:
-        instance = response["Reservations"][0]["Instances"][0]
-    except:
-        instance = None
-    return instance
+        s3_client.upload_file(filename, s3_bucket, obj_name)
+    except ClientError as e:
+        print(f"Failed to upload {obj_name} to {s3_bucket}, ({e})")
+    else:
+        s3_filename = f"s3://{s3_bucket}/{obj_name}"
+        print(f"Successfully uploaded {filename} to {s3_filename}")
+    return s3_filename
+
 
 # --------------------------------------------------------------------------------------
 # On EC2: Create a trimmed dataframe from CSV and save to S3 in parquet format
@@ -347,17 +419,22 @@ def get_instance(instance_id):
 # --------------------------------------------------------------------------------------
 # Main
 # --------------------------------------------------------------------------------------
-# if __name__ == "__main__":
+if __name__ == "__main__":
+    # -------  Create a logger -------
+    script_name = os.path.splitext(os.path.basename(__file__))[0]
+    logger = get_logger(None, script_name)
+    # -------  Find or create template -------
+    # Adds the script to the spot template
+    success = create_spot_launch_template(
+        spot_template_name, instance_type, security_group_id, script_filename,
+        key_name)
 
+    # -------  Run instance from template -------
+    # Runs the script on instantiation
+    response = run_instance_spot(instance_basename, spot_template_name)
 
-# -------  Find or create template -------
-# Adds the script to the spot template
-success = create_spot_launch_template(
-        spot_template_name, security_group_id, script_filename, key_name)
-
-# -------  Run instance from template -------
-# Runs the script on instantiation
-instance_id = run_instance_spot(instance_basename, spot_template_name)
-
-# instance = get_instance(instance_id)
-# ip = instance["PublicIpAddress"]
+    # Create and upload a file triggering an event that converts the CSV to parquet
+    fname = "go.txt"
+    with open(fname, "r") as f:
+        f.write("go!")
+    trigger = upload_to_s3(TRIGGER_FILENAME, BUCKET, ORIG_DATA_PATH)
