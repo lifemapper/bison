@@ -10,56 +10,47 @@ from logging.handlers import RotatingFileHandler
 import os
 import pandas
 
+from awsglue.context import GlueContext
+from awsglue.transforms import *
+from awsglue.dynamicframe import DynamicFrame
+from pyspark.context import SparkContext
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col
+
+
 # --------------------------------------------------------------------------------------
 # Constants for GBIF data, local dev machine, EC2, S3
 # --------------------------------------------------------------------------------------
-key_name = "aimee-aws-key"
-aws_zone = "us-east-1"
+PROJ_NAME = "bison"
+
+GBIF_BUCKET = f"gbif-open-data-us-east-1/occurrence"
+
+MY_BUCKET = f"{PROJ_NAME}-321942852011-us-east-1"
+KEY_NAME = "aimee-aws-key"
+REGION = "us-east-1"
 # Allows KU Dyche hall
-security_group_id = "sg-0b379fdb3e37389d1"
+SECURITY_GROUP_ID = "sg-0b379fdb3e37389d1"
 
-# Local machine data
-local_ec2_key = f"/home/astewart/.ssh/{key_name}.pem"
-
-# DWCA data for download from GBIF, retrieved and extracted to S3 by spot instance
+GBIF_ARN = "arn:aws:s3:::gbif-open-data-us-east-1"
+GBIF_ODR_FNAME = "occurrence.parquet"
 
 # S3
-BUCKET = "bison-321942852011-us-east-1"
 ORIG_DATA_PATH = "orig_data"
 TRIGGER_FILENAME = "go.txt"
 
 # EC2 Spot Instance
-iam_user = "arn:aws:iam::321942852011:user/aimee.stewart"
-spot_template_name = "bison_launch_template"
+SPOT_TEMPLATE_NAME = f"{PROJ_NAME}_launch_template"
 # List of instance types at https://aws.amazon.com/ec2/spot/pricing/
-instance_type = "a1.medium"
-# instance_type = "a1.large"
-instance_basename = "bison"
+INSTANCE_TYPE = "a1.medium"
+# INSTANCE_TYPE = "a1.large"
 # TODO: Define the GBIF download file as an environment variable in template
 #  instead of user_data script
-script_filename = "scripts/user_data_for_ec2spot.sh"
-
-# Spot instance specs
-target_capactity_spec = {
-    "TotalTargetCapacity": 1,
-    "SpotTargetCapacity": 1,
-    "DefaultTargetCapacityType": "spot"
-}
-spot_opts = {
-    "AllocationStrategy": "price-capacity-optimized",
-    "InstanceInterruptionBehavior": "terminate"
-}
-launch_template_config = {
-    "LaunchTemplateSpecification": {
-    "LaunchTemplateName": spot_template_name,
-    "Version": "1"
-    }
-}
+USER_DATA_FILENAME = "scripts/user_data_for_ec2spot.sh"
 
 # Log processing progress
 LOGINTERVAL = 1000000
 LOG_FORMAT = " ".join(["%(asctime)s", "%(levelname)-8s", "%(message)s"])
-LOG_DATE_FORMAT = '%d %b %Y %H:%M'
+LOG_DATE_FORMAT = "%d %b %Y %H:%M"
 LOGFILE_MAX_BYTES = 52000000
 LOGFILE_BACKUP_COUNT = 5
 
@@ -203,6 +194,32 @@ def _create_token(type):
 
 
 # ----------------------------------------------------
+def get_date_str():
+    n = datetime.datetime.now()
+    date_str = f"{n.year}-{n.month}-{n.day}"
+    return date_str
+
+
+# ----------------------------------------------------
+def get_current_gbif_subdir():
+    n = datetime.datetime.now()
+    date_str = f"{n.year}-{n.month}-01"
+    return date_str
+
+
+# ----------------------------------------------------
+def get_prev_gbif_subdir():
+    n = datetime.datetime.now()
+    yr = n.year
+    mo = n.month
+    if n.month == 1:
+        mo = 12
+        yr -= 1
+    date_str = f"{yr}-{mo}-01"
+    return date_str
+
+
+# ----------------------------------------------------
 def _get_user_data(script_filename):
     try:
         with open(script_filename, "r") as infile:
@@ -239,7 +256,7 @@ def _print_inst_info(reservation):
 
 # ----------------------------------------------------
 def _define_spot_launch_template_data(
-        spot_template_name, instance_type, security_group_id, script_filename, key_name):
+        template_name, instance_type, security_group_id, script_filename, key_name):
     user_data_64 = _get_user_data(script_filename)
     launch_template_data = {
         "EbsOptimized": True,
@@ -277,7 +294,7 @@ def _define_spot_launch_template_data(
             }
         ],
         "ImageId": "ami-0a0c8eebcdd6dcbd0",
-        "InstanceType": "t4g.medium",
+        "InstanceType": instance_type,
         "KeyName": key_name,
         "Monitoring": {"Enabled": False},
         "Placement": {
@@ -289,7 +306,7 @@ def _define_spot_launch_template_data(
         "TagSpecifications": [
             {
                 "ResourceType": "instance",
-                "Tags": [{"Key": "TemplateName", "Value": spot_template_name}]
+                "Tags": [{"Key": "TemplateName", "Value": template_name}]
             }
         ],
         "InstanceMarketOptions": {
@@ -325,7 +342,7 @@ def _define_spot_launch_template_data(
 # --------------------------------------------------------------------------------------
 # On local machine: Describe the launch_template with the template_name
 def _get_launch_template(template_name):
-    ec2_client = boto3.client("ec2", region_name=aws_zone)
+    ec2_client = boto3.client("ec2", region_name=REGION)
     lnch_temp = None
     try:
         response = ec2_client.describe_launch_templates(
@@ -344,47 +361,47 @@ def _get_launch_template(template_name):
 
 # ----------------------------------------------------
 def create_spot_launch_template(
-        ec2_client, spot_template_name, instance_type, security_group_id, script_filename, key_name):
+        ec2_client, template_name, instance_type, security_group_id, script_filename, key_name):
     success = False
-    template = _get_launch_template(spot_template_name)
+    template = _get_launch_template(template_name)
     if template is not None:
         success = True
     else:
         spot_template_data = _define_spot_launch_template_data(
-            spot_template_name, instance_type, security_group_id, script_filename,
+            template_name, instance_type, security_group_id, script_filename,
             key_name)
         template_token = _create_token("template")
         try:
             response = ec2_client.create_launch_template(
                 DryRun = False,
                 ClientToken = template_token,
-                LaunchTemplateName = spot_template_name,
+                LaunchTemplateName = template_name,
                 VersionDescription = "Spot for GBIF/BISON process",
                 LaunchTemplateData = spot_template_data
             )
         except ClientError as e:
-            print(f"Failed to create launch template {spot_template_name}, ({e})")
+            print(f"Failed to create launch template {template_name}, ({e})")
         else:
             success = (response["ResponseMetadata"]["HTTPStatusCode"] == 200)
     return success
 
 
 # ----------------------------------------------------
-def run_instance_spot(ec2_client, instance_basename, spot_template_name):
+def run_instance_spot(ec2_client, proj_name, template_name):
     instance_id = None
     spot_token = _create_token("spot")
-    instance_name = _create_token(instance_basename)
+    instance_name = _create_token(proj_name)
     try:
         response = ec2_client.run_instances(
             # KeyName=key_name,
             ClientToken=spot_token,
             MinCount=1, MaxCount=1,
-            LaunchTemplate = {"LaunchTemplateName": spot_template_name, "Version": "1"},
+            LaunchTemplate = {"LaunchTemplateName": template_name, "Version": "1"},
             TagSpecifications=[{
                 "ResourceType": "instance",
                 "Tags": [
                     {"Key": "Name", "Value": instance_name},
-                    {"Key": "TemplateName", "Value": spot_template_name}
+                    {"Key": "TemplateName", "Value": template_name}
                 ]
             }]
         )
@@ -416,6 +433,60 @@ def upload_trigger_to_s3(filename, s3_bucket, s3_bucket_path):
     return s3_filename
 
 
+def retrieve_gbif_subset_to_s3(s3_client, source_bucket, source_fname, target_bucket, target_folder):
+    # AWS Glue Context
+    sc = SparkContext()
+    spark = SparkSession(sc)
+    glueContext = GlueContext(sc)
+
+    # Define filters
+    filters = [
+        {"Name": "Country", "Operator": "EQUALS", "Value": "United States of America"},
+        {"Name": "HasCoordinate", "Operator": "EQUALS", "Value": "true"},
+        {"Name": "HasGeospatialIssue", "Operator": "EQUALS", "Value": "false"},
+        {"Name": "OccurrenceStatus", "Operator": "EQUALS", "Value": "Present"}
+    ]
+
+    # Create an S3 session for AWS Glue
+    glueContext = GlueContext(SparkContext.getOrCreate())
+
+    subdir = get_current_gbif_subdir()
+    # Create a dynamic frame from the dataset using the provided filters
+    # dynamic_frame = glueContext.create_dynamic_frame.from_catalog(
+    #     database=database,
+    #     table_name="your-table-name",
+    #     push_down_predicate=filters
+    # )
+    # Create DynamicFrame from Glue Data Catalog
+    gbif_data = glueContext.create_dynamic_frame.from_catalog(
+        "s3",
+        {
+            "paths": [
+                f"s3://{source_bucket}/{subdir}/{source_fname}"
+            ]
+        },
+        "parquet",
+        {"withHeader": True},
+    )
+
+    # Create filtered DynamicFrame with custom lambda
+    # to filter records by Provider State and Provider City
+    gbif_subset = gbif_data.filter(
+        f=lambda x: x["Provider State"] in ["CA", "AL"]
+                    and x["Provider City"] in ["SACRAMENTO", "MONTGOMERY"]
+    )
+
+    # Convert the dynamic frame to a Spark DataFrame for further processing
+    df = gbif_subset.toDF()
+
+    # Write the filtered data to a Parquet file in S3
+    output_path = f"s3://{target_bucket}/{target_folder}/"
+    df.write.parquet(output_path, mode="overwrite")
+
+    # Print the path to the Parquet files in the destination bucket
+    print(f"Filtered records have been written to: {output_path}")
+
+
 # --------------------------------------------------------------------------------------
 # On EC2: Create a trimmed dataframe from CSV and save to S3 in parquet format
 # --------------------------------------------------------------------------------------
@@ -426,20 +497,26 @@ if __name__ == "__main__":
     # -------  Create a logger -------
     script_name = os.path.splitext(os.path.basename(__file__))[0]
     logger = get_logger(None, script_name)
-    # Get EC2 client
-    ec2_client = boto3.client("ec2", region_name=aws_zone)
-    # -------  Find or create template -------
-    # Adds the script to the spot template
-    success = create_spot_launch_template(
-        ec2_client, spot_template_name, instance_type, security_group_id, script_filename,
-        key_name)
 
-    # -------  Run instance from template -------
-    # Runs the script on instantiation
-    response = run_instance_spot(ec2_client, instance_basename, spot_template_name)
+    # # ------- Get EC2 client -------
+    # ec2_client = boto3.client("ec2", region_name=REGION)
+    #
+    # # -------  Find or create template -------
+    # # Adds the script to the spot template
+    # success = create_spot_launch_template(
+    #     ec2_client, SPOT_TEMPLATE_NAME, INSTANCE_TYPE, SECURITY_GROUP_ID,
+    #     USER_DATA_FILENAME, KEY_NAME)
+    #
+    # # -------  Run instance from template -------
+    # # Runs the script on instantiation
+    # response = run_instance_spot(ec2_client, PROJ_NAME, SPOT_TEMPLATE_NAME)
+
+    s3_client = boto3.client("s3", region_name=REGION)
+    retrieve_gbif_subset_to_s3(
+        s3_client, GBIF_BUCKET, GBIF_ODR_FNAME, MY_BUCKET, ORIG_DATA_PATH)
 
     # Create and upload a file triggering an event that converts the CSV to parquet
     fname = "go.txt"
     with open(fname, "r") as f:
         f.write("go!")
-    trigger = upload_to_s3(TRIGGER_FILENAME, BUCKET, ORIG_DATA_PATH)
+    trigger = upload_to_s3(TRIGGER_FILENAME, MY_BUCKET, ORIG_DATA_PATH)
