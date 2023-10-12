@@ -325,7 +325,7 @@ def _define_spot_launch_template_data(
 # --------------------------------------------------------------------------------------
 # On local machine: Describe the launch_template with the template_name
 def _get_launch_template(template_name):
-    ec2_client = boto3.client("ec2")
+    ec2_client = boto3.client("ec2", region_name=aws_zone)
     lnch_temp = None
     try:
         response = ec2_client.describe_launch_templates(
@@ -344,7 +344,8 @@ def _get_launch_template(template_name):
 
 # ----------------------------------------------------
 def create_spot_launch_template(
-        spot_template_name, instance_type, security_group_id, script_filename, key_name):
+        ec2_client, spot_template_name, instance_type, security_group_id, script_filename, key_name):
+    success = False
     template = _get_launch_template(spot_template_name)
     if template is not None:
         success = True
@@ -353,22 +354,24 @@ def create_spot_launch_template(
             spot_template_name, instance_type, security_group_id, script_filename,
             key_name)
         template_token = _create_token("template")
-        ec2_client = boto3.client("ec2")
-        response = ec2_client.create_launch_template(
-            DryRun = False,
-            ClientToken = template_token,
-            LaunchTemplateName = spot_template_name,
-            VersionDescription = "Spot for GBIF/BISON process",
-            LaunchTemplateData = spot_template_data
-        )
-        success = (response["ResponseMetadata"]["HTTPStatusCode"] == 200)
+        try:
+            response = ec2_client.create_launch_template(
+                DryRun = False,
+                ClientToken = template_token,
+                LaunchTemplateName = spot_template_name,
+                VersionDescription = "Spot for GBIF/BISON process",
+                LaunchTemplateData = spot_template_data
+            )
+        except ClientError as e:
+            print(f"Failed to create launch template {spot_template_name}, ({e})")
+        else:
+            success = (response["ResponseMetadata"]["HTTPStatusCode"] == 200)
     return success
 
 
 # ----------------------------------------------------
-def run_instance_spot(instance_basename, spot_template_name):
+def run_instance_spot(ec2_client, instance_basename, spot_template_name):
     instance_id = None
-    ec2_client = boto3.client("ec2")
     spot_token = _create_token("spot")
     instance_name = _create_token(instance_basename)
     try:
@@ -423,15 +426,17 @@ if __name__ == "__main__":
     # -------  Create a logger -------
     script_name = os.path.splitext(os.path.basename(__file__))[0]
     logger = get_logger(None, script_name)
+    # Get EC2 client
+    ec2_client = boto3.client("ec2", region_name=aws_zone)
     # -------  Find or create template -------
     # Adds the script to the spot template
     success = create_spot_launch_template(
-        spot_template_name, instance_type, security_group_id, script_filename,
+        ec2_client, spot_template_name, instance_type, security_group_id, script_filename,
         key_name)
 
     # -------  Run instance from template -------
     # Runs the script on instantiation
-    response = run_instance_spot(instance_basename, spot_template_name)
+    response = run_instance_spot(ec2_client, instance_basename, spot_template_name)
 
     # Create and upload a file triggering an event that converts the CSV to parquet
     fname = "go.txt"
