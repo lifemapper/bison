@@ -433,59 +433,6 @@ def upload_trigger_to_s3(filename, s3_bucket, s3_bucket_path):
     return s3_filename
 
 
-def retrieve_gbif_subset_to_s3(s3_client, source_bucket, source_fname, target_bucket, target_folder):
-    # AWS Glue Context
-    sc = SparkContext()
-    spark = SparkSession(sc)
-    glueContext = GlueContext(sc)
-
-    # Define filters
-    filters = [
-        {"Name": "Country", "Operator": "EQUALS", "Value": "United States of America"},
-        {"Name": "HasCoordinate", "Operator": "EQUALS", "Value": "true"},
-        {"Name": "HasGeospatialIssue", "Operator": "EQUALS", "Value": "false"},
-        {"Name": "OccurrenceStatus", "Operator": "EQUALS", "Value": "Present"}
-    ]
-
-    # Create an S3 session for AWS Glue
-    glueContext = GlueContext(SparkContext.getOrCreate())
-
-    subdir = get_current_gbif_subdir()
-    # Create a dynamic frame from the dataset using the provided filters
-    # dynamic_frame = glueContext.create_dynamic_frame.from_catalog(
-    #     database=database,
-    #     table_name="your-table-name",
-    #     push_down_predicate=filters
-    # )
-    # Create DynamicFrame from Glue Data Catalog
-    gbif_data = glueContext.create_dynamic_frame.from_catalog(
-        "s3",
-        {
-            "paths": [
-                f"s3://{source_bucket}/{subdir}/{source_fname}"
-            ]
-        },
-        "parquet",
-        {"withHeader": True},
-    )
-
-    # Create filtered DynamicFrame with custom lambda
-    # to filter records by Provider State and Provider City
-    gbif_subset = gbif_data.filter(
-        f=lambda x: x["Provider State"] in ["CA", "AL"]
-                    and x["Provider City"] in ["SACRAMENTO", "MONTGOMERY"]
-    )
-
-    # Convert the dynamic frame to a Spark DataFrame for further processing
-    df = gbif_subset.toDF()
-
-    # Write the filtered data to a Parquet file in S3
-    output_path = f"s3://{target_bucket}/{target_folder}/"
-    df.write.parquet(output_path, mode="overwrite")
-
-    # Print the path to the Parquet files in the destination bucket
-    print(f"Filtered records have been written to: {output_path}")
-
 
 # --------------------------------------------------------------------------------------
 # On EC2: Create a trimmed dataframe from CSV and save to S3 in parquet format
@@ -498,22 +445,18 @@ if __name__ == "__main__":
     script_name = os.path.splitext(os.path.basename(__file__))[0]
     logger = get_logger(None, script_name)
 
-    # # ------- Get EC2 client -------
-    # ec2_client = boto3.client("ec2", region_name=REGION)
-    #
-    # # -------  Find or create template -------
-    # # Adds the script to the spot template
-    # success = create_spot_launch_template(
-    #     ec2_client, SPOT_TEMPLATE_NAME, INSTANCE_TYPE, SECURITY_GROUP_ID,
-    #     USER_DATA_FILENAME, KEY_NAME)
-    #
-    # # -------  Run instance from template -------
-    # # Runs the script on instantiation
-    # response = run_instance_spot(ec2_client, PROJ_NAME, SPOT_TEMPLATE_NAME)
+    # ------- Get EC2 client -------
+    ec2_client = boto3.client("ec2", region_name=REGION)
 
-    s3_client = boto3.client("s3", region_name=REGION)
-    retrieve_gbif_subset_to_s3(
-        s3_client, GBIF_BUCKET, GBIF_ODR_FNAME, MY_BUCKET, ORIG_DATA_PATH)
+    # -------  Find or create template -------
+    # Adds the script to the spot template
+    success = create_spot_launch_template(
+        ec2_client, SPOT_TEMPLATE_NAME, INSTANCE_TYPE, SECURITY_GROUP_ID,
+        USER_DATA_FILENAME, KEY_NAME)
+
+    # -------  Run instance from template -------
+    # Runs the script on instantiation
+    response = run_instance_spot(ec2_client, PROJ_NAME, SPOT_TEMPLATE_NAME)
 
     # Create and upload a file triggering an event that converts the CSV to parquet
     fname = "go.txt"
