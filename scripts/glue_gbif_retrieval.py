@@ -1,59 +1,64 @@
-import datetime as DT
-import sys
-from awsglue.transforms import *
+from awsglue.transforms import Filter
 from awsglue.utils import getResolvedOptions
-from pyspark.context import SparkContext
 from awsglue.context import GlueContext
 from awsglue.job import Job
+import datetime as DT
+from pyspark import SparkConf
+from pyspark.context import SparkContext
+import sys
 
-bison_path = "s3://bison-321942852011-us-east-1/raw_data/"
+bison_path = "s3://bison-321942852011-us-east-1"
 gbif_path = "s3://gbif-open-data-us-east-1/occurrence"
+
 n = DT.datetime.now()
-cur_folder = f"{n.year}-{n.month}-01"
-gbif_s3_path = f"{gbif_path}/{cur_folder}/occurrence.parquet/"
+datastr = f"{n.year}-{n.month}-01"
+
+gbif_s3_fullname = f"{gbif_path}/{datastr}/occurrence.parquet/"
+bison_s3_fullname = f"{bison_path}/raw_data/gbif_{datastr}.parquet/"
 
 args = getResolvedOptions(sys.argv, ["JOB_NAME"])
-sc = SparkContext()
+
+conf = SparkConf()
+conf.set("spark.sql.legacy.parquet.int96RebaseModeInRead", "CORRECTED")
+conf.set("spark.sql.legacy.parquet.int96RebaseModeInWrite", "CORRECTED")
+conf.set("spark.sql.legacy.parquet.datetimeRebaseModeInRead", "CORRECTED")
+conf.set("spark.sql.legacy.parquet.datetimeRebaseModeInWrite", "CORRECTED")
+
+sc = SparkContext.getOrCreate(conf=conf)
 glueContext = GlueContext(sc)
 spark = glueContext.spark_session
+
 job = Job(glueContext)
 job.init(args["JOB_NAME"], args)
 
-# Script generated for node S3 bucket
+# Input from GBIF S3 bucket
 gbif_full_data = glueContext.create_dynamic_frame.from_options(
     format_options={},
     connection_type="s3",
     format="parquet",
-    datetimeRebaseMode="CORRECTED",
     connection_options={
-        "paths": [ gbif_s3_path ],
+        "paths": [ gbif_s3_fullname ],
         "recurse": True,
     },
     transformation_ctx="S3bucket_node_gbif",
 )
 
 # Create filtered DynamicFrame with custom lambda to filter records
-# gbif_subset = gbif_full_data.filter(
-#     f=lambda x: x["countrycode"] EQUALS "US" and x["occurrencestatus"] EQUALS "PRESENT" and x["taxonrank"] in [ "species", "subspecies", "variety", "form", "infraspecific_name", "infrasubspecific_name"] and "COORDINATE_INVALID" not in x["issue"] and "COORDINATE_OUT_OF_RANGE" not in x["issue"] and "COORDINATE_REPROJECTION_FAILED" not in x["issue"] and "COORDINATE_REPROJECTION_SUSPICIOUS" not in x["issue"])
 gbif_subset = Filter.apply(
     frame = gbif_full_data,
     f = lambda x: x["countrycode"] == "US" and x["occurrencestatus"] == "PRESENT" and x["taxonrank"] in ["species", "subspecies", "variety", "form", "infraspecific_name", "infrasubspecific_name"] and "COORDINATE_INVALID" not in x["issue"] and "COORDINATE_OUT_OF_RANGE" not in x["issue"] and "COORDINATE_REPROJECTION_FAILED" not in x["issue"] and "COORDINATE_REPROJECTION_SUSPICIOUS" not in x["issue"])
 
-# Convert the dynamic frame to a Spark DataFrame for further processing
-subset_df = gbif_subset.toDF()
-
-# Write the filtered data to a Parquet file in S3
-subset_df.write.parquet(bison_path, mode="overwrite")
-
-# # Script generated for node S3 bucket
-# S3bucket_node_bison = glueContext.write_dynamic_frame.from_options(
-#     frame=gbif_subset,
-#     connection_type="s3",
-#     format="glueparquet",
-#     connection_options={
-#         "path": "s3://bison-321942852011-us-east-1/raw_data/",
-#         "compression": "snappy", "partitionKeys": []},
-#     transformation_ctx="S3bucket_node_bison",
-# )
+# Output to BISON S3 bucket
+bison_full_data = glueContext.write_dynamic_frame.from_options(
+    frame=gbif_subset,
+    connection_type="s3",
+    format="parquet",
+    connection_options={
+        "path": bison_s3_fullname,
+        "compression": "snappy",
+        "partitionKeys": []
+    },
+    transformation_ctx="S3bucket_node_bison",
+)
 
 job.commit()
