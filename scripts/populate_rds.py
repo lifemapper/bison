@@ -64,7 +64,7 @@ BISON_INPUTS = [
     {
         "table": "pad",
         "relative_path": "input_data/pad/",
-        "pattern": "PADUS3_0Designation_Region[0-9]{1,2}_4326\.zip",
+        "pattern": r"PADUS3_0Designation_Region[0-9]{1,2}_4326\.zip",
         "is_geo": True
     },
     {
@@ -235,4 +235,3 @@ for meta in BISON_INPUTS:
         else:
             insert_csvfile_to_database(
                 REGION, BUCKET, rfname, engine, DB_SCHEMA, table, append=append)
-

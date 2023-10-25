@@ -16,8 +16,6 @@ CREATE ROLE reader NOINHERIT;
 -- CREATE ROLE annotator with LOGIN INHERIT PASSWORD  %password%;
 GRANT reader TO annotator;
 
-:Tc[rVVAfP:1W)gS>+1cFQ7ysy+p
-U5z%45msE98BkdWf
 -- ----------------------------------------------------------------------------
 \c template1 admin
 -- ----------------------------------------------------------------------------
