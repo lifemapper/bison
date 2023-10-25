@@ -7,8 +7,9 @@ from pyspark import SparkConf
 from pyspark.context import SparkContext
 import sys
 
-bison_path = "s3://bison-321942852011-us-east-1"
-gbif_path = "s3://gbif-open-data-us-east-1/occurrence"
+region = "us-east-1"
+bison_path = f"s3://bison-321942852011-{region}"
+gbif_path = f"s3://gbif-open-data-{region}/occurrence"
 
 n = DT.datetime.now()
 datastr = f"{n.year}-{n.month}-01"

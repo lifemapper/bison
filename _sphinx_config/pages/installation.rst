@@ -12,8 +12,8 @@ implementation can run this process in parallel, and uses the number of CPUs on 
 machine minus 2.  In Aug 2023, using 18 (of 20) cores, on 904 million
 records, the process took 5 days.
 
-These processes are all written in Python, and the implementation has been tested
-on a machine running Ubuntu Linux.  Scripts will need minimal modification to run
+These processes are all written in Python, and the implementatioin has been tested
+on a machine running Ubuntu Linux.  Scripts will need minimal modfication to run
 on Windows or OSX successfully.
 
 Download this Repository

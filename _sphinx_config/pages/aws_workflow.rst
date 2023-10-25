@@ -23,7 +23,22 @@ Use python libs **awscli** and **boto3** to connect with AWS
 
 Setup
 ---------------------------
-* install aws-cli
+* install aws-cli on local dev machine
+* Subset GBIF Open Data Registry to Bison S3 bucket, serverless,
+  glue_bison_subset_gbif.py
+* Handle input geospatial data
+  * add shapefiles to S3 as zipfiles
+  * add RIIS data to S3
+  * create RDS, PostgreSQL
+* create EC2 for test/debug connection
+  * update/upgrade apt, install stuff
+  * add aws config and credentials
+* Populate RDS
+    * add postgis to postgres:
+      https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Appendix.PostgreSQL.CommonDBATasks.PostGIS.html
+    * insert census boundaries, native lands, PAD (scripts/populate_rds.py
+
+* Redshift?
 
 Workflow
 ---------------------------
