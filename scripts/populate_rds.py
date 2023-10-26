@@ -28,24 +28,18 @@ from sqlalchemy import create_engine, URL
 import pandas
 import psycopg2
 
-# Use this code snippet in your app.
-# If you need more information about configurations
-# or implementing the sample code, visit the AWS docs:
-# https://aws.amazon.com/developer/language/python/
-
-# Set up your AWS credentials
+# AWS credentials
 SECRET_DB_ACCESS_KEY = "aws/secretsmanager"
 SECRET_NAME = "admin_bison-db-test"
 REGION = "us-east-1"
 
-# Configure your PostgreSQL connection
+# PostgreSQL connection
 DB_INSTANCE = "bison-db-test"
 DB_SCHEMA = "lmb"
 DB_NAME = "bison_input"
 
 # S3 paths
 BUCKET = "bison-321942852011-us-east-1"
-
 
 # Data tables, s3 input files
 BISON_INPUTS = [
@@ -65,6 +59,7 @@ BISON_INPUTS = [
         "table": "pad",
         "relative_path": "input_data/pad/",
         "pattern": r"PADUS3_0Designation_Region[0-9]{1,2}_4326\.zip",
+        "pattern": r"PADUS3_0Designation_State[A-Z]{2}.zip",
         "is_geo": True
     },
     {
@@ -235,3 +230,21 @@ for meta in BISON_INPUTS:
         else:
             insert_csvfile_to_database(
                 REGION, BUCKET, rfname, engine, DB_SCHEMA, table, append=append)
+
+
+
+"""
+table = meta["table"]
+rel_fnames = list_files(REGION, BUCKET, meta["relative_path"], meta["pattern"])
+rfname = rel_fnames[0]
+append = False
+if rfname != rel_fnames[0]:
+    append = True
+if meta["is_geo"] is True:
+    # TODO: why is PAD data insertion crashing python with "Killed" message?
+    insert_geofile_to_database(
+        REGION, BUCKET, rfname, engine, DB_SCHEMA, table, append=append)
+else:
+    insert_csvfile_to_database(
+        REGION, BUCKET, rfname, engine, DB_SCHEMA, table, append=append)
+"""
