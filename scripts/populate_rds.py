@@ -58,8 +58,8 @@ BISON_INPUTS = [
     {
         "table": "pad",
         "relative_path": "input_data/pad/",
-        "pattern": r"PADUS3_0Designation_Region[0-9]{1,2}_4326\.zip",
-        "pattern": r"PADUS3_0Designation_State[A-Z]{2}.zip",
+        # "pattern": r"PADUS3_0Designation_State[A-Z]{1,2}_4326\.zip",
+        "pattern": r"PADUS3_0Designation_State[A-Z]{1,2}\.zip",
         "is_geo": True
     },
     {
@@ -85,6 +85,24 @@ def get_secret(secret_name, region):
     # Decrypts secret using the associated KMS key.
     secret_str = secret_value_response["SecretString"]
     return eval(secret_str)
+
+
+# ----------------------------------------------------
+# Function to create a pgpass file for database connection
+def create_pgpass(db_name, secret):
+    filename = "~/.pgpass"
+    line = f"{secret['host']}:{secret['port']}:{db_name}:{secret['username']}:{secret['password']}"
+    try:
+        f = open(filename, "w")
+        f.write(line)
+        print(f"Created {filename}")
+    except IOError as e:
+        raise(f"Error creating {filename}: {e}")
+    finally:
+        f.close()
+    if os.path.exists(filename):
+        return True
+    return False
 
 
 # ----------------------------------------------------
@@ -122,11 +140,12 @@ def get_db_engine(db_name, secret):
 
 # ----------------------------------------------------
 # List files in an S3 Bucket matching
-def list_files(region, bucket_name, rel_path, filepattern):
+ # region, bucket, rel_path, filepattern = REGION, BUCKET, meta["relative_path"], meta["pattern"]
+def list_files(region, bucket, rel_path, filepattern):
     relative_filenames = []
     session = boto3.session.Session()
     s3_client = session.client(service_name="s3", region_name=region)
-    response = s3_client.list_objects_v2(Bucket=bucket_name, Prefix=rel_path)
+    response = s3_client.list_objects_v2(Bucket=bucket, Prefix=rel_path)
     try:
         contents = response["Contents"]
     except KeyError:
@@ -139,6 +158,21 @@ def list_files(region, bucket_name, rel_path, filepattern):
         if result is not None:
             relative_filenames.append(rel_fname)
     return relative_filenames
+
+
+# ----------------------------------------------------
+# Download a file from an S3 Bucket into a GeoPandas dataframe
+def download_file(region, bucket, rel_filename):
+    session = boto3.session.Session()
+    s3_client = session.client(service_name="s3", region_name=region)
+    local_filename = os.path.join("/tmp", os.path.split(rel_filename)[1])
+    try:
+        obj = s3_client.download_file(bucket, rel_filename, local_filename)
+    except Exception as e:
+        raise(f"Failed to download {bucket}/{rel_filename}: {e}")
+    if obj is None:
+        raise (f"No object downloaded from {bucket}/{rel_filename}")
+    return local_filename
 
 
 # ----------------------------------------------------
@@ -160,18 +194,55 @@ def read_s3file_into_geodataframe(region, bucket, rel_filename):
 # ----------------------------------------------------
 # Insert a GeoPandas dataframe into a database table
 def insert_geofile_to_database(
-        region, bucket, rel_filename, engine, schema, table, append=False):
+        region, bucket, rel_filename, engine, schema, table, do_replace=True):
     # New or existing
     exist_behavior = "replace"
-    if append is True:
+    if do_replace is False:
         exist_behavior = "append"
     # Read from S3 bucket into geo-df
     geo_dataframe = read_s3file_into_geodataframe(region, bucket, rel_filename)
     print(f"Read {rfname} into geo dataframe")
     # Create or add to table
     geo_dataframe.to_postgis(
-        table, engine, schema=schema, if_exists=exist_behavior, index=False)
+        table, engine, schema=schema, if_exists=exist_behavior, chunksize=100,
+        index=False)
     print(f"Inserted geo dataframe into {table}")
+
+
+# ----------------------------------------------------
+# Insert a GeoPandas dataframe into a database table
+def insert_padfile_to_database(
+        region, bucket, rel_filename, db_name, secret, schema, table, do_replace=True):
+    # shp2pgsql  -s 4269 -g the_geom_4269 -S -W "latin1" -a $z ${STATE_SCHEMA}.${t} | psql -d $DB -U $USER_NAME;
+    # New or existing
+    exist_behavior = "replace"
+    if do_replace is False:
+        exist_behavior = "append"
+    success = create_pgpass(db_name, secret)
+    if success:
+        # Download from S3 bucket
+        local_filename = download_file(region, bucket, rel_filename)
+        print(f"Downloaded {local_filename}")
+        # Create or add to table
+        cmd = (f"shp2pgsql  -s 4326 -g geom -S -W 'latin1' -a $z ${schema}.${table}"
+               f" | psql --host=secret['host']  {db_name}  {secret['username']};")
+
+
+# ----------------------------------------------------
+# Insert a GeoPandas dataframe into a database table
+def insert_csvfile_to_database(
+        region, bucket, rel_filename, engine, schema, table, do_replace=True):
+    # New or existing
+    exist_behavior = "replace"
+    if do_replace is False:
+        exist_behavior = "append"
+    # Read from S3 bucket into df
+    dataframe = read_s3file_into_dataframe(region, bucket, rel_filename)
+    print(f"Read {rfname} into dataframe")
+    # Create or add to table
+    dataframe.to_sql(
+        table, engine, schema=schema, if_exists=exist_behavior, index=False)
+    print(f"Inserted dataframe into {table}")
 
 
 # ----------------------------------------------------
@@ -189,62 +260,57 @@ def read_s3file_into_dataframe(region, bucket, rel_filename):
     dataframe = pandas.read_csv(filestream)
     return dataframe
 
-# ----------------------------------------------------
-# Insert a GeoPandas dataframe into a database table
-def insert_csvfile_to_database(
-        region, bucket, rel_filename, engine, schema, table, append=False):
-    # New or existing
-    exist_behavior = "replace"
-    if append is True:
-        exist_behavior = "append"
-    # Read from S3 bucket into df
-    dataframe = read_s3file_into_dataframe(region, bucket, rel_filename)
-    print(f"Read {rfname} into dataframe")
-    # Create or add to table
-    dataframe.to_sql(
-        table, engine, schema=schema, if_exists=exist_behavior, index=False)
-    print(f"Inserted dataframe into {table}")
-
-
 # --------------------------------------------------------------------------------------
 # Retrieve credentials
 secret = get_secret(SECRET_NAME, REGION)
 engine = get_db_engine(DB_NAME, secret)
 
-region = REGION
-bucket = BUCKET
-schema = DB_SCHEMA
-meta = BISON_INPUTS[2]
-
 for meta in BISON_INPUTS:
     table = meta["table"]
     rel_fnames = list_files(REGION, BUCKET, meta["relative_path"], meta["pattern"])
     for rfname in rel_fnames:
-        append = False
-        if rfname != rel_fnames[0]:
-            append = True
+        do_replace = True
+        # if series and not first, append
+        if len(rel_fnames) > 1 and rfname != rel_fnames[0]:
+            do_replace = False
         if meta["is_geo"] is True:
-            # TODO: why is PAD data insertion crashing python with "Killed" message?
-            insert_geofile_to_database(
-                REGION, BUCKET, rfname, engine, DB_SCHEMA, table, append=append)
+            if meta["table"] == "pad":
+                insert_geofile_to_database(
+                    REGION, BUCKET, rfname, engine, DB_SCHEMA, table,
+                    do_replace=do_replace)
+            else:
+                # TODO: why is PAD data insertion crashing python with "Killed" message?
+                insert_padfile_to_database(
+                    REGION, BUCKET, rfname, engine, DB_SCHEMA, table,
+                    do_replace=do_replace)
         else:
             insert_csvfile_to_database(
-                REGION, BUCKET, rfname, engine, DB_SCHEMA, table, append=append)
+                REGION, BUCKET, rfname, engine, DB_SCHEMA, table, do_replace=do_replace)
 
 
 
 """
+region = REGION
+bucket = BUCKET
+schema = DB_SCHEMA
+
+# Test PAD state data
+meta = BISON_INPUTS[2]
 table = meta["table"]
+table, rel_path, filepattern = meta["table"], meta["relative_path"], meta["pattern"]
 rel_fnames = list_files(REGION, BUCKET, meta["relative_path"], meta["pattern"])
+
+# Test
 rfname = rel_fnames[0]
-append = False
-if rfname != rel_fnames[0]:
-    append = True
-if meta["is_geo"] is True:
-    # TODO: why is PAD data insertion crashing python with "Killed" message?
-    insert_geofile_to_database(
-        REGION, BUCKET, rfname, engine, DB_SCHEMA, table, append=append)
-else:
-    insert_csvfile_to_database(
-        REGION, BUCKET, rfname, engine, DB_SCHEMA, table, append=append)
+rel_filename = rfname
+append = True
+if rfname == rel_fnames[0]:
+    append = False
+
+
+insert_geofile_to_database(
+    REGION, BUCKET, rfname, engine, DB_SCHEMA, table, append=append)
+
+# insert_csvfile_to_database(
+#     REGION, BUCKET, rfname, engine, DB_SCHEMA, table, append=append)
 """
