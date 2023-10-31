@@ -121,8 +121,6 @@ Shapefiles used for 2023 processing (2022 was not yet available at time of downl
 Census, Cartographic Boundary Files, 2021
 * https://www.census.gov/geographies/mapping-files/time-series/geo/cartographic-boundary.html
 
-.................
-
 **Counties**
 * 1:500,000, cb_2021_us_county_500k.zip
 
@@ -182,10 +180,13 @@ Reported problems with projected dataset:
         U.S. Geological Survey (USGS) Gap Analysis Project (GAP), 2022,
         Protected Areas Database of the United States (PAD-US) 3.0:
         U.S. Geological Survey data release, https://doi.org/10.5066/P9Q9LQ4B.
-    * Geographic areas for Designation, Easement, Fee, Proclamation, Marine
+    * Geographic areas in separate shapefiles for Designation, Easement, Fee,
+      Proclamation, Marine
     * target GAP status 1-3
         * 1 - managed for biodiversity - disturbance events proceed or are mimicked
         * 2 - managed for biodiversity - disturbance events suppressed
         * 3 - managed for multiple uses - subject to extractive (e.g. mining or logging) or OHV use
         * 4 - no known mandate for biodiversity protection
-
+  * Citation: U.S. Geological Survey (USGS) Gap Analysis Project (GAP), 2022, Protected
+    Areas Database of the United States (PAD-US) 3.0: U.S. Geological Survey data
+    release, https://doi.org/10.5066/P9Q9LQ4B.

@@ -23,7 +23,7 @@ Required parameters include:
 * output_path (str): Destination directory for output data.
 
 Step 1: Annotate RIIS with GBIF Taxa
-__________________
+-------------------------------
 We determine the Introduced and Invasive Species status of a GBIF record by first
 resolving the scientificName in the US Registry of Introduced and Invasive Species
 (RIIS) to the closest matching name in GBIF.
@@ -33,40 +33,36 @@ For this step, we will
   corresponding to every RIIS record scientificName, and
 * append acceptedScientificName and acceptedTaxonKey to each RIIS record
 
-```commandline
-python process_gbif.py resolve data/config/process_gbif.json
-```
+::
+
+    $ python process_gbif.py resolve data/config/process_gbif.json
 
 
 Step 2: Split large GBIF data into manageable files
-__________________
+-------------------------------
 We split the large GBIF data file into smaller chunks to reduce the memory footprint
 of each process, allow for easier debugging, and facilitate parallel processing for
 time-intensive, but not CPU-intensive, data processes.
 
-```commandline
-python process_gbif.py chunk data/config/process_gbif.json
-```
+::
 
-Step 3: Annotate GBIF records with geographical areas and RIIS determinations
-__________________
+    $ python process_gbif.py chunk data/config/process_gbif.json
+
+
+Step 3: Annotate GBIF records with RIIS determinations and geographical regions
+-------------------------------
+RIIS annotation:
+* US-RIIS records consist of a list of species and the areas in which they are
+  considered Introduced or Invasive.
+
 Geographical Areas:
 * Census County and State boundaries from 2021 County file
 * Census AIANNH from 2021 file
-* (failed in 2023, consider alternate methods) US_PAD from DOI regions 1-12
-  * Geographic areas for Designation, Easement, Fee, Proclamation, Marine
-  * target GAP status 1-3
-    * 1 - managed for biodiversity - disturbance events proceed or are mimicked
-    * 2 - managed for biodiversity - disturbance events suppressed
-    * 3 - managed for multiple uses - subject to extractive (e.g. mining or logging) or OHV use
-    * 4 - no known mandate for biodiversity protection
-  * Citation: U.S. Geological Survey (USGS) Gap Analysis Project (GAP), 2022, Protected
-    Areas Database of the United States (PAD-US) 3.0: U.S. Geological Survey data
-    release, https://doi.org/10.5066/P9Q9LQ4B.
+* (new, and failed in year 4, consider alternate methods) US_PAD
 
-RIIS annotation:
-* US-RIIS records consist of a list of species and the areas in which they are considered
-Introduced or Invasive.
+::
+
+    $ python process_gbif.py annotate data/config/process_gbif.json
 
 Step 4: Summarize annotations
 -------------------------------
@@ -82,21 +78,22 @@ Summarize annotated GBIF occurrence records (each subset file), by:
 Then summarize the summaries into a single file, and aggregate summary into files of
 species and counts for each region:
 
-```commandline
-python process_gbif.py summarize data/config/process_gbif.json
-```
+::
 
-Step 5: Create a heat matrix
------------------------------
+    $ python process_gbif.py summarize data/config/process_gbif.json
+
+Step 5: Create a heat matrix for counties x species
+----------------------------------------------------
 
 Create a 2d matrix of counties (rows) by species (columns) with a count for each species
 found at that location.
 
-```commandline
-python process_gbif.py heat_matrix data/config/process_gbif.json
-```
+::
 
-Step 6: Create a Presence-Absence Matrix (PAM) for counties x species
+    $ python process_gbif.py heat_matrix data/config/process_gbif.json
+
+
+Step 6: Create a Presence-Absence Matrix (PAM) and compute stats
 -----------------------------------------------------------------------
 
 Convert the heat matrix into a binary PAM, and compute diversity statistics: overall
@@ -105,15 +102,11 @@ diversities (alpha) and total diversity to county diversities (beta).  In additi
 compute species statistics: range size (omega) and mean proportional range size
 (omega_proportional).
 
-```commandline
-python process_gbif.py pam_stats data/config/process_gbif.json
-```
+::
 
-Step 7: Compute diversity statistics
-----------------------------------------
+python process_gbif.py pam_stats data/config/process_gbif.json
 
 Stats references for alpha, beta, gamma diversity:
 * https://www.frontiersin.org/articles/10.3389/fpls.2022.839407/full
 * https://specifydev.slack.com/archives/DQSAVMMHN/p1693260539704259
 * https://bio.libretexts.org/Bookshelves/Ecology/Biodiversity_(Bynum)/7%3A_Alpha_Beta_and_Gamma_Diversity
-

@@ -143,7 +143,7 @@ drwxrwxr-x  2 astewart astewart 45056 Feb 27 15:50 output/
 drwxrwxr-x  2 astewart astewart  4096 Feb 27 14:50 process/
 ```
 
-* In the big_data/geodata directory, place all geospatial data files.  All data within 
+* In the big_data/geodata directory, place all geospatial data files.  All data within
   this directory will be referenced by relative filenames
 
 ```shell
@@ -290,3 +290,6 @@ Stats references for alpha, beta, gamma diversity:
 ```commandline
 (venv)$ pip3 install mkdocs
 ```
+
+Build documentation:
+https://docs.readthedocs.io/en/stable/intro/getting-started-with-sphinx.html

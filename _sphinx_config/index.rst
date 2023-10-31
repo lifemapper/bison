@@ -10,7 +10,8 @@ with information regarding geographic location and USGS RIIS status of the recor
 
     pages/about
     pages/installation
-    pages/data_process
+    pages/data_input
+    pages/process_data
 
 * :ref:`genindex`
 * :ref:`modindex`
