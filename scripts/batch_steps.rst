@@ -88,4 +88,3 @@ Batch
   * Command: Define the command that should be executed within the container.
 
 * Submit AWS Batch Job
-

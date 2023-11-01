@@ -269,6 +269,13 @@ class RIIS:
 
     # ...............................................
     def logit(self, msg, refname=None, log_level=INFO):
+        """Method to log a message to a logger/file/stream or print to console.
+
+        Args:
+            msg: message to print.
+            refname: calling function name.
+            log_level: error level, INFO, DEBUG, WARNING, ERROR
+        """
         if self._log is not None:
             self._log.log(msg, refname=refname, log_level=log_level)
         else:
@@ -292,6 +299,11 @@ class RIIS:
     # ...............................................
     # @property
     def is_annotated(self):
+        """Flag indicating whether the current dataset has been annotated with GBIF.
+
+        Returns:
+            boolean value indicating whether the data in memory has been annotated.
+        """
         return self._is_annotated
 
     # ...............................................

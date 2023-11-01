@@ -1,7 +1,7 @@
 """Common classes for Specimen Occurrence record processing."""
 import os
 
-from bison.common.constants import ENCODING, EXTRA_CSV_FIELD, GBIF
+from bison.common.constants import ENCODING, EXTRA_CSV_FIELD, GBIF, LOG
 from bison.common.util import get_csv_dict_reader
 
 
@@ -188,4 +188,4 @@ class DwcData(object):
 
 
 # .............................................................................
-__all__ = [ "DwcData" ]
+__all__ = ["DwcData"]

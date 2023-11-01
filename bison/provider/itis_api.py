@@ -167,5 +167,6 @@ class ITISSvc(APISvc):
     #                   .format(tsn, accepted_tsn_list, kingdom, usage, sciname))
         return tsn, accepted_name, kingdom, accepted_tsn_list
 
+
 # .............................................................................
-__all__ = [ "ITISSvc" ]
+__all__ = ["ITISSvc"]

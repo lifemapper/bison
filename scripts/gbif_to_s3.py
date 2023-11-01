@@ -10,13 +10,6 @@ from logging.handlers import RotatingFileHandler
 import os
 import pandas
 
-from awsglue.context import GlueContext
-from awsglue.transforms import *
-from awsglue.dynamicframe import DynamicFrame
-from pyspark.context import SparkContext
-from pyspark.sql import SparkSession
-from pyspark.sql.functions import col
-
 
 # --------------------------------------------------------------------------------------
 # Constants for GBIF data, local dev machine, EC2, S3

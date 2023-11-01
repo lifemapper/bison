@@ -1,23 +1,4 @@
-"""Script to populate RDS with S3 data, using EC2."""
-
-"""
-sudo su -
-apt-get update -y
-apt-get upgrade -y
-apt-get install -y awscli
-apt-get install -y python3-pip
-
-# Set up configuration in local file ~/.aws/config
-aws configure set default.region us-east-1 && \
-aws configure set default.output json
-
-Setup credentials in local file  ~/.aws/credentials
-[default]
-aws_access_key_id = <>
-aws_secret_access_key = <>
-
-pip3 install boto3 pandas geopandas psycopg2-binary sqlalchemy
-"""
+"""Script to populate existing RDS with S3 data, using EC2."""
 import boto3
 from botocore.exceptions import ClientError
 from io import BytesIO
@@ -97,7 +78,7 @@ def create_pgpass(db_name, secret):
         f.write(line)
         print(f"Created {filename}")
     except IOError as e:
-        raise(f"Error creating {filename}: {e}")
+        raise Exception(f"Error creating {filename}: {e}")
     finally:
         f.close()
     if os.path.exists(filename):
@@ -115,7 +96,7 @@ def get_db_connection(db_name, secret):
             password=secret["password"]
         )
     except Exception as e:
-        raise("Error connecting to PostgreSQL database:", e)
+        raise Exception("Error connecting to PostgreSQL database:", e)
     return conn
 
 
@@ -149,7 +130,7 @@ def list_files(region, bucket, rel_path, filepattern):
     try:
         contents = response["Contents"]
     except KeyError:
-        raise(f"No files found matching: {rel_path}{filepattern}")
+        raise Exception(f"No files found matching: {rel_path}{filepattern}")
     pattern = re.compile(filepattern)
     for item in contents:
         rel_fname = item["Key"]
@@ -169,9 +150,9 @@ def download_file(region, bucket, rel_filename):
     try:
         obj = s3_client.download_file(bucket, rel_filename, local_filename)
     except Exception as e:
-        raise(f"Failed to download {bucket}/{rel_filename}: {e}")
+        raise Exception(f"Failed to download {bucket}/{rel_filename}: {e}")
     if obj is None:
-        raise (f"No object downloaded from {bucket}/{rel_filename}")
+        raise Exception(f"No object downloaded from {bucket}/{rel_filename}")
     return local_filename
 
 
@@ -183,9 +164,9 @@ def read_s3file_into_geodataframe(region, bucket, rel_filename):
     try:
         obj = s3_client.get_object(Bucket=bucket, Key=rel_filename)
     except Exception as e:
-        raise(f"Failed to retrieve {bucket}/{rel_filename}: {e}")
+        raise Exception(f"Failed to retrieve {bucket}/{rel_filename}: {e}")
     if obj is None:
-        raise (f"No object retrieved from {bucket}/{rel_filename}")
+        raise Exception(f"No object retrieved from {bucket}/{rel_filename}")
     filestream = BytesIO(obj["Body"].read())
     geo_dataframe = geopandas.read_file(filestream)
     return geo_dataframe
@@ -253,9 +234,9 @@ def read_s3file_into_dataframe(region, bucket, rel_filename):
     try:
         obj = s3_client.get_object(Bucket=bucket, Key=rel_filename)
     except Exception as e:
-        raise(f"Failed to retrieve {bucket}/{rel_filename}: {e}")
+        raise Exception(f"Failed to retrieve {bucket}/{rel_filename}: {e}")
     if obj is None:
-        raise (f"No object retrieved from {bucket}/{rel_filename}")
+        raise Exception(f"No object retrieved from {bucket}/{rel_filename}")
     filestream = BytesIO(obj["Body"].read())
     dataframe = pandas.read_csv(filestream)
     return dataframe
@@ -288,7 +269,6 @@ for meta in BISON_INPUTS:
                 REGION, BUCKET, rfname, engine, DB_SCHEMA, table, do_replace=do_replace)
 
 
-
 """
 region = REGION
 bucket = BUCKET
@@ -313,4 +293,23 @@ insert_geofile_to_database(
 
 # insert_csvfile_to_database(
 #     REGION, BUCKET, rfname, engine, DB_SCHEMA, table, append=append)
+"""
+
+"""
+sudo su -
+apt-get update -y
+apt-get upgrade -y
+apt-get install -y awscli
+apt-get install -y python3-pip
+
+# Set up configuration in local file ~/.aws/config
+aws configure set default.region us-east-1 && \
+aws configure set default.output json
+
+Setup credentials in local file  ~/.aws/credentials
+[default]
+aws_access_key_id = <>
+aws_secret_access_key = <>
+
+pip3 install boto3 pandas geopandas psycopg2-binary sqlalchemy
 """

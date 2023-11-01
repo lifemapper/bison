@@ -350,6 +350,17 @@ def count_lines(filename_or_pattern, grep_strings=None):
 
 # .............................................................................
 def get_site_headers_from_shapefile(site_id_fld, x_fld, y_fld, shape_filename):
+    """Create row headers from FID, longitude, latitude for features in a shapefile.
+
+    Args:
+        site_id_fld: Fieldname containing the site id or FID.
+        x_fld: Fieldname containing the longitude coordinate.
+        y_fld: Fieldname containing the latitude coordinate.
+        shape_filename: Filename of the shapefile to read.
+
+    Returns:
+        site_headers: list of tuples containing (site_id, x, y)
+    """
     site_headers = []
     driver = ogr.GetDriverByName("ESRI Shapefile")
     data_src = driver.Open(shape_filename, 0)
@@ -500,7 +511,7 @@ def get_fields_from_header(csvfile, delimiter=GBIF.DWCA_DELIMITER, encoding="utf
 
 
 class BisonKey():
-    # ...............................................
+    """Compound key to use as unique identifier."""
     @staticmethod
     def get_compound_key(*values):
         """Construct a compound key for dictionaries.
@@ -539,6 +550,7 @@ class BisonKey():
 
 # .............................................................................
 class Chunker():
+    """Class for splitting CSV data into similar sized chunks of records."""
     @classmethod
     def identify_chunks(cls, big_csv_filename, chunk_count=0):
         """Determine the start and stop lines in a large file that will make up the contents of smaller subsets of the file.
@@ -733,7 +745,7 @@ class Chunker():
 
 # .............................................................................
 class BisonNameOp():
-
+    """Class for constructing filenames following a pattern for different processes."""
     separator = "_"
 
     @staticmethod

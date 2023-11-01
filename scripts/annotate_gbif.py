@@ -1,3 +1,4 @@
+"""Unfinished Glue Script to annotate GBIF records."""
 import boto3
 import os
 
@@ -15,11 +16,13 @@ subset_prefix = "subset"
 GEO_PATH = ""
 ANNOTATED_RIIS_FILE = ""
 
+
 # .............................................................................
 def get_riis_lookup():
     riis_lookup = RIIS(ANNOTATED_RIIS_FILE)
     riis_lookup.read_riis()
     return riis_lookup
+
 
 # .............................................................................
 def get_georesolvers():
@@ -106,7 +109,6 @@ def compute_values(
             rec[bison_fld] = fldvals[in_fld]
 
 
-
 # .............................................................................
 def compute_state_county(gbif_id, lon, lat, county_geo):
     fldvals = {}
@@ -135,6 +137,7 @@ def compute_aiannh(gbif_id, lon, lat, aiannh_geo):
         if fldval_list:
             fldvals = fldval_list[0]
     return fldvals
+
 
 # .............................................................................
 def compute_pad(gbif_id, lon, lat, pad_geo):
@@ -203,13 +206,3 @@ def filter_find_taxon_keys(rank, acc_taxon_key, species_key):
             # If acceptedTaxonKey is below species, also find RIIS records for species
             taxkeys.append(species_key)
     return taxkeys
-
-
-# .............................................................................
-
-
-
-# .....................................................................................
-# if __name__ == '__main__':  # pragma: no cover
-#     if len(sys.argv != 2):
-#         print("Usage: python annotate_gbif.py <account_id>")

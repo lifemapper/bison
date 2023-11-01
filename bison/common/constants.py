@@ -409,7 +409,10 @@ class APPEND_TO_DWC:
             # APPEND_TO_DWC.PAD_GAP_STATUS_DESC,
         )
 
+
 CENSUS_STATE_FLDNAME = "STUSPS"
+
+
 class REGION:
     """Geospatial regions to add to DwC data and summarize with RIIS determinations."""
     COUNTY = {
@@ -770,6 +773,7 @@ class RIIS_DATA:
         "occurrenceRemarks",
         "occurrenceID",
     ]
+
 
 # .............................................................................
 __all__ = [
