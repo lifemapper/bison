@@ -339,5 +339,7 @@ class GeoException(Exception):
 
 # .............................................................................
 __all__ = [
+    "GeoException",
+    "GeoResolver",
     "get_geo_resolvers",
 ]

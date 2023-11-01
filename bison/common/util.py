@@ -1086,10 +1086,16 @@ class BisonNameOp():
 # .............................................................................
 __all__ = [
     "available_cpu_count",
+    "BisonKey",
+    "BisonNameOp",
+    "Chunker",
     "count_lines",
+    "count_lines_with_cat",
     "delete_file",
     "get_csv_dict_reader",
     "get_csv_dict_writer",
     "get_csv_writer",
+    "get_fields_from_header",
+    "get_site_headers_from_shapefile",
     "ready_filename"
 ]

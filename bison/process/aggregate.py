@@ -1274,6 +1274,8 @@ def parallel_summarize(annotated_filenames, output_path, main_logger):
 
 # .............................................................................
 __all__ = [
+    "Aggregator",
     "parallel_summarize",
+    "RIIS_Counts",
     "summarize_annotations"
 ]

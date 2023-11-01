@@ -612,6 +612,8 @@ class SiteMatrix(object):
         else:
             self._log.log(f"File {filename} already exists.")
 
+# .............................................................................
+__all__ = [ "SiteMatrix" ]
 
 # # .............................................................................
 # # Press the green button in the gutter to run the script.

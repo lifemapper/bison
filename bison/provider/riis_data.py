@@ -817,6 +817,8 @@ def resolve_riis_taxa(riis_filename, logger, overwrite=True):
 
 # .............................................................................
 __all__ = [
-    "standardize_name",
-    "resolve_riis_taxa"
+    "resolve_riis_taxa",
+    "RIIS",
+    "RIISRec",
+    "standardize_name"
 ]

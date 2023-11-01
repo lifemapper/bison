@@ -5,6 +5,23 @@ import sys
 
 from bison.common.constants import LOG
 
+# # .............................................................................
+# class LOG:
+#     """Constants for logging across the project."""
+#     DIR = "log"
+#     INTERVAL = 1000000
+#     # FORMAT = " ".join([
+#     #     "%(asctime)s",
+#     #     "%(funcName)s",
+#     #     "line",
+#     #     "%(lineno)d",
+#     #     "%(levelname)-8s",
+#     #     "%(message)s"])
+#     FORMAT = " ".join(["%(asctime)s", "%(levelname)-8s", "%(message)s"])
+#     DATE_FORMAT = '%d %b %Y %H:%M'
+#     FILE_MAX_BYTES = 52000000
+#     FILE_BACKUP_COUNT = 5
+
 
 # .....................................................................................
 class Logger:
@@ -58,3 +75,6 @@ class Logger:
         """
         if self.logger is not None:
             self.logger.log(log_level, refname + ': ' + msg)
+
+# .....................................................................................
+__all__ = ["Logger"]

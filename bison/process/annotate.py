@@ -511,7 +511,6 @@ def parallel_annotate(
 # .............................................................................
 __all__ = [
     "annotate_occurrence_file",
-    # "annotate_occurrence_file_update",
+    "Annotator",
     "parallel_annotate",
-    # "parallel_annotate_update"
 ]

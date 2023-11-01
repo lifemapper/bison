@@ -10,7 +10,7 @@ from bison.tools.annotate_gbif import DESCRIPTION as annotate_gbif_desc
 from bison.tools.annotate_gbif import PARAMETERS as annotate_gbif_params
 from bison.tools.chunk_large_file import DESCRIPTION as chunk_large_file_desc
 from bison.tools.chunk_large_file import PARAMETERS as chunk_large_file_params
-from tests.tools.test_setup import get_test_parameters
+from test_setup import get_test_parameters
 
 config_path = "/volumes/bison/config/"
 command_meta = [

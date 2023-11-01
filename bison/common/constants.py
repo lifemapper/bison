@@ -770,3 +770,34 @@ class RIIS_DATA:
         "occurrenceRemarks",
         "occurrenceID",
     ]
+
+# .............................................................................
+__all__ = [
+    "AGGREGATOR_DELIMITER",
+    "APPEND_TO_DWC",
+    "APPEND_TO_RIIS",
+    "BIG_DATA_PATH",
+    "CENSUS_STATE_FLDNAME",
+    "COARSE_BUFFER_RANGE",
+    "COMMANDS",
+    "CONFIG_PARAM",
+    "DATA_PATH",
+    "ENCODING",
+    "ERR_SEPARATOR",
+    "EXTRA_CSV_FIELD",
+    "GBIF",
+    "INPUT_DIR",
+    "ITIS",
+    "LINENO_FLD",
+    "LMBISON",
+    "LMBISON_PROCESS",
+    "NS",
+    "OUT_DIR",
+    "PAD_BUFFER",
+    "RANKS",
+    "RANKS_BELOW_SPECIES",
+    "REGION",
+    "REPORT",
+    "RIIS_DATA",
+    "US_STATES"
+]
