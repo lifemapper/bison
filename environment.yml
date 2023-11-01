@@ -12,4 +12,4 @@ dependencies:
   - coveralls
   - pytest
   - pytest-cov
-  - pip
+  - pip=21.3.1
