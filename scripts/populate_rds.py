@@ -55,6 +55,18 @@ BISON_INPUTS = [
 
 # ----------------------------------------------------
 def get_secret(secret_name, region):
+    """Get a secret from the Secrets Manager for connection authentication.
+
+    Args:
+        secret_name: name of the secret to retrieve.
+        region: AWS region containint the secret.
+
+    Returns:
+        a dictionary containing the secret data.
+
+    Raises:
+        ClientError:  an AWS error in communication.
+    """
     # Create a Secrets Manager client
     session = boto3.session.Session()
     client = session.client(service_name="secretsmanager", region_name=region)
@@ -63,7 +75,7 @@ def get_secret(secret_name, region):
     except ClientError as e:
         # For a list of exceptions thrown, see
         # https://docs.aws.amazon.com/secretsmanager/latest/apireference/API_GetSecretValue.html
-        raise e
+        raise(e)
     # Decrypts secret using the associated KMS key.
     secret_str = secret_value_response["SecretString"]
     return eval(secret_str)
@@ -72,6 +84,18 @@ def get_secret(secret_name, region):
 # ----------------------------------------------------
 # Function to create a pgpass file for database connection
 def create_pgpass(db_name, secret):
+    """Create a file of PostgreSQL database credentials to be read from the environment.
+
+    Args:
+        db_name: Database for which to write credential info.
+        secret: Dictionary containing AWS RDS database credentials.
+
+    Returns:
+        boolean flag indicating if the file write was successful.
+
+    Raises:
+        Exception: on failure to open or write to file.
+    """
     filename = "~/.pgpass"
     line = f"{secret['host']}:{secret['port']}:{db_name}:{secret['username']}:{secret['password']}"
     try:
@@ -88,9 +112,19 @@ def create_pgpass(db_name, secret):
 
 
 # ----------------------------------------------------
-# Function to create a PostgreSQL database and PostGIS extension
 def get_db_connection(db_name, secret):
-    # Use the psycopg2 library to create a PostgreSQL database and PostGIS extension
+    """Create a psycopg2 connection to a PostgreSQL database.
+
+    Args:
+        db_name: Database to connect to.
+        secret: Dictionary containing AWS RDS database credentials.
+
+    Returns:
+        conn: psycopg2.connection to the database.
+
+    Raises:
+        Exception: on failure to connect to database.
+    """
     try:
         conn = psycopg2.connect(
             host=secret["host"], database=db_name, user=secret["username"],
@@ -103,6 +137,15 @@ def get_db_connection(db_name, secret):
 
 # ----------------------------------------------------
 def get_db_engine(db_name, secret):
+    """Create a sqlalchemy engine to connect to a PostgreSQL database.
+
+    Args:
+        db_name: Database to connect to.
+        secret: Dictionary containing AWS RDS database credentials.
+
+    Returns:
+        engine: sqlalchemy.engine to the database.
+    """
     drivername = "postgresql+psycopg2"
     url_object = URL.create(
         drivername,
@@ -124,6 +167,20 @@ def get_db_engine(db_name, secret):
 # List files in an S3 Bucket matching
 # region, bucket, rel_path, filepattern = REGION, BUCKET, meta["relative_path"], meta["pattern"]
 def list_files(region, bucket, rel_path, filepattern):
+    """List files matching a pattern from AWS S3.
+
+    Args:
+        region: AWS region for operations
+        bucket: AWS S3 bucket containing files.
+        rel_path: string of S3 enclosing "folders" in bucket
+        filepattern: string for matching files in the relative path.
+
+    Returns:
+        relative_filenames: relative path to the S3 files.
+
+    Raises:
+        Exception: on failure to match any files.
+    """
     relative_filenames = []
     session = boto3.session.Session()
     s3_client = session.client(service_name="s3", region_name=region)
@@ -154,6 +211,10 @@ def download_file(region, bucket, rel_filename):
 
     Returns:
         local_filename: full path to the local file.
+
+    Raises:
+        Exception: on failure during file download.
+        Exception: on object failed to be downloaded.
     """
     session = boto3.session.Session()
     s3_client = session.client(service_name="s3", region_name=region)
@@ -180,6 +241,10 @@ def read_s3file_into_geodataframe(region, bucket, rel_filename):
     Returns:
         geo_dataframe (geopandas.GeoDataFrame): dataframe containing the geospatial
             data.
+
+    Raises:
+        Exception: on failure during file download.
+        Exception: on object failed to be downloaded.
     """
     session = boto3.session.Session()
     s3_client = session.client(service_name="s3", region_name=region)
@@ -299,6 +364,10 @@ def read_s3file_into_dataframe(region, bucket, rel_filename):
 
     Returns:
         dataframe (pandas.DataFrame): dataframe containing the structured data.
+
+    Raises:
+        Exception: on failure during file download.
+        Exception: on object failed to be downloaded.
     """
     session = boto3.session.Session()
     s3_client = session.client(service_name="s3", region_name=region)
@@ -312,32 +381,36 @@ def read_s3file_into_dataframe(region, bucket, rel_filename):
     dataframe = pandas.read_csv(filestream)
     return dataframe
 
-# --------------------------------------------------------------------------------------
-# Retrieve credentials
-secret = get_secret(SECRET_NAME, REGION)
-engine = get_db_engine(DB_NAME, secret)
 
-for meta in BISON_INPUTS:
-    table = meta["table"]
-    rel_fnames = list_files(REGION, BUCKET, meta["relative_path"], meta["pattern"])
-    for rfname in rel_fnames:
-        do_replace = True
-        # if series and not first, append
-        if len(rel_fnames) > 1 and rfname != rel_fnames[0]:
-            do_replace = False
-        if meta["is_geo"] is True:
-            if meta["table"] == "pad":
-                insert_geofile_to_database(
-                    REGION, BUCKET, rfname, engine, DB_SCHEMA, table,
-                    do_replace=do_replace)
+# --------------------------------------------------------------------------------------
+# Press the green button in the gutter to run the script.
+if __name__ == '__main__':
+    """Main script to execute all elements of the summarize-GBIF BISON workflow."""
+    # Retrieve credentials
+    secret = get_secret(SECRET_NAME, REGION)
+    engine = get_db_engine(DB_NAME, secret)
+
+    for meta in BISON_INPUTS:
+        table = meta["table"]
+        rel_fnames = list_files(REGION, BUCKET, meta["relative_path"], meta["pattern"])
+        for rfname in rel_fnames:
+            do_replace = True
+            # if series and not first, append
+            if len(rel_fnames) > 1 and rfname != rel_fnames[0]:
+                do_replace = False
+            if meta["is_geo"] is True:
+                if meta["table"] == "pad":
+                    insert_geofile_to_database(
+                        REGION, BUCKET, rfname, engine, DB_SCHEMA, table,
+                        do_replace=do_replace)
+                else:
+                    # TODO: why is PAD data insertion crashing python with "Killed" message?
+                    insert_padfile_to_database(
+                        REGION, BUCKET, rfname, DB_NAME, secret, DB_SCHEMA, table,
+                        do_replace=do_replace)
             else:
-                # TODO: why is PAD data insertion crashing python with "Killed" message?
-                insert_padfile_to_database(
-                    REGION, BUCKET, rfname, engine, DB_SCHEMA, table,
-                    do_replace=do_replace)
-        else:
-            insert_csvfile_to_database(
-                REGION, BUCKET, rfname, engine, DB_SCHEMA, table, do_replace=do_replace)
+                insert_csvfile_to_database(
+                    REGION, BUCKET, rfname, engine, DB_SCHEMA, table, do_replace=do_replace)
 
 
 """

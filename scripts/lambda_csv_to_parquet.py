@@ -1,3 +1,4 @@
+"""Lambda function to respond to an S3 event of records deposited, then write to S3."""
 import boto3
 import io
 import os.path
@@ -9,7 +10,18 @@ OUT_PATH = "raw_data"
 GBIF_OCC_FNAME = "occurrence.txt"
 
 s3_client = boto3.client("s3")
+
+
 def lambda_handler(event, context):
+    """Handler for lambda event.
+
+    Args:
+        event: event triggering this handler.
+        context: context of the execution.
+
+    Returns:
+        JSON formatted status response.
+    """
     # Get the input CSV file from S3
     input_bucket = event["Records"][0]["s3"]["bucket"]["name"]
     input_name = event["Records"][0]["s3"]["object"]["key"]

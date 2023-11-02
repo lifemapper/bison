@@ -285,6 +285,13 @@ class GeoResolver(object):
 
     # ...............................................
     def logit(self, msg, refname=None, log_level=INFO):
+        """Method to log a message to a logger/file/stream or print to console.
+
+        Args:
+            msg: message to print.
+            refname: calling function name.
+            log_level: error level, INFO, DEBUG, WARNING, ERROR
+        """
         if self._log is not None:
             self._log.log(msg, refname=refname, log_level=log_level)
         else:

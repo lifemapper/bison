@@ -274,7 +274,8 @@ class RIIS:
         Args:
             msg: message to print.
             refname: calling function name.
-            log_level: error level, INFO, DEBUG, WARNING, ERROR
+            log_level: logging constant error level (logging.INFO, logging.DEBUG,
+                logging.WARNING, logging.ERROR)
         """
         if self._log is not None:
             self._log.log(msg, refname=refname, log_level=log_level)

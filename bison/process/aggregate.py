@@ -416,7 +416,7 @@ class Aggregator():
     def summarized(self):
         """Boolean flag indicating whether the data has been summarized to a dictionary.
 
-        Return:
+        Returns:
             Boolean value, true if dictionary self._locations is filled
         """
         loc_sums = 0
@@ -431,7 +431,7 @@ class Aggregator():
     def summary(self):
         """Return a message summarizing the number of species names and locations.
 
-        Return:
+        Returns:
             msg: string of information.
         """
         msg = "Read the following unique values:"
@@ -598,7 +598,11 @@ class Aggregator():
 
     # ...............................................
     def summarize_assessments_by_region(self):
-        """Summarize annotated records by RIIS assessments by region."""
+        """Summarize annotated records by RIIS assessments by region.
+
+        Raises:
+            Exception: on failure to write file.
+        """
         try:
             self._log.log(
                 "Summarizing region summaries to ",

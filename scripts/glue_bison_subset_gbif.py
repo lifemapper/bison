@@ -1,3 +1,4 @@
+"""Glue script to pull data subset from AWS GBIF Open Data Registry and write to S3."""
 from awsglue.transforms import Filter
 from awsglue.utils import getResolvedOptions
 from awsglue.context import GlueContext
@@ -38,7 +39,7 @@ gbif_full_data = glueContext.create_dynamic_frame.from_options(
     connection_type="s3",
     format="parquet",
     connection_options={
-        "paths": [ gbif_s3_fullname ],
+        "paths": [gbif_s3_fullname],
         "recurse": True,
     },
     transformation_ctx="S3bucket_node_gbif",
@@ -46,8 +47,8 @@ gbif_full_data = glueContext.create_dynamic_frame.from_options(
 
 # Create filtered DynamicFrame with custom lambda to filter records
 gbif_subset = Filter.apply(
-    frame = gbif_full_data,
-    f = lambda x: x["countrycode"] == "US" and x["occurrencestatus"] == "PRESENT" and x["taxonrank"] in ["species", "subspecies", "variety", "form", "infraspecific_name", "infrasubspecific_name"] and "COORDINATE_INVALID" not in x["issue"] and "COORDINATE_OUT_OF_RANGE" not in x["issue"] and "COORDINATE_REPROJECTION_FAILED" not in x["issue"] and "COORDINATE_REPROJECTION_SUSPICIOUS" not in x["issue"])
+    frame=gbif_full_data,
+    f=lambda x: x["countrycode"] == "US" and x["occurrencestatus"] == "PRESENT" and x["taxonrank"] in ["species", "subspecies", "variety", "form", "infraspecific_name", "infrasubspecific_name"] and "COORDINATE_INVALID" not in x["issue"] and "COORDINATE_OUT_OF_RANGE" not in x["issue"] and "COORDINATE_REPROJECTION_FAILED" not in x["issue"] and "COORDINATE_REPROJECTION_SUSPICIOUS" not in x["issue"])
 
 # Output to BISON S3 bucket
 bison_full_data = glueContext.write_dynamic_frame.from_options(

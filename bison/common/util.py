@@ -360,6 +360,9 @@ def get_site_headers_from_shapefile(site_id_fld, x_fld, y_fld, shape_filename):
 
     Returns:
         site_headers: list of tuples containing (site_id, x, y)
+
+    Raises:
+        Exception: on failure to read a feature from which to get FID and coordinates.
     """
     site_headers = []
     driver = ogr.GetDriverByName("ESRI Shapefile")
