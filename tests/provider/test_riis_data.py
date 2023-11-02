@@ -1,11 +1,13 @@
 """Test the structure, size, and content of input US-RIIS data files."""
 import os
 
+from bison.common.constants import PARAMETERS
 from bison.common.log import Logger
 from bison.provider.riis_data import RIIS
-from tests.tools.test_setup import get_test_parameters
+from bison.tools._config_parser import process_arguments_from_file
 
 script_name = os.path.splitext(os.path.basename(__file__))[0]
+config_filename = "/volumes/bison/tests/test_process_gbif.json"
 
 
 class TestRIISInput(RIIS):
@@ -14,9 +16,9 @@ class TestRIISInput(RIIS):
     # .....................................
     def test_read_riis(self):
         """Test reading an original RIIS file by checking counts."""
-        fn_args = get_test_parameters(script_name)
+        params = process_arguments_from_file(config_filename, PARAMETERS)
         logger = Logger(script_name)
-        riis = RIIS(fn_args["riis_filename"], logger)
+        riis = RIIS(params["riis_filename"], logger)
         # Read original species data
         riis.read_riis()
 

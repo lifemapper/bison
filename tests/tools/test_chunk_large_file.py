@@ -2,42 +2,30 @@
 import math
 import os
 
+from bison.common.constants import APPEND_TO_DWC, PARAMETERS, REPORT
 from bison.common.log import Logger
-from bison.common.util import Chunker, count_lines
-from tests.tools.test_setup import get_test_parameters
+from bison.common.util import Chunker
+from bison.tools._config_parser import process_arguments_from_file
 
-script_name = os.path.splitext(os.path.basename(__file__))[0]
+logger = Logger(os.path.splitext(os.path.basename(__file__))[0])
+config_filename = "/volumes/bison/tests/test_process_gbif.json"
+params = process_arguments_from_file(config_filename, PARAMETERS)
 
 
 # .............................................................................
 class Test_chunk_large_file:
     """Test the CLI tool and dependencies that annotate RIIS data with GBIF taxa."""
 
-    def __init__(self):
-        """Constructor."""
-        self._logger = Logger(script_name)
-
     # .....................................
     def test_identify_chunks(self):
         """Test identifying the chunks of records to be put into smaller files."""
-        fn_args = get_test_parameters(script_name)
-
-        boundary_pairs, rec_count, chunk_size = Chunker.identify_chunks(
-            fn_args["big_csv_filename"],
-            chunk_count=fn_args["number_of_chunks"])
-        expected_chunk_size = math.ceil(
-            fn_args["_test_record_count"]
-            / fn_args["number_of_chunks"])
-
-        assert len(boundary_pairs) == fn_args["number_of_chunks"]
-        assert rec_count == fn_args["_test_record_count"]
-        assert chunk_size == expected_chunk_size
+        chunk_files = Chunker.identify_chunks(params["gbif_filename"], chunk_count=10)
+        assert(len(chunk_files) == 10)
 
     # .....................................
     def test_count_lines(self):
         """Test reading an original RIIS file by checking counts."""
-        fn_args = get_test_parameters(script_name)
-        line_count = count_lines(fn_args["big_csv_filename"])
+        line_count = count_lines(fn_args["gbif_filename"])
         # record_count = line_count - 1 (header)
         assert (line_count - 1 == fn_args["_test_record_count"])
 

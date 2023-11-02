@@ -3,31 +3,29 @@ import os
 
 import pytest
 
+from bison.common.constants import PARAMETERS
 from bison.tools._config_parser import process_arguments_from_file
 from bison.tools.annotate_riis import DESCRIPTION as annotate_riis_desc
-from bison.tools.annotate_riis import PARAMETERS as annotate_riis_params
 from bison.tools.annotate_gbif import DESCRIPTION as annotate_gbif_desc
-from bison.tools.annotate_gbif import PARAMETERS as annotate_gbif_params
 from bison.tools.chunk_large_file import DESCRIPTION as chunk_large_file_desc
-from bison.tools.chunk_large_file import PARAMETERS as chunk_large_file_params
 from test_setup import get_test_parameters
 
-config_path = "/volumes/bison/config/"
+config_path = "/volumes/bison/tests/config/"
 command_meta = [
     (
-        annotate_riis_params,
+        PARAMETERS,
         annotate_riis_desc,
-        "annotate_riis.json",
+        "test_process_gbif.json",
         get_test_parameters("test_annotate_riis")
     ),
     (
-        annotate_gbif_params,
+        PARAMETERS,
         annotate_gbif_desc,
         "annotate_gbif.json",
         get_test_parameters("test_annotate_gbif")
     ),
     (
-        chunk_large_file_params,
+        PARAMETERS,
         chunk_large_file_desc,
         "chunk_large_file.json",
         get_test_parameters("test_chunk_large_file")

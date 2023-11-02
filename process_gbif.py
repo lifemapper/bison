@@ -6,7 +6,7 @@ import os
 import time
 
 from bison.common.constants import (
-    APPEND_TO_DWC, CONFIG_PARAM, LMBISON_PROCESS, GBIF, ENCODING, EXTRA_CSV_FIELD, LOG,
+    APPEND_TO_DWC, LMBISON_PROCESS, GBIF, ENCODING, EXTRA_CSV_FIELD, LOG, PARAMETERS,
     REGION, REPORT)
 from bison.common.util import (
     BisonNameOp, Chunker, delete_file, get_csv_dict_reader)
@@ -21,83 +21,6 @@ from bison.tools._config_parser import get_common_arguments
 script_name = os.path.splitext(os.path.basename(__file__))[0]
 DESCRIPTION = """Execute one or more steps of annotating GBIF data with RIIS
                 assessments, and summarizing by species, county, and state"""
-# .............................................................................
-PARAMETERS = {
-    "required":
-        {
-            "riis_filename":
-                {
-                    CONFIG_PARAM.TYPE: str,
-                    CONFIG_PARAM.IS_INPUT_FILE: True,
-                    CONFIG_PARAM.HELP:
-                        "Full filename of input USGS RIIS data in CSV format."
-                },
-            "gbif_filename":
-                {
-                    CONFIG_PARAM.TYPE: str,
-                    CONFIG_PARAM.IS_INPUT_FILE: True,
-                    CONFIG_PARAM.HELP:
-                        "Full filename of input GBIF occurrence data in CSV format."
-                },
-            "do_split":
-                {
-                    CONFIG_PARAM.TYPE: bool,
-                    CONFIG_PARAM.HELP:
-                        "Flag indicating whether the GBIF data is to be (or has been) "
-                        "split into smaller subsets."
-                },
-            "run_parallel":
-                {
-                    CONFIG_PARAM.TYPE: bool,
-                    CONFIG_PARAM.HELP:
-                        "Flag indicating whether the annotation process is to be "
-                        "run in parallel threads."
-                },
-            "geo_path":
-                {
-                    CONFIG_PARAM.TYPE: str,
-                    CONFIG_PARAM.IS_INPUT_DIR: True,
-                    CONFIG_PARAM.HELP:
-                        "Source directory containing geospatial input data."
-                },
-            "process_path":
-                {
-                    CONFIG_PARAM.TYPE: str,
-                    CONFIG_PARAM.IS_OUPUT_DIR: True,
-                    CONFIG_PARAM.HELP: "Large destination directory for temporary data."
-                },
-            "output_path":
-                {
-                    CONFIG_PARAM.TYPE: str,
-                    CONFIG_PARAM.IS_OUPUT_DIR: True,
-                    CONFIG_PARAM.HELP: "Large destination directory for output data."
-                }
-        },
-    "optional":
-        {
-            "gbif_id":
-                {
-                    CONFIG_PARAM.TYPE: int,
-                    CONFIG_PARAM.HELP:
-                        "Identifier, gbifId, of troublesome record in original or "
-                        "annotated occurrence file."
-                },
-            "line_num":
-                {
-                    CONFIG_PARAM.TYPE: int,
-                    CONFIG_PARAM.HELP:
-                        "Line number of record to examine in original or "
-                        "annotated occurrence file."
-                },
-            "examine_filenames":
-                {
-                    CONFIG_PARAM.TYPE: list,
-                    CONFIG_PARAM.IS_INPUT_FILE: True,
-                    CONFIG_PARAM.HELP:
-                        "List of full filenames of input occurrence files to inspect."
-                }
-        }
-}
 
 
 # .............................................................................
