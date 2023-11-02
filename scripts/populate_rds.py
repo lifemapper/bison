@@ -4,10 +4,11 @@ from botocore.exceptions import ClientError
 from io import BytesIO
 import geopandas
 import os
-import re
-from sqlalchemy import create_engine, URL
 import pandas
 import psycopg2
+import re
+from sqlalchemy import create_engine, URL
+import subprocess
 
 # AWS credentials
 SECRET_DB_ACCESS_KEY = "aws/secretsmanager"
@@ -35,7 +36,7 @@ BISON_INPUTS = [
         "relative_path": "input_data/region/",
         "filepattern": "cb_2021_us_aiannh_500k.zip",
         "is_geo": True
-},
+    },
     {
         "table": "pad",
         "relative_path": "input_data/pad/",
@@ -121,7 +122,7 @@ def get_db_engine(db_name, secret):
 
 # ----------------------------------------------------
 # List files in an S3 Bucket matching
- # region, bucket, rel_path, filepattern = REGION, BUCKET, meta["relative_path"], meta["pattern"]
+# region, bucket, rel_path, filepattern = REGION, BUCKET, meta["relative_path"], meta["pattern"]
 def list_files(region, bucket, rel_path, filepattern):
     relative_filenames = []
     session = boto3.session.Session()
@@ -144,6 +145,16 @@ def list_files(region, bucket, rel_path, filepattern):
 # ----------------------------------------------------
 # Download a file from an S3 Bucket into a GeoPandas dataframe
 def download_file(region, bucket, rel_filename):
+    """Download a file from AWS S3.
+
+    Args:
+        region: AWS region for operations
+        bucket: AWS S3 bucket containing shapefile.
+        rel_filename: Shapefilename including S3 enclosing "folders" in bucket
+
+    Returns:
+        local_filename: full path to the local file.
+    """
     session = boto3.session.Session()
     s3_client = session.client(service_name="s3", region_name=region)
     local_filename = os.path.join("/tmp", os.path.split(rel_filename)[1])
@@ -159,6 +170,17 @@ def download_file(region, bucket, rel_filename):
 # ----------------------------------------------------
 # Read file from an S3 Bucket into a GeoPandas dataframe
 def read_s3file_into_geodataframe(region, bucket, rel_filename):
+    """Read a shapefile from AWS S3 into a geopandas DataFrame.
+
+    Args:
+        region: AWS region for operations
+        bucket: AWS S3 bucket containing shapefile.
+        rel_filename: Shapefilename including S3 enclosing "folders" in bucket
+
+    Returns:
+        geo_dataframe (geopandas.GeoDataFrame): dataframe containing the geospatial
+            data.
+    """
     session = boto3.session.Session()
     s3_client = session.client(service_name="s3", region_name=region)
     try:
@@ -176,6 +198,18 @@ def read_s3file_into_geodataframe(region, bucket, rel_filename):
 # Insert a GeoPandas dataframe into a database table
 def insert_geofile_to_database(
         region, bucket, rel_filename, engine, schema, table, do_replace=True):
+    """Read a shapefile from AWS S3, then upload it to a table in AWS RDS.
+
+    Args:
+        region: AWS region for operations
+        bucket: AWS S3 bucket containing shapefile.
+        rel_filename: Shapefilename including S3 enclosing "folders" in bucket
+        engine: SQLAlchemy connection to the database.
+        schema: Organizing structure for the database definitions.
+        table: Table for data insertion
+        do_replace: Flag indicating whether to replace the table if it exists,
+            or append to it.
+    """
     # New or existing
     exist_behavior = "replace"
     if do_replace is False:
@@ -194,25 +228,52 @@ def insert_geofile_to_database(
 # Insert a GeoPandas dataframe into a database table
 def insert_padfile_to_database(
         region, bucket, rel_filename, db_name, secret, schema, table, do_replace=True):
-    # shp2pgsql  -s 4269 -g the_geom_4269 -S -W "latin1" -a $z ${STATE_SCHEMA}.${t} | psql -d $DB -U $USER_NAME;
-    # New or existing
-    exist_behavior = "replace"
+    """Download a shapefile from AWS S3, then upload it to a table in AWS RDS.
+
+    Args:
+        region: AWS region for operations
+        bucket: AWS S3 bucket containing shapefile.
+        rel_filename: Shapefilename including S3 enclosing "folders" in bucket
+        db_name: Database in which to insert the data.
+        secret: Dictionary containing AWS RDS database credentials.
+        schema: Organizing structure for the database definitions.
+        table: Table for data insertion
+        do_replace: Flag indicating whether to replace the table if it exists,
+            or append to it.
+    """
+    # success = create_pgpass(db_name, secret)
+    # if success:
+    # Download from S3 bucket
+    local_filename = download_file(region, bucket, rel_filename)
+    print(f"Downloaded {local_filename}")
+    # Create or append
+    behavior = "-c"
     if do_replace is False:
-        exist_behavior = "append"
-    success = create_pgpass(db_name, secret)
-    if success:
-        # Download from S3 bucket
-        local_filename = download_file(region, bucket, rel_filename)
-        print(f"Downloaded {local_filename}")
-        # Create or add to table
-        cmd = (f"shp2pgsql  -s 4326 -g geom -S -W 'latin1' -a $z ${schema}.${table}"
-               f" | psql --host=secret['host']  {db_name}  {secret['username']};")
+        behavior = "-a"
+    cmd = (f"shp2pgsql  -s 4326 {behavior} -W 'UTF-8' {local_filename} ${schema}.${table}"
+           f" | psql --host={secret['host']}  -d {db_name} -U {secret['username']};")
+    info, err = subprocess.Popen(
+        cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()
+    if err:
+        print(f"Failed to execute shp2pgsql on {table}")
 
 
 # ----------------------------------------------------
 # Insert a GeoPandas dataframe into a database table
 def insert_csvfile_to_database(
         region, bucket, rel_filename, engine, schema, table, do_replace=True):
+    """Read a CSV from AWS S3, then upload it to a table in AWS RDS.
+
+    Args:
+        region: AWS region for operations
+        bucket: AWS S3 bucket containing shapefile.
+        rel_filename: Shapefilename including S3 enclosing "folders" in bucket
+        engine: SQLAlchemy connection to the database.
+        schema: Organizing structure for the database definitions.
+        table: Table for data insertion
+        do_replace: Flag indicating whether to replace the table if it exists,
+            or append to it.
+    """
     # New or existing
     exist_behavior = "replace"
     if do_replace is False:
@@ -229,6 +290,16 @@ def insert_csvfile_to_database(
 # ----------------------------------------------------
 # Read file from an S3 Bucket into a GeoPandas dataframe
 def read_s3file_into_dataframe(region, bucket, rel_filename):
+    """Read a CSV from AWS S3 into a pandas DataFrame.
+
+    Args:
+        region: AWS region for operations
+        bucket: AWS S3 bucket containing shapefile.
+        rel_filename: Shapefilename including S3 enclosing "folders" in bucket
+
+    Returns:
+        dataframe (pandas.DataFrame): dataframe containing the structured data.
+    """
     session = boto3.session.Session()
     s3_client = session.client(service_name="s3", region_name=region)
     try:
