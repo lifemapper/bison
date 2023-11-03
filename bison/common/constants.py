@@ -340,6 +340,12 @@ PARAMETERS = {
         },
     "optional":
         {
+            "chunk_count":
+                {
+                    CONFIG_PARAM.TYPE: int,
+                    CONFIG_PARAM.HELP:
+                        "Number of files to split a large CSV into."
+                },
             "gbif_id":
                 {
                     CONFIG_PARAM.TYPE: int,

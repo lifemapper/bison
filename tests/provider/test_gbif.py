@@ -29,7 +29,7 @@ class TestGBIFData(DwcData):
             dwc.close()
 
 
-    # .....................................
+    #
     def test_read_rec(self):
         """Test reading a record from a GBIF CSV file."""
         dwc = DwcData(params["gbif_filename"], logger)
@@ -40,6 +40,27 @@ class TestGBIFData(DwcData):
             assert(False)
         else:
             assert(isinstance(rec, dict))
+        finally:
+            dwc.close()
+
+    # .....................................
+    def test_read_all_recs(self):
+        """Test reading all records from a GBIF CSV file."""
+        dwc = DwcData(params["gbif_filename"], logger)
+        count = 0
+        try:
+            dwc.open()
+            rec = dwc.get_record()
+            while rec is not None:
+                count += 1
+                try:
+                    rec = dwc.get_record()
+                except Exception:
+                    assert(False)
+        except Exception:
+            assert(False)
+        else:
+            assert(count == params["_test_gbif_record_count"])
         finally:
             dwc.close()
 

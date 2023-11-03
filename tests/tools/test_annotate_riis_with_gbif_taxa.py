@@ -10,7 +10,6 @@ from bison.provider.riis_data import RIIS
 logger = Logger(os.path.splitext(os.path.basename(__file__))[0])
 config_filename = "/volumes/bison/tests/config/test_process_gbif.json"
 params = process_arguments_from_file(config_filename, PARAMETERS)
-small_riis_filename = "/volumes/bison/tests/input/US-RIIS_MasterList_top100_2021.csv"
 
 # .............................................................................
 class Test_annotate_riis:
@@ -18,10 +17,10 @@ class Test_annotate_riis:
 
     def test_read_small_riis(self):
         """Test reading an original RIIS file by checking counts."""
-        riis = RIIS(small_riis_filename, logger)
+        riis = RIIS(params["_test_riis_filename"], logger)
         # Read original species data
         riis.read_riis()
-        line_count = count_lines_with_cat(small_riis_filename)
+        line_count = count_lines_with_cat(params["_test_riis_filename"])
         print("Find counts: riis.by_taxon, by_riis_id, line_count")
         # assert (len(riis.by_taxon) == 0)
         # assert (len(riis.by_riis_id) == 0)
@@ -30,7 +29,7 @@ class Test_annotate_riis:
     # .....................................
     def test_resolve_small_riis(self):
         """Test resolving taxa in a small RIIS file by checking summary report."""
-        riis = RIIS(small_riis_filename, self._logger)
+        riis = RIIS(params["_test_riis_filename"], logger)
         report = riis.resolve_riis_to_gbif_taxa(overwrite=True)
         assert(report[REPORT.SUMMARY])
         for key in (

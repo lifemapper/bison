@@ -57,8 +57,9 @@ def cli():
     if not os.path.exists(output_path):
         raise Exception(f"Output path {output_path} does not exist.")
 
+    chunk_count = config["chunk_count"]
     report = Chunker.chunk_files(
-        infilename, output_path, logger, chunk_count=config["number_of_chunks"])
+        infilename, output_path, logger, chunk_count)
 
     try:
         with open(config["report_filename"], mode='wt') as out_file:

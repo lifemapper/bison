@@ -1,9 +1,12 @@
 {
     "riis_filename": "/volumes/bison/input/US-RIIS_MasterList_2021.csv",
-    "gbif_filename": "/volumes/bison/tests/input/gbif/gbif10k_2023-01-26.csv",
+    "gbif_filename": "/volumes/bison/tests/input/gbif10k_2023-01-26.csv",
     "do_split": true,
     "run_parallel": true,
     "geo_path": "/volumes/bison/big_data/geodata",
     "process_path": "/volumes/bison/tests/process",
-    "output_path": "/volumes/bison/tests/output"
+    "output_path": "/volumes/bison/tests/output",
+    "chunk_count": 10,
+    "_test_gbif_record_count": 10000,
+    "_test_riis_filename": "/volumes/bison/tests/input/US-RIIS_MasterList_top100_2021.csv"
 }

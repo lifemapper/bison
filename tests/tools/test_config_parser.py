@@ -8,7 +8,7 @@ from bison.common.log import Logger
 from bison.tools._config_parser import process_arguments_from_file
 
 logger = Logger(os.path.splitext(os.path.basename(__file__))[0])
-config_filename = "/volumes/bison/tests/test_process_gbif.json"
+config_filename = "/volumes/bison/tests/config/test_process_gbif.json"
 
 class Test_config_parser:
     """Test the config_parser methods used in all CLI tools."""
@@ -18,11 +18,11 @@ class Test_config_parser:
         """Test the configuration files for all CLI tools."""
         params = process_arguments_from_file(config_filename, PARAMETERS)
         try:
-            valid_keys = list(params["required"].keys())
+            valid_keys = list(PARAMETERS["required"].keys())
         except Exception:
             valid_keys = []
         try:
-            opt_keys = list(params["optional"].keys())
+            opt_keys = list(PARAMETERS["optional"].keys())
         except Exception:
             opt_keys = []
         valid_keys.extend(opt_keys)

@@ -24,11 +24,12 @@ DESCRIPTION = """Execute one or more steps of annotating GBIF data with RIIS
 
 
 # .............................................................................
-def a_find_or_create_subset_files(gbif_filename, output_path, logger):
+def a_find_or_create_subset_files(gbif_filename, chunk_count, output_path, logger):
     """Find or create subset files from a large file based on the file size and CPUs.
 
     Args:
         gbif_filename (str): full filename of data file to be subsetted into chunks.
+        chunk_count (int): number of subset files to create from the original.
         output_path (str): Destination directory for subset files.
         logger (object): logger for saving relevant processing messages
 
@@ -36,7 +37,8 @@ def a_find_or_create_subset_files(gbif_filename, output_path, logger):
         chunk_filenames (list): full filenames for subset files created from large
             input file.
     """
-    chunk_filenames = Chunker.identify_chunk_files(gbif_filename, output_path)
+    chunk_filenames = Chunker.identify_chunk_files(
+        gbif_filename, output_path, chunk_count)
     # If any are missing, delete them all and split
     re_split = False
     for chunk_fname in chunk_filenames:
@@ -48,7 +50,8 @@ def a_find_or_create_subset_files(gbif_filename, output_path, logger):
         for chunk_fname in chunk_filenames:
             delete_file(chunk_fname)
         # Resplit into subset files
-        chunk_filenames = Chunker.chunk_files(gbif_filename, output_path, logger)
+        chunk_filenames = Chunker.chunk_files(
+            gbif_filename, chunk_count, output_path, logger)
 
     return chunk_filenames
 
@@ -711,7 +714,7 @@ def _prepare_args(config):
     if config["do_split"] is True:
         # Find existing or create subset files
         raw_filenames = a_find_or_create_subset_files(
-            infile, config["process_path"], logger)
+            infile, config["chunk_count"], config["process_path"], logger)
     else:
         raw_filenames = [infile]
 

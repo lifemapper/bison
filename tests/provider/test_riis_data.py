@@ -6,8 +6,9 @@ from bison.common.log import Logger
 from bison.provider.riis_data import RIIS
 from bison.tools._config_parser import process_arguments_from_file
 
-script_name = os.path.splitext(os.path.basename(__file__))[0]
+logger = Logger(os.path.splitext(os.path.basename(__file__))[0])
 config_filename = "/volumes/bison/tests/config/test_process_gbif.json"
+params = process_arguments_from_file(config_filename, PARAMETERS)
 
 
 class TestRIISInput(RIIS):
@@ -16,8 +17,6 @@ class TestRIISInput(RIIS):
     # .....................................
     def test_read_riis(self):
         """Test reading an original RIIS file by checking counts."""
-        params = process_arguments_from_file(config_filename, PARAMETERS)
-        logger = Logger(script_name)
         riis = RIIS(params["riis_filename"], logger)
         # Read original species data
         riis.read_riis()

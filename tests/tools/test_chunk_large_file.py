@@ -11,8 +11,6 @@ logger = Logger(os.path.splitext(os.path.basename(__file__))[0])
 config_filename = "/volumes/bison/tests/config/test_process_gbif.json"
 params = process_arguments_from_file(config_filename, PARAMETERS)
 
-CHUNK_COUNT = 10
-
 
 # .............................................................................
 class Test_chunk_large_file:
@@ -21,24 +19,24 @@ class Test_chunk_large_file:
     # .....................................
     def test_identify_chunks(self):
         """Test identifying the chunks of records to be put into smaller files."""
-        chunk_files = Chunker.identify_chunks(
-            params["gbif_filename"], chunk_count=params["chunk_count"])
-        assert(len(chunk_files) == 10)
+        start_stop_pairs, rec_count, chunk_size = Chunker.identify_chunks(
+            params["gbif_filename"], params["chunk_count"])
+        assert(len(start_stop_pairs) == 10)
 
 
     # .....................................
     def test_chunk_files(self):
         """Test chunking a large file into smaller files."""
         chunk_filenames, _report = Chunker.chunk_files(
-            params["gbif_filename"], params["output_path"], logger,
-            chunk_count=CHUNK_COUNT)
+            params["gbif_filename"], params["chunk_count"], params["output_path"],
+            logger)
 
         file_count = len(chunk_filenames)
-        assert (file_count == CHUNK_COUNT)
+        assert (file_count == params["chunk_count"])
 
         # The last file may be a smaller size than all the others
         expected_chunk_size = math.ceil(
-            params["_test_record_count"] / params["number_of_chunks"])
+            params["_test_gbif_record_count"] / params["chunk_count"])
         name_linecount = []
         for fn in chunk_filenames:
             line_count = count_lines(fn)
@@ -55,7 +53,6 @@ class Test_chunk_large_file:
     def test_identify_chunk_files(self):
         """Test identifying subset filenames created from chunking a large file."""
         chunk_filenames = Chunker.identify_chunk_files(
-            params["big_csv_filename"], params["output_path"],
-            chunk_count=params["number_of_chunks"])
+            params["gbif_filename"], params["chunk_count"], params["output_path"])
 
-        assert (len(chunk_filenames) == params["_test_small_number_of_chunks"])
+        assert (len(chunk_filenames) == params["chunk_count"])
