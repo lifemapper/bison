@@ -297,6 +297,7 @@ def _parse_cat_output(subproc_output):
 
 
 # .............................................................................
+@classmethod
 def count_lines(filename_or_pattern, grep_strings=None):
     """Find total number of lines in a file.
 

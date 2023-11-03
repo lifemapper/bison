@@ -1,83 +1,107 @@
-{
-  "_comment1": "Test configuration using very small data",
-  "_comment2": "Input, output, and config are mostly located under the `tests` directory",
-  "_comment3": "Some inputs are located under the main repository data directory",
-  "_comment4": "Intended for tests run outside of the Docker environment",
-  "_comment5": "Each top level key indicates the basename of a test file, with a dictionary value containing parmeters",
-  "_comment6": "Keys starting with `# comment` are comments, keys starting with `_test_` are unique for tests",
-
-  "test_config_parser":
-  {
-    "log_filename": "/volumes/bison/tests/output/test_config_parser.log",
-    "report_filename": "/volumes/bison/tests/output/test_config_parser.rpt",
-    "big_csv_filename": "/volumes/bison/tests/input/gbif_2023-01-26_10k.csv"
-  },
-  "test_chunk_large_file":
-  {
-    "log_filename": "/volumes/bison/tests/output/test_chunk_large_file.log",
-    "report_filename": "/volumes/bison/tests/output/test_chunk_large_file.rpt",
-    "output_path":  "/volumes/bison/tests/output",
-    "big_csv_filename": "/volumes/bison/tests/input/gbif_2023-01-26_10k.csv",
-    "number_of_chunks": 10,
-    "_test_record_count": 10000
-  },
-  "test_riis_data":
-  {
-    "log_filename": "/volumes/bison/tests/output/test_riis_data.log",
-    "report_filename": "/volumes/bison/tests/output/test_riis_data.rpt",
-    "riis_filename": "/volumes/bison/input/US-RIIS_MasterList_2021.csv",
-    "_test_riis_record_count": 15263,
-    "_test_riis_name_count": 12981,
-    "_test_annotated_riis_filename": "/volumes/bison/input/US-RIIS_MasterList_annotated.csv"
-  },
-  "test_annotate_riis":
-  {
-    "log_filename": "/volumes/bison/tests/output/test_annotate_riis.log",
-    "report_filename": "/volumes/bison/tests/output/test_annotate_riis.rpt",
-    "riis_filename": "/volumes/bison/input/US-RIIS_MasterList_2021.csv",
-    "_test_small_riis_filename": "/volumes/bison/tests/input/US-RIIS_MasterList_2021_100.csv",
-    "_test_small_annotated_riis_filename": "/volumes/bison/tests/output/US-RIIS_MasterList_2021_100_annotated.csv",
-    "_test_small_riis_record_count": 100,
-    "_test_small_riis_name_count": 100,
-    "_test_riis_record_count": 15264,
-    "_test_riis_name_count": 12981
-  },
-  "test_annotate_gbif":
-  {
-    "log_filename": "/volumes/bison/tests/output/test_annotate_gbif.log",
-    "report_filename": "/volumes/bison/tests/output/test_annotate_gbif.rpt",
-    "dwc_filenames": [
-      "/volumes/bison/tests/input/gbif-2023-01-26-10k_chunk-1-100.csv",
-      "/volumes/bison/tests/input/gbif-2023-01-26-10k_chunk-101-200.csv"],
-    "geoinput_path": "/volumes/bison/big_data/geodata",
-    "riis_with_gbif_taxa_filename": "/volumes/bison/input/US-RIIS_MasterList_2021_annotated.csv",
-    "output_path": "/volumes/bison/tests/output"
-  },
-  "test_summarize_annotations":
-  {
-    "log_filename": "/volumes/bison/tests/output/test_summarize_annotations.log",
-    "report_filename": "/volumes/bison/tests/output/test_summarize_annotations.rpt",
-    "annotated_dwc_filenames": [
-      "/volumes/bison/tests/input/gbif-2023-01-26-10k_chunk-1-100.csv",
-      "/volumes/bison/tests/input/gbif-2023-01-26-10k_chunk-101-200.csv"],
-    "output_path": "/volumes/bison/tests/output"
-  },
-  "test_combine_summaries":
-          {
-    "log_filename": "/volumes/bison/tests/output/test_combine_summaries.log",
-    "report_filename": "/volumes/bison/tests/output/test_combine_summaries.rpt",
-    "summary_filenames": [
-            "/volumes/bison/big_data/process/gbif-2023-01-26-10k_chunk-1001-2000_summary.csv",
-            "/volumes/bison/big_data/process/gbif-2023-01-26-10k_chunk-2001-3000_summary.csv",
-            "/volumes/bison/big_data/process/gbif-2023-01-26-10k_chunk-3001-4000_summary.csv",
-            "/volumes/bison/big_data/process/gbif-2023-01-26-10k_chunk-4001-5000_summary.csv",
-            "/volumes/bison/big_data/process/gbif-2023-01-26-10k_chunk-5001-6000_summary.csv",
-            "/volumes/bison/big_data/process/gbif-2023-01-26-10k_chunk-6001-7000_summary.csv",
-            "/volumes/bison/big_data/process/gbif-2023-01-26-10k_chunk-7001-8000_summary.csv",
-            "/volumes/bison/big_data/process/gbif-2023-01-26-10k_chunk-8001-9000_summary.csv",
-            "/volumes/bison/big_data/process/gbif-2023-01-26-10k_chunk-9001-10000_summary.csv"
-        ],
-    "output_path": "/volumes/bison/tests/output"
+# .............................................................................
+PARAMETERS = {
+    "required":
+        {
+            "riis_filename":
+                {
+                    CONFIG_PARAM.TYPE: str,
+                    CONFIG_PARAM.IS_INPUT_FILE: True,
+                    CONFIG_PARAM.HELP:
+                        "Full filename of input USGS RIIS data in CSV format."
+                },
+            "gbif_filename":
+                {
+                    CONFIG_PARAM.TYPE: str,
+                    CONFIG_PARAM.IS_INPUT_FILE: True,
+                    CONFIG_PARAM.HELP:
+                        "Full filename of input GBIF occurrence data in CSV format."
+                },
+            "do_split":
+                {
+                    CONFIG_PARAM.TYPE: bool,
+                    CONFIG_PARAM.HELP:
+                        "Flag indicating whether the GBIF data is to be (or has been) "
+                        "split into smaller subsets."
+                },
+            "run_parallel":
+                {
+                    CONFIG_PARAM.TYPE: bool,
+                    CONFIG_PARAM.HELP:
+                        "Flag indicating whether the annotation process is to be "
+                        "run in parallel threads."
+                },
+            "geo_path":
+                {
+                    CONFIG_PARAM.TYPE: str,
+                    CONFIG_PARAM.IS_INPUT_DIR: True,
+                    CONFIG_PARAM.HELP:
+                        "Source directory containing geospatial input data."
+                },
+            "process_path":
+                {
+                    CONFIG_PARAM.TYPE: str,
+                    CONFIG_PARAM.IS_OUPUT_DIR: True,
+                    CONFIG_PARAM.HELP: "Large destination directory for temporary data."
+                },
+            "output_path":
+                {
+                    CONFIG_PARAM.TYPE: str,
+                    CONFIG_PARAM.IS_OUPUT_DIR: True,
+                    CONFIG_PARAM.HELP: "Large destination directory for output data."
+                }
+        },
+    "optional":
+        {
+            "gbif_id":
+                {
+                    CONFIG_PARAM.TYPE: int,
+                    CONFIG_PARAM.HELP:
+                        "Identifier, gbifId, of troublesome record in original or "
+                        "annotated occurrence file."
+                },
+            "line_num":
+                {
+                    CONFIG_PARAM.TYPE: int,
+                    CONFIG_PARAM.HELP:
+                        "Line number of record to examine in original or "
+                        "annotated occurrence file."
+                },
+            "examine_filenames":
+                {
+                    CONFIG_PARAM.TYPE: list,
+                    CONFIG_PARAM.IS_INPUT_FILE: True,
+                    CONFIG_PARAM.HELP:
+                        "List of full filenames of input occurrence files to inspect."
+                },
+            "chunk_count":
+                {
+                    CONFIG_PARAM.TYPE: int,
+                    CONFIG_PARAM.HELP:
+                        "Number of subset files to create from a large CSV file."
+                }
+            "line_num":
+                {
+                    CONFIG_PARAM.TYPE: int,
+                    CONFIG_PARAM.HELP:
+                        "Line number of record to examine in original or "
+                }
+            "line_num":
+                {
+                    CONFIG_PARAM.TYPE: int,
+                    CONFIG_PARAM.HELP:
+                        "Line number of record to examine in original or "
+                }
+            "line_num":
+                {
+                    CONFIG_PARAM.TYPE: int,
+                    CONFIG_PARAM.HELP:
+                        "Line number of record to examine in original or "
+                }
+            "line_num":
+                {
+                    CONFIG_PARAM.TYPE: int,
+                    CONFIG_PARAM.HELP:
+                        "Line number of record to examine in original or "
+                },
 }
-
 }

@@ -6,7 +6,7 @@ from bison.common.log import Logger
 from bison.tools._config_parser import process_arguments_from_file
 
 logger = Logger(os.path.splitext(os.path.basename(__file__))[0])
-config_filename = "/volumes/bison/tests/test_process_gbif.json"
+config_filename = "/volumes/bison/tests/config/test_process_gbif.json"
 params = process_arguments_from_file(config_filename, PARAMETERS)
 
 

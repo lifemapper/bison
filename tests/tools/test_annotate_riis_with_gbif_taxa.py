@@ -8,7 +8,7 @@ from bison.tools._config_parser import process_arguments_from_file
 from bison.provider.riis_data import RIIS
 
 logger = Logger(os.path.splitext(os.path.basename(__file__))[0])
-config_filename = "/volumes/bison/tests/test_process_gbif.json"
+config_filename = "/volumes/bison/tests/config/test_process_gbif.json"
 params = process_arguments_from_file(config_filename, PARAMETERS)
 small_riis_filename = "/volumes/bison/tests/input/US-RIIS_MasterList_top100_2021.csv"
 
