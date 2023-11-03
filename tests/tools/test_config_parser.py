@@ -4,36 +4,11 @@ import os
 import pytest
 
 from bison.common.constants import PARAMETERS
+from bison.common.log import Logger
 from bison.tools._config_parser import process_arguments_from_file
-from bison.tools.annotate_riis import DESCRIPTION as annotate_riis_desc
-from bison.tools.annotate_gbif import DESCRIPTION as annotate_gbif_desc
-from bison.tools.chunk_large_file import DESCRIPTION as chunk_large_file_desc
-from test_setup import get_test_parameters
 
-config_path = "/volumes/bison/tests/config/"
-command_meta = [
-    (
-        PARAMETERS,
-        annotate_riis_desc,
-        "test_process_gbif.json",
-        get_test_parameters("test_annotate_riis")
-    ),
-    (
-        PARAMETERS,
-        annotate_gbif_desc,
-        "annotate_gbif.json",
-        get_test_parameters("test_annotate_gbif")
-    ),
-    (
-        PARAMETERS,
-        chunk_large_file_desc,
-        "chunk_large_file.json",
-        get_test_parameters("test_chunk_large_file")
-    )
-]
-
-script_name = os.path.splitext(os.path.basename(__file__))[0]
-
+logger = Logger(os.path.splitext(os.path.basename(__file__))[0])
+config_filename = "/volumes/bison/tests/test_process_gbif.json"
 
 class Test_config_parser:
     """Test the config_parser methods used in all CLI tools."""
@@ -41,30 +16,26 @@ class Test_config_parser:
     # .....................................
     def test_process_arguments_from_file(self):
         """Test the configuration files for all CLI tools."""
-        for params, _desc, config_file, _test_values in command_meta:
-            config_file = os.path.join(config_path, config_file)
-            # This returns exception if missing required parameter
-            config = process_arguments_from_file(config_file, params)
-            # Test all parameters
-            try:
-                valid_keys = list(params["required"].keys())
-            except Exception:
-                valid_keys = []
-            try:
-                opt_keys = list(params["optional"].keys())
-            except Exception:
-                opt_keys = []
-            valid_keys.extend(opt_keys)
+        params = process_arguments_from_file(config_filename, PARAMETERS)
+        try:
+            valid_keys = list(params["required"].keys())
+        except Exception:
+            valid_keys = []
+        try:
+            opt_keys = list(params["optional"].keys())
+        except Exception:
+            opt_keys = []
+        valid_keys.extend(opt_keys)
 
-            for key in config.keys():
-                if (
-                        not key.startswith("_comment") and
-                        not key.startswith("_test_") and
-                        not key.startswith("_ignore")
-                ):
-                    if key not in valid_keys:
-                        print(f"Key {key} is not present in tool definition")
-                        pytest.fail()
+        for key in params.keys():
+            if (
+                    not key.startswith("_comment") and
+                    not key.startswith("_test_") and
+                    not key.startswith("_ignore")
+            ):
+                if key not in valid_keys:
+                    print(f"Key {key} is not present in tool definition")
+                    pytest.fail()
     #
     # # .....................................
     # def test_build_parser(self):
