@@ -16,3 +16,4 @@ tests/data/process/*csv
 
 tests/data/process/*csv
 tests/data/output/*csv
+test.log

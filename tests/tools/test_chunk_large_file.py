@@ -2,14 +2,16 @@
 import math
 import os
 
-from bison.common.constants import APPEND_TO_DWC, PARAMETERS, REPORT
+from bison.common.constants import PARAMETERS
 from bison.common.log import Logger
-from bison.common.util import Chunker
+from bison.common.util import Chunker, count_lines
 from bison.tools._config_parser import process_arguments_from_file
 
 logger = Logger(os.path.splitext(os.path.basename(__file__))[0])
-config_filename = "/volumes/bison/tests/test_process_gbif.json"
+config_filename = "/volumes/bison/tests/config/test_process_gbif.json"
 params = process_arguments_from_file(config_filename, PARAMETERS)
+
+CHUNK_COUNT = 10
 
 
 # .............................................................................
@@ -19,31 +21,24 @@ class Test_chunk_large_file:
     # .....................................
     def test_identify_chunks(self):
         """Test identifying the chunks of records to be put into smaller files."""
-        chunk_files = Chunker.identify_chunks(params["gbif_filename"], chunk_count=10)
+        chunk_files = Chunker.identify_chunks(
+            params["gbif_filename"], chunk_count=params["chunk_count"])
         assert(len(chunk_files) == 10)
 
-    # .....................................
-    def test_count_lines(self):
-        """Test reading an original RIIS file by checking counts."""
-        line_count = count_lines(fn_args["gbif_filename"])
-        # record_count = line_count - 1 (header)
-        assert (line_count - 1 == fn_args["_test_record_count"])
 
     # .....................................
     def test_chunk_files(self):
         """Test chunking a large file into smaller files."""
-        fn_args = get_test_parameters(script_name)
-
         chunk_filenames, _report = Chunker.chunk_files(
-            fn_args["big_csv_filename"], fn_args["output_path"],
-            self._logger, chunk_count=fn_args["number_of_chunks"])
+            params["gbif_filename"], params["output_path"], logger,
+            chunk_count=CHUNK_COUNT)
 
         file_count = len(chunk_filenames)
-        assert (file_count == fn_args["_test_small_number_of_chunks"])
+        assert (file_count == CHUNK_COUNT)
 
         # The last file may be a smaller size than all the others
         expected_chunk_size = math.ceil(
-            fn_args["_test_record_count"] / fn_args["number_of_chunks"])
+            params["_test_record_count"] / params["number_of_chunks"])
         name_linecount = []
         for fn in chunk_filenames:
             line_count = count_lines(fn)
@@ -59,9 +54,8 @@ class Test_chunk_large_file:
     # .....................................
     def test_identify_chunk_files(self):
         """Test identifying subset filenames created from chunking a large file."""
-        fn_args = get_test_parameters(script_name)
         chunk_filenames = Chunker.identify_chunk_files(
-            fn_args["big_csv_filename"], fn_args["output_path"],
-            chunk_count=fn_args["number_of_chunks"])
+            params["big_csv_filename"], params["output_path"],
+            chunk_count=params["number_of_chunks"])
 
-        assert (len(chunk_filenames) == fn_args["_test_small_number_of_chunks"])
+        assert (len(chunk_filenames) == params["_test_small_number_of_chunks"])
