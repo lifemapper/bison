@@ -89,6 +89,7 @@ Base data paths are specified in the user-created configuration file.  The confi
 file used by the author to test and execute the workflow is in the `process_gbif.json
 <https://github.com/lifemapper/bison/tree/main/data/config/process_gbif.json>`_ file.
 
+.. _Year 4 Data Preparation:
 **********************
 Data Preparation
 **********************

@@ -29,7 +29,7 @@ for species, occurrences, and RIIS status.
 Current decisions
 ******************
 * Region: us-east-1
-* Inputs: same as , `Data Inputs <history/yr4_inputs.rst#Data Preparation>`_
+* Inputs: same as  :ref:_Year 4 Data Preparation
 
 Setup
 ---------------------------
@@ -61,8 +61,7 @@ Currently, much of our input data (GBIF, census county/state and AIANNH) are in
 EPSG:4326, using decimal degrees.
 
 USGS may choose to change the geospatial regions for aggregation.  If so, the REGION
-class in `constants.py
-<https://github.com/lifemapper/bison/tree/main/bison/common/constants.py>`_
+class in `constants.py <../../bison/common/constants.py>`_
 must be changed, and code changed slightly.  Only the county/state data is required for
 matching RIIS records to occurrence records.
 
@@ -125,7 +124,7 @@ Darwin Core fields.  More information is in `GBIF Ingestion`_ below.
 Data constants
 ^^^^^^^^^^^^^^^^
 Check/modify attributes in the GBIF class in the `constants.py
-<https://github.com/lifemapper/bison/tree/main/bison/common/constants.py>`_ file:
+<../..//bison/common/constants.py>`_ file:
 
 * Edit the filename in DATA_DICT_FNAME
 * Verify that the DWCA_META_FNAME is still the correct file for field definitions.
@@ -136,7 +135,7 @@ Region Data
 
 **Data location**:  The geospatial data may be placed in any accessible directory, but
 must be specified in the "geo_path" value of the configuration file `process_gbif.json
-<https://github.com/lifemapper/bison/tree/main/data/config/process_gbif.json>`_.
+<../../data/config/process_gbif.json>`_.
 Relative filepaths to the data are specified in the REGION class of the file
 `constants.py <https://github.com/lifemapper/bison/tree/main/bison/common/constants.py>`_ .
 
@@ -153,7 +152,7 @@ Census, Cartographic Boundary Files, 2021
 * 1:500,000, cb_2021_us_county_500k.zip
 
 Check/modify attributes in the REGION class in the `constants.py
-<https://github.com/lifemapper/bison/tree/main/bison/common/constants.py>`_ file:
+<../../common/constants.py>`_ file:
 including:  COUNTY["file"] for the filename and the keys in COUNTY["map"] for
 fieldnames within that shapefile.
 
@@ -168,7 +167,7 @@ https://www.census.gov/geographies/mapping-files/time-series/geo/cartographic-bo
 * 1:500,000, cb_2021_us_aiannh_500k.zip
 
 Check/modify attributes in the REGION class in the `constants.py
-<https://github.com/lifemapper/bison/tree/main/bison/common/constants.py>`_ file:
+<../../bison/common/constants.py>`_ file:
 including:  AIANNH["file"] for the filename and the keys in AIANNH["map"] for
 fieldnames within that shapefile.
 
@@ -194,8 +193,7 @@ those datasets are still too large and complex.
 Download the PAD data for states, this also removes the need for another intersect.
 
 Project the dataset to EPSG:4326 with commands like A sample script is in
-`project_doi_pad.sh
-<https://github.com/lifemapper/bison/tree/main/bison/data/project_doi_pad.sh>`_
+`project_doi_pad.sh <../../bison/data/preprocess/project_doi_pad.sh>`_
 
 Reported problems with projected dataset:
 * TopologyException: side location conflict
