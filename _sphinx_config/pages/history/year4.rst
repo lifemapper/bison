@@ -1,6 +1,6 @@
-===============
-Lifemapper-BISON processing
-===============
+==================
+Process Data Year 4, 2022-2023
+==================
 
 Processing consists of 6 unique steps, each initiated with the process_gbif.py script
 and 2 arguments: command and a parameter file.
@@ -75,8 +75,8 @@ Summarize annotated GBIF occurrence records (each subset file), by:
    * scientific name, species name (for convenience in final aggregation outputs)
    * count
 
-Then summarize the summaries into a single file, and aggregate summary into files of
-species and counts for each region:
+Then summarize the subset summaries into a single file, and aggregate single summary
+into files of species and counts for each region:
 
 ::
 

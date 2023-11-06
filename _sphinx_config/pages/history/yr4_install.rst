@@ -1,5 +1,5 @@
 ===============
-LMBison Preparation
+Installation
 ===============
 
 LMBison can be run either locally on a powerful machine with a large amount of storage,
