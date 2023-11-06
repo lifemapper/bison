@@ -38,10 +38,10 @@ class Test_annotate_gbif:
         infields = get_fields_from_header(infile)
         new_fields = APPEND_TO_DWC.annotation_fields()
         chunk_files = Chunker.identify_chunk_files(
-            infile, params["process_path"], params["chunk_count"])
+            infile, params["chunk_count"], params["process_path"])
 
         for fn in chunk_files:
-            rpt = ant.annotate_dwca_records(fn, params["output_path"])
+            rpt = ant.annotate_dwca_records(fn, params["output_path"], overwrite=True)
             outfields = get_fields_from_header(rpt[REPORT.OUTFILE])
             assert(len(infields) + len(new_fields) == len(outfields))
             for fld in APPEND_TO_DWC.annotation_fields():

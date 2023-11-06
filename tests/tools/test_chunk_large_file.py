@@ -23,14 +23,13 @@ class Test_chunk_large_file:
             params["gbif_filename"], params["chunk_count"])
         assert(len(start_stop_pairs) == 10)
 
-
     # .....................................
     def test_chunk_files(self):
         """Test chunking a large file into smaller files."""
-        chunk_filenames, _report = Chunker.chunk_files(
+        report = Chunker.chunk_files(
             params["gbif_filename"], params["chunk_count"], params["output_path"],
             logger)
-
+        chunk_filenames = report["chunked_files"]
         file_count = len(chunk_filenames)
         assert (file_count == params["chunk_count"])
 

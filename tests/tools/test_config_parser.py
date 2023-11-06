@@ -10,6 +10,7 @@ from bison.tools._config_parser import process_arguments_from_file
 logger = Logger(os.path.splitext(os.path.basename(__file__))[0])
 config_filename = "/volumes/bison/tests/config/test_process_gbif.json"
 
+
 class Test_config_parser:
     """Test the config_parser methods used in all CLI tools."""
 

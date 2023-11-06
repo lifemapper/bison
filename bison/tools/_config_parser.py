@@ -114,7 +114,7 @@ def process_arguments_from_file(config_filename, parameter_meta):
             try:
                 config[rkey] = _confirm_val(rkey, val, p_meta)
             except Exception:
-                raise Exception(f"Missing required argument {key} in {config_filename}")
+                raise Exception(f"Missing required argument {rkey} in {config_filename}")
 
     try:
         opt_meta = parameter_meta["optional"]

@@ -38,7 +38,7 @@ def a_find_or_create_subset_files(gbif_filename, chunk_count, output_path, logge
             input file.
     """
     chunk_filenames = Chunker.identify_chunk_files(
-        gbif_filename, output_path, chunk_count)
+        gbif_filename, chunk_count, output_path)
     # If any are missing, delete them all and split
     re_split = False
     for chunk_fname in chunk_filenames:
@@ -756,7 +756,8 @@ def execute_command(config, logger):
         infile, outpath=process_path, step_or_process=LMBISON_PROCESS.HEATMATRIX)
 
     if config["command"] == "split":
-        report = Chunker.chunk_files(infile, process_path, logger, overwrite=False)
+        report = Chunker.chunk_files(
+            infile, config["chunk_count"], process_path, logger, overwrite=False)
 
     elif config["command"] == "resolve":
         step_or_process = LMBISON_PROCESS.RESOLVE

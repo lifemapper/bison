@@ -11,6 +11,7 @@ logger = Logger(os.path.splitext(os.path.basename(__file__))[0])
 config_filename = "/volumes/bison/tests/config/test_process_gbif.json"
 params = process_arguments_from_file(config_filename, PARAMETERS)
 
+
 # .............................................................................
 class Test_annotate_riis:
     """Test the CLI tool and dependencies that annotate RIIS data with GBIF taxa."""

@@ -11,7 +11,7 @@ config_filename = "/volumes/bison/tests/config/test_process_gbif.json"
 params = process_arguments_from_file(config_filename, PARAMETERS)
 
 
-class TestRIISInput(RIIS):
+class TestRIISInput():
     """Class for testing input authority and riis files."""
 
     # .....................................

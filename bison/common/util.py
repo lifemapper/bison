@@ -600,14 +600,14 @@ class Chunker():
 
     # .............................................................................
     @staticmethod
-    def identify_chunk_files(big_csv_filename, output_path, chunk_count):
+    def identify_chunk_files(big_csv_filename, chunk_count, output_path):
         """Construct filenames for smaller files subset from a large file.
 
         Args:
             big_csv_filename (str): Full path to the original large CSV file of records
-            output_path (str): Destination directory for subset files.
             chunk_count (int): Number of smaller files to split large file into.
                 Defaults to the number of available CPUs minus 2.
+            output_path (str): Destination directory for subset files.
 
         Returns:
             chunk_filenames: a list of chunk filenames

@@ -11,33 +11,41 @@ params = process_arguments_from_file(config_filename, PARAMETERS)
 
 
 # .............................................................................
-class TestGBIFData(DwcData):
+class TestGBIFData():
     """Class for testing downloaded simple GBIF CSV file."""
 
     # .....................................
     def test_read_header(self):
-        """Test reading the header of a GBIF CSV file."""
+        """Test reading the header of a GBIF CSV file.
+
+        Raises:
+            Exception: on failure to open or read record from DwcData object.
+        """
         dwc = DwcData(params["gbif_filename"], logger)
         try:
             dwc.open()
             fldnames = dwc.fieldnames
-            for fn in GBIF.REQUIRED_FIELDS:
+            for fn in GBIF.REQUIRED_FIELDS():
                 assert(fn in fldnames)
         except Exception as e:
-            assert(False)
+            raise Exception(f"Failed to open or read DwcData {params['gbif_filename']}: {e}")
         finally:
             dwc.close()
 
-
     #
+    # .....................................
     def test_read_rec(self):
-        """Test reading a record from a GBIF CSV file."""
+        """Test reading a record from a GBIF CSV file.
+
+        Raises:
+            Exception: on failure to open or read record from DwcData object.
+        """
         dwc = DwcData(params["gbif_filename"], logger)
         try:
             dwc.open()
             rec = dwc.get_record()
-        except Exception:
-            assert(False)
+        except Exception as e:
+            raise Exception(f"Failed to open or read DwcData {params['gbif_filename']}: {e}")
         else:
             assert(isinstance(rec, dict))
         finally:
@@ -45,7 +53,12 @@ class TestGBIFData(DwcData):
 
     # .....................................
     def test_read_all_recs(self):
-        """Test reading all records from a GBIF CSV file."""
+        """Test reading all records from a GBIF CSV file.
+
+        Raises:
+            Exception: on failure to open DwcData object.
+            Exception: on failure to read record from DwcData object.
+        """
         dwc = DwcData(params["gbif_filename"], logger)
         count = 0
         try:
@@ -55,10 +68,10 @@ class TestGBIFData(DwcData):
                 count += 1
                 try:
                     rec = dwc.get_record()
-                except Exception:
-                    assert(False)
-        except Exception:
-            assert(False)
+                except Exception as e:
+                    raise Exception(f"Failed to read record at {dwc.recno}: {e}")
+        except Exception as e:
+            raise Exception(f"Failed to open DwcData {params['gbif_filename']}: {e}")
         else:
             assert(count == params["_test_gbif_record_count"])
         finally:
