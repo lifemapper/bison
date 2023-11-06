@@ -19,9 +19,9 @@ sys.path.insert(0, os.path.abspath('../..'))
 # import lmpy  # noqa: E402
 
 # -- Project information -----------------------------------------------------
-project = 'Biotaphy Tutorials'
-copyright = '2022, Biotaphy Team'
-author = 'Biotaphy Team'
+project = 'LmBISON documentation'
+copyright = '2023, LmBISON Team'
+author = 'LmBISON Team'
 
 # The full version, including alpha/beta/rc tags
 release = '1.0a1'

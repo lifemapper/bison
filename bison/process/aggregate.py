@@ -414,6 +414,11 @@ class Aggregator():
     # ...............................................
     @property
     def summarized(self):
+        """Boolean flag indicating whether the data has been summarized to a dictionary.
+
+        Returns:
+            Boolean value, true if dictionary self._locations is filled
+        """
         loc_sums = 0
         for prefix in REGION.summary_fields().keys():
             loc_sums += len(self._locations[prefix])
@@ -424,6 +429,11 @@ class Aggregator():
 
     # ...............................................
     def summary(self):
+        """Return a message summarizing the number of species names and locations.
+
+        Returns:
+            msg: string of information.
+        """
         msg = "Read the following unique values:"
         msg += f"   {len(self._acc_species_name)} accepted species names"
         for rtype, rloc in self._locations.items():
@@ -432,6 +442,11 @@ class Aggregator():
 
     # ...............................................
     def get_location_summary(self):
+        """Return a report of locations, species and occurrences.
+
+        Returns:
+            report: dictionary of metadata about the data in memory.
+        """
         report = {}
         for prefix in self._locations.keys():
             loc_count = sp_count = occ_count = 0
@@ -490,6 +505,11 @@ class Aggregator():
 
     # ...............................................
     def get_species_lookup(self):
+        """Return a dictionary of keys: species keys and values: accepted species names.
+
+        Returns:
+            report: dictionary of species keys and accepted names.
+        """
         return self._acc_species_name
 
     # ...............................................
@@ -578,8 +598,11 @@ class Aggregator():
 
     # ...............................................
     def summarize_assessments_by_region(self):
-        # Write summary of annotated records,
-        #       with LOCATION_PREFIX, LOCATION_KEY, SPECIES_KEY, SPECIES_NAME, COUNT_KEY
+        """Summarize annotated records by RIIS assessments by region.
+
+        Raises:
+            Exception: on failure to write file.
+        """
         try:
             self._log.log(
                 "Summarizing region summaries to ",
@@ -1274,6 +1297,8 @@ def parallel_summarize(annotated_filenames, output_path, main_logger):
 
 # .............................................................................
 __all__ = [
+    "Aggregator",
     "parallel_summarize",
+    "RIIS_Counts",
     "summarize_annotations"
 ]

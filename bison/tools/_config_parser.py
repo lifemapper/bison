@@ -16,7 +16,7 @@ def _build_parser(command, description):
         description (str): Description of command processes.
 
     Returns:
-        argparse.ArgumentParser: An argument parser for the tool's parameters.
+        argparse.ArgumentParser: An argument parser for the tool's parameter_meta.
     """
     parser = argparse.ArgumentParser(prog=command, description=description)
     parser.add_argument(
@@ -32,7 +32,7 @@ def _get_command_config_file_arguments(parser):
     """Retrieve the configuration file argument passed through a ArgumentParser.
 
     Args:
-        parser (argparse.ArgumentParser): An argparse.ArgumentParser with parameters.
+        parser (argparse.ArgumentParser): An argparse.ArgumentParser with parameter_meta.
 
     Returns:
         config_filename: the configuration file argument passed through the command line
@@ -67,16 +67,16 @@ def _confirm_val(key, val, paramdict):
 
 
 # .....................................................................................
-def process_arguments_from_file(config_filename, parameters):
+def process_arguments_from_file(config_filename, parameter_meta):
     """Process arguments provided by configuration file.
 
     Args:
-        config_filename (str): Full filename of a JSON file with parameters and values.
-        parameters (dict): Dictionary of optional and required arguments with expected
+        config_filename (str): Full filename of a JSON file with parameter_meta and values.
+        parameter_meta (dict): Dictionary of optional and required arguments with expected
             value, and help string.
 
     Returns:
-        argparse.Namespace: An augmented Namespace with any parameters specified in a
+        argparse.Namespace: An augmented Namespace with any parameter_meta specified in a
             configuration file.
 
     Raises:
@@ -100,44 +100,50 @@ def process_arguments_from_file(config_filename, parameters):
 
     # Test that required arguments are present in configuration file
     try:
-        params = parameters["required"]
+        req_meta = parameter_meta["required"]
     except Exception:
-        params = {}
-    for key, paramdict in params.items():
-        try:
-            val = config[key]
-            config[key] = _confirm_val(key, val, paramdict)
-        except Exception:
-            raise Exception(f"Missing required argument {key} in {config_filename}")
+        pass
+    else:
+        for rkey, p_meta in req_meta.items():
+            # Confirm required keys are present
+            try:
+                val = config[rkey]
+            except KeyError:
+                raise Exception(f"Missing required argument {rkey} in {config_filename}")
+            # Confirm value is valid
+            try:
+                config[rkey] = _confirm_val(rkey, val, p_meta)
+            except Exception:
+                raise Exception(f"Missing required argument {rkey} in {config_filename}")
 
     try:
-        opt_args = parameters["optional"]
+        opt_meta = parameter_meta["optional"]
     except Exception:
-        opt_args = {}
-
-    for okey, paramdict in opt_args.items():
-        try:
-            val = config[okey]
-            config[okey] = _confirm_val(okey, val, paramdict)
-        except Exception:
-            # Add optional argument with value None to config dictionary
-            if paramdict[CONFIG_PARAM.TYPE] is list:
-                config[okey] = []
+        pass
+    else:
+        for okey, p_meta in opt_meta.items():
+            try:
+                val = config[okey]
+            except KeyError:
+                # Add optional argument with empty value to config dictionary
+                if p_meta[CONFIG_PARAM.TYPE] is list:
+                    config[okey] = []
+                else:
+                    config[okey] = None
             else:
-                config[okey] = None
+                config[okey] = _confirm_val(okey, val, p_meta)
 
-    params.update(opt_args)
     return config
 
 
 # .....................................................................................
-def get_common_arguments(script_name, description, parameters):
+def get_common_arguments(script_name, description, parameter_meta):
     """Get configuration dictionary for a .
 
     Args:
         script_name (str): basename of the script being executed.
         description (str): Help string for the script being executed.
-        parameters (dict): Dictionary of optional and required arguments with expected
+        parameter_meta (dict): Dictionary of optional and required arguments with expected
             value, and help string.
 
     Returns:
@@ -148,7 +154,7 @@ def get_common_arguments(script_name, description, parameters):
     Raises:
         Exception: on missing --config_file argument
 
-    TODO: make config_file required or accept other parameters from the command line.
+    TODO: make config_file required or accept other parameter_meta from the command line.
     """
     parser = _build_parser(script_name, description)
     command, config_filename = _get_command_config_file_arguments(parser)
@@ -156,7 +162,7 @@ def get_common_arguments(script_name, description, parameters):
         raise Exception(f"{command} is not in valid commands: {COMMANDS}")
     if not config_filename:
         raise Exception(f"Script {script_name} requires value for config_file")
-    config = process_arguments_from_file(config_filename, parameters)
+    config = process_arguments_from_file(config_filename, parameter_meta)
     config["command"] = command
     meta_basename = f"{script_name}_{command}"
 

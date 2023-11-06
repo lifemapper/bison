@@ -25,6 +25,26 @@
       ]
     }
 
+  * Test data
+
+    When using this dataset please use the following citation:
+    GBIF.org (25 September 2023) GBIF Occurrence Download https://doi.org/10.15468/dl.33f5eq
+    Download Information
+    DOI: https://doi.org/10.15468/dl.33f5eq (may take some hours before being active)
+    Creation Date: 16:16:09 25 September 2023
+    Records included: 1421243 records from 73 published datasets
+    Compressed data size: 257.2 MB
+    Download format: DWCA
+    Filter used:
+    {
+      "and" : [
+        "BasisOfRecord is Occurrence evidence",
+        "Country is United States of America",
+        "HasCoordinate is true",
+        "HasGeospatialIssue is false",
+        "OccurrenceStatus is Present"
+      ]
+    }
 
 ## USGS RIIS Input
 
@@ -88,77 +108,6 @@ pip3 install -r requirements.txt
 pip3 install -r requirements-test.txt
 ```
 
-* This project also depends on Specify-lmpy, still in active development (Mar 2023).
-  To easily keep these tools current, **from the activated bison venv**, uninstall if
-  necessary, then install specify-lmpy from a cloned copy of the repository.
-
-```commandline
-(venv) astewart@murderbot:~/git/bison pip uninstall specify-lmpy
-Found existing installation: specify-lmpy 3.1.21.post0.dev184
-Uninstalling specify-lmpy-3.1.21.post0.dev184:
-  Would remove:
-    /home/astewart/git/bison/venv/bin/aggregate_matrices
-    /home/astewart/git/bison/venv/bin/build_grid
-    /home/astewart/git/bison/venv/bin/calculate_p_values
-    /home/astewart/git/bison/venv/bin/calculate_pam_stats
-    /home/astewart/git/bison/venv/bin/convert_csv_to_lmm
-    /home/astewart/git/bison/venv/bin/convert_lmm_to_csv
-    /home/astewart/git/bison/venv/bin/convert_lmm_to_geojson
-    /home/astewart/git/bison/venv/bin/convert_lmm_to_raster
-    /home/astewart/git/bison/venv/bin/convert_lmm_to_shapefile
-    /home/astewart/git/bison/venv/bin/create_rare_species_model
-    /home/astewart/git/bison/venv/bin/create_scatter_plot
-    /home/astewart/git/bison/venv/bin/create_sdm
-    /home/astewart/git/bison/venv/bin/create_tree_matrix
-    /home/astewart/git/bison/venv/bin/encode_layers
-    /home/astewart/git/bison/venv/bin/encode_tree_mcpa
-    /home/astewart/git/bison/venv/bin/mcpa_run
-    /home/astewart/git/bison/venv/bin/randomize_pam
-    /home/astewart/git/bison/venv/bin/rasterize_point_heatmap
-    /home/astewart/git/bison/venv/bin/split_occurrence_data
-    /home/astewart/git/bison/venv/bin/wrangle_matrix
-    /home/astewart/git/bison/venv/bin/wrangle_occurrences
-    /home/astewart/git/bison/venv/bin/wrangle_species_list
-    /home/astewart/git/bison/venv/bin/wrangle_tree
-    /home/astewart/git/bison/venv/lib/python3.8/site-packages/lmpy/*
-    /home/astewart/git/bison/venv/lib/python3.8/site-packages/specify_lmpy-3.1.21.post0.dev184.dist-info/*
-    /home/astewart/git/bison/venv/lib/python3.8/site-packages/tests/test_plots/*
-    /home/astewart/git/bison/venv/lib/python3.8/site-packages/tests/test_randomize/*
-    /home/astewart/git/bison/venv/lib/python3.8/site-packages/tests/test_spatial/*
-    /home/astewart/git/bison/venv/lib/python3.8/site-packages/tests/test_statistics/*
-    /home/astewart/git/bison/venv/lib/python3.8/site-packages/tests/test_tutorials/*
-Proceed (Y/n)? Y
-  Successfully uninstalled specify-lmpy-3.1.21.post0.dev184
-
-
-(venv) astewart@murderbot:~/git/bison cd ../lmpy
-(venv) astewart@murderbot:~/git/lmpy$ git pull
-Already up to date.
-(venv) astewart@murderbot:~/git/lmpy$ cd ../bison
-(venv) astewart@murderbot:~/git/lmpy$ pip install --upgrade pip
-(venv) astewart@murderbot:~/git/bison$ pip install --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host files.pythonhosted.org ~/git/lmpy
-Processing /home/astewart/git/lmpy
-  Installing build dependencies ... done
-  Getting requirements to build wheel ... done
-  Preparing metadata (pyproject.toml) ... done
-Requirement already satisfied: defusedxml in ./venv/lib/python3.8/site-packages (from specify-lmpy==3.1.21.post0.dev175) (0.7.1)
-Requirement already satisfied: dendropy in /home/astewart/.local/lib/python3.8/site-packages (from specify-lmpy==3.1.21.post0.dev175) (4.5.2)
-Requirement already satisfied: matplotlib in /usr/lib/python3/dist-packages (from specify-lmpy==3.1.21.post0.dev175) (3.1.2)
-Requirement already satisfied: gdal in /usr/lib/python3/dist-packages (from specify-lmpy==3.1.21.post0.dev175) (3.0.4)
-Requirement already satisfied: rtree in ./venv/lib/python3.8/site-packages (from specify-lmpy==3.1.21.post0.dev175) (0.9.7)
-Requirement already satisfied: numpy in /home/astewart/.local/lib/python3.8/site-packages (from specify-lmpy==3.1.21.post0.dev175) (1.21.4)
-Requirement already satisfied: requests in /usr/lib/python3/dist-packages (from specify-lmpy==3.1.21.post0.dev175) (2.22.0)
-Requirement already satisfied: setuptools in ./venv/lib/python3.8/site-packages (from dendropy->specify-lmpy==3.1.21.post0.dev175) (60.5.0)
-Building wheels for collected packages: specify-lmpy
-  Building wheel for specify-lmpy (pyproject.toml) ... done
-  Created wheel for specify-lmpy: filename=specify_lmpy-3.1.21.post0.dev175-py3-none-any.whl size=207498 sha256=d0c8cb7c04edc2675ec08553490669a60efd0d648cf0334bfed4f4a0f050043e
-  Stored in directory: /tmp/pip-ephem-wheel-cache-19fai64l/wheels/1b/cc/3e/3bbc265f1071e7556f3c5562910676711a9fc5a56d8b8f672c
-Successfully built specify-lmpy
-Installing collected packages: specify-lmpy
-Successfully installed specify-lmpy-3.1.21.post0.dev175
-```
-
-
 ### Data layout
 
 * For local setup and testing, create directories to mimic the volumes created by the Dockerfile.
@@ -194,26 +143,30 @@ drwxrwxr-x  2 astewart astewart 45056 Feb 27 15:50 output/
 drwxrwxr-x  2 astewart astewart  4096 Feb 27 14:50 process/
 ```
 
-* In the big_data/geodata directory, place all geospatial data files.  All data within this directory will be
-  referenced by relative filenames
+* In the big_data/geodata directory, place all geospatial data files.  All data within
+  this directory will be referenced by relative filenames
 
 ```shell
-astewart@badenov:/tank/bison/2023$ ll big_data/geodata/
-...
-drwxrwxr-x  2 astewart astewart  4096 Feb  8 13:34 aiannh/
-drwxrwxr-x  2 astewart astewart  4096 Feb  8 15:05 county/
-drwxrwxr-x  2 astewart astewart  4096 Feb  8 13:14 PADUS3_0_Region_10_SHP/
-drwxrwxr-x  2 astewart astewart  4096 Feb  8 13:15 PADUS3_0_Region_11_SHP/
-drwxrwxr-x  2 astewart astewart  4096 Feb  8 13:15 PADUS3_0_Region_12_SHP/
-drwxrwxr-x  2 astewart astewart  4096 Feb  8 13:19 PADUS3_0_Region_1_SHP/
-drwxrwxr-x  2 astewart astewart  4096 Feb  8 13:34 PADUS3_0_Region_2_SHP/
-drwxrwxr-x  2 astewart astewart  4096 Feb  8 13:14 PADUS3_0_Region_3_SHP/
-drwxrwxr-x  2 astewart astewart  4096 Feb  8 13:14 PADUS3_0_Region_4_SHP/
-drwxrwxr-x  2 astewart astewart  4096 Feb  8 13:15 PADUS3_0_Region_5_SHP/
-drwxrwxr-x  2 astewart astewart  4096 Feb  8 13:15 PADUS3_0_Region_6_SHP/
-drwxrwxr-x  2 astewart astewart  4096 Feb  8 13:15 PADUS3_0_Region_7_SHP/
-drwxrwxr-x  2 astewart astewart  4096 Feb  8 13:15 PADUS3_0_Region_8_SHP/
-drwxrwxr-x  2 astewart astewart  4096 Feb  8 13:15 PADUS3_0_Region_9_SHP/
+astewart@badenov:/tank/bison/2023$ ll big_data/geodata/census
+total 33184
+drwxrwxr-x 2 astewart astewart     4096 Feb  9  2023 ./
+drwxrwxr-x 5 astewart astewart     4096 Sep 12 15:25 ../
+-rw-rw---- 1 astewart astewart        5 Apr  8  2022 cb_2021_us_aiannh_500k.cpg
+-rw-rw---- 1 astewart astewart   183362 Apr  8  2022 cb_2021_us_aiannh_500k.dbf
+-rw-rw---- 1 astewart astewart      165 Apr  8  2022 cb_2021_us_aiannh_500k.prj
+-rw-rw---- 1 astewart astewart  2207408 Apr  8  2022 cb_2021_us_aiannh_500k.shp
+-rwxrwxrwx 1 astewart astewart    37370 Apr  8  2022 cb_2021_us_aiannh_500k.shp.ea.iso.xml*
+-rwxrwxrwx 1 astewart astewart    35993 Apr  8  2022 cb_2021_us_aiannh_500k.shp.iso.xml*
+-rw-rw---- 1 astewart astewart     5732 Apr  8  2022 cb_2021_us_aiannh_500k.shx
+-rw-rw-r-- 1 astewart astewart  1517895 Jan 26  2023 cb_2021_us_aiannh_500k.zip
+-rw-rw---- 1 astewart astewart        5 Apr  8  2022 cb_2021_us_county_500k.cpg
+-rw-rw---- 1 astewart astewart  1180828 Apr  8  2022 cb_2021_us_county_500k.dbf
+-rw-rw---- 1 astewart astewart      165 Apr  8  2022 cb_2021_us_county_500k.prj
+-rw-rw---- 1 astewart astewart 16837620 Apr  8  2022 cb_2021_us_county_500k.shp
+-rwxrwxrwx 1 astewart astewart    26550 Apr  8  2022 cb_2021_us_county_500k.shp.ea.iso.xml*
+-rwxrwxrwx 1 astewart astewart    35074 Apr  8  2022 cb_2021_us_county_500k.shp.iso.xml*
+-rw-rw---- 1 astewart astewart    25972 Apr  8  2022 cb_2021_us_county_500k.shx
+-rw-rw-r-- 1 astewart astewart 11838247 Feb  9  2023 cb_2021_us_county_500k.zip
 ```
 
 * In the /volumes/bison directory create symbolic links to the large directory:
@@ -337,3 +290,6 @@ Stats references for alpha, beta, gamma diversity:
 ```commandline
 (venv)$ pip3 install mkdocs
 ```
+
+Build documentation:
+https://docs.readthedocs.io/en/stable/intro/getting-started-with-sphinx.html

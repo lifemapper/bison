@@ -2,8 +2,14 @@
 LMBison Preparation
 ===============
 
+LMBison can be run either locally on a powerful machine with a large amount of storage,
+or on AWS.  The workflow is different for each of these options.
+
+Local implementation
+---------------------
+
 Hardware requirements
------------------------
+.........................
 
 Data processing for BISON annotation, summary, and statistics requires a powerful
 machine with a large amount of available storage.  The most processing intensive
@@ -13,11 +19,11 @@ machine minus 2.  In Aug 2023, using 18 (of 20) cores, on 904 million
 records, the process took 5 days.
 
 These processes are all written in Python, and the implementation has been tested
-on a machine running Ubuntu Linux.  Scripts will need minimal modification to run
+on a machine running Ubuntu Linux.  Scripts will need minimal modfication to run
 on Windows or OSX successfully.
 
 Download this Repository
------------------------
+.........................
 
 The `LmBISON repository <https://github.com/lifemapper/bison>`_  can be installed by
 downloading from Github.  This code repository contains scripts, Docker composition
@@ -39,7 +45,7 @@ directory location.  In Linux or OSX, open a Terminal
 window.
 
 Download Large Data
------------------------
+.........................
 
 Download newest versions of geospatial data.  Links and more information at `Input Data
 <data_input>`_ .  In each case, new versions of the data might have different
@@ -54,10 +60,10 @@ Required Data not included in Github repo:
 * Census data:
   * county (includes state field)
   * American Indian/Alaska Native Areas/Hawaiian Home Lands (AIANNH)
-* Protected Areas Database (US-PAD)
-  * split into datasets by Dept of Interior region
-* Department of Interior (DOI)
-  * used to identify which US-PAD dataset to intersect
 
 Create expected file structure
 -----------------------
+
+Base data paths are specified in the user-created configuration file.  The configuration
+file used by the author to test and execute the workflow is in the `process_bison.json
+<https://github.com/lifemapper/bison/tree/main/data/config/process_bison.json>`_ file.

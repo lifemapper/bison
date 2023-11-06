@@ -6,7 +6,7 @@ import os
 import time
 
 from bison.common.constants import (
-    APPEND_TO_DWC, CONFIG_PARAM, LMBISON_PROCESS, GBIF, ENCODING, EXTRA_CSV_FIELD, LOG,
+    APPEND_TO_DWC, LMBISON_PROCESS, GBIF, ENCODING, EXTRA_CSV_FIELD, LOG, PARAMETERS,
     REGION, REPORT)
 from bison.common.util import (
     BisonNameOp, Chunker, delete_file, get_csv_dict_reader)
@@ -21,91 +21,15 @@ from bison.tools._config_parser import get_common_arguments
 script_name = os.path.splitext(os.path.basename(__file__))[0]
 DESCRIPTION = """Execute one or more steps of annotating GBIF data with RIIS
                 assessments, and summarizing by species, county, and state"""
-# .............................................................................
-PARAMETERS = {
-    "required":
-        {
-            "riis_filename":
-                {
-                    CONFIG_PARAM.TYPE: str,
-                    CONFIG_PARAM.IS_INPUT_FILE: True,
-                    CONFIG_PARAM.HELP:
-                        "Full filename of input USGS RIIS data in CSV format."
-                },
-            "gbif_filename":
-                {
-                    CONFIG_PARAM.TYPE: str,
-                    CONFIG_PARAM.IS_INPUT_FILE: True,
-                    CONFIG_PARAM.HELP:
-                        "Full filename of input GBIF occurrence data in CSV format."
-                },
-            "do_split":
-                {
-                    CONFIG_PARAM.TYPE: bool,
-                    CONFIG_PARAM.HELP:
-                        "Flag indicating whether the GBIF data is to be (or has been) "
-                        "split into smaller subsets."
-                },
-            "run_parallel":
-                {
-                    CONFIG_PARAM.TYPE: bool,
-                    CONFIG_PARAM.HELP:
-                        "Flag indicating whether the annotation process is to be "
-                        "run in parallel threads."
-                },
-            "geo_path":
-                {
-                    CONFIG_PARAM.TYPE: str,
-                    CONFIG_PARAM.IS_INPUT_DIR: True,
-                    CONFIG_PARAM.HELP:
-                        "Source directory containing geospatial input data."
-                },
-            "process_path":
-                {
-                    CONFIG_PARAM.TYPE: str,
-                    CONFIG_PARAM.IS_OUPUT_DIR: True,
-                    CONFIG_PARAM.HELP: "Large destination directory for temporary data."
-                },
-            "output_path":
-                {
-                    CONFIG_PARAM.TYPE: str,
-                    CONFIG_PARAM.IS_OUPUT_DIR: True,
-                    CONFIG_PARAM.HELP: "Large destination directory for output data."
-                }
-        },
-    "optional":
-        {
-            "gbif_id":
-                {
-                    CONFIG_PARAM.TYPE: int,
-                    CONFIG_PARAM.HELP:
-                        "Identifier, gbifId, of troublesome record in original or "
-                        "annotated occurrence file."
-                },
-            "line_num":
-                {
-                    CONFIG_PARAM.TYPE: int,
-                    CONFIG_PARAM.HELP:
-                        "Line number of record to examine in original or "
-                        "annotated occurrence file."
-                },
-            "examine_filenames":
-                {
-                    CONFIG_PARAM.TYPE: list,
-                    CONFIG_PARAM.IS_INPUT_FILE: True,
-                    CONFIG_PARAM.HELP:
-                        "List of full filenames of input occurrence files to inspect."
-                }
-        }
-}
 
 
 # .............................................................................
-def a_find_or_create_subset_files(gbif_filename, output_path, logger):
+def a_find_or_create_subset_files(gbif_filename, chunk_count, output_path, logger):
     """Find or create subset files from a large file based on the file size and CPUs.
 
     Args:
         gbif_filename (str): full filename of data file to be subsetted into chunks.
+        chunk_count (int): number of subset files to create from the original.
         output_path (str): Destination directory for subset files.
         logger (object): logger for saving relevant processing messages
 
@@ -113,7 +37,8 @@ def a_find_or_create_subset_files(gbif_filename, output_path, logger):
         chunk_filenames (list): full filenames for subset files created from large
             input file.
     """
-    chunk_filenames = Chunker.identify_chunk_files(gbif_filename, output_path)
+    chunk_filenames = Chunker.identify_chunk_files(
+        gbif_filename, chunk_count, output_path)
     # If any are missing, delete them all and split
     re_split = False
     for chunk_fname in chunk_filenames:
@@ -125,7 +50,8 @@ def a_find_or_create_subset_files(gbif_filename, output_path, logger):
         for chunk_fname in chunk_filenames:
             delete_file(chunk_fname)
         # Resplit into subset files
-        chunk_filenames = Chunker.chunk_files(gbif_filename, output_path, logger)
+        chunk_filenames = Chunker.chunk_files(
+            gbif_filename, chunk_count, output_path, logger)
 
     return chunk_filenames
 
@@ -788,7 +714,7 @@ def _prepare_args(config):
     if config["do_split"] is True:
         # Find existing or create subset files
         raw_filenames = a_find_or_create_subset_files(
-            infile, config["process_path"], logger)
+            infile, config["chunk_count"], config["process_path"], logger)
     else:
         raw_filenames = [infile]
 
@@ -830,7 +756,8 @@ def execute_command(config, logger):
         infile, outpath=process_path, step_or_process=LMBISON_PROCESS.HEATMATRIX)
 
     if config["command"] == "split":
-        report = Chunker.chunk_files(infile, process_path, logger, overwrite=False)
+        report = Chunker.chunk_files(
+            infile, config["chunk_count"], process_path, logger, overwrite=False)
 
     elif config["command"] == "resolve":
         step_or_process = LMBISON_PROCESS.RESOLVE

@@ -350,6 +350,20 @@ def count_lines(filename_or_pattern, grep_strings=None):
 
 # .............................................................................
 def get_site_headers_from_shapefile(site_id_fld, x_fld, y_fld, shape_filename):
+    """Create row headers from FID, longitude, latitude for features in a shapefile.
+
+    Args:
+        site_id_fld: Fieldname containing the site id or FID.
+        x_fld: Fieldname containing the longitude coordinate.
+        y_fld: Fieldname containing the latitude coordinate.
+        shape_filename: Filename of the shapefile to read.
+
+    Returns:
+        site_headers: list of tuples containing (site_id, x, y)
+
+    Raises:
+        Exception: on failure to read a feature from which to get FID and coordinates.
+    """
     site_headers = []
     driver = ogr.GetDriverByName("ESRI Shapefile")
     data_src = driver.Open(shape_filename, 0)
@@ -500,7 +514,7 @@ def get_fields_from_header(csvfile, delimiter=GBIF.DWCA_DELIMITER, encoding="utf
 
 
 class BisonKey():
-    # ...............................................
+    """Compound key to use as unique identifier."""
     @staticmethod
     def get_compound_key(*values):
         """Construct a compound key for dictionaries.
@@ -539,23 +553,26 @@ class BisonKey():
 
 # .............................................................................
 class Chunker():
-    @classmethod
-    def identify_chunks(cls, big_csv_filename, chunk_count=0):
-        """Determine the start and stop lines in a large file that will make up the contents of smaller subsets of the file.
+    """Class for splitting CSV data into similar sized chunks of records."""
+    @staticmethod
+    def identify_chunks(big_csv_filename, chunk_count):
+        """Determine the start and stop lines in a large file to be split.
 
-        The purpose of chunking the files is to split the large file into more manageable chunks that can be processed
-         concurrently by the CPUs on the local machine.
+        The purpose of chunking the files is to split the large file into more
+        manageable chunks that can be processed concurrently by the CPUs on the local
+        machine.
 
         Args:
             big_csv_filename (str): Full path to the original large CSV file of records
-            chunk_count (int): Number of smaller files to split large file into.  Defaults
-                to the number of available CPUs minus 2.
+            chunk_count (int): Number of smaller files to split large file into.
+                Defaults to the number of available CPUs minus 2.
 
         Returns:
-            start_stop_pairs: a list of tuples, containing pairs of line numbers in the original file that will be the first
-                and last record of a subset chunk of the file.
+            start_stop_pairs: a list of tuples, containing pairs of line numbers in the
+                original file that will be the first and last record of a subset chunk
+                of the file.
         """
-        if chunk_count == 0:
+        if chunk_count is None:
             chunk_count = available_cpu_count() - 2
         start_stop_pairs = []
 
@@ -582,23 +599,25 @@ class Chunker():
         return start_stop_pairs, rec_count, chunk_size
 
     # .............................................................................
-    @classmethod
-    def identify_chunk_files(cls, big_csv_filename, output_path, chunk_count=0):
+    @staticmethod
+    def identify_chunk_files(big_csv_filename, chunk_count, output_path):
         """Construct filenames for smaller files subset from a large file.
 
         Args:
             big_csv_filename (str): Full path to the original large CSV file of records
+            chunk_count (int): Number of smaller files to split large file into.
+                Defaults to the number of available CPUs minus 2.
             output_path (str): Destination directory for subset files.
-            chunk_count (int): Number of smaller files to split large file into.  Defaults
-                to the number of available CPUs minus 2.
 
         Returns:
             chunk_filenames: a list of chunk filenames
         """
+        if chunk_count is None:
+            chunk_count = available_cpu_count() - 2
         chunk_filenames = []
         basename, ext = os.path.splitext(os.path.basename(big_csv_filename))
-        boundary_pairs, _rec_count, _chunk_size = cls.identify_chunks(
-            big_csv_filename, chunk_count=chunk_count)
+        boundary_pairs, _rec_count, _chunk_size = Chunker.identify_chunks(
+            big_csv_filename, chunk_count)
         for (start, stop) in boundary_pairs:
             chunk_fname = BisonNameOp.get_chunk_filename(
                 basename, ext, start, stop)
@@ -606,9 +625,9 @@ class Chunker():
         return chunk_filenames
 
     # .............................................................................
-    @classmethod
+    @staticmethod
     def cleanup_obsolete_chunks(
-            self, boundary_pairs, output_path, basename, ext, overwrite):
+            boundary_pairs, output_path, basename, ext, overwrite):
         """Delete existing chunk files if any are missing or if overwrite is True.
 
         Args:
@@ -637,17 +656,17 @@ class Chunker():
                 delete_file(fn)
 
     # .............................................................................
-    @classmethod
+    @staticmethod
     def chunk_files(
-            cls, big_csv_filename, output_path, logger, chunk_count=0, overwrite=False):
+            big_csv_filename, chunk_count, output_path, logger, overwrite=False):
         """Split a large input csv file into multiple smaller input csv files.
 
         Args:
             big_csv_filename (str): Full path to the original large CSV file of records
-            output_path (str): Destination directory for chunked files.
-            logger (object): logger for writing messages to file and console
             chunk_count (int): Number of smaller files to split large file into.  Defaults
                 to the number of available CPUs minus 2.
+            output_path (str): Destination directory for chunked files.
+            logger (object): logger for writing messages to file and console
             overwrite (bool): Flag indicating whether to overwrite existing chunked
                 files. If only some of the chunk files exist, delete them all before
                 writing new files, regardless of this flag.
@@ -666,9 +685,11 @@ class Chunker():
         inpath, base_filename = os.path.split(big_csv_filename)
         basename, ext = os.path.splitext(base_filename)
         chunk_filenames = []
-        boundary_pairs, rec_count, chunk_size = cls.identify_chunks(
-            big_csv_filename, chunk_count=chunk_count)
-        cls.cleanup_obsolete_chunks(
+        if chunk_count is None:
+            chunk_count = available_cpu_count() - 2
+        boundary_pairs, rec_count, chunk_size = Chunker.identify_chunks(
+            big_csv_filename, chunk_count)
+        Chunker.cleanup_obsolete_chunks(
             boundary_pairs, output_path, basename, ext, overwrite)
 
         try:
@@ -733,7 +754,7 @@ class Chunker():
 
 # .............................................................................
 class BisonNameOp():
-
+    """Class for constructing filenames following a pattern for different processes."""
     separator = "_"
 
     @staticmethod
@@ -1086,10 +1107,16 @@ class BisonNameOp():
 # .............................................................................
 __all__ = [
     "available_cpu_count",
+    "BisonKey",
+    "BisonNameOp",
+    "Chunker",
     "count_lines",
+    "count_lines_with_cat",
     "delete_file",
     "get_csv_dict_reader",
     "get_csv_dict_writer",
     "get_csv_writer",
+    "get_fields_from_header",
+    "get_site_headers_from_shapefile",
     "ready_filename"
 ]

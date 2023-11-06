@@ -386,11 +386,11 @@ class Annotator():
                 report[REPORT.SUMMARY] = summary
 
                 self._log.log(
-                    f"End Annotator.annotate_dwca_records: {time.asctime()}, {end - start} "
-                    f"seconds elapsed", refname=self.__class__.__name__)
+                    f"End Annotator.annotate_dwca_records: {time.asctime()}, "
+                    f"{end - start} seconds elapsed", refname=self.__class__.__name__)
                 self._log.log(
-                    f"Filtered out {self.rank_filtered_records} records of {self.bad_ranks}",
-                    refname=self.__class__.__name__)
+                    f"Filtered out {self.rank_filtered_records} records of "
+                    f"{self.bad_ranks}", refname=self.__class__.__name__)
 
         return report
 
@@ -511,7 +511,6 @@ def parallel_annotate(
 # .............................................................................
 __all__ = [
     "annotate_occurrence_file",
-    # "annotate_occurrence_file_update",
+    "Annotator",
     "parallel_annotate",
-    # "parallel_annotate_update"
 ]

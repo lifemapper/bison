@@ -287,6 +287,91 @@ class CONFIG_PARAM:
 
 
 # .............................................................................
+PARAMETERS = {
+    "required":
+        {
+            "riis_filename":
+                {
+                    CONFIG_PARAM.TYPE: str,
+                    CONFIG_PARAM.IS_INPUT_FILE: True,
+                    CONFIG_PARAM.HELP:
+                        "Full filename of input USGS RIIS data in CSV format."
+                },
+            "gbif_filename":
+                {
+                    CONFIG_PARAM.TYPE: str,
+                    CONFIG_PARAM.IS_INPUT_FILE: True,
+                    CONFIG_PARAM.HELP:
+                        "Full filename of input GBIF occurrence data in CSV format."
+                },
+            "do_split":
+                {
+                    CONFIG_PARAM.TYPE: bool,
+                    CONFIG_PARAM.HELP:
+                        "Flag indicating whether the GBIF data is to be (or has been) "
+                        "split into smaller subsets."
+                },
+            "run_parallel":
+                {
+                    CONFIG_PARAM.TYPE: bool,
+                    CONFIG_PARAM.HELP:
+                        "Flag indicating whether the annotation process is to be "
+                        "run in parallel threads."
+                },
+            "geo_path":
+                {
+                    CONFIG_PARAM.TYPE: str,
+                    CONFIG_PARAM.IS_INPUT_DIR: True,
+                    CONFIG_PARAM.HELP:
+                        "Source directory containing geospatial input data."
+                },
+            "process_path":
+                {
+                    CONFIG_PARAM.TYPE: str,
+                    CONFIG_PARAM.IS_OUPUT_DIR: True,
+                    CONFIG_PARAM.HELP: "Large destination directory for temporary data."
+                },
+            "output_path":
+                {
+                    CONFIG_PARAM.TYPE: str,
+                    CONFIG_PARAM.IS_OUPUT_DIR: True,
+                    CONFIG_PARAM.HELP: "Large destination directory for output data."
+                }
+        },
+    "optional":
+        {
+            "chunk_count":
+                {
+                    CONFIG_PARAM.TYPE: int,
+                    CONFIG_PARAM.HELP:
+                        "Number of files to split a large CSV into."
+                },
+            "gbif_id":
+                {
+                    CONFIG_PARAM.TYPE: int,
+                    CONFIG_PARAM.HELP:
+                        "Identifier, gbifId, of troublesome record in original or "
+                        "annotated occurrence file."
+                },
+            "line_num":
+                {
+                    CONFIG_PARAM.TYPE: int,
+                    CONFIG_PARAM.HELP:
+                        "Line number of record to examine in original or "
+                        "annotated occurrence file."
+                },
+            "examine_filenames":
+                {
+                    CONFIG_PARAM.TYPE: list,
+                    CONFIG_PARAM.IS_INPUT_FILE: True,
+                    CONFIG_PARAM.HELP:
+                        "List of full filenames of input occurrence files to inspect."
+                }
+        }
+}
+
+
+# .............................................................................
 class LMBISON:
     """Headers for temporary and final output files."""
     RR_SPECIES_KEY = "riisregion_specieskey"
@@ -410,6 +495,9 @@ class APPEND_TO_DWC:
         )
 
 
+CENSUS_STATE_FLDNAME = "STUSPS"
+
+
 class REGION:
     """Geospatial regions to add to DwC data and summarize with RIIS determinations."""
     COUNTY = {
@@ -422,7 +510,7 @@ class REGION:
         ],
         "map": {
             "NAME": APPEND_TO_DWC.RESOLVED_CTY,
-            "STUSPS": APPEND_TO_DWC.RESOLVED_ST
+            CENSUS_STATE_FLDNAME: APPEND_TO_DWC.RESOLVED_ST
         }
     }
     AIANNH = {
@@ -617,6 +705,18 @@ class GBIF:
     SUBSET = "0-5000"
 
     @classmethod
+    def REQUIRED_FIELDS(cls):
+        """Data fields required to process records for BISON.
+
+        Returns:
+            set of fieldnames needed for BISON processing.
+        """
+        return (
+            GBIF.ID_FLD, GBIF.TAXON_FLD, GBIF.SPECIES_KEY_FLD, GBIF.RANK_FLD,
+            GBIF.ACC_NAME_FLD, GBIF.ACC_TAXON_FLD, GBIF.LON_FLD, GBIF.LAT_FLD
+        )
+
+    @classmethod
     def DATASET_URL(cls):
         """GBIF Dataset API base URL.
 
@@ -770,3 +870,35 @@ class RIIS_DATA:
         "occurrenceRemarks",
         "occurrenceID",
     ]
+
+
+# .............................................................................
+__all__ = [
+    "AGGREGATOR_DELIMITER",
+    "APPEND_TO_DWC",
+    "APPEND_TO_RIIS",
+    "BIG_DATA_PATH",
+    "CENSUS_STATE_FLDNAME",
+    "COARSE_BUFFER_RANGE",
+    "COMMANDS",
+    "CONFIG_PARAM",
+    "DATA_PATH",
+    "ENCODING",
+    "ERR_SEPARATOR",
+    "EXTRA_CSV_FIELD",
+    "GBIF",
+    "INPUT_DIR",
+    "ITIS",
+    "LINENO_FLD",
+    "LMBISON",
+    "LMBISON_PROCESS",
+    "NS",
+    "OUT_DIR",
+    "PAD_BUFFER",
+    "RANKS",
+    "RANKS_BELOW_SPECIES",
+    "REGION",
+    "REPORT",
+    "RIIS_DATA",
+    "US_STATES"
+]

@@ -54,6 +54,16 @@ class GeoResolver(object):
         return os.path.basename(self._spatial_filename)
 
     # ...............................................
+    @property
+    def fieldmap(self):
+        """Return a dictionary mapping original to bison fieldnames.
+
+        Returns:
+            Dictionary of keys of original fieldnames and values of bison fieldnames.
+        """
+        return self._spatial_fields
+
+    # ...............................................
     def _initialize_geospatial_data(self):
         """Create a spatial index for the features in self._spatial_filename."""
         driver = ogr.GetDriverByName("ESRI Shapefile")
@@ -275,6 +285,13 @@ class GeoResolver(object):
 
     # ...............................................
     def logit(self, msg, refname=None, log_level=INFO):
+        """Method to log a message to a logger/file/stream or print to console.
+
+        Args:
+            msg: message to print.
+            refname: calling function name.
+            log_level: error level, INFO, DEBUG, WARNING, ERROR
+        """
         if self._log is not None:
             self._log.log(msg, refname=refname, log_level=log_level)
         else:
@@ -329,5 +346,7 @@ class GeoException(Exception):
 
 # .............................................................................
 __all__ = [
+    "GeoException",
+    "GeoResolver",
     "get_geo_resolvers",
 ]

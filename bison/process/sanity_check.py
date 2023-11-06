@@ -516,3 +516,7 @@ class Counter():
     #     self._log_comparison(
     #         gtruth_cty_speciesXassess, cty_species_counts,
     #         f"{county} species", "RIIS summary")
+
+
+# .............................................................................
+__all__ = ["Counter"]

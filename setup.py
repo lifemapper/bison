@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Setup module for lmpy."""
+"""Setup module for lmbison."""
 from setuptools import setup, find_packages
 
 
@@ -11,7 +11,7 @@ with open("LICENSE") as f:
 
 setup(
     name="lmbison",
-    version="0.4.0",
+    version="0.5.0",
     description="Package of Lifemapper-Bison objects and tools",
     long_description=readme,
     author="Specify Systems Lifemapper Team",
@@ -21,6 +21,8 @@ setup(
     packages=find_packages(exclude=("tests", "docs")),
     install_requires=[
         "gdal",
+        "numpy",
+        "pandas",
         "requests",
         "rtree",
     ],

@@ -60,18 +60,5 @@ class Logger:
             self.logger.log(log_level, refname + ': ' + msg)
 
 
-# # .....................................................................................
-# def _log_level_str(log_level):
-#     if log_level == logging.INFO:
-#         level = 'INFO'
-#     elif log_level == logging.DEBUG:
-#         level = 'DEBUG'
-#     elif log_level in (logging.WARN, logging.WARNING):
-#         level = 'WARN'
-#     elif log_level == logging.ERROR:
-#         level = 'ERROR'
-#     elif log_level == logging.CRITICAL:
-#         level = 'CRITICAL'
-#     elif log_level == logging.FATAL:
-#         level = 'FATAL'
-#     return level
+# .....................................................................................
+__all__ = ["Logger"]
