@@ -18,3 +18,14 @@ tests/data/process/*csv
 tests/data/output/*csv
 test.log
 tests/data/input/US-RIIS_MasterList_top100_2021_annotated.csv
+tests/data/process/process_gbif_split.log
+tests/data/process/gbif10k_2023-01-26_chunk-1001-2000_raw.csv
+tests/data/process/gbif10k_2023-01-26_chunk-1-1000_raw.csv
+tests/data/process/gbif10k_2023-01-26_chunk-2001-3000_raw.csv
+tests/data/process/gbif10k_2023-01-26_chunk-3001-4000_raw.csv
+tests/data/process/gbif10k_2023-01-26_chunk-4001-5000_raw.csv
+tests/data/process/gbif10k_2023-01-26_chunk-5001-6000_raw.csv
+tests/data/process/gbif10k_2023-01-26_chunk-6001-7000_raw.csv
+tests/data/process/gbif10k_2023-01-26_chunk-7001-8000_raw.csv
+tests/data/process/gbif10k_2023-01-26_chunk-8001-9000_raw.csv
+tests/data/process/gbif10k_2023-01-26_chunk-9001-10000_raw.csv
