@@ -11,7 +11,6 @@ with information regarding geographic location and USGS RIIS status of the recor
     pages/data_inputs
     pages/installation
     pages/year5
-
     pages/yr5_inputs
     pages/yr5_process
 
