@@ -8,8 +8,6 @@ with information regarding geographic location and USGS RIIS status of the recor
     :maxdepth: 2
 
     pages/about
-    pages/data_inputs
-    pages/installation
     pages/year5
     pages/yr5_inputs
     pages/yr5_process
@@ -20,7 +18,6 @@ with information regarding geographic location and USGS RIIS status of the recor
     pages/history/yr4_process
 
     pages/history/year3
-    pages/history/yr3_process
 
 
 
