@@ -152,8 +152,8 @@ GBIF will send an email with a link for downloading the Darwin Core Archive, a
 very large zipped file.  Only the occurrence.txt file is required for data processing.
 Rename the file with the date for clarity on what data is being used. Use
 the following pattern gbif_yyyy-mm-dd.csv so that interim data filenames can be
-created and parsed consistently.  Note the underscore (_) between 'gbif' and the date, and
-the dash (-) between date elements.
+created and parsed consistently.  Note the underscore (_) between 'gbif' and the date,
+and the dash (-) between date elements.
 
 **Data location**:  The GBIF data may be placed in any accessible directory, but must
 be specified in the "gbif_filename" value of the configuration file `process_gbif.json
@@ -286,7 +286,7 @@ Reported problems with projected dataset:
     release, https://doi.org/10.5066/P9Q9LQ4B.
 
 **********************
-Process Data Year 4
+Processing Steps
 **********************
 
 Processing consists of 6 unique steps, each initiated with the process_gbif.py script

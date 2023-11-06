@@ -17,10 +17,28 @@ a RIIS region (Alaska, Hawaii, or Lower 48), where it is identified as "Introduc
 or "Invasive".  Region summaries include both state and county boundaries.
 
 Regions also include **American Indian, Alaskan Native, and Native Hawaiian** (AIANNH)
-regions and **US Federal Protected Areas** (US‐PAD).
+regions and possibly **US Federal Protected Areas** (US‐PAD). US-PAD has proved
+problematic and has failed to intersect in reasonable times, and crashed python when
+attempting  insertion into an AWS PostgreSQL/PostGIS database.
 
-All regions (state, county, AIANNH, PAD) will be summarized by count and proportion
+All regions (state, county, AIANNH, PAD?) will be summarized by count and proportion
 for species, occurrences, and RIIS status.
+
+
+******************
+Current decisions
+******************
+* Region: us-east-1
+* Inputs: same as , `Data Inputs <history/yr4_inputs.rst>`_
+
+Setup
+---------------------------
+* install aws-cli on local dev machine
+* Add reference data to S3 manually
+* create EC2 for test/debug connection
+  * update/upgrade apt, install stuff
+  * add aws config and credentials
+
 
 ******************
 Data Preparation
@@ -58,37 +76,34 @@ US-RIIS records consist of a list of species and the areas in which they are con
 Introduced or Invasive.  Any other species/region combinations encountered will be
 identified as "presumed-native"
 
-Data location
-^^^^^^^^^^^^^^^^
-The RIIS data may be placed in any accessible directory, but must
-be specified in the "riis_filename" value of the configuration file `process_gbif.json
-<https://github.com/lifemapper/bison/tree/main/data/config/process_gbif.json>`_.  The
-RIIS annotation process will place the annotated file, with a postfix of "_annotated"
-in the same directory.
-
 The latest US-RIIS data is present in this Github repository in the `data/input
 <https://github.com/lifemapper/bison/tree/main/data/input>`_ directory.  If a new
-version is available, update it, and the following:
+version is available, update it, and any data constants that may have changed.
 
 Data constants
 ^^^^^^^^^^^^^^^^
 * Check/modify attributes in the RIIS_DATA class in the `constants.py
-  <https://github.com/lifemapper/bison/tree/main/bison/common/constants.py>`_ file:
+  <../../bison/common/constants.py>`_ file:
 * Edit the filename in DATA_DICT_FNAME
 * Check the file header, and if necessary, edit the fields in SPECIES_GEO_HEADER and
   matching fields in SPECIES_GEO_KEY, GBIF_KEY, ITIS_KEY, LOCALITY_FLD, KINGDOM_FLD,
   SCINAME_FLD, SCIAUTHOR_FLD, RANK_FLD, ASSESSMENT_FLD, TAXON_AUTHORITY_FLD.
 
 
-GBIF  data
+GBIF data options
 ----------------
 
-To get a current version of GBIF data:
+**Option1:** Get a current version of GBIF data from the GBIF portal
   * Create a user account on the GBIF website, then login and
   * request the data by putting the following URL in a browser:
     https://www.gbif.org/occurrence/search?country=US&has_coordinate=true&has_geospatial_issue=false&occurrence_status=present
   * adding a restriction to occurrence data identified to species or a lower rank
     will reduce the amount of data that will be filtered out.
+
+Verify that the file occurrence.txt contains GBIF-annotated records that will be the
+primary input file.  The primary input file will contain fieldnames in the first line
+of the file, and those listed as values for GBIF class attributes with (attribute)
+names ending in _FLD or _KEY should all be among the fields.
 
 The query will request a download, which will take some time for GBIF to assemble.
 GBIF will send an email with a link for downloading the Darwin Core Archive, a
@@ -98,26 +113,14 @@ the following pattern gbif_yyyy-mm-dd.csv so that interim data filenames can be
 created and parsed consistently.  Note the underscore (_) between 'gbif' and the date, and
 the dash (-) between date elements.
 
-Data location
-^^^^^^^^^^^^^^^^
-The GBIF data may be placed in any accessible directory, but must
-be specified in the "gbif_filename" value of the configuration file `process_gbif.json
-<https://github.com/lifemapper/bison/tree/main/data/config/process_gbif.json>`_.  The
-temporary output files, such as raw chunks, annotated chunks, and summaries of chunks,
-will be placed in the directory specified in the "process_path" value of the
-configuration file, with postfixes "_raw", "_annotate", and "_summary" respectively.
-Final output files will be placed in the directory specified in the "output_path" value.
+::
 
-Data structure
-^^^^^^^^^^^^^^^^
-Verify that the file occurrence.txt contains GBIF-annotated records that will be the
-primary input file.  The primary input file will contain fieldnames in the first line
-of the file, and those listed as values for GBIF class attributes with (attribute)
-names ending in _FLD or _KEY should all be among the fields.
-
-    .. code-block::
     unzip <dwca zipfile> occurrence.txt
     mv occurrence.txt gbif_2023-08-23.csv
+
+**Option 2:** Use the GBIF Open Data Registry on AWS S3.  The data contains a subset of
+Darwin Core fields.  More information is in **Workflow Options/GBIF Ingestion** below.
+
 
 Data constants
 ^^^^^^^^^^^^^^^^
@@ -218,7 +221,7 @@ Reported problems with projected dataset:
 
 
 ******************
-Build/Annotate/Analyze
+Workflow options
 ******************
 
 Data ingestion and processing will be executed on Amazon Web Services (AWS), utilizing
@@ -227,10 +230,6 @@ S3, for easy access by AWS tools.  In order to minimize costs, we will experimen
 different data storage and processing strategies - they each have speed and cost pros
 and cons.
 
-Current decisions
----------------------------
-* Region: us-east-1
-* Inputs: same as , `Data Inputs <history/yr4_inputs.rst>`_
 
 GBIF Ingestion
 ---------------------------
