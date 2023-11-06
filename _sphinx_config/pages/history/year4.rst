@@ -90,6 +90,7 @@ file used by the author to test and execute the workflow is in the `process_gbif
 <https://github.com/lifemapper/bison/tree/main/data/config/process_gbif.json>`_ file.
 
 .. _Year 4 Data Preparation:
+
 **********************
 Data Preparation
 **********************

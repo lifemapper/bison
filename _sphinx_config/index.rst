@@ -9,16 +9,9 @@ with information regarding geographic location and USGS RIIS status of the recor
 
     pages/about
     pages/year5
-    pages/yr5_inputs
-    pages/yr5_process
 
     pages/history/year4
-    pages/history/yr4_install
-    pages/history/yr4_inputs
-    pages/history/yr4_process
-
     pages/history/year3
-
 
 
 
