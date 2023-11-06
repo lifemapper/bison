@@ -1,5 +1,11 @@
+AWS workflow experiments
+==========================
+
 AWS Batch
 ***************
+
+Preparation
+------------
 
 1. Getting started
 
@@ -39,10 +45,10 @@ AWS Batch
    * docker pull ghcr.io/osgeo/gdal:alpine-small-latest
 
 Workflow:
-***************
+-------------
 
 Prep:
------
+............
 * Create a Docker image from osgeo/gdal with
   * python dependencies
   * bison code
@@ -50,7 +56,7 @@ Prep:
 * Save on S3 or Github
 
 Input data acquisition:
------------------------
+............
 * Create EC2 spot image
 
   * download data from GBIF
@@ -58,7 +64,7 @@ Input data acquisition:
   * copy to S3
 
 Input data prep:
-----------------
+............
 * Create a Step Workflow to:
 
   * crawl for metadata
@@ -67,7 +73,7 @@ Input data prep:
   * count records and identify subsets
 
 Batch
-------
+............
 * Create AWS Batch Compute Environment
 
   * name

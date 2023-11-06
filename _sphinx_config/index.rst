@@ -9,10 +9,13 @@ with information regarding geographic location and USGS RIIS status of the recor
     :maxdepth: 1
 
     pages/about
+    pages/data_inputs
     pages/installation
-    pages/data_input
-    pages/process_data
+    Year 5 Process <pages/year5>
+
+    Year 4 Process <pages/history/year4>
+    Year 3 Process <pages/history/year3>
+
+
 
 * :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`

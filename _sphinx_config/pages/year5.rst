@@ -1,57 +1,33 @@
-=============================================
-AWS strategy
-=============================================
+==================
+Year 5, 2023-2024
+==================
 
-Data
----------------------------
-* on us-east-1
-* Find bucket, specify_athena
+.. toctree::
+    :glob:
+    :maxdepth: 1
 
-gbif_extract: 303237553
-gbif_parquet_extract: 301669806
+    pages/yr5_install
+    pages/yr5_process
 
-Use python libs **awscli** and **boto3** to connect with AWS
+Objectives
+----------------
 
-* query (Norway only):
+2023, Year 5 SOW specifies building the project as an AWS application, so that USGS
+personnel with little to no technical experience, and no local resources, can run the
+analyses on a regular schedule.
 
-  https://www.gbif.org/occurrence/download?basis_of_record=PRESERVED_SPECIMEN&basis_of_record=FOSSIL_SPECIMEN&basis_of_record=OCCURRENCE&country=NO&occurrence_status=present
+The initial processes include annotating **GBIF occurrence data** from the
+US, with designations from the **US Registry of Introduced and Invasive Species**
+(RIIS), then summarizing the data by different regions, then aggregating data by a
+geospatial grid of counties, and computing biodiversity statistics.
 
-* DwCA 9 GB data (2 GB zipped)
-* 5,293,875 records
-* download: https://www.gbif.org/occurrence/download/0098682-230530130749713
+Regions include **US Census state and county boundaries**.  States are required
+in order to identify whether the occurrence of a particular species falls within the
+a RIIS region (Alaska, Hawaii, or Lower 48), where it is identified as "Introduced"
+or "Invasive".  Region summaries include both state and county boundaries.
 
+Regions also include **American Indian, Alaskan Native, and Native Hawaiian** (AIANNH)
+regions and **US Federal Protected Areas** (US‐PAD).
 
-Setup
----------------------------
-* install aws-cli on local dev machine
-* Subset GBIF Open Data Registry to Bison S3 bucket, serverless,
-  glue_bison_subset_gbif.py
-* Handle input geospatial data
-  * add shapefiles to S3 as zipfiles
-  * add RIIS data to S3
-  * create RDS, PostgreSQL
-* create EC2 for test/debug connection
-  * update/upgrade apt, install stuff
-  * add aws config and credentials
-* Populate RDS
-    * add postgis to postgres:
-      https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Appendix.PostgreSQL.CommonDBATasks.PostGIS.html
-    * insert census boundaries, native lands, PAD (scripts/populate_rds.py
-
-* Redshift?
-
-Workflow
----------------------------
-
-* download GBIF data (~350 GB)
-
-  * directly to EC2 instance using wget or script
-
-* upload to S3
-
-  * put-object with AWS CLI v2
-    https://awscli.amazonaws.com/v2/documentation/api/latest/reference/s3api/put-object.html
-  * AWS Python SDK put_object using Boto3
-    https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3/client/put_object.html#
-
-* pyspark
+All regions (state, county, AIANNH, PAD) will be summarized by count and proportion
+for species, occurrences, and RIIS status.
