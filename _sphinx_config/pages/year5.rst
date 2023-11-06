@@ -29,7 +29,7 @@ for species, occurrences, and RIIS status.
 Current decisions
 ******************
 * Region: us-east-1
-* Inputs: same as , `Data Inputs <history/yr4_inputs.rst>`_
+* Inputs: same as , `Data Inputs <history/yr4_inputs.rst#Data Preparation>`_
 
 Setup
 ---------------------------
@@ -77,7 +77,7 @@ Introduced or Invasive.  Any other species/region combinations encountered will 
 identified as "presumed-native"
 
 The latest US-RIIS data is present in this Github repository in the `data/input
-<https://github.com/lifemapper/bison/tree/main/data/input>`_ directory.  If a new
+<../../data/input>`_ directory.  If a new
 version is available, update it, and any data constants that may have changed.
 
 Data constants
@@ -119,7 +119,7 @@ the dash (-) between date elements.
     mv occurrence.txt gbif_2023-08-23.csv
 
 **Option 2:** Use the GBIF Open Data Registry on AWS S3.  The data contains a subset of
-Darwin Core fields.  More information is in **Workflow Options/GBIF Ingestion** below.
+Darwin Core fields.  More information is in `GBIF Ingestion`_ below.
 
 
 Data constants
