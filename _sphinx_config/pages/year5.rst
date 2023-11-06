@@ -2,13 +2,6 @@
 Year 5, 2023-2024
 ==================
 
-.. toctree::
-    :glob:
-    :maxdepth: 1
-
-    pages/yr5_install
-    pages/yr5_process
-
 Objectives
 ----------------
 

@@ -5,16 +5,24 @@ The BISON repository contains data and scripts to annotate GBIF occurrence recor
 with information regarding geographic location and USGS RIIS status of the record.
 
 .. toctree::
-    :glob:
-    :maxdepth: 1
+    :maxdepth: 2
 
     pages/about
     pages/data_inputs
     pages/installation
-    Year 5 Process <pages/year5>
+    pages/year5
 
-    Year 4 Process <pages/history/year4>
-    Year 3 Process <pages/history/year3>
+    pages/yr5_inputs
+    pages/yr5_process
+
+    pages/history/year4
+    pages/history/yr4_install
+    pages/history/yr4_inputs
+    pages/history/yr4_process
+
+    pages/history/year3
+    pages/history/yr3_process
+
 
 
 

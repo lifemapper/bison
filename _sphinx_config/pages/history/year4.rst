@@ -2,14 +2,6 @@
 Year 4, 2022-2023
 ==================
 
-.. toctree::
-    :glob:
-    :maxdepth: 1
-
-    pages/history/yr4_install
-    pages/history/yr4_inputs
-    pages/history/yr4_process
-
 Objectives
 ----------------
 

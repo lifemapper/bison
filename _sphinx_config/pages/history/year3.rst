@@ -2,12 +2,6 @@
 Year 3, 2021-2022
 ==================
 
-.. toctree::
-    :glob:
-    :maxdepth: 1
-
-    pages/history/yr3_process
-
 Objectives
 ----------------
 
