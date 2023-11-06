@@ -29,7 +29,11 @@ for species, occurrences, and RIIS status.
 Current decisions
 ******************
 * Region: us-east-1
-* Inputs: same as  :ref:_Year 4 Data Preparation
+* Inputs: same as
+
+  :doc:`Year 4 <history/year4>`
+  :ref:`Year 4 Data Preparation`
+
 
 Setup
 ---------------------------
