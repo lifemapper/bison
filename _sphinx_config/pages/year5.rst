@@ -89,37 +89,9 @@ Data constants
   SCINAME_FLD, SCIAUTHOR_FLD, RANK_FLD, ASSESSMENT_FLD, TAXON_AUTHORITY_FLD.
 
 
-GBIF data options
-----------------
-
-**Option1:** Get a current version of GBIF data from the GBIF portal
-  * Create a user account on the GBIF website, then login and
-  * request the data by putting the following URL in a browser:
-    https://www.gbif.org/occurrence/search?country=US&has_coordinate=true&has_geospatial_issue=false&occurrence_status=present
-  * adding a restriction to occurrence data identified to species or a lower rank
-    will reduce the amount of data that will be filtered out.
-
-Verify that the file occurrence.txt contains GBIF-annotated records that will be the
-primary input file.  The primary input file will contain fieldnames in the first line
-of the file, and those listed as values for GBIF class attributes with (attribute)
-names ending in _FLD or _KEY should all be among the fields.
-
-The query will request a download, which will take some time for GBIF to assemble.
-GBIF will send an email with a link for downloading the Darwin Core Archive, a
-very large zipped file.  Only the occurrence.txt file is required for data processing.
-Rename the file with the date for clarity on what data is being used. Use
-the following pattern gbif_yyyy-mm-dd.csv so that interim data filenames can be
-created and parsed consistently.  Note the underscore (_) between 'gbif' and the date, and
-the dash (-) between date elements.
-
-::
-
-    unzip <dwca zipfile> occurrence.txt
-    mv occurrence.txt gbif_2023-08-23.csv
-
-**Option 2:** Use the GBIF Open Data Registry on AWS S3.  The data contains a subset of
-Darwin Core fields.  More information is in `GBIF Ingestion`_ below.
-
+GBIF Data
+--------------
+Ingested in Workflow
 
 Data constants
 ^^^^^^^^^^^^^^^^
@@ -229,16 +201,55 @@ different data storage and processing strategies - they each have speed and cost
 and cons.
 
 
-GBIF Ingestion
----------------------------
-* **Option 1:** Subset GBIF Open Data Registry to Bison S3 bucket, serverless, script
-  `glue_bison_subset_gbif.py <../../scripts/glue_bison_subset_gbif.py>`_
+GBIF Data Ingestion
+--------------------
+
+
+* **Option 1:** Using **S3 Select**, subset GBIF Open Data Registry to Bison S3 bucket,
+  serverless, script `glue_bison_subset_gbif.py
+  <../../scripts/glue_bison_subset_gbif.py>`_  `AWS S3 Select Doc
+  <https://docs.aws.amazon.com/AmazonS3/latest/userguide/selecting-content-from-objects.html>`_
+  and `blog post
+  <https://aws.amazon.com/blogs/storage/querying-data-without-servers-or-databases-using-amazon-s3-select/>`_
 * **Option 2:** Query GBIF portal manually, then initiate an EC2 Spot instance to
   download and subset it, saving it to S3. The script that downloads, subsets, and
   uploads data from the EC2 Spot instance is installed on the EC2
   instance on creation, `user_data_for_ec2spot.py
   <../../scripts/user_data_for_ec2spot.py>`_.  The script that builds and instantiates
   the EC2 Spot instance is: `gbif_to_s3.py <../../scripts/gbif_to_s3.py>`_ .
+
+
+GBIF data options
+----------------
+
+**Option1:** Get a current version of GBIF data from the GBIF portal
+  * Create a user account on the GBIF website, then login and
+  * request the data by putting the following URL in a browser:
+    https://www.gbif.org/occurrence/search?country=US&has_coordinate=true&has_geospatial_issue=false&occurrence_status=present
+  * adding a restriction to occurrence data identified to species or a lower rank
+    will reduce the amount of data that will be filtered out.
+
+Verify that the file occurrence.txt contains GBIF-annotated records that will be the
+primary input file.  The primary input file will contain fieldnames in the first line
+of the file, and those listed as values for GBIF class attributes with (attribute)
+names ending in _FLD or _KEY should all be among the fields.
+
+The query will request a download, which will take some time for GBIF to assemble.
+GBIF will send an email with a link for downloading the Darwin Core Archive, a
+very large zipped file.  Only the occurrence.txt file is required for data processing.
+Rename the file with the date for clarity on what data is being used. Use
+the following pattern gbif_yyyy-mm-dd.csv so that interim data filenames can be
+created and parsed consistently.  Note the underscore (_) between 'gbif' and the date, and
+the dash (-) between date elements.
+
+::
+
+    unzip <dwca zipfile> occurrence.txt
+    mv occurrence.txt gbif_2023-08-23.csv
+
+**Option 2:** Use the GBIF Open Data Registry on AWS S3.  The data contains a subset of
+Darwin Core fields.  More information is in `GBIF Ingestion`_ below.
+
 
 Reference Data
 -----------------

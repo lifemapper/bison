@@ -1,6 +1,8 @@
+#######################
 AWS workflow experiments
-==========================
+#######################
 
+***************
 AWS Batch
 ***************
 
@@ -94,3 +96,80 @@ Batch
   * Command: Define the command that should be executed within the container.
 
 * Submit AWS Batch Job
+
+***************************
+Glue - Interactive Development
+***************************
+
+`AWS Glue Studio with Jupyter
+<https://docs.aws.amazon.com/glue/latest/dg/create-notebook-job.html>`_
+
+`Local development with Jupyter
+<https://docs.aws.amazon.com/glue/latest/dg/aws-glue-programming-etl-format-parquet-home.html>`_
+
+
+Problem/Solution
+--------------------
+Interactive Samples fail with error (File Not Found) for public GBIF data
+
+* Create database in AWS Glue for metadata about project inputs
+
+  * In the DB, create table for each data input, using Glue Crawler
+
+Problem/Solution
+--------------------
+
+Interactive Data Preview fails for public and private data
+
+* Use AWS Glue DataBrew to visually examine data
+
+  * First add dataset to Glue Data Catalog
+        "A table is the metadata definition that represents your data, including its
+        schema. A table can be used as a source or target in a job definition."
+  * Next add dataset to Glue DataBrew
+
+Problem/Solution
+--------------------
+AWS Glue DataBrew add dataset, create connection to RDS, shows no tables in
+bison-metadata database.
+
+
+***************************
+BISON AWS data/tools
+***************************
+
+* Amazon RDS, PostgreSQL, bison-db-test
+
+    * Create JDBC connection from Crawler, then change to Amazon RDS to bison-test-db/%
+
+* AWS Glue Data Catalog
+
+  * bison-metadata Database, populated by
+  * AWS Glue Crawler, crawls data to create tables of metadata/schema
+
+    * GBIF Crawler to crawl GBIF Open Data Registry 11-2023 --> gbif-odr-occurrence_parquet table
+    * BISON RDS Crawler to crawl Amazon RDS bison-db-test --> bison-ref-?? table
+
+        Problem: fails with Permission Errors
+
+        "Crawler Error:
+        com.amazonaws.services.secretsmanager.model.AWSSecretsManagerException: Service
+        Principal: glue.amazonaws.com is not authorized to perform:
+        secretsmanager:GetSecretValue on resource: admin_bison-db-test because no
+        identity-based policy allows the secretsmanager:GetSecretValue action
+        (Service: AWSSecretsManager; Status Code: 400; Error Code:
+        AccessDeniedException; Request ID: bcb2d711-0c65-4976-815c-4bc3d6dd1e66; Proxy:
+        null). For more information, see Setting up IAM Permissions in the Developer
+        Guide (http://docs.aws.amazon.com/glue/latest/dg/getting-started-access.html)."
+
+        Added SecretManager policy to AWSGlueServiceRole-
+        "Crawler Error:
+        Crawler cannot be started. Verify the permissions in the policies attached to
+        the IAM role defined in the crawler.  "
+
+        Does Glue Crawler only access S3?
+
+        Add policy to my user:
+        https://docs.aws.amazon.com/glue/latest/dg/configure-iam-for-glue.html
+        Added policy according to instructions in Step 3, verbatim -
+        Error:
