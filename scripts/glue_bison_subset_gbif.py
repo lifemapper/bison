@@ -1,3 +1,4 @@
+"""Glue Spark script to read GBIF Open Data Registry data, subset it, and save it to S3."""
 import datetime as DT
 import sys
 from awsglue.utils import getResolvedOptions

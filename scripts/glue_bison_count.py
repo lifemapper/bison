@@ -1,11 +1,11 @@
-import datetime as DT
+"""Glue Spark script to read S3 occurrence data and report the number of records."""
 import sys
-from awsglue.transforms import Filter
+import datetime as DT
 from awsglue.utils import getResolvedOptions
-from pyspark import SparkConf
-from pyspark.context import SparkContext
 from awsglue.context import GlueContext
 from awsglue.job import Job
+from pyspark import SparkConf
+from pyspark.context import SparkContext
 
 bison_bucket = "s3://bison-321942852011-us-east-1/"
 gbif_bucket = "s3://gbif-open-data-us-east-1/"
@@ -40,21 +40,19 @@ bison_subset_dynf = glueContext.create_dynamic_frame.from_options(
         "recurse": True,
     },
 )
-print(f"Read GBIF {bison_subset_s3_fullname} with {bison_subset_dynf.count()} records.")
-
+print(f"Read BISON subset {bison_subset_s3_fullname} with {bison_subset_dynf.count()} records.")
 
 # BISON raw dataset
-bison_s3_bad_fullname = f"{bison_bucket}/gbif_{datastr}.geoparquet/"
+bison_s3_fullname = f"{bison_bucket}/raw_data/gbif_{datastr}.parquet/"
 bison_dynf = glueContext.create_dynamic_frame.from_options(
     format_options={},
     connection_type="s3",
     format="parquet",
     connection_options={
-        "paths": [bison_s3_bad_fullname],
+        "paths": [bison_s3_fullname],
         "recurse": True,
     },
 )
-print(f"Read GBIF {bison_s3_bad_fullname} with {bison_dynf.count()} records.")
-
+print(f"Read BISON filtered {bison_s3_fullname} with {bison_dynf.count()} records.")
 
 job.commit()

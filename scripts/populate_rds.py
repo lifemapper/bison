@@ -1,4 +1,4 @@
-"""Script to populate existing RDS with S3 data, using EC2."""
+"""EC2 python Script to populate existing RDS with S3 data."""
 import boto3
 from botocore.exceptions import ClientError
 from io import BytesIO
@@ -414,6 +414,9 @@ if __name__ == '__main__':
 
 
 """
+# jdbc driver for Glue Connection:
+# jdbc:postgresql://bison-db-test.cqvncffkwz9t.us-east-1.rds.amazonaws.com:5432/bison-db-test
+
 region = REGION
 bucket = BUCKET
 schema = DB_SCHEMA
