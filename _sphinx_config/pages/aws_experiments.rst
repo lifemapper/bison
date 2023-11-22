@@ -166,6 +166,7 @@ BISON AWS data/tools
         At least one security group must open all ingress ports.To limit traffic, the
         source security group in your inbound rule can be restricted to the same
         security group
+    * Added inbound and outbound rules to my security group for postgresql, same error
 
 
 
