@@ -1,0 +1,43 @@
+CREATE external schema redshift_spectrum
+    FROM data catalog
+    DATABASE dev
+    IAM_ROLE 'arn:aws:iam::321942852011:role/service-role/AmazonRedshift-CommandsAccessRole-20231129T105842'
+    CREATE external database if NOT exists;
+
+
+CREATE EXTERNAL TABLE redshift_spectrum.occurrence_2023_11_01_parquet (
+    gbifid	VARCHAR(200),
+	species	VARCHAR(200),
+	taxonrank	VARCHAR(200),
+	scientificname	VARCHAR(200),
+	countrycode	VARCHAR(200),
+	stateprovince	VARCHAR(200),
+	occurrencestatus	VARCHAR(200),
+	publishingorgkey	VARCHAR(200),
+	decimallatitude	DOUBLE PRECISION,
+	decimallongitude	DOUBLE PRECISION,
+	day	INT,
+	month	INT,
+	year	INT,
+	taxonkey	INT,
+	specieskey	INT,
+	basisofrecord	VARCHAR(200)
+    )
+    STORED AS PARQUET
+    LOCATION 's3://gbif-open-data-us-east-1/occurrence/2023-11-01/occurrence.parquet/';
+
+SELECT * FROM SVV_EXTERNAL_DATABASES WHERE
+databasename = 'dev';
+
+SELECT COUNT(*) from dev.redshift_spectrum.occurrence_2023_11_01_parquet;
+
+create table public.gbif_subset_2023_11_01 as
+	SELECT
+		gbifid, species, taxonrank, scientificname, countrycode, stateprovince,
+		occurrencestatus, publishingorgkey, decimallatitude, decimallongitude, day,
+		month, year, taxonkey, specieskey, basisofrecord,
+		ST_Makepoint(decimallongitude, decimallatitude) as geom
+	FROM dev.redshift_spectrum.occurrence_2023_11_01_parquet
+	WHERE
+	    countrycode = ‘US’ and occurrencestatus = ‘PRESENT’ and taxonrank IN
+		(‘SPECIES’, ‘SUBSPECIES’, ‘FORM’, ‘INFRASPECIFIC_NAME’, ‘INFRASUBSPECIFIC_NAME’);
