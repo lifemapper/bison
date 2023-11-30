@@ -2,11 +2,11 @@
 AWS workflow experiments
 #######################
 
-***************
+
 AWS Batch
 ***************
 
-Preparation
+Overview
 ------------
 
 1. Getting started
@@ -50,7 +50,7 @@ Workflow:
 -------------
 
 Prep:
-............
+
 * Create a Docker image from osgeo/gdal with
   * python dependencies
   * bison code
@@ -58,7 +58,7 @@ Prep:
 * Save on S3 or Github
 
 Input data acquisition:
-............
+
 * Create EC2 spot image
 
   * download data from GBIF
@@ -66,7 +66,6 @@ Input data acquisition:
   * copy to S3
 
 Input data prep:
-............
 * Create a Step Workflow to:
 
   * crawl for metadata
@@ -74,8 +73,7 @@ Input data prep:
   * add annotation fields
   * count records and identify subsets
 
-Batch
-............
+Batch:
 * Create AWS Batch Compute Environment
 
   * name
@@ -97,9 +95,9 @@ Batch
 
 * Submit AWS Batch Job
 
-***************************
+#######################
 Glue - Interactive Development
-***************************
+#######################
 
 `AWS Glue Studio with Jupyter
 <https://docs.aws.amazon.com/glue/latest/dg/create-notebook-job.html>`_
@@ -134,16 +132,30 @@ AWS Glue DataBrew add dataset, create connection to RDS, shows no tables in
 bison-metadata database.
 
 
-***************************
+#######################
 BISON AWS data/tools
-***************************
+#######################
 
-* Amazon RDS, PostgreSQL, bison-db-test
+Amazon S3
+-----------------------------------------
 
-    * Create JDBC connection from Crawler, then change to Amazon RDS to bison-test-db/%
+ * Use Glue to Subset GBIF ODR data into local bucket
+   arn:aws:s3:::bison-321942852011-us-east-1
+ * Crawl GBIF data s3://gbif-open-data-us-east-1/occurrence/2023-11-01/occurrence.parquet/
+   to create gbif-odr-occurrence_parquet table in Data Catalog tables
 
-* AWS Glue Data Catalog
 
+Amazon RDS, PostgreSQL, bison-db-test
+-----------------------------------------
+    * Create JDBC connection from Glue, then TestConnection
+
+        InvalidInputException: VPC S3 endpoint validation failed for SubnetId:
+        subnet-0861208f72b8eac53. VPC: vpc-09d4c9a0524b17382. Reason: Could not find
+        S3 endpoint or NAT gateway for subnetId: subnet-0861208f72b8eac53 in Vpc
+        vpc-09d4c9a0524b17382
+
+AWS Glue Data Catalog
+-----------------------------------------
   * bison-metadata Database, populated by
   * AWS Glue Crawler, crawls data to create tables of metadata/schema
 
