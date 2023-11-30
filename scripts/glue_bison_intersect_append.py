@@ -19,11 +19,6 @@ glueContext = GlueContext(sc)
 spark = glueContext.spark_session
 job = Job(glueContext)
 
-REGION = "us-east-1"
-BISON_BUCKET = "s3://bison-321942852011-us-east-1/"
-SECRET_NAME = "admin_bison-db-test"
-
-
 # ----------------------------------------------------
 def get_secret(secret_name, region):
     """Get a secret from the Secrets Manager for connection authentication.
@@ -173,6 +168,10 @@ datastr = f"{n.year}-{n.month}-01"
 input_s3_path = f"raw_data/gbif_5k_{datastr}.parquet/"
 output_s3_path = f"out_data/bison_{datastr}.parquet/"
 
+REGION = "us-east-1"
+BISON_BUCKET = "s3://bison-321942852011-us-east-1/"
+SECRET_NAME = "admin_bison-db-test"
+
 secret = get_secret(SECRET_NAME, REGION)
 
 # Get dynamic frame of point records
@@ -183,7 +182,7 @@ polygon_table = get_rds_table(secret, rds_instance, rds_db_schema, county_table)
 
 intersected_points = gbif_pt_recs.crossJoin(polygon_table).filter(
     "ST_INTERSECTS("
-    "ST_POINT(point_records.decimal_longitude, point_records.decimal_latitude), "
+    "ST_POINT(point_records.decimallongitude, point_records.decimallatitude), "
     "polygon_table.geometry")
 
 # Intersect points with polygons

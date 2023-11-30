@@ -131,6 +131,8 @@ Problem/Solution
 AWS Glue DataBrew add dataset, create connection to RDS, shows no tables in
 bison-metadata database.
 
+DataBrew for visual representation of data, not examination
+
 
 #######################
 BISON AWS data/tools
@@ -158,30 +160,34 @@ AWS Glue Data Catalog
 -----------------------------------------
   * bison-metadata Database, populated by
   * AWS Glue Crawler, crawls data to create tables of metadata/schema
-
     * GBIF Crawler to crawl GBIF Open Data Registry 11-2023 --> gbif-odr-occurrence_parquet table
-    * BISON RDS Crawler to crawl Amazon RDS bison-db-test --> bison-ref-?? table
+    * Does Glue Crawler only access S3?
 
-        Problem: fails with Permission Errors
+* To connect to RDS, add Glue/Data Catalog/Connection
 
-        "Crawler Error:
-        com.amazonaws.services.secretsmanager.model.AWSSecretsManagerException: Service
-        Principal: glue.amazonaws.com is not authorized to perform:
-        secretsmanager:GetSecretValue on resource: admin_bison-db-test because no
-        identity-based policy allows the secretsmanager:GetSecretValue action
-        (Service: AWSSecretsManager; Status Code: 400; Error Code:
-        AccessDeniedException; Request ID: bcb2d711-0c65-4976-815c-4bc3d6dd1e66; Proxy:
-        null). For more information, see Setting up IAM Permissions in the Developer
-        Guide (http://docs.aws.amazon.com/glue/latest/dg/getting-started-access.html)."
+    * endpoint: bison-db-test.cqvncffkwz9t.us-east-1.rds.amazonaws.com
+    * dbname: bison_db_test
+    * connection url: jdbc:postgresql://bison-db-test.cqvncffkwz9t.us-east-1.rds.amazonaws.com:5432/bison_db_test
 
-        Added SecretManager policy to AWSGlueServiceRole-
-        "Crawler Error:
-        Crawler cannot be started. Verify the permissions in the policies attached to
-        the IAM role defined in the crawler.  "
+    * "InvalidInputException: Unable to resolve any valid connection"
+      Docs point to error logs in /aws-glue/testconnection/output, but this does not exist
+      check https://repost.aws/knowledge-center/glue-test-connection-failed
 
-        Does Glue Crawler only access S3?
+    * Added RDS database VPC, 1 subnet, all 3 security groups
+    * Result: InvalidInputException:
+        At least one security group must open all ingress ports.To limit traffic, the
+        source security group in your inbound rule can be restricted to the same
+        security group
+    * Added inbound and outbound rules to my security group for postgresql, same error
+
+
 
         Add policy to my user:
         https://docs.aws.amazon.com/glue/latest/dg/configure-iam-for-glue.html
         Added policy according to instructions in Step 3, verbatim -
         Error:
+
+Permissions Solution:
+--------------------
+Add AdministratorAccess  to Role, the audit the calls later to identify
+minimum permissions needed.
