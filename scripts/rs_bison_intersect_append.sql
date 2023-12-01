@@ -1,104 +1,75 @@
-CREATE TABLE aiannh (
-   shape GEOMETRY,
-   AIANNHCE VARCHAR(max),
-   AIANNHNS VARCHAR(max),
-   AFFGEOID VARCHAR(max),
-   GEOID VARCHAR(max),
-   NAME VARCHAR(max),
-   NAMELSAD VARCHAR(max),
-   LSAD VARCHAR(max),
-   ALAND VARCHAR(max),
-   AWATER VARCHAR(max)
-);
+-- Create a BISON table with a subset of records and subset of fields
+CREATE TABLE public.bison_subset_2023_11_01 AS
+	SELECT
+		gbifid, species, taxonrank, scientificname, countrycode, stateprovince,
+		occurrencestatus, publishingorgkey, decimallatitude, decimallongitude, day,
+		month, year, taxonkey, specieskey, basisofrecord,
+		ST_Makepoint(decimallongitude, decimallatitude) as geom
+	FROM dev.redshift_spectrum.occurrence_2023_11_01_parquet
+	WHERE
+	    countrycode = 'US' and occurrencestatus = 'PRESENT' and taxonrank IN
+		('SPECIES', 'SUBSPECIES', 'FORM', 'INFRASPECIFIC_NAME', 'INFRASUBSPECIFIC_NAME');
 
-COPY aiannh FROM 's3://bison-321942852011-us-east-1/input_data/region/cb_2021_us_aiannh_500k.shp'
-FORMAT SHAPEFILE
-SIMPLIFY AUTO
-IAM_role DEFAULT;
+SHOW TABLES FROM SCHEMA dev.public;
 
-select * from aiannh limit 10
+-- Append fields
+ALTER TABLE public.bison_subset_2023_11_01
+    ADD COLUMN census_state  VARCHAR(2)
+    DEFAULT NULL;
+ALTER TABLE public.bison_subset_2023_11_01
+    ADD COLUMN census_county   VARCHAR(max)
+    DEFAULT NULL;
+ALTER TABLE public.bison_subset_2023_11_01
+    ADD COLUMN riis_occurrence_id   VARCHAR(max)
+    DEFAULT NULL;
+ALTER TABLE public.bison_subset_2023_11_01
+    ADD COLUMN riis_assessment   VARCHAR(20)
+    DEFAULT NULL;
+ALTER TABLE public.bison_subset_2023_11_01
+    ADD COLUMN aiannh_name   VARCHAR(max)
+    DEFAULT NULL;
+ALTER TABLE public.bison_subset_2023_11_01
+    ADD COLUMN aiannh_geoid   VARCHAR(max)
+    DEFAULT NULL;
 
-CREATE TABLE county (
-   shape GEOMETRY,
-   STATEFP VARCHAR(max),
-   COUNTYFP VARCHAR(max),
-   COUNTYNS VARCHAR(max),
-   AFFGEOID VARCHAR(max),
-   GEOID VARCHAR(max),
-   NAME VARCHAR(max),
-   NAMELSAD VARCHAR(max),
-   STUSPS VARCHAR(max),
-   STATE_NAME VARCHAR(max),
-   LSAD VARCHAR(max),
-   ALAND VARCHAR(max),
-   AWATER VARCHAR(max)
-);
+-- Temp table with state/county values
+CREATE TABLE public.temp_cty_intersect_2023_11_01 AS
+	SELECT subset.gbifid, county.STUSPS, county.NAME
+	FROM county, public.bison_subset_2023_11_01 as subset
+	WHERE ST_intersects(ST_SetSRID(subset.geom, 4326), ST_SetSRID(county.shape, 4326));
 
-COPY county FROM 's3://bison-321942852011-us-east-1/input_data/region/cb_2021_us_county_500k.shp'
-FORMAT SHAPEFILE
-SIMPLIFY AUTO
-IAM_role DEFAULT;
+-- Temp table with aiannh values
+CREATE TABLE public.temp_aiannh_intersect_2023_11_01 AS
+	SELECT subset.gbifid, aiannh.namelsad, aiannh.geoid
+	FROM aiannh, public.bison_subset_2023_11_01 as subset
+	WHERE ST_intersects(ST_SetSRID(subset.geom, 4326), ST_SetSRID(aiannh.shape, 4326));
 
-select * from county limit 10
+-- Intersected records
+SELECT COUNT(*) FROM public.temp_cty_intersect_2023_11_01;
+SELECT COUNT(*) FROM public.temp_aiannh_intersect_2023_11_01;
+
+-- Add state/county values to dataset
+UPDATE bison_subset_2023_11_01 AS subset
+	SET census_state = temp.stusps, census_county = temp.name
+	FROM temp_cty_intersect_2023_11_01 AS temp
+	WHERE subset.gbifid = temp.gbifid;
+
+-- Add aiannh values to dataset
+UPDATE bison_subset_2023_11_01 AS subset
+	SET aiannh_name = temp.namelsad, aiannh_geoid = temp.geoid
+	FROM temp_aiannh_intersect_2023_11_01 AS temp
+	WHERE subset.gbifid = temp.gbifid;
+
+-- Add riis values to dataset
+UPDATE bison_subset_2023_11_01 AS subset
+	SET riis_occurrence_id = temp.stusps, riis_assessment = temp.name
+	FROM temp_cty_intersect_2023_11_01 AS temp
+	WHERE subset.gbifid = temp.gbifid;
 
 
--- SELECT gbifid, decimallatitude, decimallongitude FROM
---  'dev'.'redshift_spectrum'.'occurrence_parquet' limit 10;
-
----- small dataset does not contain all fields
---CREATE TABLE bison_very_small (
---	taxonrank	VARCHAR(max),
---	occurrenceid    VARCHAR(max),
---	kingdom	VARCHAR(max),
---	specieskey	INT,
---	coordinateprecision	DOUBLE PRECISION,
---	individualcount	INT,
---	lastinterpreted	TIMESTAMP,
--- 	datasetkey	VARCHAR(max),
---	taxonkey	INT,
---	_order	VARCHAR(max),
---	genus	VARCHAR(max),
---	eventdate	TIMESTAMP,
---	verbatimscientificname	VARCHAR(max),
---	dateidentified	TIMESTAMP,
---	countrycode	VARCHAR(max),
---	family	VARCHAR(max),
---	stateprovince	VARCHAR(max),
---	publishingorgkey	VARCHAR(max),
---	typestatus	SUPER,
---	year	INT,
---	coordinateuncertaintyinmeters	DOUBLE PRECISION,
---	verbatimscientificnameauthorship	VARCHAR(max),
---	issue	SUPER,
---	locality	VARCHAR(max),
---	basisofrecord	VARCHAR(max),
---	species	VARCHAR(max),
---	decimallongitude	DOUBLE PRECISION,
---	rightsholder	VARCHAR(max),
---	occurrencestatus	VARCHAR(max),
---	class	VARCHAR(max),
---	phylum	VARCHAR(max),
---	institutioncode	VARCHAR(max),
---	recordnumber	VARCHAR(max),
---	decimallatitude	DOUBLE PRECISION,
---	license	VARCHAR(max),
---	month	INT,
---	catalognumber	VARCHAR(max),
---    gbifid	VARCHAR(max),
---	collectioncode	VARCHAR(max),
---	day	INT,
---	scientificname	VARCHAR(max)
---);
---
-----	census_state    VARCHAR(2),
-----	census_county   VARCHAR(max),
-----	riis_occurrence_id   VARCHAR(max),
-----    riis_assessment   VARCHAR(20),
-----    aiannh_name   VARCHAR(max),
-----    aiannh_geoid   VARCHAR(max)
---
---COPY dev.public.gbif_very_small
---FROM 's3://bison-321942852011-us-east-1/raw_data/gbif_5k_2023-11-01.parquet'
---IAM_ROLE 'arn:aws:iam::321942852011:role/service-role/AmazonRedshift-CommandsAccessRole-20231129T105842'
---FORMAT AS PARQUET SERIALIZETOJSON
-
+---- Faster than creating a temp table and joining,
+---- BUT this only keeps records that intersect, and does not use new fieldnames
+--create table public.bison_annotate_2023_11_01 as
+--	SELECT bison_subset_2023_11_01.*, county.STUSPS, county.NAME
+--	FROM bison_subset_2023_11_01 AS subset, county
+--	WHERE ST_intersects(ST_SetSRID(subset.geom, 4326), ST_SetSRID(county.shape, 4326));

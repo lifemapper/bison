@@ -6,14 +6,14 @@ CREATE external schema redshift_spectrum
 
 
 CREATE EXTERNAL TABLE redshift_spectrum.occurrence_2023_11_01_parquet (
-    gbifid	VARCHAR(200),
-	species	VARCHAR(200),
-	taxonrank	VARCHAR(200),
-	scientificname	VARCHAR(200),
-	countrycode	VARCHAR(200),
-	stateprovince	VARCHAR(200),
-	occurrencestatus	VARCHAR(200),
-	publishingorgkey	VARCHAR(200),
+    gbifid	VARCHAR(max),
+	species	VARCHAR(max),
+	taxonrank	VARCHAR(max),
+	scientificname	VARCHAR(max),
+	countrycode	VARCHAR(max),
+	stateprovince	VARCHAR(max),
+	occurrencestatus	VARCHAR(max),
+	publishingorgkey	VARCHAR(max),
 	decimallatitude	DOUBLE PRECISION,
 	decimallongitude	DOUBLE PRECISION,
 	day	INT,
@@ -21,7 +21,7 @@ CREATE EXTERNAL TABLE redshift_spectrum.occurrence_2023_11_01_parquet (
 	year	INT,
 	taxonkey	INT,
 	specieskey	INT,
-	basisofrecord	VARCHAR(200)
+	basisofrecord	VARCHAR(max)
     )
     STORED AS PARQUET
     LOCATION 's3://gbif-open-data-us-east-1/occurrence/2023-11-01/occurrence.parquet/';
@@ -30,14 +30,3 @@ SELECT * FROM SVV_EXTERNAL_DATABASES WHERE
 databasename = 'dev';
 
 SELECT COUNT(*) from dev.redshift_spectrum.occurrence_2023_11_01_parquet;
-
-create table public.gbif_subset_2023_11_01 as
-	SELECT
-		gbifid, species, taxonrank, scientificname, countrycode, stateprovince,
-		occurrencestatus, publishingorgkey, decimallatitude, decimallongitude, day,
-		month, year, taxonkey, specieskey, basisofrecord,
-		ST_Makepoint(decimallongitude, decimallatitude) as geom
-	FROM dev.redshift_spectrum.occurrence_2023_11_01_parquet
-	WHERE
-	    countrycode = ‘US’ and occurrencestatus = ‘PRESENT’ and taxonrank IN
-		(‘SPECIES’, ‘SUBSPECIES’, ‘FORM’, ‘INFRASPECIFIC_NAME’, ‘INFRASUBSPECIFIC_NAME’);
