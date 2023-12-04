@@ -1,75 +1,71 @@
--- Create a BISON table with a subset of records and subset of fields
-CREATE TABLE public.bison_subset_2023_11_01 AS
-	SELECT
-		gbifid, species, taxonrank, scientificname, countrycode, stateprovince,
-		occurrencestatus, publishingorgkey, decimallatitude, decimallongitude, day,
-		month, year, taxonkey, specieskey, basisofrecord,
-		ST_Makepoint(decimallongitude, decimallatitude) as geom
-	FROM dev.redshift_spectrum.occurrence_2023_11_01_parquet
-	WHERE
-	    countrycode = 'US' and occurrencestatus = 'PRESENT' and taxonrank IN
-		('SPECIES', 'SUBSPECIES', 'FORM', 'INFRASPECIFIC_NAME', 'INFRASUBSPECIFIC_NAME');
-
-SHOW TABLES FROM SCHEMA dev.public;
-
--- Append fields
-ALTER TABLE public.bison_subset_2023_11_01
+-- Append fields to bison subset
+ALTER TABLE public.bison_subset
     ADD COLUMN census_state  VARCHAR(2)
     DEFAULT NULL;
-ALTER TABLE public.bison_subset_2023_11_01
-    ADD COLUMN census_county   VARCHAR(max)
+ALTER TABLE public.bison_subset
+    ADD COLUMN census_county   VARCHAR(100)
     DEFAULT NULL;
-ALTER TABLE public.bison_subset_2023_11_01
-    ADD COLUMN riis_occurrence_id   VARCHAR(max)
+ALTER TABLE public.bison_subset
+    ADD COLUMN riis_region   VARCHAR(3)
     DEFAULT NULL;
-ALTER TABLE public.bison_subset_2023_11_01
+ALTER TABLE public.bison_subset
+    ADD COLUMN riis_occurrence_id   VARCHAR(50)
+    DEFAULT NULL;
+ALTER TABLE public.bison_subset
     ADD COLUMN riis_assessment   VARCHAR(20)
     DEFAULT NULL;
-ALTER TABLE public.bison_subset_2023_11_01
-    ADD COLUMN aiannh_name   VARCHAR(max)
+ALTER TABLE public.bison_subset
+    ADD COLUMN aiannh_name   VARCHAR(200)
     DEFAULT NULL;
-ALTER TABLE public.bison_subset_2023_11_01
-    ADD COLUMN aiannh_geoid   VARCHAR(max)
+ALTER TABLE public.bison_subset
+    ADD COLUMN aiannh_geoid   VARCHAR(200)
     DEFAULT NULL;
 
--- Temp table with state/county values
-CREATE TABLE public.temp_cty_intersect_2023_11_01 AS
-	SELECT subset.gbifid, county.STUSPS, county.NAME
-	FROM county, public.bison_subset_2023_11_01 as subset
+-- Create temp tables with census/aiannh values
+CREATE TABLE public.tmp_subset_x_census AS
+	SELECT subset.gbifid, county.stusps, county.name
+	FROM county, public.bison_subset as subset
 	WHERE ST_intersects(ST_SetSRID(subset.geom, 4326), ST_SetSRID(county.shape, 4326));
-
--- Temp table with aiannh values
-CREATE TABLE public.temp_aiannh_intersect_2023_11_01 AS
+CREATE TABLE public.tmp_subset_x_aiannh AS
 	SELECT subset.gbifid, aiannh.namelsad, aiannh.geoid
-	FROM aiannh, public.bison_subset_2023_11_01 as subset
+	FROM aiannh, public.bison_subset as subset
 	WHERE ST_intersects(ST_SetSRID(subset.geom, 4326), ST_SetSRID(aiannh.shape, 4326));
 
--- Intersected records
-SELECT COUNT(*) FROM public.temp_cty_intersect_2023_11_01;
-SELECT COUNT(*) FROM public.temp_aiannh_intersect_2023_11_01;
+-- Check numbers
+SELECT COUNT(*) FROM public.tmp_subset_x_census;
+SELECT COUNT(*) FROM public.tmp_subset_x_aiannh;
+SELECT COUNT(*) FROM public.bison_subset;
 
--- Add state/county values to dataset
-UPDATE bison_subset_2023_11_01 AS subset
+-- Add census/aiannh values to big dataset
+UPDATE bison_subset AS subset
 	SET census_state = temp.stusps, census_county = temp.name
-	FROM temp_cty_intersect_2023_11_01 AS temp
+	FROM tmp_subset_x_census AS temp
 	WHERE subset.gbifid = temp.gbifid;
-
--- Add aiannh values to dataset
-UPDATE bison_subset_2023_11_01 AS subset
+UPDATE bison_subset AS subset
 	SET aiannh_name = temp.namelsad, aiannh_geoid = temp.geoid
-	FROM temp_aiannh_intersect_2023_11_01 AS temp
+	FROM tmp_subset_x_aiannh AS temp
 	WHERE subset.gbifid = temp.gbifid;
 
--- Add riis values to dataset
-UPDATE bison_subset_2023_11_01 AS subset
-	SET riis_occurrence_id = temp.stusps, riis_assessment = temp.name
-	FROM temp_cty_intersect_2023_11_01 AS temp
-	WHERE subset.gbifid = temp.gbifid;
+-- Compute riis_region values for dataset
+UPDATE bison_subset
+	SET riis_region = census_state
+	WHERE census_state IN ('AK', 'HI');
+UPDATE bison_subset
+	SET riis_region = 'L48'
+	WHERE census_state IS NOT NULL AND census_state NOT IN ('AK', 'HI');
+-- Match on RIIS region and GBIF taxonkey
+UPDATE bison_subset
+	SET riis_occurrence_id = riis.occurrenceid,
+	    riis_assessment = riis.introduced_or_invasive
+	FROM riis
+	WHERE riis.locality = riis_region
+	  AND riis.gbif_res_taxonkey = taxonkey;
+-- Non-matching records are presumed native species
+UPDATE bison_subset
+	SET riis_assessment = 'presumed_native'
+	WHERE census_state IS NOT NULL AND riis_occurrence_id IS NULL;
 
-
----- Faster than creating a temp table and joining,
----- BUT this only keeps records that intersect, and does not use new fieldnames
---create table public.bison_annotate_2023_11_01 as
---	SELECT bison_subset_2023_11_01.*, county.STUSPS, county.NAME
---	FROM bison_subset_2023_11_01 AS subset, county
---	WHERE ST_intersects(ST_SetSRID(subset.geom, 4326), ST_SetSRID(county.shape, 4326));
+-- Check numbers
+SELECT * FROM bison_subset WHERE census_state IS NOT NULL LIMIT 10;
+SELECT COUNT(*) FROM bison_subset
+    WHERE census_state IS NOT NULL AND riis_occurrence_id IS NULL;
