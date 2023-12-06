@@ -69,3 +69,15 @@ UPDATE bison_subset
 SELECT * FROM bison_subset WHERE census_state IS NOT NULL LIMIT 10;
 SELECT COUNT(*) FROM bison_subset
     WHERE census_state IS NOT NULL AND riis_occurrence_id IS NULL;
+
+SELECT COUNT(*) FROM bison_subset;
+SELECT COUNT(*) FROM bison_subset WHERE census_state IS NOT NULL;
+
+-- Write to S3
+UNLOAD (
+    'SELECT * FROM bison_subset WHERE census_state IS NOT NULL')
+    TO 's3://bison-321942852011-us-east-1/annotated_records/bison_occ_'
+    IAM_role DEFAULT
+    DELIMITER AS '\t'
+    manifest
+    HEADER;
