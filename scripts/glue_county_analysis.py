@@ -3,16 +3,12 @@ import sys
 import datetime as DT
 import pandas
 
+from awsglue.transforms import *
 from awsglue.utils import getResolvedOptions
-from awsglue.context import GlueContext
-from awsglue.job import Job
 from pyspark import SparkConf
 from pyspark.context import SparkContext
-
-bison_bucket = "s3://bison-321942852011-us-east-1/"
-
-n = DT.datetime.now()
-datastr = f"{n.year}-{n.month}-01"
+from awsglue.context import GlueContext
+from awsglue.job import Job
 
 args = getResolvedOptions(sys.argv, ["JOB_NAME"])
 
@@ -29,6 +25,13 @@ spark = glueContext.spark_session
 job = Job(glueContext)
 job.init(args["JOB_NAME"], args)
 
+bison_bucket = "s3://bison-321942852011-us-east-1/"
+data_catalog = "bison-metadata"
+county_dataname = "county_lists_000"
+output_dataname = "heatmatrix"
+n = DT.datetime.now()
+datastr = f"{n.year}-{n.month}-01"
+
 # .............................................................................
 def create_county_dict(input_df):
     """Create a dictionary of counties with species and counts.
@@ -39,6 +42,8 @@ def create_county_dict(input_df):
     Returns:
         counties: Dict of dictionaries {county: {species: count, ...}, ...}.
     """
+    county_dict = {}
+    species = set()
     # First county
     cnty = f"{input_df[0]['census_state']}_{input_df[0]['census_county']}"
     # Create a dictionary of dictionaries {county: {species: count, ...}, ...}
@@ -49,28 +54,32 @@ def create_county_dict(input_df):
         species.add(sp_name)
         if curr_cnty != cnty:
             cnty = curr_cnty
-            counties[cnty] = {sp_name: sp_count}
+            county_dict[cnty] = {sp_name: sp_count}
         else:
-            counties[cnty][sp_name] = sp_count
-    return counties
-
+            county_dict[cnty][sp_name] = sp_count
+    return county_dict, species
 
 # .............................................................................
 # Main
 # .............................................................................
 # Read county species list with occurrence counts
-county_species_list_s3_fullname = f"{bison_bucket}/out_data/county_lists_000"
+# county_species_list_s3_fullname = f"{bison_bucket}/out_data/{county_dataname}"
+# input_dynf = glueContext.create_dynamic_frame.from_options(
+#     format_options={},
+#     connection_type="s3",
+#     format="csv",
+#     delimiter="\t",
+#     connection_options={
+#         "paths": [county_species_list_s3_fullname],
+#         "recurse": True,
+#     },
+# )
 
-input_dynf = glueContext.create_dynamic_frame.from_options(
-    format_options={},
-    connection_type="s3",
-    format="parquet",
-    connection_options={
-        "paths": [county_species_list_s3_fullname],
-        "recurse": True,
-    },
-)
-print(f"Read BISON county x species data in  {county_species_list_s3_fullname} with {input_dynf.count()} records.")
+input_dynf = glueContext.create_dynamic_frame.from_catalog(
+    database=data_catalog, table_name=county_dataname)
+
+print(f"Read BISON county x species data in  {county_dataname} with "
+      f"{input_dynf.count()} records.")
 
 # input_df = spark.read.load(
 #     county_species_list_s3_fullname, format="csv", delimiter="\t", header=True)
@@ -79,32 +88,51 @@ print(f"Read BISON county x species data in  {county_species_list_s3_fullname} w
 # print(f"Read BISON county x species data in  {county_species_list_s3_fullname} "
 #       f"with {input_df.count()} county records.")
 
-# Track columns {species name: index}, rows {state_county: index}
-columns = {}
-rows = {}
-output_rows = []
-
-# Find index of field of interest
-name_idx = input_dynf.columns.index("scientificname")
-count_idx = input_dynf.columns.index("occ_count")
-
-sitexspecies_df = pandas.DataFrame()
-counties = {}
+# county_dict = create_county_dict(input_dynf)
+county_dict = {}
 species = set()
-
-county_dict = create_county_dict(input_dynf)
+# Create a dictionary of dictionaries {county: {species: count, ...}, ...}
+cnty = f"{input_dynf[0]['census_state']}_{input_dynf[0]['census_county']}"
+for idx, in_row in input_dynf.iterrows():
+    curr_cnty = f"{in_row['census_state']}_{in_row['census_county']}"
+    sp_name = in_row["scientificname"]
+    sp_count = in_row["occ_count"]
+    species.add(sp_name)
+    if curr_cnty != cnty:
+        cnty = curr_cnty
+        county_dict[cnty] = {sp_name: sp_count}
+    else:
+        county_dict[cnty][sp_name] = sp_count
 
 county_names = list(county_dict.keys())
 county_names.sort()
+print(f"Read {len(county_names)} counties and {len(species)} species")
 
 # Create an empty pandas dataframe
-df = pandas.DataFrame(columns=list(species), index=county_names)
+site_species_df = pandas.DataFrame(columns=list(species), index=county_names)
 # Fill dataframe
 for cnty_name in county_names:
     sp_dict = county_dict[cnty_name]
     for sp, cnt in sp_dict.items():
-        df[cnty_name][sp] = cnt
+        site_species_df[cnty_name][sp] = cnt
 # Convert to a pyspark dataframe
-heatmatrix_df = spark.createDataFrame(df)
+heatmatrix_df = spark.createDataFrame(site_species_df)
+
+heatmatrix_s3_fullname = f"{bison_bucket}/out_data/{output_dataname}.csv"
+heatmatrix_df.write.option("header", "true").csv(heatmatrix_s3_fullname)
+print(f"Wrote dataframe to {heatmatrix_s3_fullname}.")
+
+# glueContext.write_dynamic_frame.from_options(
+#     frame=gbif_filtered_dynf,
+#     connection_type="s3",
+#     connection_options={"path": bison_s3_fullname},
+#     format="parquet",
+#     format_options={
+#         "useGlueParquetWriter": True,
+#         "compression": "snappy"
+#     }
+# )
+# print(f"Wrote dynamic frame to {bison_s3_fullname}.")
+
 
 job.commit()
