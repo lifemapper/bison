@@ -30,7 +30,7 @@ job = Job(glueContext)
 job.init(args["JOB_NAME"], args)
 
 # .............................................................................
-def add_county_row(input_df):
+def create_county_dict(input_df):
     """Create a dictionary of counties with species and counts.
 
     Args:
@@ -61,7 +61,7 @@ def add_county_row(input_df):
 # Read county species list with occurrence counts
 county_species_list_s3_fullname = f"{bison_bucket}/out_data/county_lists_000"
 
-county_species_list_dynf = glueContext.create_dynamic_frame.from_options(
+input_dynf = glueContext.create_dynamic_frame.from_options(
     format_options={},
     connection_type="s3",
     format="parquet",
@@ -70,7 +70,7 @@ county_species_list_dynf = glueContext.create_dynamic_frame.from_options(
         "recurse": True,
     },
 )
-print(f"Read BISON county x species data in  {county_species_list_s3_fullname} with {county_species_list_dynf.count()} records.")
+print(f"Read BISON county x species data in  {county_species_list_s3_fullname} with {input_dynf.count()} records.")
 
 # input_df = spark.read.load(
 #     county_species_list_s3_fullname, format="csv", delimiter="\t", header=True)
@@ -85,39 +85,26 @@ rows = {}
 output_rows = []
 
 # Find index of field of interest
-name_idx = input_df.columns.index("scientificname")
-count_idx = input_df.columns.index("occ_count")
+name_idx = input_dynf.columns.index("scientificname")
+count_idx = input_dynf.columns.index("occ_count")
 
 sitexspecies_df = pandas.DataFrame()
 counties = {}
 species = set()
 
-# Iterate over rows/counties
-# # First county
-# cnty = f"{input_df[0]['census_state']}_{input_df[0]['census_county']}"
-#
-# for idx, in_row in input_df.iterrows():
-#     curr_cnty = f"{in_row['census_state']}_{in_row['census_county']}"
-#     sp_name = in_row["scientificname"]
-#     sp_count = in_row["occ_count"]
-#     species.add(sp_name)
-#     if curr_cnty != cnty:
-#         cnty = curr_cnty
-#         counties[cnty] = {sp_name: sp_count}
-#     else:
-#         counties[cnty][sp_name] =  sp_count
+county_dict = create_county_dict(input_dynf)
 
-county_names = list(counties.keys())
+county_names = list(county_dict.keys())
 county_names.sort()
 
 # Create an empty pandas dataframe
 df = pandas.DataFrame(columns=list(species), index=county_names)
 # Fill dataframe
 for cnty_name in county_names:
-    sp_dict = counties[cnty_name]
+    sp_dict = county_dict[cnty_name]
     for sp, cnt in sp_dict.items():
         df[cnty_name][sp] = cnt
 # Convert to a pyspark dataframe
-heatmatrix = spark.createDataFrame(df)
+heatmatrix_df = spark.createDataFrame(df)
 
 job.commit()
