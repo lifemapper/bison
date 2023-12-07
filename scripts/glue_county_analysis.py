@@ -29,9 +29,38 @@ spark = glueContext.spark_session
 job = Job(glueContext)
 job.init(args["JOB_NAME"], args)
 
+# .............................................................................
+def add_county_row(input_df):
+    """Create a dictionary of counties with species and counts.
+
+    Args:
+        input_df: dataframe from S3 table of counties with species counts
+
+    Returns:
+        counties: Dict of dictionaries {county: {species: count, ...}, ...}.
+    """
+    # First county
+    cnty = f"{input_df[0]['census_state']}_{input_df[0]['census_county']}"
+    # Create a dictionary of dictionaries {county: {species: count, ...}, ...}
+    for idx, in_row in input_df.iterrows():
+        curr_cnty = f"{in_row['census_state']}_{in_row['census_county']}"
+        sp_name = in_row["scientificname"]
+        sp_count = in_row["occ_count"]
+        species.add(sp_name)
+        if curr_cnty != cnty:
+            cnty = curr_cnty
+            counties[cnty] = {sp_name: sp_count}
+        else:
+            counties[cnty][sp_name] = sp_count
+    return counties
+
+
+# .............................................................................
+# Main
+# .............................................................................
 # Read county species list with occurrence counts
 county_species_list_s3_fullname = f"{bison_bucket}/out_data/county_lists_000"
-# BISON raw dataset
+
 county_species_list_dynf = glueContext.create_dynamic_frame.from_options(
     format_options={},
     connection_type="s3",
@@ -43,36 +72,52 @@ county_species_list_dynf = glueContext.create_dynamic_frame.from_options(
 )
 print(f"Read BISON county x species data in  {county_species_list_s3_fullname} with {county_species_list_dynf.count()} records.")
 
-agg_df = spark.read.load(
-    county_species_list_s3_fullname, format="csv", delimiter="\t", header=True)
-print(f"Read BISON county x species data in  {county_species_list_s3_fullname} "
-      f"with {agg_df.count()} county records.")
+# input_df = spark.read.load(
+#     county_species_list_s3_fullname, format="csv", delimiter="\t", header=True)
+# # Make sure indexes pair with number of rows
+# input_df = input_df.reset_index()
+# print(f"Read BISON county x species data in  {county_species_list_s3_fullname} "
+#       f"with {input_df.count()} county records.")
 
 # Track columns {species name: index}, rows {state_county: index}
 columns = {}
 rows = {}
+output_rows = []
 
 # Find index of field of interest
-name_idx = agg_df.columns.index("scientificname")
-count_idx = agg_df.columns.index("occ_count")
+name_idx = input_df.columns.index("scientificname")
+count_idx = input_df.columns.index("occ_count")
+
+sitexspecies_df = pandas.DataFrame()
+counties = {}
+species = set()
 
 # Iterate over rows/counties
-row_cnt = agg_df.size[0]
-# agg_df.foreach()
-for i in range(row_cnt):
-    # Rows = counties
-    county = f"{agg_df[i]['census_state']}_{agg_df[i]['census_county']}"
-    rows[county] = i
-    # Columns = species
-    species = agg_df[i]["scientificname"]
-    count = agg_df[i]["occ_count"]
-    # Choose existing species column
-    if species in columns.keys():
-        col_idx = columns[species]
-    # or create another
-    else:
-        col_idx = len(columns)
-        columns[species] = col_idx
-    # Count each species for county
-    agg_df.loc[i][col_idx] = count
+# # First county
+# cnty = f"{input_df[0]['census_state']}_{input_df[0]['census_county']}"
+#
+# for idx, in_row in input_df.iterrows():
+#     curr_cnty = f"{in_row['census_state']}_{in_row['census_county']}"
+#     sp_name = in_row["scientificname"]
+#     sp_count = in_row["occ_count"]
+#     species.add(sp_name)
+#     if curr_cnty != cnty:
+#         cnty = curr_cnty
+#         counties[cnty] = {sp_name: sp_count}
+#     else:
+#         counties[cnty][sp_name] =  sp_count
+
+county_names = list(counties.keys())
+county_names.sort()
+
+# Create an empty pandas dataframe
+df = pandas.DataFrame(columns=list(species), index=county_names)
+# Fill dataframe
+for cnty_name in county_names:
+    sp_dict = counties[cnty_name]
+    for sp, cnt in sp_dict.items():
+        df[cnty_name][sp] = cnt
+# Convert to a pyspark dataframe
+heatmatrix = spark.createDataFrame(df)
+
 job.commit()
