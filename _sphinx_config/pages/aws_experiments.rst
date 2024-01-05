@@ -1,10 +1,12 @@
+#######################
 AWS workflow experiments
-==========================
+#######################
+
 
 AWS Batch
 ***************
 
-Preparation
+Overview
 ------------
 
 1. Getting started
@@ -48,7 +50,7 @@ Workflow:
 -------------
 
 Prep:
-............
+
 * Create a Docker image from osgeo/gdal with
   * python dependencies
   * bison code
@@ -56,7 +58,7 @@ Prep:
 * Save on S3 or Github
 
 Input data acquisition:
-............
+
 * Create EC2 spot image
 
   * download data from GBIF
@@ -64,7 +66,6 @@ Input data acquisition:
   * copy to S3
 
 Input data prep:
-............
 * Create a Step Workflow to:
 
   * crawl for metadata
@@ -72,8 +73,7 @@ Input data prep:
   * add annotation fields
   * count records and identify subsets
 
-Batch
-............
+Batch:
 * Create AWS Batch Compute Environment
 
   * name
@@ -94,3 +94,100 @@ Batch
   * Command: Define the command that should be executed within the container.
 
 * Submit AWS Batch Job
+
+#######################
+Glue - Interactive Development
+#######################
+
+`AWS Glue Studio with Jupyter
+<https://docs.aws.amazon.com/glue/latest/dg/create-notebook-job.html>`_
+
+`Local development with Jupyter
+<https://docs.aws.amazon.com/glue/latest/dg/aws-glue-programming-etl-format-parquet-home.html>`_
+
+
+Problem/Solution
+--------------------
+Interactive Samples fail with error (File Not Found) for public GBIF data
+
+* Create database in AWS Glue for metadata about project inputs
+
+  * In the DB, create table for each data input, using Glue Crawler
+
+Problem/Solution
+--------------------
+
+Interactive Data Preview fails for public and private data
+
+* Use AWS Glue DataBrew to visually examine data
+
+  * First add dataset to Glue Data Catalog
+        "A table is the metadata definition that represents your data, including its
+        schema. A table can be used as a source or target in a job definition."
+  * Next add dataset to Glue DataBrew
+
+Problem/Solution
+--------------------
+AWS Glue DataBrew add dataset, create connection to RDS, shows no tables in
+bison-metadata database.
+
+DataBrew for visual representation of data, not examination
+
+
+#######################
+BISON AWS data/tools
+#######################
+
+Amazon S3
+-----------------------------------------
+
+ * Use Glue to Subset GBIF ODR data into local bucket
+   arn:aws:s3:::bison-321942852011-us-east-1
+ * Crawl GBIF data s3://gbif-open-data-us-east-1/occurrence/2023-11-01/occurrence.parquet/
+   to create gbif-odr-occurrence_parquet table in Data Catalog tables
+
+
+Amazon RDS, PostgreSQL, bison-db-test
+-----------------------------------------
+    * Create JDBC connection from Glue, then TestConnection
+
+        InvalidInputException: VPC S3 endpoint validation failed for SubnetId:
+        subnet-0861208f72b8eac53. VPC: vpc-09d4c9a0524b17382. Reason: Could not find
+        S3 endpoint or NAT gateway for subnetId: subnet-0861208f72b8eac53 in Vpc
+        vpc-09d4c9a0524b17382
+
+AWS Glue Data Catalog
+-----------------------------------------
+  * bison-metadata Database, populated by
+  * AWS Glue Crawler, crawls data to create tables of metadata/schema
+    * GBIF Crawler to crawl GBIF Open Data Registry 11-2023 --> gbif-odr-occurrence_parquet table
+    * Does Glue Crawler only access S3?
+
+* To connect to RDS, add Glue/Data Catalog/Connection
+
+    * endpoint: bison-db-test.cqvncffkwz9t.us-east-1.rds.amazonaws.com
+    * dbname: bison_db_test
+    * connection url: jdbc:postgresql://bison-db-test.cqvncffkwz9t.us-east-1.rds.amazonaws.com:5432/bison_db_test
+
+    * "InvalidInputException: Unable to resolve any valid connection"
+      Docs point to error logs in /aws-glue/testconnection/output, but this does not exist
+      check https://repost.aws/knowledge-center/glue-test-connection-failed
+
+    * Added RDS database VPC, 1 subnet, all 3 security groups
+    * Result: InvalidInputException:
+        At least one security group must open all ingress ports.To limit traffic, the
+        source security group in your inbound rule can be restricted to the same
+        security group
+    * Added inbound and outbound rules to my security group for postgresql, same error
+
+
+
+        Add policy to my user:
+        https://docs.aws.amazon.com/glue/latest/dg/configure-iam-for-glue.html
+        Added policy according to instructions in Step 3, verbatim -
+        Error:
+
+Permissions Solution:
+--------------------
+Add AdministratorAccess  to Role, the audit the calls later to identify
+minimum permissions needed.

@@ -60,10 +60,7 @@ information is below under **Protected Areas Database**.
 Currently, much of our input data (GBIF, census county/state and AIANNH) are in
 EPSG:4326, using decimal degrees.
 
-USGS may choose to change the geospatial regions for aggregation.  If so, the REGION
-class in `constants.py <../../bison/common/constants.py>`_
-must be changed, and code changed slightly.  Only the county/state data is required for
-matching RIIS records to occurrence records.
+
 
 USGS RIIS data
 ----------------
@@ -79,55 +76,13 @@ The latest US-RIIS data is present in this Github repository in the `data/input
 <../../data/input>`_ directory.  If a new
 version is available, update it, and any data constants that may have changed.
 
-Data constants
-^^^^^^^^^^^^^^^^
-* Check/modify attributes in the RIIS_DATA class in the `constants.py
-  <../../bison/common/constants.py>`_ file:
-* Edit the filename in DATA_DICT_FNAME
-* Check the file header, and if necessary, edit the fields in SPECIES_GEO_HEADER and
-  matching fields in SPECIES_GEO_KEY, GBIF_KEY, ITIS_KEY, LOCALITY_FLD, KINGDOM_FLD,
-  SCINAME_FLD, SCIAUTHOR_FLD, RANK_FLD, ASSESSMENT_FLD, TAXON_AUTHORITY_FLD.
 
+GBIF Data
+--------------
+GBIF data can be requested and retrieved from the data portal in DarwinCore format,
+as in Year 4, or subsetted directly from the GBIF Open Data Registry (ODR) in AWS S3.
 
-GBIF data options
-----------------
-
-**Option1:** Get a current version of GBIF data from the GBIF portal
-  * Create a user account on the GBIF website, then login and
-  * request the data by putting the following URL in a browser:
-    https://www.gbif.org/occurrence/search?country=US&has_coordinate=true&has_geospatial_issue=false&occurrence_status=present
-  * adding a restriction to occurrence data identified to species or a lower rank
-    will reduce the amount of data that will be filtered out.
-
-Verify that the file occurrence.txt contains GBIF-annotated records that will be the
-primary input file.  The primary input file will contain fieldnames in the first line
-of the file, and those listed as values for GBIF class attributes with (attribute)
-names ending in _FLD or _KEY should all be among the fields.
-
-The query will request a download, which will take some time for GBIF to assemble.
-GBIF will send an email with a link for downloading the Darwin Core Archive, a
-very large zipped file.  Only the occurrence.txt file is required for data processing.
-Rename the file with the date for clarity on what data is being used. Use
-the following pattern gbif_yyyy-mm-dd.csv so that interim data filenames can be
-created and parsed consistently.  Note the underscore (_) between 'gbif' and the date, and
-the dash (-) between date elements.
-
-::
-
-    unzip <dwca zipfile> occurrence.txt
-    mv occurrence.txt gbif_2023-08-23.csv
-
-**Option 2:** Use the GBIF Open Data Registry on AWS S3.  The data contains a subset of
-Darwin Core fields.  More information is in `GBIF Ingestion`_ below.
-
-
-Data constants
-^^^^^^^^^^^^^^^^
-Check/modify attributes in the GBIF class in the `constants.py
-<../..//bison/common/constants.py>`_ file:
-
-* Edit the filename in DATA_DICT_FNAME
-* Verify that the DWCA_META_FNAME is still the correct file for field definitions.
+Methods are documented below in `GBIF Data Ingestion`_.
 
 
 Region Data
@@ -136,8 +91,6 @@ Region Data
 **Data location**:  The geospatial data may be placed in any accessible directory, but
 must be specified in the "geo_path" value of the configuration file `process_gbif.json
 <../../data/config/process_gbif.json>`_.
-Relative filepaths to the data are specified in the REGION class of the file
-`constants.py <https://github.com/lifemapper/bison/tree/main/bison/common/constants.py>`_ .
 
 Census: State and County
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -151,11 +104,6 @@ Census, Cartographic Boundary Files, 2021
 **Counties**
 * 1:500,000, cb_2021_us_county_500k.zip
 
-Check/modify attributes in the REGION class in the `constants.py
-<../../common/constants.py>`_ file:
-including:  COUNTY["file"] for the filename and the keys in COUNTY["map"] for
-fieldnames within that shapefile.
-
 Census: AIANNH
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -166,10 +114,6 @@ https://www.census.gov/geographies/mapping-files/time-series/geo/cartographic-bo
 **American Indian/Alaska Native Areas/Hawaiian Home Lands**, AIANNH
 * 1:500,000, cb_2021_us_aiannh_500k.zip
 
-Check/modify attributes in the REGION class in the `constants.py
-<../../bison/common/constants.py>`_ file:
-including:  AIANNH["file"] for the filename and the keys in AIANNH["map"] for
-fieldnames within that shapefile.
 
 Protected Areas Database, US-PAD (not currently used)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -229,16 +173,60 @@ different data storage and processing strategies - they each have speed and cost
 and cons.
 
 
-GBIF Ingestion
----------------------------
-* **Option 1:** Subset GBIF Open Data Registry to Bison S3 bucket, serverless, script
-  `glue_bison_subset_gbif.py <../../scripts/glue_bison_subset_gbif.py>`_
-* **Option 2:** Query GBIF portal manually, then initiate an EC2 Spot instance to
-  download and subset it, saving it to S3. The script that downloads, subsets, and
-  uploads data from the EC2 Spot instance is installed on the EC2
-  instance on creation, `user_data_for_ec2spot.py
-  <../../scripts/user_data_for_ec2spot.py>`_.  The script that builds and instantiates
-  the EC2 Spot instance is: `gbif_to_s3.py <../../scripts/gbif_to_s3.py>`_ .
+GBIF Data Ingestion
+--------------------
+
+**Option1:** Darwin Core via GBIF data portal
+
+To get a current version of GBIF data via the portal:
+  * Create a user account on the GBIF website, then login and
+  * request the data by putting the following URL in a browser:
+    https://www.gbif.org/occurrence/search?country=US&has_coordinate=true&has_geospatial_issue=false&occurrence_status=present
+  * adding a restriction to occurrence data identified to species or a lower rank
+    will reduce the amount of data that will be filtered out.
+
+The query will request a download, which will take some time for GBIF to assemble.
+GBIF will send an email with a link for downloading the Darwin Core Archive, a
+very large zipped file.  The download file will have an identifier that is used as the
+name of the download file.  Note this identifier and edit the variable DOWNLOAD_NAME in
+the user_data_for_ec2spot.sh script.  Only the occurrence.txt file is required for data
+processing.  Rename the file with the date for clarity on what data is being used. Use
+the following pattern gbif_yyyy-mm-dd.csv so that interim data filenames can be
+created and parsed consistently.  Note the underscore (_) between 'gbif' and the date,
+and the dash (-) between date elements.
+
+Verify that the file occurrence.txt within the zipfile contains GBIF-annotated records
+that will be the primary input file.  The primary input file will contain fieldnames in
+the first line of the file, and those listed as values for GBIF class attributes with
+(attribute) names ending in _FLD or _KEY should all be among the fields.
+
+Two scripts are used to ingest the data:
+
+  * `gbif_to_s3.py <../../scripts/gbif_to_s3.py>`_ launches a Spot EC2 instance which
+    will download the data, extract the occurrence dataset, then upload it to S3.
+  * `user_data_for_ec2spot.sh <../../scripts/user_data_for_ec2spot.sh>`_ is a script
+    that is written to the EC2 Spot instance and then executed on instantiation.  In
+    Update the variable DOWNLOAD_NAME in this script with the identifier for the
+    download file.
+
+References:
+
+* `AWS S3 Select Doc
+  <https://docs.aws.amazon.com/AmazonS3/latest/userguide/selecting-content-from-objects.html>`_
+* `blog post
+  <https://aws.amazon.com/blogs/storage/querying-data-without-servers-or-databases-using-amazon-s3-select/>`_
+
+**Option 2:** Occurrence Records via AWS S3 Open Data Registry
+
+The ODR data contains a subset of data fields, but includes the key fields of
+accepted scientific name (resolved to the GBIF Backbone Taxonomy), taxonomic rank,
+and latitude and longitude.
+Ingest in AWS Glue Studio ETL Job: bison_subset_gbif, also documented in
+`glue_bison_subset_gbif.py <../../scripts/glue_bison_subset_gbif.py>`_ file.
+
+As of 2023/11/20, subseting via this Glue job took 14 hours and resulted in about
+923 million records.
+
 
 Reference Data
 -----------------
@@ -270,6 +258,16 @@ Setup
     * insert geospatial data: census boundaries, native lands, PAD
 
 * Redshift?
+
+Glue
+--------------
+
+* Can add python code from files in S3
+* https://docs.aws.amazon.com/glue/latest/dg/aws-glue-programming-python-libraries.html
+
+    * In Job Details tab, Advanced Properties, Job Parameters add
+        key --additional-python-modules
+        value  s3://bison-321942852011-us-east-1/lib/SQLAlchemy-2.0.23.tar.gz
 
 Experiment
 ---------------------------
@@ -305,3 +303,34 @@ Workflow
     https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3/client/put_object.html#
 
 * pyspark
+
+******************
+Data constants
+******************
+
+Various constants indicate fieldnames or values of interest in code.  Check/modify
+attributes in the `constants.py <../../bison/common/constants.py>`_ file:
+
+GBIF:
+
+In the GBIF class:
+    * Edit the filename in DATA_DICT_FNAME
+    * Verify that the DWCA_META_FNAME is still the correct file for field definitions.
+
+USGS aggregation regions:
+
+USGS may choose to change the geospatial regions for aggregation.  If so, the REGION
+class must be changed, and code changed slightly.  Only the county/state data is
+required for matching RIIS records to occurrence records. Each region type
+(class member) in this class contains a dictionary of metadata relating to that region.
+The key "file" contains the relative path to the shapefile, and the key "map" contains
+a dictionary of fieldnames within that shapefile mapped to the corresponding fieldnames
+to be appended to the occurrence data.
+
+US Registry for Introduced and Invasive Species (RIIS):
+
+In the RIIS_DATA class:
+    * Edit the filename in DATA_DICT_FNAME
+    * Check the file header, and if necessary, edit the fields in SPECIES_GEO_HEADER and
+      matching fields in SPECIES_GEO_KEY, GBIF_KEY, ITIS_KEY, LOCALITY_FLD, KINGDOM_FLD,
+      SCINAME_FLD, SCIAUTHOR_FLD, RANK_FLD, ASSESSMENT_FLD, TAXON_AUTHORITY_FLD.
