@@ -206,6 +206,30 @@ lrwxrwxrwx 1 astewart astewart   35 Feb 15 12:16 tests -> /home/astewart/git/bis
 ```commandline
 head -n 10001 occurrence.txt > gbif_2023-01-26_10k.csv
 ```
+# AWS prep
+
+## Local machine for testing
+
+* Create a virtual environment, activate
+* Pip install requirements*.txt files
+* Install boto3 and botocore for local access
+* Ensure AWS key is in ~/.ssh/ directory
+* Create  ~/.aws/config file
+
+```commandline
+[default]
+region = <region>
+output = json
+glue_role_arn = <service_role>
+```
+
+Create ~/.aws/credentials file
+
+```commandline
+[default]
+aws_access_key_id = <access_key_id>
+aws_secret_access_key = <secret_access_key>
+```
 
 # Run all processes on GBIF data
 
