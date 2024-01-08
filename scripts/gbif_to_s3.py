@@ -34,7 +34,7 @@ TRIGGER_FILENAME = "go.txt"
 # EC2 Spot Instance
 SPOT_TEMPLATE_NAME = f"{PROJ_NAME}_launch_template"
 # List of instance types at https://aws.amazon.com/ec2/spot/pricing/
-INSTANCE_TYPE = "a1.medium"
+INSTANCE_TYPE = "t2.micro"
 # INSTANCE_TYPE = "a1.large"
 # TODO: Define the GBIF download file as an environment variable in template
 #  instead of user_data script
@@ -86,7 +86,7 @@ def get_logger(log_directory, log_name, log_level=logging.INFO):
 # Tools for experimentation
 # --------------------------------------------------------------------------------------
 # ----------------------------------------------------
-def get_launch_template_from_instance(instance_id):
+def get_launch_template_from_instance(instance_id, region_name=REGION):
     """Return a JSON formatted template from an existing EC2 instance.
 
     Args:
@@ -112,7 +112,7 @@ def delete_launch_template(template_name):
     """
     response = None
     ec2_client = boto3.client("ec2")
-    lnch_tmpl = _get_launch_template(template_name)
+    lnch_tmpl = get_launch_template(template_name)
     if lnch_tmpl is not None:
         response = ec2_client.delete_launch_template(LaunchTemplateName=template_name)
     return response
@@ -390,7 +390,7 @@ def _define_spot_launch_template_data(
 
 # --------------------------------------------------------------------------------------
 # On local machine: Describe the launch_template with the template_name
-def _get_launch_template(template_name):
+def get_launch_template(template_name):
     ec2_client = boto3.client("ec2", region_name=REGION)
     lnch_temp = None
     try:
@@ -426,7 +426,7 @@ def create_spot_launch_template(
         success: boolean flag indicating the success of creating launch template.
     """
     success = False
-    template = _get_launch_template(template_name)
+    template = get_launch_template(template_name)
     if template is not None:
         success = True
     else:
