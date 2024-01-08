@@ -1,6 +1,15 @@
 -- Mount S3 GBIF Open Data Registry as an external table, then subset it for BISON
 
--- Create a schema for mounting external data
+-------------------
+-- Set variables
+-------------------
+-- TODO: Script the date for previous and current original and subset data
+
+
+-------------------
+-- Mount GBIF
+-------------------
+-- Create a schema for mounting external data, throws error if pre-existing
 CREATE external schema redshift_spectrum
     FROM data catalog
     DATABASE dev
@@ -8,14 +17,14 @@ CREATE external schema redshift_spectrum
     CREATE external database if NOT exists;
 
 -- Mount a table for subset of GBIF ODR data in S3
-CREATE EXTERNAL TABLE redshift_spectrum.occurrence_2023_12_parquet (
+CREATE EXTERNAL TABLE redshift_spectrum.occurrence_2024_01_01_parquet (
     gbifid	VARCHAR(max),
     datasetkey	VARCHAR(max),
     occurrenceid	VARCHAR(max),
     kingdom	VARCHAR(max),
     phylum	VARCHAR(max),
 	class	VARCHAR(max),
-	order	VARCHAR(max),
+	_order	VARCHAR(max),
 	family	VARCHAR(max),
 	genus	VARCHAR(max),
 	species	VARCHAR(max),
@@ -61,21 +70,25 @@ CREATE EXTERNAL TABLE redshift_spectrum.occurrence_2023_12_parquet (
 	issue    SUPER
 )
     STORED AS PARQUET
-    LOCATION 's3://gbif-open-data-us-east-1/occurrence/2023-12-01/occurrence.parquet/';
+    LOCATION 's3://gbif-open-data-us-east-1/occurrence/2024-01-01/occurrence.parquet/';
 
--- Create a BISON table with a subset of records and subset of fields
-
+-- TODO: Get creation time of existing table
 SELECT create_time FROM INFORMATION_SCHEMA.TABLES
-WHERE table_schema = 'dev' AND table_name = 'public.bison_subset';
+WHERE table_schema = 'publlic' AND table_name = 'bison_subset';
 
-DROP TABLE public.bison_subset;
+-------------------
+-- Subset to BISON
+-------------------
+-- Drop existing table;
+DROP TABLE public.bison_subset IF EXISTS;
+-- Create a BISON table with a subset of records and subset of fields
 CREATE TABLE public.bison_subset AS
 	SELECT
 		gbifid, species, taxonrank, scientificname, countrycode, stateprovince,
 		occurrencestatus, publishingorgkey, day, month, year, taxonkey, specieskey,
 		basisofrecord,
 		ST_Makepoint(decimallongitude, decimallatitude) as geom
-	FROM redshift_spectrum.occurrence_2023_12_parquet
+	FROM redshift_spectrum.occurrence_2024_01_01_parquet
 	WHERE countrycode = 'US'
 	  AND decimallatitude IS NOT NULL
 	  AND decimallongitude IS NOT NULL
@@ -87,14 +100,22 @@ CREATE TABLE public.bison_subset AS
 	  AND basisofrecord IN
 	    ('HUMAN_OBSERVATION', 'OBSERVATION', 'OCCURRENCE', 'PRESERVED_SPECIMEN');
 
+-------------------
+-- Misc Queries
+-------------------
+-- Count records from full GBIF and BISON subset
+SELECT COUNT(*) from dev.redshift_spectrum.occurrence_2024_01_01_parquet;
 SELECT COUNT(*) FROM public.bison_subset;
-
+-- List databases (Redshift, Glue, and RDS)
+SELECT * FROM SVV_EXTERNAL_DATABASES WHERE databasename = 'dev';
+-- List Redshift tables and creation times
 SELECT reloid AS tableid, nspname as schemaname, relname as tablename, relcreationtime
 FROM pg_class_info cls LEFT JOIN pg_namespace ns ON cls.relnamespace=ns.oid
 WHERE cls.relnamespace = ns.oid
   AND schemaname = 'public';
 
-SELECT * FROM SVV_EXTERNAL_DATABASES WHERE
-databasename = 'dev';
-
-SELECT COUNT(*) from dev.redshift_spectrum.occurrence_2023_12_parquet;
+-------------------
+-- Cleanup
+-------------------
+-- Unmount original GBIF data
+DROP TABLE redshift_spectrum.occurrence_2024_01_01_parquet;

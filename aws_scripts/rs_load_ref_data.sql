@@ -1,4 +1,11 @@
--- Load reference region shapefiles and US Registry of Introduced and Invasive Species
+-- Load reference region shapefiles and US RIIS into Redshift
+DROP TABLE pad;
+CREATE TABLE pad (
+);
+
+COPY pad FROM 's3://bison-321942852011-us-east-1/input_data/region/pad/PADUS3_0VectorAnalysisFile_ClipCensus.zip'
+FORMAT SHAPEFILE
+IAM_role DEFAULT;
 
 -- Load American Indian, Alaskan Native, Native Hawaiian lands (AIANNH)
 DROP TABLE aiannh;
@@ -14,7 +21,6 @@ CREATE TABLE aiannh (
    ALAND    VARCHAR(max),
    AWATER   VARCHAR(max)
 );
-
 COPY aiannh FROM 's3://bison-321942852011-us-east-1/input_data/region/cb_2021_us_aiannh_500k.shp'
 FORMAT SHAPEFILE
 --SIMPLIFY AUTO
@@ -39,7 +45,6 @@ CREATE TABLE county (
    ALAND    VARCHAR(max),
    AWATER   VARCHAR(max)
 );
-
 COPY county FROM 's3://bison-321942852011-us-east-1/input_data/region/cb_2021_us_county_500k.shp'
 FORMAT SHAPEFILE
 --SIMPLIFY AUTO
