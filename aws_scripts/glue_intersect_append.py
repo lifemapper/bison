@@ -19,6 +19,7 @@ glueContext = GlueContext(sc)
 spark = glueContext.spark_session
 job = Job(glueContext)
 
+
 # ----------------------------------------------------
 def get_secret(secret_name, region):
     """Get a secret from the Secrets Manager for connection authentication.
