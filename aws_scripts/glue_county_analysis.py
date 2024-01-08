@@ -3,7 +3,6 @@ import sys
 import datetime as DT
 import pandas
 
-from awsglue.transforms import *
 from awsglue.utils import getResolvedOptions
 from pyspark import SparkConf
 from pyspark.context import SparkContext
@@ -32,6 +31,7 @@ output_dataname = "heatmatrix"
 n = DT.datetime.now()
 datastr = f"{n.year}-{n.month}-01"
 
+
 # .............................................................................
 def create_county_dict(input_df):
     """Create a dictionary of counties with species and counts.
@@ -47,7 +47,7 @@ def create_county_dict(input_df):
     # First county
     cnty = f"{input_df[0]['census_state']}_{input_df[0]['census_county']}"
     # Create a dictionary of dictionaries {county: {species: count, ...}, ...}
-    for idx, in_row in input_df.iterrows():
+    for _idx, in_row in input_df.iterrows():
         curr_cnty = f"{in_row['census_state']}_{in_row['census_county']}"
         sp_name = in_row["scientificname"]
         sp_count = in_row["occ_count"]
@@ -58,6 +58,7 @@ def create_county_dict(input_df):
         else:
             county_dict[cnty][sp_name] = sp_count
     return county_dict, species
+
 
 # .............................................................................
 # Main
@@ -93,7 +94,7 @@ county_dict = {}
 species = set()
 # Create a dictionary of dictionaries {county: {species: count, ...}, ...}
 cnty = f"{input_dynf[0]['census_state']}_{input_dynf[0]['census_county']}"
-for idx, in_row in input_dynf.iterrows():
+for _idx, in_row in input_dynf.iterrows():
     curr_cnty = f"{in_row['census_state']}_{in_row['census_county']}"
     sp_name = in_row["scientificname"]
     sp_count = in_row["occ_count"]
