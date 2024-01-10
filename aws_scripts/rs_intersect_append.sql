@@ -88,21 +88,24 @@ UPDATE public.bison_subset_2024_01_01
 -------------------
 -- Check some records
 SELECT * FROM public.bison_subset_2024_01_01 WHERE census_state IS NOT NULL LIMIT 10;
-SELECT COUNT(*) FROM public.bison_subset_2024_01_01
-    WHERE census_state IS NOT NULL AND riis_occurrence_id IS NULL;
+SELECT * FROM public.bison_subset_2024_01_01
+  WHERE census_state IS NOT NULL AND riis_occurrence_id IS NOT NULL LIMIT 10;
 
--- What percentage of records could be annotated with state
+-- What percentage of records could be annotated with state and matches RIIS records
 SELECT COUNT(*) FROM public.bison_subset_2024_01_01;
 SELECT COUNT(*) FROM public.bison_subset_2024_01_01 WHERE census_state IS NOT NULL;
+SELECT COUNT(*) FROM public.bison_subset_2024_01_01
+    WHERE census_state IS NOT NULL AND riis_occurrence_id IS NOT NULL;
 
 -------------------
 -- Export data
 -------------------
--- Write to S3
+-- Write to S3 as Parquet, defaults to SNAPPY compression
 UNLOAD (
     'SELECT * FROM public.bison_subset_2024_01_01 WHERE census_state IS NOT NULL')
     TO 's3://bison-321942852011-us-east-1/annotated_records/bison_2024_01_01_'
     IAM_role DEFAULT
-    DELIMITER AS '\t'
+    FORMAT AS PARQUET
+    -- DELIMITER AS '\t'
     manifest
     HEADER;

@@ -82,7 +82,7 @@ WHERE table_schema = 'publlic' AND table_name = 'bison_subset';
 -- Drop existing table;
 DROP TABLE public.bison_subset IF EXISTS;
 -- Create a BISON table with a subset of records and subset of fields
-CREATE TABLE public.bison_subset AS
+CREATE TABLE public.bison_subset_2024_01_01 AS
 	SELECT
 		gbifid, species, taxonrank, scientificname, countrycode, stateprovince,
 		occurrencestatus, publishingorgkey, day, month, year, taxonkey, specieskey,
