@@ -24,25 +24,25 @@ SELECT * from aiannh_counts_2024_01_01 ORDER BY aiannh_name, riis_assessment LIM
 
 -- Create lists of species for each region with counts
 CREATE TABLE public.county_lists_2024_01_01 AS
-    SELECT DISTINCT census_state, census_county, taxonkey, scientificname, riis_assessment,
+    SELECT DISTINCT census_state, census_county, taxonkey, species, riis_assessment,
         COUNT(*) AS occ_count
     FROM  bison_subset_2024_01_01 WHERE census_state IS NOT NULL
-    GROUP BY census_state, census_county, taxonkey, scientificname, riis_assessment;
+    GROUP BY census_state, census_county, taxonkey, species, riis_assessment;
 CREATE TABLE public.state_lists_2024_01_01 AS
-    SELECT DISTINCT census_state, taxonkey, scientificname, riis_assessment,
+    SELECT DISTINCT census_state, taxonkey, species, riis_assessment,
         COUNT(*) AS occ_count
     FROM  bison_subset_2024_01_01 WHERE census_state IS NOT NULL
-    GROUP BY census_state, taxonkey, scientificname, riis_assessment;
+    GROUP BY census_state, taxonkey, species, riis_assessment;
 CREATE TABLE public.aiannh_lists_2024_01_01 AS
-    SELECT DISTINCT aiannh_name, taxonkey, scientificname, riis_assessment,
+    SELECT DISTINCT aiannh_name, taxonkey, species, riis_assessment,
         COUNT(*) AS occ_count
     FROM  bison_subset_2024_01_01 WHERE census_state IS NOT NULL
-    GROUP BY aiannh_name, taxonkey, scientificname, riis_assessment;
+    GROUP BY aiannh_name, taxonkey, species, riis_assessment;
 
 -- Check counts
-SELECT * from county_lists_2024_01_01 ORDER BY census_state, census_county, scientificname LIMIT 10;
-SELECT * from state_lists_2024_01_01 ORDER BY census_state, scientificname LIMIT 10;
-SELECT * from aiannh_lists_2024_01_01 ORDER BY aiannh_name, scientificname LIMIT 10;
+SELECT * from county_lists_2024_01_01 ORDER BY census_state, census_county, species LIMIT 10;
+SELECT * from state_lists_2024_01_01 ORDER BY census_state, species LIMIT 10;
+SELECT * from aiannh_lists_2024_01_01 ORDER BY aiannh_name, species LIMIT 10;
 
 -- Write data summaries to S3 as Parquet, defaults to SNAPPY compression
 -- Option: add "PARTITION BY (region_field)" to separate regions into individual files;
@@ -67,19 +67,19 @@ UNLOAD (
     PARALLEL OFF;
 
 UNLOAD (
-    'SELECT * FROM county_lists_2024_01_01 ORDER BY census_state, census_county, scientificname')
+    'SELECT * FROM county_lists_2024_01_01 ORDER BY census_state, census_county, species')
     TO 's3://bison-321942852011-us-east-1/out_data/county_lists_'
     IAM_role DEFAULT
     FORMAT AS PARQUET
     PARALLEL OFF;
 UNLOAD (
-    'SELECT * FROM state_lists_2024_01_01 ORDER BY census_state, scientificname')
+    'SELECT * FROM state_lists_2024_01_01 ORDER BY census_state, species')
     TO 's3://bison-321942852011-us-east-1/out_data/state_lists_'
     IAM_role DEFAULT
     FORMAT AS PARQUET
     PARALLEL OFF;
 UNLOAD (
-    'SELECT * FROM aiannh_lists_2024_01_01 ORDER BY aiannh_name, scientificname')
+    'SELECT * FROM aiannh_lists_2024_01_01 ORDER BY aiannh_name, species')
     TO 's3://bison-321942852011-us-east-1/out_data/aiannh_lists_'
     IAM_role DEFAULT
     FORMAT AS PARQUET
