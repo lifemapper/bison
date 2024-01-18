@@ -26,8 +26,8 @@ job.init(args["JOB_NAME"], args)
 
 bison_bucket = "s3://bison-321942852011-us-east-1/"
 data_catalog = "bison-metadata"
-county_dataname = "county_lists_000"
-output_dataname = "heatmatrix"
+county_dataname = "county_lists_000.parquet"
+output_dataname = "heatmatrix.parquet"
 n = DT.datetime.now()
 datastr = f"{n.year}-{n.month}-01"
 
@@ -42,45 +42,53 @@ def create_county_dict(input_df):
     Returns:
         counties: Dict of dictionaries {county: {species: count, ...}, ...}.
     """
+    # Create a dictionary of dictionaries {county: {species: count, ...}, ...}
     county_dict = {}
     species = set()
-    # First county
-    cnty = f"{input_df[0]['census_state']}_{input_df[0]['census_county']}"
-    # Create a dictionary of dictionaries {county: {species: count, ...}, ...}
+
+    # Create a dictionary for the first entry
+    first_row = input_df[0]
+    cnty = f"{first_row['census_state']}_{first_row['census_county']}"
+    county_dict[cnty] = {first_row["scientificname"]: first_row["occ_count"]}
+    # Iterate through rows
     for _idx, in_row in input_df.iterrows():
         curr_cnty = f"{in_row['census_state']}_{in_row['census_county']}"
         sp_name = in_row["scientificname"]
         sp_count = in_row["occ_count"]
         species.add(sp_name)
+        # New county, new dictionary
         if curr_cnty != cnty:
             cnty = curr_cnty
             county_dict[cnty] = {sp_name: sp_count}
+        # Add to existing county dictionary
         else:
             county_dict[cnty][sp_name] = sp_count
-    return county_dict, species
+    return species, county_dict
 
 
 # .............................................................................
 # Main
 # .............................................................................
 # Read county species list with occurrence counts
-# county_species_list_s3_fullname = f"{bison_bucket}/out_data/{county_dataname}"
-# input_dynf = glueContext.create_dynamic_frame.from_options(
-#     format_options={},
-#     connection_type="s3",
-#     format="csv",
-#     delimiter="\t",
-#     connection_options={
-#         "paths": [county_species_list_s3_fullname],
-#         "recurse": True,
-#     },
-# )
+county_species_s3_fullname = f"{bison_bucket}/out_data/{county_dataname}"
+input_dynf = glueContext.create_dynamic_frame.from_options(
+    format_options={},
+    connection_type="s3",
+    format="parquet",
+    connection_options={
+        "paths": [county_species_s3_fullname],
+        "recurse": True,
+    },
+)
 
 input_dynf = glueContext.create_dynamic_frame.from_catalog(
     database=data_catalog, table_name=county_dataname)
 
 print(f"Read BISON county x species data in  {county_dataname} with "
       f"{input_dynf.count()} records.")
+
+filtered_dynf = input_dynf.filter(
+    f=lambda x: x["countrycode"] == "US" and x["occurrencestatus"] == "PRESENT" and x["taxonrank"] in ["SPECIES", "SUBSPECIES", "VARIETY", "FORM", "INFRASPECIFIC_NAME", "INFRASUBSPECIFIC_NAME"])
 
 # input_df = spark.read.load(
 #     county_species_list_s3_fullname, format="csv", delimiter="\t", header=True)
@@ -89,21 +97,7 @@ print(f"Read BISON county x species data in  {county_dataname} with "
 # print(f"Read BISON county x species data in  {county_species_list_s3_fullname} "
 #       f"with {input_df.count()} county records.")
 
-# county_dict = create_county_dict(input_dynf)
-county_dict = {}
-species = set()
-# Create a dictionary of dictionaries {county: {species: count, ...}, ...}
-cnty = f"{input_dynf[0]['census_state']}_{input_dynf[0]['census_county']}"
-for _idx, in_row in input_dynf.iterrows():
-    curr_cnty = f"{in_row['census_state']}_{in_row['census_county']}"
-    sp_name = in_row["scientificname"]
-    sp_count = in_row["occ_count"]
-    species.add(sp_name)
-    if curr_cnty != cnty:
-        cnty = curr_cnty
-        county_dict[cnty] = {sp_name: sp_count}
-    else:
-        county_dict[cnty][sp_name] = sp_count
+species, county_dict = create_county_dict(input_dynf)
 
 county_names = list(county_dict.keys())
 county_names.sort()

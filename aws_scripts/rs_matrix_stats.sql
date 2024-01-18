@@ -1,55 +1,68 @@
+-- Create a heatmatrix, PAM, and compute statistics
+-- -------------------------------------------------------------------
+-- Misc queries
+-- -------------------------------------------------------------------
 SELECT * FROM bison_subset_2024_01_01 WHERE taxonrank != 'SPECIES' LIMIT 10;
+SELECT DISTINCT census_state, census_county FROM county_lists_2024_01_01;
 
-SELECT DISTINCT species FROM bison_subset_2024_01_01;
-SELECT DISTINCT census_state, census_county FROM bison_subset_2024_01_01
-    WHERE census_state IS NOT NULL;
-
+DROP TABLE IF EXISTS heatmatrix_2024_01_01;
 CREATE TABLE heatmatrix_2024_01_01 AS
-    SELECT DISTINCT census_state, census_county FROM bison_subset_2024_01_01
-        WHERE census_state IS NOT NULL;
+    SELECT DISTINCT census_state, census_county FROM county_lists_2024_01_01;
 
-SELECT MAX(LEN(census_state)) FROM bison_subset_2024_01_01
+-- -------------------------------------------------------------------
+-- Create heatmatrix with just Site (state, county)
+-- -------------------------------------------------------------------
+DROP TABLE IF EXISTS heatmatrix_2024_01_01;
+CREATE TABLE heatmatrix_2024_01_01 AS
+    SELECT DISTINCT census_state, census_county FROM county_lists_2024_01_01;
+SELECT * FROM heatmatrix_2024_01_01 LIMIT 20;
 
--- Stored Procedure to create table and add column for each species
-CREATE OR REPLACE PROCEDURE create_heatmatrix_table() AS $$
+-- -------------------------------------------------------------------
+-- Add species columns to heatmatrix
+-- -------------------------------------------------------------------
+CREATE OR REPLACE PROCEDURE add_species_to_heatmatrix() AS $$
 DECLARE
     rec RECORD;
-    cnty_cnt INT;
+    cmd TEXT;
 BEGIN
-    -- Delete existing table
-    DROP TABLE IF EXISTS heatmatrix_2024_01_01;
-    -- Get length of county field
-    SELECT INTO cnty_cnt MAX(LEN(census_county)) FROM bison_subset_2024_01_01;
-    -- Create table with rows defined by state/county
-    EXECUTE  'CREATE TABLE heatmatrix_2024_01_01 (' ||
-        'census_state VARCHAR(2), census_county VARCHAR(' || cnty_cnt || '), ' ||
-        'UNIQUE (census_state, census_county))';
     -- Add species columns
     FOR rec IN
-        SELECT DISTINCT species FROM bison_subset_2024_01_01
+        SELECT DISTINCT species FROM county_lists_2024_01_01
     LOOP
-        EXECUTE 'ALTER TABLE heatmatrix_2024_01_01 ADD COLUMN \"' ||
-                rec.species || '\" INT DEFAULT 0;';
+        EXECUTE 'ALTER TABLE heatmatrix_2024_01_01 ADD COLUMN \"' || rec.species || '\" INT DEFAULT 0';
     END LOOP;
 END;
 $$ LANGUAGE plpgsql;
+CALL add_species_to_heatmatrix();
+SHOW COLUMNS FROM TABLE dev.public.heatmatrix_2024_01_01;
 
-CALL create_heatmatrix_table();
 
-
+-- -------------------------------------------------------------------
+-- Fill species columns for each county
+-- -------------------------------------------------------------------
 CREATE OR REPLACE PROCEDURE fill_heatmatrix_table() AS $$
 DECLARE
-    rec RECORD;
+    rec1 RECORD;
+    rec2 RECORD;
+    site_qry TEXT;
+    species_qry TEXT;
+    cmd TEXT;
 BEGIN
-    -- Delete existing rows
-    DELETE FROM heatmatrix_2024_01_01;
-
-    FOR rec IN
-        EXECUTE 'SELECT DISTINCT census_state, census_county ' ||
-            'FROM bison_subset_2024_01_01 WHERE census_state IS NOT NULL'
+    site_qry := 'SELECT DISTINCT census_state, census_county FROM county_lists_2024_01_01 LIMIT 5';
+    RAISE NOTICE 'site_qry: %', site_qry;
+    FOR rec1 IN
+        EXECUTE site_qry
     LOOP
-        EXECUTE 'INSERT INTO heatmatrix_2024_01_01 (census_state, census_county) ' ||
-            'VALUES (\'' || rec.census_state || '\', \'' || rec.census_county || \'')';
+        species_qry : = 'SELECT species, occ_count FROM county_lists_2024_01_01 ' ||
+            'WHERE census_state = ' || rec1.census_state || ' AND census_county = ' ||
+            rec1.census_county;
+        RAISE NOTICE 'species_qry: %', species_qry;
+        FOR rec2 IN
+            EXECUTE species_qry
+        LOOP
+            cmd := 'UPDATE heatmatrix_2024_01_01 SET \"' || rec2.species || '\" = ' ||
+                rec2.occ_count;
+            RAISE NOTICE 'cmd: %', cmd;
     END LOOP;
 
 
