@@ -5,10 +5,6 @@
 SELECT * FROM bison_subset_2024_01_01 WHERE taxonrank != 'SPECIES' LIMIT 10;
 SELECT DISTINCT census_state, census_county FROM county_lists_2024_01_01;
 
-DROP TABLE IF EXISTS heatmatrix_2024_01_01;
-CREATE TABLE heatmatrix_2024_01_01 AS
-    SELECT DISTINCT census_state, census_county FROM county_lists_2024_01_01;
-
 -- -------------------------------------------------------------------
 -- Create heatmatrix with just Site (state, county)
 -- -------------------------------------------------------------------

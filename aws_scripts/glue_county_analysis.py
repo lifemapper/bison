@@ -80,31 +80,27 @@ input_dynf = glueContext.create_dynamic_frame.from_options(
         "recurse": True,
     },
 )
-
-input_dynf = glueContext.create_dynamic_frame.from_catalog(
-    database=data_catalog, table_name=county_dataname)
-
 print(f"Read BISON county x species data in  {county_dataname} with "
       f"{input_dynf.count()} records.")
 
-filtered_dynf = input_dynf.filter(
-    f=lambda x: x["countrycode"] == "US" and x["occurrencestatus"] == "PRESENT" and x["taxonrank"] in ["SPECIES", "SUBSPECIES", "VARIETY", "FORM", "INFRASPECIFIC_NAME", "INFRASUBSPECIFIC_NAME"])
-
+# filtered_dynf = input_dynf.filter(
+#     f=lambda x: x["countrycode"] == "US" and x["occurrencestatus"] == "PRESENT" and x["taxonrank"] in ["SPECIES", "SUBSPECIES", "VARIETY", "FORM", "INFRASPECIFIC_NAME", "INFRASUBSPECIFIC_NAME"])
 # input_df = spark.read.load(
 #     county_species_list_s3_fullname, format="csv", delimiter="\t", header=True)
 # # Make sure indexes pair with number of rows
 # input_df = input_df.reset_index()
 # print(f"Read BISON county x species data in  {county_species_list_s3_fullname} "
 #       f"with {input_df.count()} county records.")
+# species, county_dict = create_county_dict(input_dynf)
+# county_names = list(county_dict.keys())
+# county_names.sort()
+# print(f"Read {len(county_names)} counties and {len(species)} species")
 
-species, county_dict = create_county_dict(input_dynf)
-
-county_names = list(county_dict.keys())
-county_names.sort()
-print(f"Read {len(county_names)} counties and {len(species)} species")
+input_dynf.select('census_state', 'census_county').distinct().show()
+input_dynf.select('species').distinct().show()
 
 # Create an empty pandas dataframe
-site_species_df = pandas.DataFrame(columns=list(species), index=county_names)
+site_species_dynf = pandas.DataFrame(columns=list(species), index=county_names)
 # Fill dataframe
 for cnty_name in county_names:
     sp_dict = county_dict[cnty_name]
