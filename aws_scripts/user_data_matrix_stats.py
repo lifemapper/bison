@@ -6,8 +6,9 @@ import logging
 from logging.handlers import RotatingFileHandler
 import os
 import pandas
-import pyarrow.parquet as pq
-import s3fs
+# import pyarrow.parquet as pq
+# import s3fs
+
 
 DOWNLOAD_NAME = "0098682-230530130749713"
 BUCKET = "bison-321942852011-us-east-1"
@@ -21,6 +22,13 @@ LOG_FORMAT = " ".join(["%(asctime)s", "%(levelname)-8s", "%(message)s"])
 LOG_DATE_FORMAT = '%d %b %Y %H:%M'
 LOGFILE_MAX_BYTES = 52000000
 LOGFILE_BACKUP_COUNT = 5
+
+bison_bucket = "s3://bison-321942852011-us-east-1/"
+data_catalog = "bison-metadata"
+county_dataname = "county_lists_000.parquet"
+output_dataname = "heatmatrix.parquet"
+n = DT.datetime.now()
+datastr = f"{n.year}-{n.month}-01"
 
 
 # ----------------------------------------------------
