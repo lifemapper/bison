@@ -118,51 +118,19 @@ def extract_occurrences_from_dwca(zip_filename, date_str, logger):
 
 
 # ----------------------------------------------------
-def upload_to_s3(csv_filename, s3_bucket, s3_bucket_path, logger):
+def upload_to_s3(full_filename, s3_bucket, s3_bucket_path, logger):
     s3_filename = None
     s3_client = boto3.client("s3")
-    obj_name = os.path.basename(csv_filename)
+    obj_name = os.path.basename(full_filename)
     if s3_bucket_path:
         obj_name = f"{s3_bucket_path}/{obj_name}"
     try:
-        response = s3_client.upload_file(csv_filename, s3_bucket, obj_name)
+        response = s3_client.upload_file(full_filename, s3_bucket, obj_name)
     except ClientError as e:
         logger.log(logging.ERROR, f"Failed to upload {obj_name} to {s3_bucket}, ({e})")
     else:
         s3_filename = f"s3://{s3_bucket}/{obj_name}"
         logger.log(logging.INFO, f"Uploaded {s3_filename} to S3")
-    return s3_filename
-
-
-# ----------------------------------------------------
-def upload_log_to_s3(csv_filename, s3_bucket, s3_bucket_path, logger):
-    s3_filename = None
-    s3_client = boto3.client("s3")
-    obj_name = os.path.basename(csv_filename)
-    if s3_bucket_path:
-        obj_name = f"{s3_bucket_path}/{obj_name}"
-    try:
-        response = s3_client.upload_file(csv_filename, s3_bucket, obj_name)
-    except ClientError as e:
-        logger.log(logging.ERROR, f"Failed to upload {obj_name} to {s3_bucket}, ({e})")
-    else:
-        s3_filename = f"s3://{s3_bucket}/{obj_name}"
-        logger.log(logging.INFO, f"Uploaded {s3_filename} to S3")
-    return s3_filename
-
-
-# ----------------------------------------------------
-def upload_log_to_s3(log_filename, s3_bucket, s3_bucket_path):
-    s3_filename = None
-    # Upload logfile to S3
-    s3_client = boto3.client("s3")
-    obj_name = f"{LOG_PATH}/{log_filename}"
-    try:
-        response = s3_client.upload_file(log_filename, s3_bucket, obj_name)
-    except ClientError as e:
-        print(f"Failed to upload {obj_name} to {s3_bucket}, ({e})")
-    else:
-        s3_filename = f"s3://{s3_bucket}/{obj_name}"
     return s3_filename
 
 
@@ -189,7 +157,7 @@ if __name__ == "__main__":
 
     # Upload logfile to S3
     logger = None
-    s3_log_filename = upload_log_to_s3(log_filename, BUCKET, LOG_PATH)
+    s3_log_filename = upload_to_s3(log_filename, BUCKET, LOG_PATH, logger)
 EOF
 
 python3 process_data_on_ec2.py

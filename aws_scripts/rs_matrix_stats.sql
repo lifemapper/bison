@@ -1,3 +1,7 @@
+-- OBSOLETE
+-- Limitation of 1600 columns in Redshift, this does not throw an error, just
+-- fails to complete.
+--
 -- Create a heatmatrix, PAM, and compute statistics
 -- -------------------------------------------------------------------
 -- Misc queries
