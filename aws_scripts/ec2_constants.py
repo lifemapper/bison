@@ -29,6 +29,8 @@ LOG_DATE_FORMAT = "%d %b %Y %H:%M"
 LOGFILE_MAX_BYTES = 52000000
 LOGFILE_BACKUP_COUNT = 5
 
+USER_DATA_TOKEN = "###SCRIPT_GOES_HERE###"
+
 # --------------------------------------------------------------------------------------
 # Methods for constructing and instantiating EC2 instances
 # --------------------------------------------------------------------------------------

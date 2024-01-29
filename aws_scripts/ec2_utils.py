@@ -106,9 +106,23 @@ def define_spot_launch_template_data(template_name, script_filename):
     return launch_template_data
 
 # ----------------------------------------------------
-def get_user_data(script_filename):
+def get_user_data(user_data_filename, script_filename, token):
+    """ Return the EC2 user_data script as a Base64 encoded string.
+
+    Args:
+        user_data_filename: Filename containing the user-data script to be executed on
+            EC2 instantiation.
+        script_filename: Filename containing a python script to be written to a file on
+            the EC2 instantiation.
+        token: string within the user_data_filename which will be replaced by the
+            text in the script filename.
+
+    Returns:
+        A Base64-encoded string of the user_data file to create on an EC2 instance.
+    """
+    fill_user_data_script(user_data_filename, script_filename, token)
     try:
-        with open(script_filename, "r") as infile:
+        with open(user_data_filename, "r") as infile:
             script_text = infile.read()
     except Exception:
         return None
@@ -117,6 +131,40 @@ def get_user_data(script_filename):
         text_base64_bytes = base64.b64encode(text_bytes)
         base64_script_text = text_base64_bytes.decode("ascii")
         return base64_script_text
+
+
+# ----------------------------------------------------
+def fill_user_data_script(user_data_filename, script_filename, token):
+    """ Fill the EC2 user_data script with a python script in another file.
+
+    Args:
+        user_data_filename: Filename containing the user-data script to be executed on
+            EC2 instantiation.
+        script_filename: Filename containing a python script to be written to a file on
+            the EC2 instantiation.
+        token: string within the user_data_filename which will be replaced by the
+            text in the script filename.
+
+    Postcondition:
+        The user_data file contains the text of the script file.
+    """
+    # Safely read the input filename using 'with'
+    with open(user_data_filename) as f:
+        s = f.read()
+        if token not in s:
+            print(f"{token} not found in {user_data_filename}.")
+            return
+
+    with open(script_filename) as sf:
+        script = sf.read()
+
+    # Safely write the changed content, if found in the file
+    with open(user_data_filename, "w") as uf:
+        print(
+            f"Changing {token} in {user_data_filename} to contents in "
+            f"{script_filename}")
+        s = s.replace(token, script)
+        uf.write(s)
 
 
 # ----------------------------------------------------
