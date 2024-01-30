@@ -547,4 +547,3 @@ def create_dataframe_from_gbifcsv_s3_bucket(bucket, csv_path):
         s3_obj["Body"], delimiter="\t", encoding="utf-8", low_memory=False,
         quoting=csv.QUOTE_NONE)
     return df
-

@@ -11,7 +11,6 @@ import sys
 # import pyarrow.parquet as pq
 # import s3fs
 
-
 DOWNLOAD_NAME = "0098682-230530130749713"
 BUCKET = "bison-321942852011-us-east-1"
 BUCKET_PATH = "out_data"
@@ -106,15 +105,6 @@ def download_from_s3(bucket, bucket_path, filename, logger, overwrite=True):
     return local_filename
 
 
-# # ----------------------------------------------------
-# def read_s3_parquet_to_pandas_alt(bucket, bucket_path, filename, logger, overwrite=True):
-#     s3 = s3fs.S3FileSystem()
-#     s3_filename = f"s3://{bucket}/{bucket_path}/{filename}"
-#     pandas_df = (pq.ParquetDataset(
-#         s3_filename, filesystem=s3).read_pandas().to_pandas())
-#     return pandas_df
-
-
 # ----------------------------------------------------
 def read_s3_parquet_to_pandas(
         bucket, bucket_path, filename, logger, s3_client=None, **args):
@@ -143,6 +133,7 @@ def read_s3_parquet_to_pandas(
 
     dataframe = pandas.read_parquet(io.BytesIO(obj['Body'].read()), **args)
     return dataframe
+
 
 # ----------------------------------------------------
 def read_s3_multiple_parquets_to_pandas(
@@ -203,6 +194,151 @@ def read_species_to_dict(orig_df):
             county_species_counts[cty] = [(sp, total)]
     return county_species_counts
 
+class PamStats:
+    """Class for managing metric computation for PAM statistics."""
+
+    # covariance_stats = [('sigma sites', sigma_sites), ('sigma species', sigma_species)]
+    diversity_stats = [
+        ('c-score', c_score),
+        ('lande', lande),
+        ('legendre', legendre),
+        ('num sites', num_sites),
+        ('num species', num_species),
+        ('whittaker', whittaker),
+    ]
+    site_matrix_stats = [
+        ('alpha', alpha),
+        ('alpha proportional', alpha_proportional),
+        ('phi', phi),
+        ('phi average proportional', phi_average_proportional),
+    ]
+    # site_pam_dist_mtx_stats = [('pearson_correlation', pearson_correlation)]
+    # species_matrix_stats = [
+    #     ('omega', omega),
+    #     ('omega_proportional', omega_proportional),
+    #     ('psi', psi),
+    #     ('psi_average_proportional', psi_average_proportional),
+    # ]
+
+    # ...........................
+    def __init__(self, pam_df, logger):
+        """Constructor for PAM stats computations.
+
+        Args:
+            pam_df (pandas.DataFrame): A presence-absence matrix to use for computations.
+            logger (object): An optional local logger to use for logging output
+                with consistent options
+        """
+        self.pam = pam_df
+        self.logger = logger
+        self._report = {}
+
+    # .............................................................................
+    # Diversity metrics
+    # .............................................................................
+    def schluter_species_variance_ratio(self):
+        """Calculate Schluter's species variance ratio.
+
+        Returns:
+            float: The Schluter species variance ratio for the PAM.
+        """
+        sigma_species_, _hdrs = self.sigma_species(self.pam)
+        return float(sigma_species_.sum() / sigma_species_.trace())
+
+    # .............................................................................
+    def schluter_site_variance_ratio(self):
+        """Calculate Schluter's site variance ratio.
+
+        Returns:
+            float: The Schluter site variance ratio for the PAM.
+        """
+        sigma_sites_, _hdrs = self.sigma_sites(pam)
+        return float(sigma_sites_.sum() / sigma_sites_.trace())
+
+    # .............................................................................
+    def num_sites(self):
+        """Get the number of sites with presences.
+
+        Args:
+            pam (Matrix): The presence-absence matrix to use for the computation.
+
+        Returns:
+            int: The number of sites that have present species.
+        """
+        return int(pandas.sum(pandas.any(self.pam, axis=1)))
+
+    # .............................................................................
+    def num_species(self):
+        """Get the number of species with presences.
+
+        Args:
+            pam (Matrix): The presence-absence matrix to use for the computation.
+
+        Returns:
+            int: The number of species that are present in at least one site.
+        """
+        return int(pandas.sum(pandas.any(self.pam, axis=0)))
+
+    # .............................................................................
+    def whittaker(self):
+        """Calculate Whittaker's beta diversity metric for a PAM.
+
+        Args:
+            pam (Matrix): The presence-absence matrix to use for the computation.
+
+        Returns:
+            float: Whittaker's beta diversity for the PAM.
+        """
+        return float(num_species(self.pam) / omega_proportional(self.pam).sum())
+
+    # ...........................
+    def lande(self):
+        """Calculate Lande's beta diversity metric for a PAM.
+
+        Returns:
+            float: Lande's beta diversity for the PAM.
+        """
+        return float(
+            num_species(self.pam) - (self.pam.sum(axis=0).astype(float)
+            / num_sites(self.pam)).sum()
+        )
+
+    # ...........................
+    def legendre(self):
+        """Calculate Legendre's beta diversity metric for a PAM.
+
+        Args:
+            pam (Matrix): The presence-absence matrix to use for the computation.
+
+        Returns:
+            float: Legendre's beta diversity for the PAM.
+        """
+        return float(
+            omega(self.pam).sum() - (float((omega(self.pam) ** 2).sum())
+            / num_sites(self.pam))
+        )
+
+    # # ...........................
+    # def calculate_diversity_statistics(self):
+    #     """Calculate diversity statistics.
+    #
+    #     Returns:
+    #         list of tuple: A list of metric name, value tuples for diversity metrics.
+    #     """
+    #     diversity_stat_names = [name for name, _ in self.diversity_stats]
+    #     diversity_stat_vals = [func(self.pam) for _, func in self.diversity_stats]
+    #     self._log(
+    #         f"Calculate {diversity_stat_names} diversity stats for PAM " +
+    #         f"resulting in {str(diversity_stat_vals)}",
+    #         refname=self.__class__.__name__)
+    #     diversity_matrix = Matrix(
+    #         np.array(diversity_stat_vals),
+    #         headers={'0': ['value'], '1': diversity_stat_names},
+    #     )
+    #     self._report["Diversity"] = diversity_matrix.get_report()
+    #     self._report["Diversity"]["statistics"] = diversity_stat_names
+    #     return diversity_matrix
+
 # ----------------------------------------------------
 def reframe_to_heatmatrix(orig_df, logger):
     """Create a dataframe of species columns by county rows from county species lists.
@@ -216,9 +352,8 @@ def reframe_to_heatmatrix(orig_df, logger):
         heat_df (Pandas.DataFrame): DF of species (columnns, x axis=1) by counties
             (rows, y axis=0, sites), with values = number of occurrences.
     """
-    # make sure indexes pair with number of rows
-    orig_df = orig_df.reset_index()
-    orig_df["state_county"] = df["census_state"] + "_" + orig_df["census_county"]
+    # Create ST_county column to handle same-named counties in different states
+    orig_df["state_county"] = orig_df["census_state"] + "_" + orig_df["census_county"]
 
     # Create dataframe of zeros with rows=sites and columns=species
     counties = orig_df.state_county.unique()
@@ -227,7 +362,7 @@ def reframe_to_heatmatrix(orig_df, logger):
 
     # Fill dataframe
     county_species_counts = read_species_to_dict(orig_df, logger)
-    for cty, sp_counts in county_species_counts.iteritems():
+    for cty, sp_counts in county_species_counts.items():
         for (sp, count) in sp_counts:
             heat_df.loc[cty][sp] = count
 
@@ -235,8 +370,34 @@ def reframe_to_heatmatrix(orig_df, logger):
 
 
 # ----------------------------------------------------
+def reframe_to_pam(heat_df, min_val):
+    """Create a dataframe of species columns by county rows from county species lists.
+
+    Args:
+        heat_df (pandas.DataFrame): DataFrame of species (columnns, x axis=1) by
+            counties (rows, y axis=0, sites), with values = number of occurrences.
+
+    Returns:
+        pam_df (Pandas.DataFrame): DF of species (columnns, x axis=1) by counties
+            (rows, y axis=0, sites), with values = 1 (presence) or 0 (absence).
+    """
+    # # make sure indexes pair with number of rows
+    # # This adds a numerical index (row index) and moves row names to first column
+    # heat_df = heat_df.reset_index()
+    try:
+        # pandas 2.1.0
+        pam_df = heat_df.applymap(lambda x: 1 if x >= min_val else 0)
+    except AttributeError as e:
+        pam_df = heat_df.applymap(lambda x: 1 if x >= min_val else 0)
+    return pam_df
+
+
+# ----------------------------------------------------
 def upload_to_s3(full_filename, bucket, bucket_path, logger):
-    """Upload a file to S3.
+# ----------------------------------------------------
+def upload_to_s3(full_filename, bucket, bucket_path, logger):
+
+        """Upload a file to S3.
 
     Args:
         full_filename (str): Full filename to the file to upload.
