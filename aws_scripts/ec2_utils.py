@@ -14,14 +14,22 @@ import os
 
 from ec2_constants import (
     INSTANCE_TYPE, KEY_NAME, LOGFILE_MAX_BYTES, LOG_FORMAT, LOG_DATE_FORMAT, PROJ_NAME,
-    REGION, SECURITY_GROUP_ID, SPOT_TEMPLATE_BASENAME)
+    REGION, SECURITY_GROUP_ID, SPOT_TEMPLATE_BASENAME, USER_DATA_TOKEN)
+
 
 # --------------------------------------------------------------------------------------
 # Methods for constructing and instantiating EC2 instances
 # --------------------------------------------------------------------------------------
-
 # ----------------------------------------------------
 def create_spot_launch_template_name(desc_str=None):
+    """Create a name identifier for a Spot Launch Template.
+
+    Args:
+        desc_str (str): optional descriptor to include in the name.
+
+    Returns:
+        template_name (str): name for identifying this Spot Launch Template.
+    """
     if desc_str is None:
         template_name = f"{PROJ_NAME}_{SPOT_TEMPLATE_BASENAME}"
     else:
@@ -30,8 +38,24 @@ def create_spot_launch_template_name(desc_str=None):
 
 
 # ----------------------------------------------------
-def define_spot_launch_template_data(template_name, script_filename):
-    user_data_64 = get_user_data(script_filename)
+def define_spot_launch_template_data(
+        template_name, user_data_filename, script_filename,
+        token_to_replace=USER_DATA_TOKEN):
+    """Create the configuration data for a Spot Launch Template.
+
+    Args:
+        template_name: unique name for this Spot Launch Template.
+        user_data_filename: full filename for script to be included in the
+            template and executed on Spot instantiation.
+        script_filename: full filename for script to be inserted into user_data file.
+        token_to_replace: string within the user_data_filename which will be replaced
+            by the text in the script filename.
+
+    Returns:
+        launch_template_data (dict): Dictionary of configuration data for the template.
+    """
+    user_data_64 = get_user_data(
+        user_data_filename, script_filename, token_to_replace=token_to_replace)
     launch_template_data = {
         "EbsOptimized": True,
         "IamInstanceProfile":
@@ -105,8 +129,9 @@ def define_spot_launch_template_data(template_name, script_filename):
     }
     return launch_template_data
 
+
 # ----------------------------------------------------
-def get_user_data(user_data_filename, script_filename, token):
+def get_user_data(user_data_filename, script_filename, token_to_replace=USER_DATA_TOKEN):
     """ Return the EC2 user_data script as a Base64 encoded string.
 
     Args:
@@ -114,13 +139,13 @@ def get_user_data(user_data_filename, script_filename, token):
             EC2 instantiation.
         script_filename: Filename containing a python script to be written to a file on
             the EC2 instantiation.
-        token: string within the user_data_filename which will be replaced by the
-            text in the script filename.
+        token_to_replace: string within the user_data_filename which will be replaced
+            by the text in the script filename.
 
     Returns:
         A Base64-encoded string of the user_data file to create on an EC2 instance.
     """
-    fill_user_data_script(user_data_filename, script_filename, token)
+    fill_user_data_script(user_data_filename, script_filename, token_to_replace)
     try:
         with open(user_data_filename, "r") as infile:
             script_text = infile.read()
@@ -134,7 +159,8 @@ def get_user_data(user_data_filename, script_filename, token):
 
 
 # ----------------------------------------------------
-def fill_user_data_script(user_data_filename, script_filename, token):
+def fill_user_data_script(
+        user_data_filename, script_filename, token_to_replace):
     """ Fill the EC2 user_data script with a python script in another file.
 
     Args:
@@ -142,8 +168,8 @@ def fill_user_data_script(user_data_filename, script_filename, token):
             EC2 instantiation.
         script_filename: Filename containing a python script to be written to a file on
             the EC2 instantiation.
-        token: string within the user_data_filename which will be replaced by the
-            text in the script filename.
+        token_to_replace: string within the user_data_filename which will be replaced
+            by the text in the script filename.
 
     Postcondition:
         The user_data file contains the text of the script file.
@@ -151,8 +177,8 @@ def fill_user_data_script(user_data_filename, script_filename, token):
     # Safely read the input filename using 'with'
     with open(user_data_filename) as f:
         s = f.read()
-        if token not in s:
-            print(f"{token} not found in {user_data_filename}.")
+        if token_to_replace not in s:
+            print(f"{token_to_replace} not found in {user_data_filename}.")
             return
 
     with open(script_filename) as sf:
@@ -161,14 +187,22 @@ def fill_user_data_script(user_data_filename, script_filename, token):
     # Safely write the changed content, if found in the file
     with open(user_data_filename, "w") as uf:
         print(
-            f"Changing {token} in {user_data_filename} to contents in "
+            f"Changing {token_to_replace} in {user_data_filename} to contents in "
             f"{script_filename}")
-        s = s.replace(token, script)
+        s = s.replace(token_to_replace, script)
         uf.write(s)
 
 
 # ----------------------------------------------------
 def create_token(type=None):
+    """Create a token to name and identify an AWS resource.
+
+    Args:
+        type (str): optional descriptor to include in the token string.
+
+    Returns:
+        token(str): token for AWS resource identification.
+    """
     if type is None:
         type = PROJ_NAME
     token = f"{type}_{datetime.datetime.now().timestamp()}"
@@ -177,6 +211,11 @@ def create_token(type=None):
 
 # ----------------------------------------------------
 def get_date_str():
+    """Get a string representation of the current date.
+
+    Returns:
+        date_str(str): string representing date in YYYY-MM-DD format.
+    """
     n = datetime.datetime.now()
     date_str = f"{n.year}-{n.month}-{n.day}"
     return date_str
@@ -184,6 +223,11 @@ def get_date_str():
 
 # ----------------------------------------------------
 def get_current_date_str():
+    """Get a string representation of the first day of the current month.
+
+    Returns:
+        date_str(str): string representing date in YYYY-MM-DD format.
+    """
     n = datetime.datetime.now()
     date_str = f"{n.year}-{n.month}-01"
     return date_str
@@ -191,6 +235,11 @@ def get_current_date_str():
 
 # ----------------------------------------------------
 def get_previous_date_str():
+    """Get a string representation of the first day of the previous month.
+
+    Returns:
+        date_str(str): string representing date in YYYY-MM-DD format.
+    """
     n = datetime.datetime.now()
     yr = n.year
     mo = n.month
@@ -203,17 +252,15 @@ def get_previous_date_str():
 
 # ----------------------------------------------------
 def create_spot_launch_template(
-        ec2_client, template_name, instance_type, security_group_id, script_filename,
-        key_name, overwrite=False):
+        ec2_client, template_name, user_data_filename, script_filename,
+        overwrite=False):
     """Create an EC2 Spot Instance Launch template on AWS.
 
     Args:
         ec2_client: an object for communicating with EC2.
-        template_name: name for the launch template
-        instance_type: AWS-defined type of instance.
-        security_group_id: identifier of an existing security group.
-        script_filename: script to be installed and run on EC2 instantiation.
-        key_name: name of authentication key with permission to execute this process.
+        template_name: name for the launch template0
+        user_data_filename: script to be installed and run on EC2 instantiation.
+        script_filename: script to be inserted into user_data_filename.
         overwrite: flag indicating whether to use an existing template with this name,
             or create a new
 
@@ -228,8 +275,7 @@ def create_spot_launch_template(
         success = True
     else:
         spot_template_data = define_spot_launch_template_data(
-            template_name, instance_type, security_group_id, script_filename,
-            key_name)
+            template_name, user_data_filename, script_filename)
         template_token = create_token("template")
         try:
             response = ec2_client.create_launch_template(
@@ -247,13 +293,14 @@ def create_spot_launch_template(
 
 
 # ----------------------------------------------------
-def upload_trigger_to_s3(trigger_name, s3_bucket, s3_bucket_path):
+def upload_trigger_to_s3(trigger_name, s3_bucket, s3_bucket_path, region=REGION):
     """Upload a file to S3 which will trigger a workflow.
 
     Args:
         trigger_name: Name of workflow to trigger.
         s3_bucket: name of the S3 bucket destination.
         s3_bucket_path: the data destination inside the S3 bucket (without filename).
+        region: AWS region to query.
 
     Returns:
         s3_filename: the URI to the file in the S3 bucket.
@@ -261,7 +308,7 @@ def upload_trigger_to_s3(trigger_name, s3_bucket, s3_bucket_path):
     filename = f"{trigger_name}.txt"
     with open(filename, "r") as f:
         f.write("go!")
-    s3_client = boto3.client("s3")
+    s3_client = boto3.client("s3", region_name=region)
     obj_name = f"{s3_bucket_path}/{filename}"
     try:
         s3_client.upload_file(filename, s3_bucket, obj_name)
@@ -273,48 +320,51 @@ def upload_trigger_to_s3(trigger_name, s3_bucket, s3_bucket_path):
     return s3_filename
 
 
+# # ----------------------------------------------------
+# def write_dataframe_to_s3_parquet(df, bucket, parquet_path, region=REGION):
+#     """Convert DataFrame to Parquet format and upload to S3.
+#
+#     Args:
+#         df: pandas DataFrame containing data.
+#         bucket: name of the S3 bucket destination.
+#         parquet_path: the data destination inside the S3 bucket
+#         region: AWS region to query.
+#     """
+#     s3_client = boto3.client("s3", region_name=region)
+#     parquet_buffer = io.BytesIO()
+#     df.to_parquet(parquet_buffer, engine="pyarrow")
+#     parquet_buffer.seek(0)
+#     s3_client.upload_fileobj(parquet_buffer, bucket, parquet_path)
+
+
 # ----------------------------------------------------
-def write_dataframe_to_s3_parquet(df, bucket, parquet_path):
-    """Convert DataFrame to Parquet format and upload to S3.
-
-    Args:
-        df: pandas DataFrame containing data.
-        bucket: name of the S3 bucket destination.
-        parquet_path: the data destination inside the S3 bucket
-    """
-    s3_client = boto3.client("s3")
-    parquet_buffer = io.BytesIO()
-    df.to_parquet(parquet_buffer, engine="pyarrow")
-    parquet_buffer.seek(0)
-    s3_client.upload_fileobj(parquet_buffer, bucket, parquet_path)
-
-
-# ----------------------------------------------------
-def upload_to_s3(local_filename, bucket, s3_path):
+def upload_to_s3(local_filename, bucket, s3_path, region=REGION):
     """Upload a file to S3.
 
     Args:
         local_filename: Full path to local file for upload.
         bucket: name of the S3 bucket destination.
         s3_path: the data destination inside the S3 bucket (without filename).
+        region: AWS region to query.
     """
-    s3_client = boto3.client("s3")
+    s3_client = boto3.client("s3", region_name=region)
     filename = os.path.split(local_filename)[1]
     s3_client.upload_file(local_filename, bucket, s3_path)
     print(f"Successfully uploaded {filename} to s3://{bucket}/{s3_path}")
 
 
 # ----------------------------------------------------
-def get_instance(instance_id):
+def get_instance(instance_id, region=REGION):
     """Describe an EC2 instance with instance_id.
 
     Args:
         instance_id: EC2 instance identifier.
+        region: AWS region to query.
 
     Returns:
         instance: metadata for the EC2 instance
     """
-    ec2_client = boto3.client("ec2")
+    ec2_client = boto3.client("ec2", region_name=region)
     response = ec2_client.describe_instances(
         InstanceIds=[instance_id],
         DryRun=False,
@@ -366,7 +416,6 @@ def run_instance_spot(ec2_client, template_name):
         else:
             instance_id = instance["InstanceId"]
     return instance_id
-
 
 
 # --------------------------------------------------------------------------------------
@@ -430,24 +479,34 @@ def find_instances(key_name, launch_template_name):
 
 
 # ----------------------------------------------------
-def get_launch_template_from_instance(instance_id, region_name=REGION):
+def get_launch_template_from_instance(instance_id, region=REGION):
     """Return a JSON formatted template from an existing EC2 instance.
 
     Args:
         instance_id: unique identifier for the selected EC2 instance.
+        region: AWS region to query.
 
     Returns:
         launch_template_data: a JSON formatted launch template.
     """
-    ec2_client = boto3.client("ec2")
+    ec2_client = boto3.client("ec2", region_name=region)
     launch_template_data = ec2_client.get_launch_template_data(InstanceId=instance_id)
     return launch_template_data
 
 
 # --------------------------------------------------------------------------------------
 # On local machine: Describe the launch_template with the template_name
-def get_launch_template(template_name):
-    ec2_client = boto3.client("ec2", region_name=REGION)
+def get_launch_template(template_name, region=REGION):
+    """Return a JSON formatted template for a template_name.
+
+    Args:
+        template_name: unique name for the requested template.
+        region: AWS region to query.
+
+    Returns:
+        launch_template_data: a JSON formatted launch template.
+    """
+    ec2_client = boto3.client("ec2", region_name=region)
     lnch_temp = None
     # Find pre-existing template
     try:
@@ -466,17 +525,18 @@ def get_launch_template(template_name):
 
 
 # ----------------------------------------------------
-def delete_launch_template(template_name):
+def delete_launch_template(template_name, region=REGION):
     """Delete an EC2 launch template AWS.
 
     Args:
         template_name: name of the selected EC2 launch template.
+        region: AWS region to query.
 
     Returns:
         response: a JSON formatted AWS response.
     """
     response = None
-    ec2_client = boto3.client("ec2")
+    ec2_client = boto3.client("ec2", region_name=region)
     lnch_tmpl = get_launch_template(template_name)
     if lnch_tmpl is not None:
         response = ec2_client.delete_launch_template(LaunchTemplateName=template_name)
@@ -484,26 +544,28 @@ def delete_launch_template(template_name):
 
 
 # ----------------------------------------------------
-def delete_instance(instance_id):
+def delete_instance(instance_id, region=REGION):
     """Delete an EC2 instance.
 
     Args:
         instance_id: unique identifier for the selected EC2 instance.
+        region: AWS region to query.
 
     Returns:
         response: a JSON formatted AWS response.
     """
-    ec2_client = boto3.client("ec2")
+    ec2_client = boto3.client("ec2", region_name=region)
     response = ec2_client.delete_instance(InstanceId=instance_id)
     return response
+
 
 # ----------------------------------------------------
 def get_logger(log_name, log_dir=None, log_level=logging.INFO):
     """Get a logger for writing logging messages to file and console.
 
     Args:
-        log_directory: absolute path for the logfile.
         log_name: Name for the log object and output log file.
+        log_dir: absolute path for the logfile.
         log_level: logging constant error level (logging.INFO, logging.DEBUG,
                 logging.WARNING, logging.ERROR)
 
@@ -530,18 +592,20 @@ def get_logger(log_name, log_dir=None, log_level=logging.INFO):
     logger.propagate = False
     return logger
 
+
 # ----------------------------------------------------
-def create_dataframe_from_gbifcsv_s3_bucket(bucket, csv_path):
+def create_dataframe_from_gbifcsv_s3_bucket(bucket, csv_path, region=REGION):
     """Read CSV data from S3 into a pandas DataFrame.
 
     Args:
         bucket: name of the bucket containing the CSV data.
         csv_path: the CSV object name with enclosing S3 bucket folders.
+        region: AWS region to query.
 
     Returns:
         df: pandas DataFrame containing the CSV data.
     """
-    s3_client = boto3.client("s3")
+    s3_client = boto3.client("s3", region_name=region)
     s3_obj = s3_client.get_object(Bucket=bucket, Key=csv_path)
     df = pandas.read_csv(
         s3_obj["Body"], delimiter="\t", encoding="utf-8", low_memory=False,
