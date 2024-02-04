@@ -12,8 +12,8 @@ from ec2_utils import (
 # TRIGGER_PATH = "trigger"
 # TRIGGER_FILENAME = "go.txt"
 
-user_data_matrix_fname = "scripts/user_data_matrix_stats.sh"
-user_data_matrix_script_fname = "scripts/user_data_matrix_stats.py"
+user_data_matrix_fname = "user_data_matrix_stats.sh"
+user_data_matrix_script_fname = "user_data_matrix_stats.py"
 
 
 # --------------------------------------------------------------------------------------

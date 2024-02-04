@@ -1,7 +1,8 @@
 # Python3.8
-# boto3
+boto3
 numpy
 pandas
+pyarrow
 requests
 # gdal (must be in system python, fails in virtenv)
 rtree
