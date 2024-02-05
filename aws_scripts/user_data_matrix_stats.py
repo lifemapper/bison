@@ -400,9 +400,8 @@ class SiteMatrix:
         beta_series = None
         if self._pam_df is not None:
             beta_series = float(self.num_species) / self._pam_df.sum(axis=1)
-            # beta_series = float(self.num_species) / self.omega_proportional()
             beta_series.replace([numpy.inf, -numpy.inf], 0, inplace=True)
-            beta_series.name = "beta_diversity"
+            beta_series.name = "whittakers_gamma/alpha_ratio_beta_diversity"
         return beta_series
 
     # ...............................................
@@ -429,7 +428,7 @@ class SiteMatrix:
         omega_pr_series = None
         if self._pam_df is not None:
             omega_pr_series = self._pam_df.sum(axis=0) / float(self.num_sites)
-        omega_pr_series.name = "omega_proportional"
+            omega_pr_series.name = "omega_proportional"
         return omega_pr_series
 
     # .............................................................................
@@ -437,33 +436,35 @@ class SiteMatrix:
         """Calculate the range richness of each species.
 
         Returns:
-            psi_df (pandas.DataFrame): A 2d matrix of range richness for the sites that
+            psi_df (pandas.Series): A Series of range richness for the sites that
                 each species is present in.
 
         TODO: revisit this
         """
-        psi_df = None
+        psi_series = None
         if self._pam_df is not None:
-            psi_df = self._pam_df.sum(axis=1).dot(self._pam_df)
-        return psi_df
+            psi_series = self._pam_df.sum(axis=1).dot(self._pam_df)
+            psi_series.name = "psi"
+        return psi_series
 
     # .............................................................................
     def psi_average_proportional(self):
         """Calculate the mean proportional species diversity.
 
         Returns:
-            psi_avg_df (pandas.DataFrame): A 2d matrix of proportional range richness
+            psi_avg_df (pandas.DataFrame): A Series of proportional range richness
                 for the sites that each species in the PAM is present.
 
         TODO: revisit this
         """
-        psi_avg_df = None
+        psi_avg_series = None
         if self._pam_df is not None:
-            psi_avg_df = (
+            psi_avg_series = (
                     self.alpha().dot(self._pam_df).astype(float)
                     / (self.num_species * self.omega())
             )
-        return psi_avg_df
+            psi_avg_series.name = "psi_average_proportional"
+        return psi_avg_series
 
     # ...............................................
     def whittaker(self):
@@ -535,7 +536,9 @@ class SiteMatrix:
                 the selected metrics.  Columns are statistic names, rows are sites
                 (counties).
         """
-        site_stats = [self.alpha(), self.alpha_proportional(), self.phi(), self.phi_average_proportional()]
+        site_stats = [
+            self.alpha(), self.alpha_proportional(), self.beta(), self.phi(),
+            self.phi_average_proportional()]
         site_stats_df = pandas.DataFrame(site_stats)
         return site_stats_df
 
@@ -586,8 +589,42 @@ if __name__ == "__main__":
     s3_log_filename = upload_to_s3(log_filename, BUCKET, LOG_PATH, logger)
 
 """
-from user_data_matrix_stats import *
+from user_data_matrix_stats import (
+    read_s3_parquet_to_pandas,  reframe_to_heatmatrix, reframe_to_pam, get_logger)
+from user_data_matrix_stats import SiteMatrix as SM
+
+import boto3
+from botocore.exceptions import ClientError
+import datetime as DT
 from importlib import reload
+import io
+import logging
+from logging.handlers import RotatingFileHandler
+import os
+import pandas
+import sys
+
+REGION = "us-east-1"
+BUCKET = f"bison-321942852011-{REGION}"
+BUCKET_PATH = "out_data"
+LOG_PATH = "log"
+
+n = DT.datetime.now()
+datastr = f"{n.year}-{n.month}-01"
+
+species_county_list_basename = "county_lists_000"
+species_county_list_fname = f"{species_county_list_basename}.parquet"
+# Log processing progress
+LOGINTERVAL = 1000000
+LOG_FORMAT = " ".join(["%(asctime)s", "%(levelname)-8s", "%(message)s"])
+LOG_DATE_FORMAT = "%d %b %Y %H:%M"
+LOGFILE_MAX_BYTES = 52000000
+LOGFILE_BACKUP_COUNT = 5
+
+bison_bucket = "s3://bison-321942852011-us-east-1/"
+output_dataname = "heatmatrix.parquet"
+
+
 reload(user_data_matrix_stats)
 from user_data_matrix_stats import SiteMatrix
 
@@ -602,7 +639,73 @@ orig_df = read_s3_parquet_to_pandas(
     BUCKET, BUCKET_PATH, species_county_list_fname, logger, s3_client=None)
 heat_df = reframe_to_heatmatrix(orig_df, logger)
 pam_df = reframe_to_pam(heat_df, 1)
-pam = SiteMatrix(pam_df, logger)
+
+# OLD matrix
+# create a multi-index for rows required by old-style SiteMatrix
+full_idx = pandas.MultiIndex.from_arrays(
+    [[i for i in range(len(pam_df.index))], pam_df.index], names=["row_idx", "region"])
+pam_df.index = full_idx
+pam_old = SiteMatrix(dataframe=pam_df, logger=logger)
+pam_old._min_presence = 1
+
+# NEW matrix
+pam_new = SM(pam_df, logger)
+
+# old diversity stats
+lande_old = pam_old.lande()
+legendre_old = pam_old.legendre()
+whittaker_old = pam_old.whittaker()
+species_ct_old = pam_old.num_species
+site_ct_old = pam_old.num_sites
+
+# new diversity stats
+lande_new = pam_new.lande()
+legendre_new = pam_new.legendre()
+whittaker_new = pam_new.whittaker()
+species_ct_new = pam_new.num_species
+site_ct_new = pam_new.num_sites
+
+# COMPARE diversity stats
+print(f"lande: old {lande_old} vs new {lande_new}")
+print(f"legendre: old {legendre_old} vs new {legendre_new}")
+print(f"whittaker: old {whittaker_old} vs new {whittaker_new}")
+print(f"species_ct: old {species_ct_old} vs new {species_ct_new}")
+print(f"site_ct: old {site_ct_old} vs new {site_ct_new}")
+
+
+# old site stats
+beta_old = pam_old.beta()
+alpha_old = pam_old.alpha()
+alpha_proportional_old = pam_old.alpha_proportional()
+
+# new site stats
+beta_new = pam_new.beta()
+alpha_new = pam_new.alpha()
+alpha_proportional_new = pam_new.alpha_proportional()
+phi_new = pam_new.phi()
+phi_average_proportional_new = pam_new.phi_average_proportional()
+
+print(f"beta old = new: {beta_old.equals(beta_new)}")
+print(f"alpha old = new: {alpha_old.equals(alpha_new)}")
+print(f"alpha_proportional old = new: {alpha_proportional_old.equals(alpha_proportional_new)}")
+
+# old species stats
+omega_old = pam_old.omega()
+omega_proportional_old = pam_old.omega_proportional()
+psi_old = pam_old.psi(),
+psi_average_proportional_old = pam_old.psi_average_proportional()
+
+print(f"omega old = new: {omega_old.equals(omega_new)}")
+print(f"omega_proportional old = new: {omega_proportional_old.equals(omega_proportional_new)}")
+print(f"psi old = new: {psi_old.equals(psi_new)}")
+print(f"psi_average_proportional old = new: {psi_average_proportional_old.equals(psi_average_proportional_new)}")
+
+# new species stats
+omega_new = pam_new.omega()
+omega_proportional_new = pam_old.omega_proportional()
+psi_new = pam_new.psi(),
+psi_average_proportional_new = pam_new.psi_average_proportional()
+
 
 diversity_df = pam.calculate_diversity_statistics()
 site_stat_df = pam.calculate_site_statistics()

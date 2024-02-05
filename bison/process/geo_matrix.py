@@ -31,7 +31,7 @@ class SiteMatrix(object):
                 construct a matrix defined by one row per polygon, identified by a
                 feature identifier (FID), and optionally, a string of one or more
                 concatenated attributes, unique to that polygon.
-            fieldnames (iterable): lisf of fieldname for polygon attributes of interest
+            fieldnames (iterable): list of fieldnames for polygon attributes of interest
             logger (object): logger for saving relevant processing messages
 
         Raises:
@@ -51,7 +51,7 @@ class SiteMatrix(object):
         self._matrix_filename = matrix_filename
         self._spatial_filename = spatial_filename
         self._fieldnames = fieldnames
-        self._min_presence = 0
+        self._min_presence = 1
         self._max_presence = None
         self._row_indices = {}
 
@@ -467,14 +467,15 @@ class SiteMatrix(object):
         """Calculate the range richness of each species.
 
         Returns:
-            psi_df (pandas.DataFrame): A 2d matrix of range richness for the sites that
+            psi_series (pandas.Series): A Series of range richness for the sites that
                 each species is present in.
 
         TODO: revisit this
         """
         psi_df = None
         if self._df is not None:
-            psi_df = self._df.sum(axis=1).dot(self._df)
+            psi_series = self._df.sum(axis=1).dot(self._df)
+            psi_series.name = "psi"
         return psi_df
 
     # .............................................................................
@@ -482,18 +483,19 @@ class SiteMatrix(object):
         """Calculate the mean proportional species diversity.
 
         Returns:
-            psi_avg_df (pandas.DataFrame): A 2d matrix of proportional range richness
+            psi_avg_series (pandas.Series): A Series of proportional range richness
                 for the sites that each species in the PAM is present.
 
         TODO: revisit this
         """
-        psi_avg_df = None
+        psi_avg_series = None
         if self._df is not None:
-            psi_avg_df = (
+            psi_avg_series = (
                     self.alpha().dot(self._df).astype(float)
                     / (self.num_species * self.omega())
             )
-        return psi_avg_df
+            psi_avg_series.name = "psi_average_proportional"
+        return psi_avg_series
 
     # # ...............................................
     # def schluter_species_variance_ratio(self):
