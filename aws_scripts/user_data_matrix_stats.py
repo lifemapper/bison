@@ -536,10 +536,15 @@ class SiteMatrix:
                 the selected metrics.  Columns are statistic names, rows are sites
                 (counties).
         """
-        site_stats = [
-            self.alpha(), self.alpha_proportional(), self.beta(), self.phi(),
-            self.phi_average_proportional()]
-        site_stats_df = pandas.DataFrame(site_stats)
+        site_stats_df = None
+        if self._pam_df is not None:
+            site_stats = [
+                self.alpha(), self.alpha_proportional(), self.beta(), self.phi(),
+                self.phi_average_proportional()]
+            # Create matrix with each series as a row, columns = sites, rows = stats
+            site_stats_df = pandas.DataFrame(site_stats)
+            # Transpose to put statistics in columns, sites/counties in rows
+            site_stats_df = site_stats_df.T
         return site_stats_df
 
     # ...............................................llll
@@ -550,14 +555,16 @@ class SiteMatrix:
             species_stats_df (pandas.DataFrame): A matrix of species-based statistics
                 for the selected metrics.  Columns are statistics, rows are species.
         """
-        species_stats = [
-            self.omega(), self.omega_proportional(), self.psi(),
-            self.psi_average_proportional()
-        ]
-        # Create matrix with columns = stats, rows = species
-        species_stats_df = pandas.DataFrame(species_stats)
-        # # Transpose to rows = stats, columns = species
-        # species_stats_df = tmp_df.T
+        species_stats_df = None
+        if self._pam_df is not None:
+            species_stats = [
+                self.omega(), self.omega_proportional(), self.psi(),
+                self.psi_average_proportional()
+            ]
+            # Create matrix with each series as a row, columns = species, rows = stats
+            species_stats_df = pandas.DataFrame(species_stats)
+            # Transpose to put columns = stats, rows = species
+            species_stats_df = species_stats_df.T
         return species_stats_df
 
 
@@ -589,9 +596,9 @@ if __name__ == "__main__":
     s3_log_filename = upload_to_s3(log_filename, BUCKET, LOG_PATH, logger)
 
 """
-from user_data_matrix_stats import (
+from aws_scripts.user_data_matrix_stats import (
     read_s3_parquet_to_pandas,  reframe_to_heatmatrix, reframe_to_pam, get_logger)
-from user_data_matrix_stats import SiteMatrix as SM
+from aws_scripts.user_data_matrix_stats import SiteMatrix as SM
 
 import boto3
 from botocore.exceptions import ClientError
@@ -650,6 +657,9 @@ pam_old._min_presence = 1
 
 # NEW matrix
 pam_new = SM(pam_df, logger)
+diversity_df = pam_new.calculate_diversity_statistics()
+site_stat_df = pam_new.calculate_site_statistics()
+species_stat_df = pam_new.calculate_species_statistics()
 
 # old diversity stats
 lande_old = pam_old.lande()
@@ -707,9 +717,7 @@ psi_new = pam_new.psi(),
 psi_average_proportional_new = pam_new.psi_average_proportional()
 
 
-diversity_df = pam.calculate_diversity_statistics()
-site_stat_df = pam.calculate_site_statistics()
-species_stat_df = pam.calculate_species_statistics()
+
 
 # Upload logfile to S3
 s3_log_filename = upload_to_s3(log_filename, BUCKET, LOG_PATH)
