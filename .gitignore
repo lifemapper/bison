@@ -2,6 +2,7 @@
 
 .idea/
 
+aws_scripts/*log
 data/.~lock*
 data/*updated*csv
 data/log/
@@ -16,9 +17,9 @@ tests/data/process/*csv
 
 tests/data/process/*csv
 tests/data/output/*csv
-test.log
+.log
 tests/data/input/US-RIIS_MasterList_top100_2021_annotated.csv
-tests/data/process/process_gbif_split.log
+tests/data/process/*.log
 tests/data/process/gbif10k_2023-01-26_chunk-1001-2000_raw.csv
 tests/data/process/gbif10k_2023-01-26_chunk-1-1000_raw.csv
 tests/data/process/gbif10k_2023-01-26_chunk-2001-3000_raw.csv

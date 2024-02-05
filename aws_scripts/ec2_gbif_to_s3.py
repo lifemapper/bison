@@ -2,8 +2,7 @@
 import boto3
 import os
 
-from ec2_constants import (
-    INSTANCE_TYPE, KEY_NAME, REGION, SECURITY_GROUP_ID)
+from ec2_constants import REGION
 from ec2_utils import (
     create_spot_launch_template_name, create_spot_launch_template, get_current_date_str,
     get_logger, run_instance_spot)
@@ -34,8 +33,8 @@ if __name__ == "__main__":
     desc = f"gbif_{get_current_date_str()}"
     template_name = create_spot_launch_template_name(desc_str=desc)
     success = create_spot_launch_template(
-        ec2_client, template_name, INSTANCE_TYPE, SECURITY_GROUP_ID,
-        user_data_gbif_download_fname, KEY_NAME, overwrite=True)
+        ec2_client, template_name, user_data_gbif_download_fname,
+        insert_script_filename=None, overwrite=True)
 
     # -------  Run instance from template -------
     # Runs the script on instantiation

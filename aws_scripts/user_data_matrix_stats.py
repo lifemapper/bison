@@ -383,7 +383,7 @@ class SiteMatrix:
         if self._pam_df is not None:
             phi_avg_pr_series = self._pam_df.dot(
                 self.omega()).astype(float) / (self.num_sites * self.alpha())
-            phi_series.name = "phi_average_proportional_range_sizes"
+            phi_avg_pr_series.name = "phi_average_proportional_range_sizes"
         return phi_avg_pr_series
 
     # ...............................................
@@ -474,8 +474,8 @@ class SiteMatrix:
         """
         whittaker_dict = {}
         if self._pam_df is not None:
-            whittaker = float(self.num_species / self.omega_proportional().sum())
-            whittaker_dict["whittaker_beta_diversity"] = whittaker
+            whittaker_dict["whittaker_beta_diversity"] = float(
+                self.num_species / self.omega_proportional().sum())
         return whittaker_dict
 
     # ...............................................
@@ -485,13 +485,12 @@ class SiteMatrix:
         Returns:
             lande_dict: Lande's beta diversity for the PAM.
         """
-        lande_dict = None
+        lande_dict = {}
         if self._pam_df is not None:
-            lande = float(
+            lande_dict["lande_beta_diversity"] = float(
                 self.num_species -
                 (self._pam_df.sum(axis=0).astype(float) / self.num_sites).sum()
             )
-            lande_dict["lande_beta_diversity"] = lande
         return lande_dict
 
     # ...............................................
@@ -503,11 +502,10 @@ class SiteMatrix:
         """
         legendre_dict = {}
         if self._pam_df is not None:
-            legendre = float(
+            legendre_dict["legendre_beta_diversity"] = float(
                 self.omega().sum() -
                 (float((self.omega() ** 2).sum()) / self.num_sites)
             )
-            legendre_dict["legendre_beta_diversity"] = legendre
         return legendre_dict
 
     # ...............................................
@@ -515,7 +513,8 @@ class SiteMatrix:
         """Compute PAM diversity statistics.
 
         Returns:
-            diversity_df (pandas.Series): A series of values for diversity metrics.
+            diversity_df (pandas.DataFrame): A matrix of values with columns as
+                diversity metric names, and one row with values.
         """
         diversity_df = None
         if self._pam_df is not None:
@@ -524,7 +523,7 @@ class SiteMatrix:
                 **self.lande(), **self.legendre(), **self.whittaker(),
                 **{"num_sites": self.num_sites}, **{"num_species": self.num_species}
             }
-        diversity_df = pandas.DataFrame(diversity_stats)
+            diversity_df = pandas.DataFrame(diversity_stats, index=["value"])
         return diversity_df
 
     # ...............................................
@@ -533,7 +532,8 @@ class SiteMatrix:
 
         Returns:
             site_stats_matrix(pandas.DataFrame): A matrix of site-based statistics for
-                the selected metrics.
+                the selected metrics.  Columns are statistic names, rows are sites
+                (counties).
         """
         site_stats = [self.alpha(), self.alpha_proportional(), self.phi(), self.phi_average_proportional()]
         site_stats_df = pandas.DataFrame(site_stats)
@@ -545,13 +545,16 @@ class SiteMatrix:
 
         Returns:
             species_stats_df (pandas.DataFrame): A matrix of species-based statistics
-                for the selected metrics.
+                for the selected metrics.  Columns are statistics, rows are species.
         """
-        species_stats = [self.omega(), self.omega_proportional(), self.psi(), self.psi_average_proportional()]
+        species_stats = [
+            self.omega(), self.omega_proportional(), self.psi(),
+            self.psi_average_proportional()
+        ]
         # Create matrix with columns = stats, rows = species
-        tmp_df = pandas.DataFrame(species_stats)
-        # Transpose to rows = stats, columns = species
-        species_stats_df = tmp_df.T
+        species_stats_df = pandas.DataFrame(species_stats)
+        # # Transpose to rows = stats, columns = species
+        # species_stats_df = tmp_df.T
         return species_stats_df
 
 
@@ -575,12 +578,18 @@ if __name__ == "__main__":
     pam_df = reframe_to_pam(heat_df, 1)
     pam = SiteMatrix(pam_df, logger)
 
+    diversity_df = pam.calculate_diversity_statistics()
+    site_stat_df = pam.calculate_site_statistics()
+    species_stat_df = pam.calculate_species_statistics()
+
     # Upload logfile to S3
-    s3_log_filename = upload_to_s3(log_filename, BUCKET, LOG_PATH)
+    s3_log_filename = upload_to_s3(log_filename, BUCKET, LOG_PATH, logger)
 
 """
 from user_data_matrix_stats import *
-
+from importlib import reload
+reload(user_data_matrix_stats)
+from user_data_matrix_stats import SiteMatrix
 
 n = DT.datetime.now()
 date_str = f"{n.year}-{n.month}-{n.day}"

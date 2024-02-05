@@ -1,4 +1,4 @@
-# Constants and Methods for BISON project: GBIF data, local dev machine, EC2, S3.
+"""Constants and Methods for BISON project: GBIF data, local dev machine, EC2, S3."""
 # --------------------------------------------------------------------------------------
 # Imports
 # --------------------------------------------------------------------------------------
@@ -131,8 +131,9 @@ def define_spot_launch_template_data(
 
 
 # ----------------------------------------------------
-def get_user_data(user_data_filename, script_filename, token_to_replace=USER_DATA_TOKEN):
-    """ Return the EC2 user_data script as a Base64 encoded string.
+def get_user_data(
+        user_data_filename, script_filename=None, token_to_replace=USER_DATA_TOKEN):
+    """Return the EC2 user_data script as a Base64 encoded string.
 
     Args:
         user_data_filename: Filename containing the user-data script to be executed on
@@ -145,7 +146,9 @@ def get_user_data(user_data_filename, script_filename, token_to_replace=USER_DAT
     Returns:
         A Base64-encoded string of the user_data file to create on an EC2 instance.
     """
-    fill_user_data_script(user_data_filename, script_filename, token_to_replace)
+    # Insert an external script if provided
+    if script_filename is not None:
+        fill_user_data_script(user_data_filename, script_filename, token_to_replace)
     try:
         with open(user_data_filename, "r") as infile:
             script_text = infile.read()
@@ -161,7 +164,7 @@ def get_user_data(user_data_filename, script_filename, token_to_replace=USER_DAT
 # ----------------------------------------------------
 def fill_user_data_script(
         user_data_filename, script_filename, token_to_replace):
-    """ Fill the EC2 user_data script with a python script in another file.
+    """Fill the EC2 user_data script with a python script in another file.
 
     Args:
         user_data_filename: Filename containing the user-data script to be executed on
@@ -252,7 +255,7 @@ def get_previous_date_str():
 
 # ----------------------------------------------------
 def create_spot_launch_template(
-        ec2_client, template_name, user_data_filename, script_filename,
+        ec2_client, template_name, user_data_filename, insert_script_filename=None,
         overwrite=False):
     """Create an EC2 Spot Instance Launch template on AWS.
 
@@ -260,7 +263,7 @@ def create_spot_launch_template(
         ec2_client: an object for communicating with EC2.
         template_name: name for the launch template0
         user_data_filename: script to be installed and run on EC2 instantiation.
-        script_filename: script to be inserted into user_data_filename.
+        insert_script_filename: optional script to be inserted into user_data_filename.
         overwrite: flag indicating whether to use an existing template with this name,
             or create a new
 
@@ -275,7 +278,7 @@ def create_spot_launch_template(
         success = True
     else:
         spot_template_data = define_spot_launch_template_data(
-            template_name, user_data_filename, script_filename)
+            template_name, user_data_filename, insert_script_filename)
         template_token = create_token("template")
         try:
             response = ec2_client.create_launch_template(
