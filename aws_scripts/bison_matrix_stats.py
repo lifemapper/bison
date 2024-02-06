@@ -1,4 +1,4 @@
-"""Script to install on an EC2 instance to compute matrix statistics on S3 data."""
+"""Script to run locally or from an EC2 instance to compute PAM statistics on S3 data."""
 import boto3
 from botocore.exceptions import ClientError
 import datetime as DT
@@ -9,6 +9,8 @@ import os
 import pandas
 import sys
 
+# Also in bison_ec2_constants, but provided here to avoid populating EC2 template with
+# multiple files for userdata.
 REGION = "us-east-1"
 BUCKET = f"bison-321942852011-{REGION}"
 BUCKET_PATH = "out_data"
@@ -26,7 +28,7 @@ LOG_DATE_FORMAT = "%d %b %Y %H:%M"
 LOGFILE_MAX_BYTES = 52000000
 LOGFILE_BACKUP_COUNT = 5
 
-bison_bucket = "s3://bison-321942852011-us-east-1/"
+bison_bucket = f"s3://{BUCKET}/"
 output_dataname = "heatmatrix.parquet"
 
 
@@ -449,7 +451,7 @@ class SiteMatrix:
 
     # .............................................................................
     def psi_average_proportional(self):
-        """Calculate the mean proportional species diversity.
+        """Calculate the mean proportional range richness.
 
         Returns:
             psi_avg_df (pandas.DataFrame): A Series of proportional range richness

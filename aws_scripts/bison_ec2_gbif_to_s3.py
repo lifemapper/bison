@@ -2,8 +2,8 @@
 import boto3
 import os
 
-from ec2_constants import REGION
-from ec2_utils import (
+from bison_ec2_constants import REGION
+from bison_ec2_utils import (
     create_spot_launch_template_name, create_spot_launch_template, get_current_date_str,
     get_logger, run_instance_spot)
 

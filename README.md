@@ -1,50 +1,14 @@
 [![Imports: isort](https://img.shields.io/badge/%20imports-isort-%231674b1?style=flat&labelColor=ef8336)](https://pycqa.github.io/isort/)
 
-# 2023 Data processing
+# Year 4 Data processing
 
 ## GBIF Input
 
-* Download GBIF data, query
+* Use the Global Biodiversity Information Facility (GBIF) Species Occurrences on the
+  AWS Open Data Registry  https://registry.opendata.aws/gbif/
+* Previously downloaded a full Darwin Core Archive from GBIF, startint with the query
   https://www.gbif.org/occurrence/search?country=US&has_coordinate=true&has_geospatial_issue=false&occurrence_status=present
-* Download option Darwin Core Archive (The taxonKey and scientific name in Simple CSV
-  option is not always the accepted version).
-  * Final dataset for processing
-    DOI: https://doi.org/10.15468/dl.vg6gg4 (may take some hours before being active)
-    Creation Date: 15:01:13 23 August 2023
-    Records included: 904377770 records from 3757 published datasets
-    Compressed data size: 311.9 GB
-    Download format: DWCA
-    Filter used:
-      GBIF.org (23 August 2023) GBIF Occurrence Download https://doi.org/10.15468/dl.epwzn6
-    {
-      "and" : [
-        "Country is United States of America",
-        "HasCoordinate is true",
-        "HasGeospatialIssue is false",
-        "OccurrenceStatus is Present"
-      ]
-    }
-
-  * Test data
-
-    When using this dataset please use the following citation:
-    GBIF.org (25 September 2023) GBIF Occurrence Download https://doi.org/10.15468/dl.33f5eq
-    Download Information
-    DOI: https://doi.org/10.15468/dl.33f5eq (may take some hours before being active)
-    Creation Date: 16:16:09 25 September 2023
-    Records included: 1421243 records from 73 published datasets
-    Compressed data size: 257.2 MB
-    Download format: DWCA
-    Filter used:
-    {
-      "and" : [
-        "BasisOfRecord is Occurrence evidence",
-        "Country is United States of America",
-        "HasCoordinate is true",
-        "HasGeospatialIssue is false",
-        "OccurrenceStatus is Present"
-      ]
-    }
+* The Simple CSV option does not always contain the accepted taxonKey and scientific name
 
 ## USGS RIIS Input
 
@@ -91,7 +55,7 @@ Data:
 # Project setup
 
 ## Dependencies
-Docker
+Amazon Web Services account with access to EC2, S3, Glue, and Redshift
 
 ## Develop and Test
 

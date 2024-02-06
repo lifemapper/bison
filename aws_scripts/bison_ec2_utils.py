@@ -12,7 +12,7 @@ from logging.handlers import RotatingFileHandler
 import pandas
 import os
 
-from ec2_constants import (
+from bison_ec2_constants import (
     INSTANCE_TYPE, KEY_NAME, LOGFILE_MAX_BYTES, LOG_FORMAT, LOG_DATE_FORMAT, PROJ_NAME,
     REGION, SECURITY_GROUP_ID, SPOT_TEMPLATE_BASENAME, USER_DATA_TOKEN)
 
