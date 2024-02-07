@@ -228,7 +228,7 @@ fieldnames within that shapefile.
 Census: AIANNH
 ----------------------------
 
-Up-to-date census data, including American Indian, Alaska Native, and Native Hawaiian,
+2021 American Indian, Alaska Native, and Native Hawaiian lands
 are available at:
 https://www.census.gov/geographies/mapping-files/time-series/geo/cartographic-boundary.html
 
@@ -245,21 +245,27 @@ Protected Areas Database, US-PAD (not currently used)
 
 U.S. Geological Survey (USGS) Gap Analysis Project (GAP), 2022, Protected Areas Database
 of the United States (PAD-US) 3.0: U.S. Geological Survey data release,
-https://doi.org/10.5066/P9Q9LQ4B.
+https://doi.org/10.5066/P9Q9LQ4B.`
 
-The US-PAD dataset proved too complex to intersect at an acceptable speed.  Intersecting
-with 900 million records was projected to take 60 days.  I tested this data in
-multiple implementations (local machine or Docker containers) and with multiple versions
-of the data (split by Dept of Interior, DOI, regions, or by states) and with multiple
-Docker configurations, with no success.  For this reason, US-PAD was abandoned until a
-good solution can be found.
+
+Plan: Annotate points with US-PAD regions for aggregation by species and
+RIIS status.  US Protected Areas are split into files by Department of Interior regions,
+and by state.  DOI region files are still very complex, and slow, so to efficiently
+intersect points with US-PAD, we intersect with census data for the correct state
+abbreviation, then intersect with the US-PAD file for that state.
+
+Data:
+  * https://www.usgs.gov/programs/gap-analysis-project/science/pad-us-data-download
+
+The state US-PAD datasets still proved too complex to intersect at an acceptable speed.
+Intersecting with 900 million records was projected to take 60 days.  I tested this data
+in multiple implementations (local machine or Docker containers) and with multiple
+versions of the data (split by Dept of Interior, DOI, regions, or by states) and with
+multiple Docker configurations, all without success.  For this reason, US-PAD was
+abandoned until a good solution can be found.
 
 The next configuration to try will use different AWS tools.  I was unable to insert
 these data into AWS RDS, PostgreSQL with PostGIS (other polygon datasets succeeded).
-
-The PAD data is divided into datasets by Department of Interior (DOI) region, but
-those datasets are still too large and complex.
-Download the PAD data for states, this also removes the need for another intersect.
 
 Project the dataset to EPSG:4326 with commands like A sample script is in
 `project_doi_pad.sh
@@ -286,6 +292,34 @@ Reported problems with projected dataset:
   * Citation: U.S. Geological Survey (USGS) Gap Analysis Project (GAP), 2022, Protected
     Areas Database of the United States (PAD-US) 3.0: U.S. Geological Survey data
     release, https://doi.org/10.5066/P9Q9LQ4B.
+
+Local Data Layout
+==========================
+* For local setup and testing, create directories to mimic the volumes created by the Dockerfile.
+* Create a local /volumes/bison directory.  Everything contained in this
+  directory will be a symlink to the repository or to the large data directory discussed next.
+* Identify a directory with plenty of space, and create directories to contain
+  large data files
+  * input:
+    * big_data/gbif
+    * big_data/geodata
+  * temporary processing files:
+    * big_data/process
+  * final output files:
+    * big_data/output
+
+* In the big_data/gbif directory, place the gbif occurrence file
+* In the big_data/geodata directory, place all geospatial data files.  All data within
+  this directory will be referenced by relative filenames
+
+
+* In the /volumes/bison directory create symbolic links to the large directory:
+  * big_data
+
+* and to the local repository
+  * config (bison/data/config)
+  * input (bison/data/input)
+  * tests (bison/tests/data)
 
 **********************
 Processing Steps
@@ -394,6 +428,91 @@ compute species statistics: range size (omega) and mean proportional range size
 ::
 
 python process_gbif.py pam_stats data/config/process_gbif.json
+
+Stats references for alpha, beta, gamma diversity:
+* https://www.frontiersin.org/articles/10.3389/fpls.2022.839407/full
+* https://specifydev.slack.com/archives/DQSAVMMHN/p1693260539704259
+* https://bio.libretexts.org/Bookshelves/Ecology/Biodiversity_(Bynum)/7%3A_Alpha_Beta_and_Gamma_Diversity
+
+
+####################
+Run all processes on GBIF data
+####################
+
+Subset GBIF file
+*************************
+
+Chunk the large GBIF occurrence data file into smaller subsets:
+
+    ```commandline
+    python process_gbif.py chunk data/config/process_gbif.json
+    ```
+
+Annotate RIIS with GBIF Taxa
+*************************
+
+Annotate USGS RIIS records with GBIF Accepted Taxa, in order to link GBIF occurrence
+   records with RIIS records using taxon and location.
+
+    ```commandline
+    python process_gbif.py resolve data/config/process_gbif.json
+    ```
+
+Annotate GBIF with RIIS and locations
+*************************
+
+Annotate GBIF occurrence records (each subset file) with:
+   * state, for assigning RIIS determination and summarizing
+   * other geospatial regions for summarizing
+   * RIIS determinations using state and taxon contained in both GBIF and RIIS records
+
+    ```commandline
+    python process_gbif.py annotate data/config/process_gbif.json
+    ```
+
+Summarize annotations
+*************************
+
+Summarize annotated GBIF occurrence records (each subset file), by:
+   * location type (state, county, American Indian, Alaskan Native, and Native Hawaiian
+     lands (AIANNH), and US-Protected Areas Database (PAD)).
+   * location value
+   * combined RIIS region and taxon key (RIIS region: AK, HI, L48)
+   * scientific name, species name (for convenience in final aggregation outputs)
+   * count
+
+Then summarize the summaries into a single file, and aggregate summary into files of
+species and counts for each region:
+
+    ```commandline
+    python process_gbif.py summarize data/config/process_gbif.json
+    ```
+
+Create a heat matrix
+*************************
+
+Create a 2d matrix of counties (rows) by species (columns) with a count for each species
+found at that location.
+
+    ```commandline
+    python process_gbif.py heat_matrix data/config/process_gbif.json
+    ```
+
+Create a Presence-Absence Matrix (PAM) for counties x species, then compute statistics
+*************************
+
+Convert the heat matrix into a binary PAM, and compute diversity statistics: overall
+diversity of the entire region (gamma), county diversities (alpha) and county
+diversities (alpha) and total diversity to county diversities (beta).  In addition,
+compute species statistics: range size (omega) and mean proportional range size
+(omega_proportional).
+
+    ```commandline
+    python process_gbif.py pam_stats data/config/process_gbif.json
+    ```
+
+Compute heatmatrix, PAM, stats
+*************************
 
 Stats references for alpha, beta, gamma diversity:
 * https://www.frontiersin.org/articles/10.3389/fpls.2022.839407/full

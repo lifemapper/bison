@@ -48,30 +48,6 @@ def get_secret(secret_name, region):
     return eval(secret_str)
 
 
-# # ----------------------------------------------------
-# def get_db_connection(db_name, secret):
-#     """Create a psycopg2 connection to a PostgreSQL database.
-#
-#     Args:
-#         db_name: Database to connect to.
-#         secret: Dictionary containing AWS RDS database credentials.
-#
-#     Returns:
-#         conn: psycopg2.connection to the database.
-#
-#     Raises:
-#         Exception: on failure to connect to database.
-#     """
-#     try:
-#         conn = psycopg2.connect(
-#             host=secret["host"], database=db_name, user=secret["username"],
-#             password=secret["password"]
-#         )
-#     except Exception as e:
-#         raise Exception("Error connecting to PostgreSQL database:", e)
-#     return conn
-
-
 # ----------------------------------------------------
 def get_db_engine(db_name, secret):
     """Create a sqlalchemy engine to connect to a PostgreSQL database.
@@ -162,21 +138,18 @@ job = Job(glueContext)
 job.init(args['JOB_NAME'], args)
 
 n = DT.now()
-datastr = f"{n.year}-{n.month}-01"
-# # Full data
-# input_s3_path = f"raw_data/gbif_{datastr}.parquet/"
-# Subset 5k data
-input_s3_path = f"raw_data/gbif_5k_{datastr}.parquet/"
+datastr = f"{n.year}-{n.month:02d}-01"
+input_s3_path = f"input_data/gbif_{datastr}.parquet/"
 output_s3_path = f"out_data/bison_{datastr}.parquet/"
 
-REGION = "us-east-1"
-BISON_BUCKET = "s3://bison-321942852011-us-east-1/"
-SECRET_NAME = "admin_bison-db-test"
+region = "us-east-1"
+bison_bucket = f"s3://bison-321942852011-{region}/"
+secret_name = "admin_bison-db-test"
 
-secret = get_secret(SECRET_NAME, REGION)
+secret = get_secret(secret_name, region)
 
 # Get dynamic frame of point records
-gbif_pt_recs = get_s3_dynframe(BISON_BUCKET, input_s3_path)
+gbif_pt_recs = get_s3_dynframe(bison_bucket, input_s3_path)
 
 # Get spatial table
 polygon_table = get_rds_table(secret, rds_instance, rds_db_schema, county_table)

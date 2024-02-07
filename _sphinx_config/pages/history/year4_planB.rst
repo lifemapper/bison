@@ -25,9 +25,6 @@ for species, occurrences, and RIIS status.
 Installation
 **********************
 
-
-
-
 Hardware requirements
 ==========================
 
@@ -71,8 +68,26 @@ Required Data not included in Github repo:
   * county (includes state field)
   * American Indian/Alaska Native Areas/Hawaiian Home Lands (AIANNH)
 
-Create expected file structure
+Upload ancillary data to AWS S3
 ==========================
+
+Choose a region, then create an S3 bucket for BISON inputs and outputs, using the naming
+convention <name>-<region>, for example bison-us-east-1.  Under
+the bucket, create the directories (and subdirectories):
+
+* annotated_records: for annotated GBIF occurrence records
+* input_data: for subsetted GBIF data, prior to annotation, and subdirectories
+    * pad: for US Protected Areas Database shapefiles
+    * region: for US census data, including AIANNH, and US counties
+    * riis: for annotated RIIS data (with GBIF accepted taxon name and key)
+* lib: for python libraries needed by scripts, namely SQLAlchemy
+    *
+* log
+* out_data
+* scripts
+
+gbif_bucket = f"s3://gbif-open-data-{region}/"
+
 
 Base data paths are specified in the user-created configuration file.  The configuration
 file used by the author to test and execute the workflow is in the `process_gbif.json
@@ -275,6 +290,16 @@ Reported problems with projected dataset:
   * Citation: U.S. Geological Survey (USGS) Gap Analysis Project (GAP), 2022, Protected
     Areas Database of the United States (PAD-US) 3.0: U.S. Geological Survey data
     release, https://doi.org/10.5066/P9Q9LQ4B.
+
+Mark Wiltermuth, USGS, suggested the "flattened" datasets:
+In terms of PAD-US v 3.0, I'd recommend the following options, if decided to revisit:
+PAD-US 3.0 Vector Analysis File https://www.sciencebase.gov/catalog/item/6196b9ffd34eb622f691aca7
+PAD-US 3.0 Raster Analysis File https://www.sciencebase.gov/catalog/item/6196bc01d34eb622f691acb5
+ These are "flattened" though spatial analysis prioritized by GAP Status Code
+(ie GAP 1 > GAP 2 > GAP > 3 > GAP 4), these are found on bottom of
+https://www.usgs.gov/programs/gap-analysis-project/science/pad-us-data-download page.
+However, the vector datasets are available only as ESRI Geodatabases.  The raster
+dataset appears to
 
 **********************
 Processing Steps
