@@ -1,4 +1,7 @@
 -- Load reference region shapefiles and US RIIS into Redshift
+-- Note: You MUST update the annotated RIIS filename with the most recent version
+--   containing the current date (first day of current month),
+--   i.e. US-RIIS_MasterList_2021_annotated_2024_02_01.csv'
 DROP TABLE pad;
 CREATE TABLE pad (
 );
@@ -21,7 +24,7 @@ CREATE TABLE aiannh (
    ALAND    VARCHAR(max),
    AWATER   VARCHAR(max)
 );
-COPY aiannh FROM 's3://bison-321942852011-us-east-1/input_data/region/cb_2021_us_aiannh_500k.shp'
+COPY aiannh FROM 's3://bison-321942852011-us-east-1/input_data/cb_2021_us_aiannh_500k.shp'
 FORMAT SHAPEFILE
 --SIMPLIFY AUTO
 IAM_role DEFAULT;
@@ -45,7 +48,7 @@ CREATE TABLE county (
    ALAND    VARCHAR(max),
    AWATER   VARCHAR(max)
 );
-COPY county FROM 's3://bison-321942852011-us-east-1/input_data/region/cb_2021_us_county_500k.shp'
+COPY county FROM 's3://bison-321942852011-us-east-1/input_data/cb_2021_us_county_500k.shp'
 FORMAT SHAPEFILE
 --SIMPLIFY AUTO
 IAM_role DEFAULT;
@@ -54,8 +57,9 @@ select * from county limit 10
 
 -- Load US Registry of Introduced and Invasive Species (US-RIIS)
 -- First crawl data with Glue Crawler to get fields
-DROP TABLE riis;
-CREATE TABLE riis (
+-- Must use underscores in table name, no dash
+DROP TABLE riis_2024_02_01;
+CREATE TABLE riis_2024_02_01 (
 	locality	VARCHAR(max),
 	scientificname	VARCHAR(max),
 	scientificnameauthorship	VARCHAR(max),
@@ -88,12 +92,12 @@ CREATE TABLE riis (
 );
 -- ERROR: Load into table 'riis' failed. Check 'sys_load_error_detail' system table for
 -- details. [ErrorId: 1-656a6401-67bc80cb02ba7898069d8916]
-COPY riis
-FROM 's3://bison-321942852011-us-east-1/input_data/riis/US-RIIS_MasterList_2021_annotated.csv'
+COPY riis_2024_02_01
+FROM 's3://bison-321942852011-us-east-1/input_data/US-RIIS_MasterList_2021_annotated_2024_02_01.csv'
 FORMAT CSV
 IAM_role DEFAULT;
 
-SELECT COUNT(*) FROM riis;
-SELECT * FROM riis LIMIT 10;
+SELECT COUNT(*) FROM riis_2024_02_01;
+SELECT * FROM riis_2024_02_01 LIMIT 10;
 
 SHOW TABLES FROM SCHEMA dev.public;

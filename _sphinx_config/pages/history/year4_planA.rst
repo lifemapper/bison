@@ -466,6 +466,10 @@ Annotate GBIF occurrence records (each subset file) with:
    * other geospatial regions for summarizing
    * RIIS determinations using state and taxon contained in both GBIF and RIIS records
 
+Occasionally a point will intersect with a county envelope (created for a spatial
+index) but not be contained within the returned geometry.  In that case, return the
+values from the geometry nearest to the point.
+
     ```commandline
     python process_gbif.py annotate data/config/process_gbif.json
     ```

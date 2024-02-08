@@ -1,5 +1,6 @@
 """Common file handling tools used in various BISON modules."""
 import csv
+import datetime
 import glob
 import logging
 import math
@@ -757,6 +758,25 @@ class BisonNameOp():
     """Class for constructing filenames following a pattern for different processes."""
     separator = "_"
 
+    # ----------------------------------------------------
+    @staticmethod
+    def get_current_date_str():
+        """Get a string representation of the first day of the current month.
+
+        Note:
+            this replicates a standalone function in aws_scripts.bison_ec2_utils, and
+            is intended to ensure that the RIIS records are resolved to the currently
+            accepted taxon each time the data is processed. This datestr matches that
+            of the most current GBIF data in the AWS Open Data Registry.
+
+        Returns:
+            date_str(str): string representing date in YYYY-MM-DD format.
+        """
+        n = datetime.datetime.now()
+        date_str = f"{n.year}-{n.month:02d}-01"
+        return date_str
+
+    # ----------------------------------------------------
     @staticmethod
     def get_annotated_riis_filename(input_riis_filename, outpath=None):
         """Construct a filename for a chunk of CSV records.
@@ -773,9 +793,11 @@ class BisonNameOp():
         if outpath is None:
             outpath = inpath
         basename, _ = os.path.splitext(fname)
-        out_filename = os.path.join(outpath, f"{basename}_annotated.csv")
+        datestr = BisonNameOp.get_current_date_str()
+        out_filename = os.path.join(outpath, f"{basename}_annotated_{datestr}.csv")
         return out_filename
 
+    # ----------------------------------------------------
     @staticmethod
     def get_chunk_filename(basename, ext, start, stop):
         """Construct a filename for a chunk of CSV records.

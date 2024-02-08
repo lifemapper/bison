@@ -33,8 +33,9 @@ Download this Repository
 ==========================
 
 The `LmBISON repository <https://github.com/lifemapper/bison>`_  can be installed by
-downloading from Github.  This code repository contains scripts, Docker composition
-files, configuration files, and test data for creating the outputs.
+downloading from Github.  This code repository contains python code, scripts for AWS
+tools, Docker composition files, configuration files, and test data for creating the
+outputs.
 
 Type `git` at the command prompt to see if you have git installed.  If you do not,
 download and install git from https://git-scm.com/downloads .
@@ -298,12 +299,22 @@ PAD-US 3.0 Raster Analysis File https://www.sciencebase.gov/catalog/item/6196bc0
  These are "flattened" though spatial analysis prioritized by GAP Status Code
 (ie GAP 1 > GAP 2 > GAP > 3 > GAP 4), these are found on bottom of
 https://www.usgs.gov/programs/gap-analysis-project/science/pad-us-data-download page.
-However, the vector datasets are available only as ESRI Geodatabases.  The raster
-dataset appears to
+However, the vector datasets are available only as ESRI Geodatabases.  Try these and the
+flattened raster dataset in AWS Redshift.
 
 **********************
 Processing Steps
 **********************
+
+To address new difficulties processing the data locally with newly added datasets,
+we moved some steps from local or Docker execution to Amazon Web Services AWS, and kept
+others to be executed locally.  To simplify, we abandoned the Docker implementation,
+since the steps it was intended to speed up were moved to AWS.
+
+The goal is to also move
+locally executed steps over to AWS, removing the requirement of local installation, and
+allowing the workflow to be initiated by an event, with the completion of each step
+triggering subsequent steps.
 
 Processing consists of 6 unique steps, each initiated with the process_gbif.py script
 and 2 arguments: command and a parameter file.
@@ -341,15 +352,9 @@ For this step, we will
     $ python process_gbif.py resolve data/config/process_gbif.json
 
 
-Step 2: Split large GBIF data into manageable files
+Step 2:
 -------------------------------
-We split the large GBIF data file into smaller chunks to reduce the memory footprint
-of each process, allow for easier debugging, and facilitate parallel processing for
-time-intensive, but not CPU-intensive, data processes.
 
-::
-
-    $ python process_gbif.py chunk data/config/process_gbif.json
 
 
 Step 3: Annotate GBIF records with RIIS determinations and geographical regions

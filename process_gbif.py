@@ -687,7 +687,7 @@ def read_bad_line(in_filename, logger, gbif_id=None, line_num=None):
 
 
 # .............................................................................
-def _prepare_args(config):
+def _prepare_args(config, logger):
     """Prepare arguments, assembling paths, filenames, and splitting data if needed.
 
     Args:
@@ -738,7 +738,7 @@ def execute_command(config, logger):
     """
     report = {}
     step_or_process = None
-    (infile, raw_filenames) = _prepare_args(config)
+    (infile, raw_filenames) = _prepare_args(config, logger)
     # Make sure input files exist
     for csv_fname in raw_filenames:
         if not os.path.exists(csv_fname):

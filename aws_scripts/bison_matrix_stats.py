@@ -17,10 +17,9 @@ BUCKET_PATH = "out_data"
 LOG_PATH = "log"
 
 n = DT.datetime.now()
-datastr = f"{n.year}-{n.month}-01"
+datestr = f"{n.year}-{n.month:02d}-01"
 
-species_county_list_basename = "county_lists_000"
-species_county_list_fname = f"{species_county_list_basename}.parquet"
+species_county_list_fname = f"county_lists_{datestr}_000.parquet"
 # Log processing progress
 LOGINTERVAL = 1000000
 LOG_FORMAT = " ".join(["%(asctime)s", "%(levelname)-8s", "%(message)s"])
@@ -29,7 +28,7 @@ LOGFILE_MAX_BYTES = 52000000
 LOGFILE_BACKUP_COUNT = 5
 
 bison_bucket = f"s3://{BUCKET}/"
-output_dataname = "heatmatrix.parquet"
+output_dataname = f"heatmatrix_{datestr}.parquet"
 
 
 # .............................................................................
@@ -574,9 +573,6 @@ class SiteMatrix:
 # Main
 # --------------------------------------------------------------------------------------
 if __name__ == "__main__":
-    n = DT.datetime.now()
-    date_str = f"{n.year}-{n.month}-{n.day}"
-
     # Create a logger
     script_name = os.path.splitext(os.path.basename(__file__))[0]
     logger, log_filename = get_logger(f"{script_name}_{date_str}")

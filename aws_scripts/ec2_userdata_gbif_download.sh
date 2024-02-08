@@ -88,7 +88,7 @@ def download_from_gbif(gbif_basename, logger):
 # ----------------------------------------------------
 def get_date_str():
     n = DT.datetime.now()
-    date_str = os.path.join(local_path, f"{n.year}-{n.month}-{n.day}")
+    date_str = os.path.join(local_path, f"{n.year}-{n.month:02d}-{n.day:02d}")
     return date_str
 
 

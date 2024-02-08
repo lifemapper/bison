@@ -220,7 +220,7 @@ def get_date_str():
         date_str(str): string representing date in YYYY-MM-DD format.
     """
     n = datetime.datetime.now()
-    date_str = f"{n.year}-{n.month}-{n.day}"
+    date_str = f"{n.year}-{n.month:02d}-{n.day:02d}"
     return date_str
 
 
@@ -232,7 +232,7 @@ def get_current_date_str():
         date_str(str): string representing date in YYYY-MM-DD format.
     """
     n = datetime.datetime.now()
-    date_str = f"{n.year}-{n.month}-01"
+    date_str = f"{n.year}-{n.month:02d}-01"
     return date_str
 
 
@@ -249,7 +249,7 @@ def get_previous_date_str():
     if n.month == 1:
         mo = 12
         yr -= 1
-    date_str = f"{yr}-{mo}-01"
+    date_str = f"{yr}-{mo:02d}-01"
     return date_str
 
 
