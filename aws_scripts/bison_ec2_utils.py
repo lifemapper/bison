@@ -1,4 +1,4 @@
-"""Constants and Methods for BISON project: GBIF data, local dev machine, EC2, S3."""
+"""Tools to use locally initiate BISON AWS EC2 Spot Instances."""
 # --------------------------------------------------------------------------------------
 # Imports
 # --------------------------------------------------------------------------------------

@@ -6,10 +6,11 @@
 -- TODO: Script the date for previous and current original and subset data
 
 
--------------------
+-- -------------------------------------------------------------------------------------
 -- Mount GBIF
--------------------
--- Create a schema for mounting external data, throws error if pre-existing
+-- -------------------------------------------------------------------------------------
+-- Create a schema for mounting external data
+-- Throws error if pre-existing
 CREATE external schema redshift_spectrum
     FROM data catalog
     DATABASE dev
@@ -17,7 +18,7 @@ CREATE external schema redshift_spectrum
     CREATE external database if NOT exists;
 
 -- Mount a table for subset of GBIF ODR data in S3
-CREATE EXTERNAL TABLE redshift_spectrum.occurrence_2024_01_01_parquet (
+CREATE EXTERNAL TABLE redshift_spectrum.occurrence_2024_02_01_parquet (
     gbifid	VARCHAR(max),
     datasetkey	VARCHAR(max),
     occurrenceid	VARCHAR(max),
@@ -73,22 +74,20 @@ CREATE EXTERNAL TABLE redshift_spectrum.occurrence_2024_01_01_parquet (
     LOCATION 's3://gbif-open-data-us-east-1/occurrence/2024-01-01/occurrence.parquet/';
 
 -- TODO: Get creation time of existing table
-SELECT create_time FROM INFORMATION_SCHEMA.TABLES
-WHERE table_schema = 'publlic' AND table_name = 'bison_subset';
 
--------------------
+-- -------------------------------------------------------------------------------------
 -- Subset to BISON
--------------------
+-- -------------------------------------------------------------------------------------
 -- Drop existing table;
-DROP TABLE public.bison_subset IF EXISTS;
+DROP TABLE IF EXISTS public.bison_subset_2024_01_01;
 -- Create a BISON table with a subset of records and subset of fields
-CREATE TABLE public.bison_subset_2024_01_01 AS
+CREATE TABLE public.bison_subset_2024_02_01 AS
 	SELECT
 		gbifid, species, taxonrank, scientificname, countrycode, stateprovince,
 		occurrencestatus, publishingorgkey, day, month, year, taxonkey, specieskey,
 		basisofrecord,
 		ST_Makepoint(decimallongitude, decimallatitude) as geom
-	FROM redshift_spectrum.occurrence_2024_01_01_parquet
+	FROM redshift_spectrum.occurrence_2024_02_01_parquet
 	WHERE countrycode = 'US'
 	  AND decimallatitude IS NOT NULL
 	  AND decimallongitude IS NOT NULL
@@ -100,11 +99,11 @@ CREATE TABLE public.bison_subset_2024_01_01 AS
 	  AND basisofrecord IN
 	    ('HUMAN_OBSERVATION', 'OBSERVATION', 'OCCURRENCE', 'PRESERVED_SPECIMEN');
 
--------------------
+-- -------------------------------------------------------------------------------------
 -- Misc Queries
--------------------
+-- -------------------------------------------------------------------------------------
 -- Count records from full GBIF and BISON subset
-SELECT COUNT(*) from dev.redshift_spectrum.occurrence_2024_01_01_parquet;
+SELECT COUNT(*) from dev.redshift_spectrum.occurrence_2024_02_01_parquet;
 SELECT COUNT(*) FROM public.bison_subset;
 -- List databases (Redshift, Glue, and RDS)
 SELECT * FROM SVV_EXTERNAL_DATABASES WHERE databasename = 'dev';
@@ -114,8 +113,7 @@ FROM pg_class_info cls LEFT JOIN pg_namespace ns ON cls.relnamespace=ns.oid
 WHERE cls.relnamespace = ns.oid
   AND schemaname = 'public';
 
--------------------
--- Cleanup
--------------------
+-- -------------------------------------------------------------------------------------
 -- Unmount original GBIF data
-DROP TABLE redshift_spectrum.occurrence_2024_01_01_parquet;
+-- -------------------------------------------------------------------------------------
+DROP TABLE redshift_spectrum.occurrence_2024_02_01_parquet;

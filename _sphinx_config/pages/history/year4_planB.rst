@@ -296,7 +296,7 @@ Mark Wiltermuth, USGS, suggested the "flattened" datasets:
 In terms of PAD-US v 3.0, I'd recommend the following options, if decided to revisit:
 PAD-US 3.0 Vector Analysis File https://www.sciencebase.gov/catalog/item/6196b9ffd34eb622f691aca7
 PAD-US 3.0 Raster Analysis File https://www.sciencebase.gov/catalog/item/6196bc01d34eb622f691acb5
- These are "flattened" though spatial analysis prioritized by GAP Status Code
+ Tese are "flattened" though spatial analysis prioritized by GAP Status Code
 (ie GAP 1 > GAP 2 > GAP > 3 > GAP 4), these are found on bottom of
 https://www.usgs.gov/programs/gap-analysis-project/science/pad-us-data-download page.
 However, the vector datasets are available only as ESRI Geodatabases.  Try these and the

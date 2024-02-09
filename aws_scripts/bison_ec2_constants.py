@@ -1,4 +1,4 @@
-"""Constants for BISON project: GBIF data, local dev machine, EC2, S3."""
+"""Constants to use locally initiate BISON AWS EC2 Spot Instances."""
 PROJ_NAME = "bison"
 
 GBIF_BUCKET = "gbif-open-data-us-east-1/occurrence"

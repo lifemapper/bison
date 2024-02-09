@@ -1,4 +1,4 @@
-"""Script to run locally or from an EC2 instance to compute PAM statistics on S3 data."""
+"""Script to run locally or from an EC2 instance to compute PAM statistics from S3 data."""
 import boto3
 from botocore.exceptions import ClientError
 import datetime as DT
@@ -17,7 +17,10 @@ BUCKET_PATH = "out_data"
 LOG_PATH = "log"
 
 n = DT.datetime.now()
-datestr = f"{n.year}-{n.month:02d}-01"
+# underscores for Redshift data
+datestr = f"{n.year}_{n.month:02d}_01"
+# date for logfile
+todaystr = f"{n.year}-{n.month:02d}-{n.day:02d}"
 
 species_county_list_fname = f"county_lists_{datestr}_000.parquet"
 # Log processing progress
@@ -575,7 +578,7 @@ class SiteMatrix:
 if __name__ == "__main__":
     # Create a logger
     script_name = os.path.splitext(os.path.basename(__file__))[0]
-    logger, log_filename = get_logger(f"{script_name}_{date_str}")
+    logger, log_filename = get_logger(f"{script_name}_{todaystr}")
 
     # Read directly into DataFrame
     orig_df = read_s3_parquet_to_pandas(
@@ -594,9 +597,9 @@ if __name__ == "__main__":
     s3_log_filename = upload_to_s3(log_filename, BUCKET, LOG_PATH, logger)
 
 """
-from aws_scripts.user_data_matrix_stats import (
-    read_s3_parquet_to_pandas,  reframe_to_heatmatrix, reframe_to_pam, get_logger)
-from aws_scripts.user_data_matrix_stats import SiteMatrix as SM
+from aws_scripts.bison_matrix_stats import (
+    read_s3_parquet_to_pandas,  reframe_to_heatmatrix, reframe_to_pam, get_logger, 
+    SiteMatrix)
 
 import boto3
 from botocore.exceptions import ClientError
@@ -615,9 +618,11 @@ BUCKET_PATH = "out_data"
 LOG_PATH = "log"
 
 n = DT.datetime.now()
-datastr = f"{n.year}-{n.month}-01"
+# underscores for Redshift data
+datestr = f"{n.year}_{n.month:02d}_01"
+todaystr = f"{n.year}_{n.month:02d}_{n.day:02d}"
 
-species_county_list_basename = "county_lists_000"
+species_county_list_basename = "county_lists_2024_02_01_000.parquet"
 species_county_list_fname = f"{species_county_list_basename}.parquet"
 # Log processing progress
 LOGINTERVAL = 1000000
@@ -627,31 +632,26 @@ LOGFILE_MAX_BYTES = 52000000
 LOGFILE_BACKUP_COUNT = 5
 
 bison_bucket = "s3://bison-321942852011-us-east-1/"
-output_dataname = "heatmatrix.parquet"
+output_dataname = "heatmatrix_{}.parquet"
 
 
-reload(user_data_matrix_stats)
-from user_data_matrix_stats import SiteMatrix
-
-n = DT.datetime.now()
-date_str = f"{n.year}-{n.month}-{n.day}"
 
 # Create a logger
 script_name = "testing"
-logger, log_filename = get_logger(f"{script_name}_{date_str}")
+logger, log_filename = get_logger(f"{script_name}_{today_str}")
 
 orig_df = read_s3_parquet_to_pandas(
     BUCKET, BUCKET_PATH, species_county_list_fname, logger, s3_client=None)
 heat_df = reframe_to_heatmatrix(orig_df, logger)
 pam_df = reframe_to_pam(heat_df, 1)
 
-# OLD matrix
-# create a multi-index for rows required by old-style SiteMatrix
-full_idx = pandas.MultiIndex.from_arrays(
-    [[i for i in range(len(pam_df.index))], pam_df.index], names=["row_idx", "region"])
-pam_df.index = full_idx
-pam_old = SiteMatrix(dataframe=pam_df, logger=logger)
-pam_old._min_presence = 1
+# # OLD matrix
+# # create a multi-index for rows required by old-style SiteMatrix
+# full_idx = pandas.MultiIndex.from_arrays(
+#     [[i for i in range(len(pam_df.index))], pam_df.index], names=["row_idx", "region"])
+# pam_df.index = full_idx
+# pam_old = SiteMatrix(dataframe=pam_df, logger=logger)
+# pam_old._min_presence = 1
 
 # NEW matrix
 pam_new = SM(pam_df, logger)

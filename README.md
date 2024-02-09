@@ -6,11 +6,12 @@
 2. Set up AWS bucket and folders for processing
 3. Assemble static ancillary inputs (local, AWS)
 4. Resolve RIIS records to GBIF accepted taxa (local, copy to AWS S3)
-5. Subset GBIF data to BISON (AWS Glue)
-6. Annotate BISON subset with regions and RIIS status (AWS Redshift)
-7. Summarize BISON subset by regions and RIIS status (AWS Redshift)
-8. Create HeatMatrix and Presence Absence Matrix (PAM) (local)
-9. Compute site and species biodiveristy statistics on PAM (local)
+5. Subset GBIF data to BISON (AWS Redshift/Glue)
+6. Load BISON subset and ancillary inputs to Redshift  
+7. Annotate BISON subset with regions and RIIS status (AWS Redshift)
+8. Summarize BISON subset by regions and RIIS status (AWS Redshift)
+9. Create HeatMatrix and Presence Absence Matrix (PAM) (local)
+10. Compute site and species biodiveristy statistics on PAM (local)
 
 ## 1. Set up the local environment
 
@@ -55,7 +56,7 @@ Under the BISON bucket (i.e. bucket-us-east-1), create the following folders:
 *   scripts
 
 
-## 3. Assemble static ancillary inputs (local, AWS)
+## 3. Assemble static ancillary inputs (local, AWS S3)
 
 ### USGS RIIS Input
 
@@ -122,15 +123,59 @@ making sure the virtual environment is activated, run:
 Upload the output file (like data/input/US-RIIS_MasterList_2021_annotated_2024-02-01.csv
 with current date string) to s3://<S3 bucket>/input_data
 
-## 5. Subset GBIF data to BISON (AWS Glue)
 
-### GBIF Input
+## Redshift steps
+
+For all redshift steps, do the following with the designated script:
+
+* In AWS Redshift console, open `Query Editor`, and choose the button `Script Editor`.
+* Open existing or Create a new script (with +) and copy in the appropriate script.
+* Update the date string this processing step with the first day of the current month, 
+  for example, replace all occurrences of 2024_01_01 with 2024_02_01.
+* Run
+
+## 5. Subset GBIF data to BISON (AWS Redshift)
+
+GBIF Input
 
 * Use the Global Biodiversity Information Facility (GBIF) Species Occurrences on the
-  AWS Open Data Registry  https://registry.opendata.aws/gbif/
-* Previously downloaded a full Darwin Core Archive from GBIF, startint with the query
-  https://www.gbif.org/occurrence/search?country=US&has_coordinate=true&has_geospatial_issue=false&occurrence_status=present
-* The Simple CSV option does not always contain the accepted taxonKey and scientific name
+  AWS Open Data Registry (ODR) in S3. https://registry.opendata.aws/gbif/
+* These data are updated on the first day of every month, with the date string in 
+  the S3 address.  
+* The date string is appended to all outputs, and referenced in the subset scripts 
+  (Redshift and Glue)
+* The data are available in each region, stay within the same AWS ODR region as the
+  BISON bucket.  
+
+### Redshift subset (3 min)
+
+* Perform Redshift steps, using script: `aws_script/rs_subset_gbif`
+
+### Glue subset (works but 10-15 hours)
+
+* In AWS Glue console, open `ETL jobs`, and choose the button `Script Editor`.
+* Open existing or Upload the script `aws_script/glue_subset_gbif.sql`
+* Run
+* If this method is used, must still load the results into Redshift for steps 7, 8
+
+## 6. Load ancillary inputs to from AWS S3 to AWS Redshift  
+
+* * Perform Redshift steps, using script:  `aws_script/rs_load_ancillary_data.sql`
+
+## 7. Annotate BISON subset with regions and RIIS status (AWS Redshift)
+
+* Perform Redshift steps, using script:  `aws_script/rs_intersect_append.sql`
+* Takes 1-3 minutes per intersection into a temp table
+  plus  1-6 min to use the temp table to annotate the bison subset 
+
+## 8. Summarize BISON subset by regions then export to S3 (AWS Redshift)
+
+* Perform Redshift steps, using script: `aws_scripts/rs_aggregate_export`
+
+## 9. Create HeatMatrix and Presence Absence Matrix (PAM) (local)
+
+* 
+## 10. Compute site and species biodiveristy statistics on PAM (local)
 
 
 # Project setup

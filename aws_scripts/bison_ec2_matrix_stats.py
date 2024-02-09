@@ -1,4 +1,4 @@
-"""Script to initiate an AWS EC2 Spot Instance to download CSV and save to S3."""
+"""Script to run locally to initiate an AWS EC2 Spot Instance."""
 import boto3
 import os
 
@@ -11,8 +11,10 @@ from bison_ec2_utils import (
 # TRIGGER_PATH = "trigger"
 # TRIGGER_FILENAME = "go.txt"
 
-user_data_matrix_fname = "user_data_matrix_stats.sh"
-user_data_matrix_script_fname = "user_data_matrix_stats.py"
+# shell script run on EC2 instantiation
+user_data_matrix_fname = "ec2_userdata_matrix_stats.sh"
+# python script to call from shell script
+user_data_matrix_script_fname = "bison_matrix_stats.py"
 
 
 # --------------------------------------------------------------------------------------
