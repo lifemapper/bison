@@ -661,7 +661,7 @@ if __name__ == "__main__":
 
 """
 from aws_scripts.bison_matrix_stats import (
-    read_s3_parquet_to_pandas,  reframe_to_heatmatrix, reframe_to_pam, get_logger, 
+    read_s3_parquet_to_pandas,  reframe_to_heatmatrix, reframe_to_pam, get_logger,
     SiteMatrix)
 
 import boto3
@@ -737,14 +737,14 @@ species_stat_df.to_parquet(f"{s3_outpath}/species_stats_{datestr}.parquet")
 # whittaker_new = pam.whittaker()
 # species_ct_new = pam.num_species
 # site_ct_new = pam.num_sites
-# 
+#
 # # new site stats
 # beta_new = pam.beta()
 # alpha_new = pam.alpha()
 # alpha_proportional_new = pam.alpha_proportional()
 # phi_new = pam.phi()
 # phi_average_proportional_new = pam.phi_average_proportional()
-# 
+#
 # # new species stats
 # omega_new = pam.omega()
 # omega_proportional_new = pam.omega_proportional()
