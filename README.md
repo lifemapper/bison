@@ -10,8 +10,7 @@
 6. Load BISON subset and ancillary inputs to Redshift  
 7. Annotate BISON subset with regions and RIIS status (AWS Redshift)
 8. Summarize BISON subset by regions and RIIS status (AWS Redshift)
-9. Create HeatMatrix and Presence Absence Matrix (PAM) (local)
-10. Compute site and species biodiveristy statistics on PAM (local)
+9. Create Presence Absence Matrix (PAM) and compute statistics (local)
 
 ## 1. Set up the local environment
 
@@ -160,22 +159,34 @@ GBIF Input
 
 ## 6. Load ancillary inputs to from AWS S3 to AWS Redshift  
 
-* * Perform Redshift steps, using script:  `aws_script/rs_load_ancillary_data.sql`
+* Perform Redshift steps, using script:  `aws_script/rs_load_ancillary_data.sql`
 
 ## 7. Annotate BISON subset with regions and RIIS status (AWS Redshift)
 
 * Perform Redshift steps, using script:  `aws_script/rs_intersect_append.sql`
 * Takes 1-3 minutes per intersection into a temp table
-  plus  1-6 min to use the temp table to annotate the bison subset 
+  plus  1-6 min to use the temp table to annotate the bison subset
 
 ## 8. Summarize BISON subset by regions then export to S3 (AWS Redshift)
 
 * Perform Redshift steps, using script: `aws_scripts/rs_aggregate_export`
+* Outputs annotated records as CSV files in bucket/folder 
+  s3://bison-321942852011-us-east-1/out_data
+  * aiannh_lists_<datestr>_000.csv
+  * state_lists_<datestr>_000.csv
+  * county_lists_<datestr>_000.csv
+  * aiannh_counts_<datestr>_000.csv
+  * state_counts_<datestr>_000.csv
+  * county_counts_<datestr>_000.csv
 
-## 9. Create HeatMatrix and Presence Absence Matrix (PAM) (local)
+## 9. Create Presence Absence Matrix (PAM) and compute statistics (local)
 
-* 
-## 10. Compute site and species biodiveristy statistics on PAM (local)
+* On a local machine, with the virtual environment activated, run the script 
+  aws_scripts/bison_matrix_stats.py
+  
+  ```commandline
+  python aws_scripts/bison_matrix_stats.py
+  ```
 
 
 # Project setup

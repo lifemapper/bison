@@ -4,5 +4,6 @@ numpy
 pandas
 pyarrow
 requests
+s3fs
 # gdal (must be in system python, fails in virtenv)
 rtree

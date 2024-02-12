@@ -15,6 +15,7 @@ REGION = "us-east-1"
 BUCKET = f"bison-321942852011-{REGION}"
 BUCKET_PATH = "out_data"
 LOG_PATH = "log"
+LOCAL_OUTDIR = "/tmp"
 
 n = DT.datetime.now()
 # underscores for Redshift data
@@ -30,8 +31,10 @@ LOG_DATE_FORMAT = "%d %b %Y %H:%M"
 LOGFILE_MAX_BYTES = 52000000
 LOGFILE_BACKUP_COUNT = 5
 
-bison_bucket = f"s3://{BUCKET}/"
-output_dataname = f"heatmatrix_{datestr}.parquet"
+LOCAL_OUTDIR = "/tmp"
+diversity_stats_dataname = os.path.join(LOCAL_OUTDIR, f"diversity_stats_{datestr}.csv")
+species_stats_dataname = os.path.join(LOCAL_OUTDIR, f"species_stats_{datestr}.csv")
+site_stats_dataname = os.path.join(LOCAL_OUTDIR, f"site_stats_{datestr}.csv")
 
 
 # .............................................................................
@@ -135,6 +138,37 @@ def read_s3_parquet_to_pandas(
         logger.log(logging.INFO, f"Read {bucket}/{s3_key} from S3")
     dataframe = pandas.read_parquet(io.BytesIO(obj["Body"].read()), **args)
     return dataframe
+
+
+# .............................................................................
+def write_pandas_to_s3(
+        dataframe, bucket, bucket_path, filename, logger, format="csv", **args):
+    """Write a pandas DataFrame to CSV or parquet on S3.
+
+    Args:
+        bucket (str): Bucket identifier on S3.
+        bucket_path (str): Folder path to the S3 output data.
+        filename (str): Filename of output data to write to S3.
+        logger (object): logger for saving relevant processing messages
+        region (str): AWS region to query.
+        args: Additional arguments to be sent to the pandas.read_parquet function.
+
+    Returns:
+        pandas.DataFrame containing the tabular data.
+    """
+    target = f"s3://{bucket}/{bucket_path}/{filename}"
+    if format.lower() not in ("csv", "parquet"):
+        raise Exception(f"Format {format} not supported.")
+    if format.lower() == "csv":
+        try:
+            dataframe.to_csv(target)
+        except Exception as e:
+            logger.log(logging.ERROR, f"Failed to write {target} as csv: {e}")
+    else:
+        try:
+            dataframe.to_parquet(target)
+        except Exception as e:
+            logger.log(logging.ERROR, f"Failed to write {target} as parquet: {e}")
 
 
 # .............................................................................
@@ -551,7 +585,7 @@ class SiteMatrix:
             site_stats_df = site_stats_df.T
         return site_stats_df
 
-    # ...............................................llll
+    # ...............................................
     def calculate_species_statistics(self):
         """Calculate site-based statistics.
 
@@ -570,6 +604,18 @@ class SiteMatrix:
             # Transpose to put columns = stats, rows = species
             species_stats_df = species_stats_df.T
         return species_stats_df
+
+    # ...............................................
+    def write_to_csv(self, filename):
+        """Write dataframe as CSV format, with comma separator, utf-8 format.
+
+        Args:
+            filename: full path to output file.
+        """
+        try:
+            self._pam_df.to_csv(filename)
+        except Exception as e:
+            self.logger.log(logging.ERROR, f"Failed to write {filename}: {e}")
 
 
 # --------------------------------------------------------------------------------------
@@ -592,6 +638,23 @@ if __name__ == "__main__":
     diversity_df = pam.calculate_diversity_statistics()
     site_stat_df = pam.calculate_site_statistics()
     species_stat_df = pam.calculate_species_statistics()
+
+    diversity_stats_dataname = os.path.join(LOCAL_OUTDIR, f"diversity_stats_{datestr}.csv")
+    species_stats_dataname = os.path.join(LOCAL_OUTDIR, f"species_stats_{datestr}.csv")
+    site_stats_dataname = os.path.join(LOCAL_OUTDIR, f"site_stats_{datestr}.csv")
+
+    diversity_df.to_csv(diversity_stats_dataname)
+    site_stat_df.to_csv(site_stats_dataname)
+    species_stat_df.to_csv(species_stats_dataname)
+
+    # Write CSV and Parquet versions to S3
+    s3_outpath = f"s3://{BUCKET}/{BUCKET_PATH}"
+    diversity_df.to_csv(f"{s3_outpath}/diversity_stats_{datestr}.csv")
+    site_stat_df.to_csv(f"{s3_outpath}/site_stats_{datestr}.csv")
+    species_stat_df.to_csv(f"{s3_outpath}/species_stats_{datestr}.csv")
+    diversity_df.to_parquet(f"{s3_outpath}/diversity_stats_{datestr}.parquet")
+    site_stat_df.to_parquet(f"{s3_outpath}/site_stats_{datestr}.parquet")
+    species_stat_df.to_parquet(f"{s3_outpath}/species_stats_{datestr}.parquet")
 
     # Upload logfile to S3
     s3_log_filename = upload_to_s3(log_filename, BUCKET, LOG_PATH, logger)
@@ -622,29 +685,72 @@ n = DT.datetime.now()
 datestr = f"{n.year}_{n.month:02d}_01"
 todaystr = f"{n.year}_{n.month:02d}_{n.day:02d}"
 
-species_county_list_basename = "county_lists_2024_02_01_000.parquet"
-species_county_list_fname = f"{species_county_list_basename}.parquet"
+species_county_list_fname = f"county_lists_{datestr}_000.parquet"
 # Log processing progress
 LOGINTERVAL = 1000000
 LOG_FORMAT = " ".join(["%(asctime)s", "%(levelname)-8s", "%(message)s"])
 LOG_DATE_FORMAT = "%d %b %Y %H:%M"
 LOGFILE_MAX_BYTES = 52000000
 LOGFILE_BACKUP_COUNT = 5
+LOCAL_OUTDIR = "."
 
-bison_bucket = "s3://bison-321942852011-us-east-1/"
-output_dataname = "heatmatrix_{}.parquet"
-
-
+s3_outpath = f"s3://{BUCKET}/{BUCKET_PATH}"
 
 # Create a logger
 script_name = "testing"
-logger, log_filename = get_logger(f"{script_name}_{today_str}")
+logger, log_filename = get_logger(f"{script_name}_{todaystr}")
 
 orig_df = read_s3_parquet_to_pandas(
     BUCKET, BUCKET_PATH, species_county_list_fname, logger, s3_client=None)
 heat_df = reframe_to_heatmatrix(orig_df, logger)
 pam_df = reframe_to_pam(heat_df, 1)
 
+# Pandas DataFrame matrix
+pam = SiteMatrix(pam_df, logger)
+diversity_df = pam.calculate_diversity_statistics()
+site_stat_df = pam.calculate_site_statistics()
+species_stat_df = pam.calculate_species_statistics()
+
+LOCAL_OUTDIR = "."
+diversity_stats_dataname = os.path.join(LOCAL_OUTDIR, f"diversity_stats_{datestr}.csv")
+species_stats_dataname = os.path.join(LOCAL_OUTDIR, f"species_stats_{datestr}.csv")
+site_stats_dataname = os.path.join(LOCAL_OUTDIR, f"site_stats_{datestr}.csv")
+
+diversity_df.to_csv(diversity_stats_dataname)
+site_stat_df.to_csv(site_stats_dataname)
+species_stat_df.to_csv(species_stats_dataname)
+
+diversity_df.to_csv(f"{s3_outpath}/diversity_stats_{datestr}.csv")
+site_stat_df.to_csv(f"{s3_outpath}/site_stats_{datestr}.csv")
+species_stat_df.to_csv(f"{s3_outpath}/species_stats_{datestr}.csv")
+
+diversity_df.to_parquet(f"{s3_outpath}/diversity_stats_{datestr}.parquet")
+site_stat_df.to_parquet(f"{s3_outpath}/site_stats_{datestr}.parquet")
+species_stat_df.to_parquet(f"{s3_outpath}/species_stats_{datestr}.parquet")
+
+
+
+
+# # new diversity stats
+# lande_new = pam.lande()
+# legendre_new = pam.legendre()
+# whittaker_new = pam.whittaker()
+# species_ct_new = pam.num_species
+# site_ct_new = pam.num_sites
+# 
+# # new site stats
+# beta_new = pam.beta()
+# alpha_new = pam.alpha()
+# alpha_proportional_new = pam.alpha_proportional()
+# phi_new = pam.phi()
+# phi_average_proportional_new = pam.phi_average_proportional()
+# 
+# # new species stats
+# omega_new = pam.omega()
+# omega_proportional_new = pam.omega_proportional()
+# psi_new = pam.psi()
+# psi_average_proportional_new = pam.psi_average_proportional()
+#
 # # OLD matrix
 # # create a multi-index for rows required by old-style SiteMatrix
 # full_idx = pandas.MultiIndex.from_arrays(
@@ -652,68 +758,36 @@ pam_df = reframe_to_pam(heat_df, 1)
 # pam_df.index = full_idx
 # pam_old = SiteMatrix(dataframe=pam_df, logger=logger)
 # pam_old._min_presence = 1
-
-# NEW matrix
-pam_new = SM(pam_df, logger)
-diversity_df = pam_new.calculate_diversity_statistics()
-site_stat_df = pam_new.calculate_site_statistics()
-species_stat_df = pam_new.calculate_species_statistics()
-
-# old diversity stats
-lande_old = pam_old.lande()
-legendre_old = pam_old.legendre()
-whittaker_old = pam_old.whittaker()
-species_ct_old = pam_old.num_species
-site_ct_old = pam_old.num_sites
-
-# new diversity stats
-lande_new = pam_new.lande()
-legendre_new = pam_new.legendre()
-whittaker_new = pam_new.whittaker()
-species_ct_new = pam_new.num_species
-site_ct_new = pam_new.num_sites
-
-# COMPARE diversity stats
-print(f"lande: old {lande_old} vs new {lande_new}")
-print(f"legendre: old {legendre_old} vs new {legendre_new}")
-print(f"whittaker: old {whittaker_old} vs new {whittaker_new}")
-print(f"species_ct: old {species_ct_old} vs new {species_ct_new}")
-print(f"site_ct: old {site_ct_old} vs new {site_ct_new}")
-
-
-# old site stats
-beta_old = pam_old.beta()
-alpha_old = pam_old.alpha()
-alpha_proportional_old = pam_old.alpha_proportional()
-
-# new site stats
-beta_new = pam_new.beta()
-alpha_new = pam_new.alpha()
-alpha_proportional_new = pam_new.alpha_proportional()
-phi_new = pam_new.phi()
-phi_average_proportional_new = pam_new.phi_average_proportional()
-
-print(f"beta old = new: {beta_old.equals(beta_new)}")
-print(f"alpha old = new: {alpha_old.equals(alpha_new)}")
-print(f"alpha_proportional old = new: {alpha_proportional_old.equals(alpha_proportional_new)}")
-
-# old species stats
-omega_old = pam_old.omega()
-omega_proportional_old = pam_old.omega_proportional()
-psi_old = pam_old.psi(),
-psi_average_proportional_old = pam_old.psi_average_proportional()
-
-print(f"omega old = new: {omega_old.equals(omega_new)}")
-print(f"omega_proportional old = new: {omega_proportional_old.equals(omega_proportional_new)}")
-print(f"psi old = new: {psi_old.equals(psi_new)}")
-print(f"psi_average_proportional old = new: {psi_average_proportional_old.equals(psi_average_proportional_new)}")
-
-# new species stats
-omega_new = pam_new.omega()
-omega_proportional_new = pam_old.omega_proportional()
-psi_new = pam_new.psi(),
-psi_average_proportional_new = pam_new.psi_average_proportional()
-
+#
+# # old diversity stats
+# lande_old = pam_old.lande()
+# legendre_old = pam_old.legendre()
+# whittaker_old = pam_old.whittaker()
+# species_ct_old = pam_old.num_species
+# site_ct_old = pam_old.num_sites
+# # old site stats
+# beta_old = pam_old.beta()
+# alpha_old = pam_old.alpha()
+# alpha_proportional_old = pam_old.alpha_proportional()
+# # old species stats
+# omega_old = pam_old.omega()
+# omega_proportional_old = pam_old.omega_proportional()
+# psi_old = pam_old.psi(),
+# psi_average_proportional_old = pam_old.psi_average_proportional()
+#
+# # COMPARE diversity stats
+# print(f"lande: old {lande_old} vs new {lande_new}")
+# print(f"legendre: old {legendre_old} vs new {legendre_new}")
+# print(f"whittaker: old {whittaker_old} vs new {whittaker_new}")
+# print(f"species_ct: old {species_ct_old} vs new {species_ct_new}")
+# print(f"site_ct: old {site_ct_old} vs new {site_ct_new}")
+# print(f"beta old = new: {beta_old.equals(beta_new)}")
+# print(f"alpha old = new: {alpha_old.equals(alpha_new)}")
+# print(f"alpha_proportional old = new: {alpha_proportional_old.equals(alpha_proportional_new)}")
+# print(f"omega old = new: {omega_old.equals(omega_new)}")
+# print(f"omega_proportional old = new: {omega_proportional_old.equals(omega_proportional_new)}")
+# print(f"psi old = new: {psi_old.equals(psi_new)}")
+# print(f"psi_average_proportional old = new: {psi_average_proportional_old.equals(psi_average_proportional_new)}")
 
 
 

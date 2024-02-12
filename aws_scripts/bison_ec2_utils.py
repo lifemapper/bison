@@ -14,12 +14,40 @@ import os
 
 from bison_ec2_constants import (
     INSTANCE_TYPE, KEY_NAME, LOGFILE_MAX_BYTES, LOG_FORMAT, LOG_DATE_FORMAT, PROJ_NAME,
-    REGION, SECURITY_GROUP_ID, SPOT_TEMPLATE_BASENAME, USER_DATA_TOKEN)
+    REGION, SECRET_NAME, SECURITY_GROUP_ID, SPOT_TEMPLATE_BASENAME, USER_DATA_TOKEN)
 
 
 # --------------------------------------------------------------------------------------
 # Methods for constructing and instantiating EC2 instances
 # --------------------------------------------------------------------------------------
+# ----------------------------------------------------
+def get_secret(secret_name, region):
+    """Get a secret from the Secrets Manager for connection authentication.
+
+    Args:
+        secret_name: name of the secret to retrieve.
+        region: AWS region containint the secret.
+
+    Returns:
+        a dictionary containing the secret data.
+
+    Raises:
+        ClientError:  an AWS error in communication.
+    """
+    # Create a Secrets Manager client
+    session = boto3.session.Session()
+    client = session.client(service_name="secretsmanager", region_name=region)
+    try:
+        secret_value_response = client.get_secret_value(SecretId=secret_name)
+    except ClientError as e:
+        # For a list of exceptions thrown, see
+        # https://docs.aws.amazon.com/secretsmanager/latest/apireference/API_GetSecretValue.html
+        raise (e)
+    # Decrypts secret using the associated KMS key.
+    secret_str = secret_value_response["SecretString"]
+    return eval(secret_str)
+
+
 # ----------------------------------------------------
 def create_spot_launch_template_name(desc_str=None):
     """Create a name identifier for a Spot Launch Template.

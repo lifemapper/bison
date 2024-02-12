@@ -12,6 +12,7 @@ KEY_NAME = "aimee-aws-key"
 REGION = "us-east-1"
 # Allows KU Dyche hall
 SECURITY_GROUP_ID = "sg-0b379fdb3e37389d1"
+SECRET_NAME = "admin_bison-db-test"
 
 # S3
 TRIGGER_PATH = "trigger"
