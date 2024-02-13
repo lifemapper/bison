@@ -146,15 +146,16 @@ def write_pandas_to_s3(
     """Write a pandas DataFrame to CSV or parquet on S3.
 
     Args:
+        dataframe (pandas.DataFrame): dataframe to write to S3.
         bucket (str): Bucket identifier on S3.
         bucket_path (str): Folder path to the S3 output data.
         filename (str): Filename of output data to write to S3.
         logger (object): logger for saving relevant processing messages
-        region (str): AWS region to query.
+        format (str): output format, "csv" and "parquet" supported.
         args: Additional arguments to be sent to the pandas.read_parquet function.
 
-    Returns:
-        pandas.DataFrame containing the tabular data.
+    Raises:
+        Exception: on format other than "csv" or "parquet"
     """
     target = f"s3://{bucket}/{bucket_path}/{filename}"
     if format.lower() not in ("csv", "parquet"):

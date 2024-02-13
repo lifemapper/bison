@@ -1,10 +1,4 @@
 """Glue Spark script to read GBIF Open Data Registry data, subset it, and save it to S3."""
-"""
-This script runs on AWS Glue in approximately XXX minutes.  If it runs longer, check 
-the input and output S3 locations are correct.  
-
-Name bison_subset_gbif in AWS Glue jobs.
-"""
 import datetime as DT
 import sys
 from awsglue.utils import getResolvedOptions
@@ -13,6 +7,10 @@ from pyspark.context import SparkContext
 from awsglue.context import GlueContext
 from awsglue.job import Job
 
+"""
+This script runs on AWS Glue in approximately 10-15 hours.  If it runs longer, check
+the input and output S3 locations are correct.
+"""
 # Query GBIF data in our working region
 region = "us-east-1"
 bison_bucket = f"s3://bison-321942852011-{region}/"

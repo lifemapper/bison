@@ -53,6 +53,9 @@ SELECT * from aiannh_lists_2024_02_01 ORDER BY aiannh_name, species LIMIT 10;
 -- -------------------------------------------------------------------------------------
 -- Option: add "PARTITION BY (region_field)" to separate regions into individual files;
 --      if so, remove the trailing underscore from the target folder name
+-- Note: include "PARALLEL OFF" so it writes serially and does not write many very small
+--      files.  Default max filesize is 6.2 GB, can change with option, for example,
+--      "MAXFILESIZE 1 gb".
 
 -- Count occurrences and species for RIIS assessment by region
 UNLOAD (
@@ -60,22 +63,22 @@ UNLOAD (
     TO 's3://bison-321942852011-us-east-1/out_data/county_counts_2024_02_01_'
     IAM_role DEFAULT
     CSV DELIMITER AS '\t'
-    manifest
-    HEADER;
+    HEADER
+    PARALLEL OFF;
 UNLOAD (
     'SELECT * FROM state_counts_2024_02_01 ORDER BY census_state, riis_assessment')
     TO 's3://bison-321942852011-us-east-1/out_data/state_counts_2024_02_01_'
     IAM_role DEFAULT
     CSV DELIMITER AS '\t'
-    manifest
-    HEADER;
+    HEADER
+    PARALLEL OFF;
 UNLOAD (
     'SELECT * FROM aiannh_counts_2024_02_01 ORDER BY aiannh_name, riis_assessment')
     TO 's3://bison-321942852011-us-east-1/out_data/aiannh_counts_2024_02_01_'
     IAM_role DEFAULT
     CSV DELIMITER AS '\t'
-    manifest
-    HEADER;
+    HEADER
+    PARALLEL OFF;
 
 -- List species with riis status, occurrence and species counts, for each region
 UNLOAD (
@@ -83,8 +86,8 @@ UNLOAD (
     TO 's3://bison-321942852011-us-east-1/out_data/county_lists_2024_02_01_'
     IAM_role DEFAULT
     CSV DELIMITER AS '\t'
-    manifest
-    HEADER;
+    HEADER
+    PARALLEL OFF;
 -- Also write as Parquet for easy DataFrame loading
 UNLOAD (
     'SELECT * FROM county_lists_2024_02_01 ORDER BY census_state, census_county, species')
@@ -97,15 +100,15 @@ UNLOAD (
     TO 's3://bison-321942852011-us-east-1/out_data/state_lists_2024_02_01_'
     IAM_role DEFAULT
     CSV DELIMITER AS '\t'
-    manifest
-    HEADER;
+    HEADER
+    PARALLEL OFF;
 UNLOAD (
     'SELECT * FROM aiannh_lists_2024_02_01 ORDER BY aiannh_name, species')
     TO 's3://bison-321942852011-us-east-1/out_data/aiannh_lists_2024_02_01_'
     IAM_role DEFAULT
     CSV DELIMITER AS '\t'
-    manifest
-    HEADER;
+    HEADER
+    PARALLEL OFF;
 
 -- Cleanup Redshift data summaries
 DROP TABLE public.county_counts_2024_02_01;

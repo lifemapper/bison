@@ -14,7 +14,7 @@ import os
 
 from bison_ec2_constants import (
     INSTANCE_TYPE, KEY_NAME, LOGFILE_MAX_BYTES, LOG_FORMAT, LOG_DATE_FORMAT, PROJ_NAME,
-    REGION, SECRET_NAME, SECURITY_GROUP_ID, SPOT_TEMPLATE_BASENAME, USER_DATA_TOKEN)
+    REGION, SECURITY_GROUP_ID, SPOT_TEMPLATE_BASENAME, USER_DATA_TOKEN)
 
 
 # --------------------------------------------------------------------------------------

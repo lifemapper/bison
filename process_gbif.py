@@ -692,6 +692,7 @@ def _prepare_args(config, logger):
 
     Args:
         config (dict): user-provided parameters
+        logger (object): logger for saving relevant processing messages
 
     Returns:
         annotated_riis_filename: Full annotated RIIS filename
