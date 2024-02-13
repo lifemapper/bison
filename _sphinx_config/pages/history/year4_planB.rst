@@ -5,32 +5,36 @@ The Docker implementation created for Year 4 was unable to handle the most
 resource-intensive step, geospatial intersection of records with shapefiles for
 annotating records with state, county, PAD, AIANNH.
 
-The initial processes include annotating **GBIF occurrence data** from the
-US, with designations from the **US Registry of Introduced and Invasive Species**
-(RIIS), then summarizing the data by different regions, then aggregating data by a
-geospatial grid of counties, and computing biodiversity statistics.
+The overall goals include annotating a subset of **GBIF occurrence** records with
+designations from the **US Registry of Introduced and Invasive Species**
+(RIIS), then summarizing the data by different regions and RIIS status, and finally
+aggregating data counts by species into a geospatial grid of counties, and computing
+biodiversity statistics.
 
-Regions include **US Census state and county boundaries**.  States are required
-in order to identify whether the occurrence of a particular species falls within the
-a RIIS region (Alaska, Hawaii, or Lower 48), where it is identified as "Introduced"
-or "Invasive".  Region summaries include both state and county boundaries.
+Regions include **US Census state and county boundaries**,
+**American Indian, Alaskan Native, and Native Hawaiian** (AIANNH) regions and
+**US Federal Protected Areas** (US‐PAD).  All regions (state, county, AIANNH, PAD) will
+be summarized by count and proportion for species, occurrences, and RIIS status.
 
-Regions also include **American Indian, Alaskan Native, and Native Hawaiian** (AIANNH)
-regions and **US Federal Protected Areas** (US‐PAD).
-
-All regions (state, county, AIANNH, PAD) will be summarized by count and proportion
-for species, occurrences, and RIIS status.
+GBIF record annotation and region summaries are performed on AWS, while RIIS record
+resolution to GBIF names (an interim step, not a deliverable), and computing
+biodiversity statistics are executed locally.
 
 **********************
 Installation
 **********************
 
 The resource intensive steps in this workflow use AWS, while the first and last steps
-are only implemented locally.
+are only implemented locally.  This is the first step towards a fully AWS workflow in
+Year 5.
 
-Hardware requirements
+Local Hardware requirements
 ==========================
 
+Since only the first and last steps of the workflow, both not resource-intensive,
+are performed locally, a smaller machine is appropriate for execution.  Since these
+steps will be moved to AWS in the next iteration of the workflow, they are not
+performed in Docker containers, and do require some software dependencies.
 
 Download this Repository
 ==========================
@@ -54,6 +58,19 @@ When the clone is complete, move to the top directory of the repository, `bison`
 All hands-on commands will be executed in a command prompt window from this
 directory location.  In Linux or OSX, open a Terminal
 window.
+
+Create a Virtual Python Environment
+=====================================
+
+Setup a virtual python environment named `venv` at the top level of the repository,
+i.e. ~/git/bison.
+
+.. code-block::
+
+    python -m venv venv
+    . venv/bin/activate
+    pip install -r requirements.txt
+
 
 Download Ancillary Data
 ==========================

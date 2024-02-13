@@ -6,7 +6,7 @@ personnel can run the analyses where they choose, whether using a Windows, Mac,
 or Linux operating system.  All processing is done in a Docker container on a local or
 remote machine.
 
-The overall goals include annotating a subset of **GBIF occurrence data** with
+The overall goals include annotating a subset of **GBIF occurrence** records with
 designations from the **US Registry of Introduced and Invasive Species**
 (RIIS), then summarizing the data by different regions and RIIS status, and finally
 aggregating data counts by species into a geospatial grid of counties, and computing
