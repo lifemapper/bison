@@ -107,9 +107,9 @@ Census, Cartographic Boundary Files, 2021
 Census: AIANNH
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Up-to-date census data, including American Indian, Alaska Native, and Native Hawaiian,
+Up-to-date census data (2023), including American Indian, Alaska Native, and Native Hawaiian,
 are available at:
-https://www.census.gov/geographies/mapping-files/time-series/geo/cartographic-boundary.html
+https://catalog.data.gov/dataset/tiger-line-shapefile-current-nation-u-s-american-indian-alaska-native-native-hawaiian-areas-aia
 
 **American Indian/Alaska Native Areas/Hawaiian Home Lands**, AIANNH
 * 1:500,000, cb_2021_us_aiannh_500k.zip

@@ -1,63 +1,77 @@
 [![Imports: isort](https://img.shields.io/badge/%20imports-isort-%231674b1?style=flat&labelColor=ef8336)](https://pycqa.github.io/isort/)
 
-# 2023 Data processing
+# Year 4 Data processing
 
-## GBIF Input
+1. Download this repository to local machine
+2. Set up AWS bucket and folders for processing
+3. Assemble static ancillary inputs (local, AWS)
+4. Resolve RIIS records to GBIF accepted taxa (local, copy to AWS S3)
+5. Subset GBIF data to BISON (AWS Redshift/Glue)
+6. Load BISON subset and ancillary inputs to Redshift
+7. Annotate BISON subset with regions and RIIS status (AWS Redshift)
+8. Summarize BISON subset by regions and RIIS status (AWS Redshift)
+9. Create Presence Absence Matrix (PAM) and compute statistics (local)
 
-* Download GBIF data, query
-  https://www.gbif.org/occurrence/search?country=US&has_coordinate=true&has_geospatial_issue=false&occurrence_status=present
-* Download option Darwin Core Archive (The taxonKey and scientific name in Simple CSV
-  option is not always the accepted version).
-  * Final dataset for processing
-    DOI: https://doi.org/10.15468/dl.vg6gg4 (may take some hours before being active)
-    Creation Date: 15:01:13 23 August 2023
-    Records included: 904377770 records from 3757 published datasets
-    Compressed data size: 311.9 GB
-    Download format: DWCA
-    Filter used:
-      GBIF.org (23 August 2023) GBIF Occurrence Download https://doi.org/10.15468/dl.epwzn6
-    {
-      "and" : [
-        "Country is United States of America",
-        "HasCoordinate is true",
-        "HasGeospatialIssue is false",
-        "OccurrenceStatus is Present"
-      ]
-    }
+## 1. Set up the local environment
 
-  * Test data
+### Download the repository
 
-    When using this dataset please use the following citation:
-    GBIF.org (25 September 2023) GBIF Occurrence Download https://doi.org/10.15468/dl.33f5eq
-    Download Information
-    DOI: https://doi.org/10.15468/dl.33f5eq (may take some hours before being active)
-    Creation Date: 16:16:09 25 September 2023
-    Records included: 1421243 records from 73 published datasets
-    Compressed data size: 257.2 MB
-    Download format: DWCA
-    Filter used:
-    {
-      "and" : [
-        "BasisOfRecord is Occurrence evidence",
-        "Country is United States of America",
-        "HasCoordinate is true",
-        "HasGeospatialIssue is false",
-        "OccurrenceStatus is Present"
-      ]
-    }
+The `LmBISON repository <https://github.com/lifemapper/bison>`_  can be installed by
+downloading from Github.  This code repository contains python code, scripts for AWS
+tools, Docker composition files, configuration files, and test data for creating the
+outputs.
 
-## USGS RIIS Input
+Type `git` at the command prompt to see if you have git installed.  If you do not,
+download and install git from https://git-scm.com/downloads .
 
-* Year 4 data: United States Register of Introduced and Invasive Species (US-RIIS)
-  https://doi.org/10.5066/P95XL09Q
-* Year 5 data: TBA
+Download the LmBISON repository, containing test data and configurations, by typing at
+the command line:
 
-## Geospatial input for region aggregation
+.. code-block::
+
+   git clone https://github.com/lifemapper/bison
+
+When the clone is complete, move to the top directory of the repository, `bison`.
+All hands-on commands will be executed in a command prompt window from this
+directory location.
+
+### Install dependencies
+
+Create a virtual python environment for installing local python dependencies.
+
+```commandline
+
+```
+
+## 2. Set up AWS bucket and folders for processing
+
+Under the BISON bucket (i.e. bucket-us-east-1), create the following folders:
+
+*   annotated_records
+*   input_data
+*   lib
+*   log
+*   out_data
+*   scripts
+
+
+## 3. Assemble static ancillary inputs (local, AWS S3)
+
+### USGS RIIS Input
+
+Use the most current version of the United States Register of Introduced and Invasive Species (US-RIIS)
+  * Year 4 data: https://doi.org/10.5066/P95XL09Q
+  * Year 5 data: TBA
+
+The current file is named US-RIIS_MasterList_2021.csv, and is available in the
+data/input directory of this repository.  Upload this file to
+s3://<S3 bucket>/input_data
 
 ### Census data for county/state
 
 * US Census 2021 cartographic boundaries from
 https://www.census.gov/geographies/mapping-files/time-series/geo/cartographic-boundary.2021.html#list-tab-B7KHMTDJCFECH4SSL2
+* Upload the shapefile to s3://<S3 bucket>/input_data
 
 Census data are in EPSG:4269 (WGS84), a geographic SRS very close to EPSG:4326 (NAD83).
 For 2 reasons, I did not project the census data:
@@ -66,32 +80,119 @@ For 2 reasons, I did not project the census data:
 
 See https://gis.stackexchange.com/questions/170839/is-re-projection-needed-from-srid-4326-wgs-84-to-srid-4269-nad-83
 
-Occasionally a point would intersect with a county envelope (created for a spatial
-index) but not be contained within the returned geometry.  In that case, I returned the
-values from the geometry nearest to the point.
-
-### US Protected Areas (US-PAD)
-
-We annotate points with US-PAD regions for aggregation by species and
-RIIS status.  US Protected Areas are split into files by Department of Interior regions,
-and by state.  DOI region files are still very complex, and slow, so to efficiently
-intersect points with US-PAD, we intersect with census data for the correct state
-abbreviation, then intersect with the US-PAD file for that state.
-
-Data:
-  * https://www.usgs.gov/programs/gap-analysis-project/science/pad-us-data-download
-
 ### American Indian/Alaska Native/Native Hawaiian Lands (AIANNH)
 
-We annotate points with AIANNH regions for aggregation by species and RIIS status.
+Annotate points with AIANNH regions for aggregation by species and RIIS status.
 
 Data:
   * https://catalog.data.gov/dataset/tiger-line-shapefile-2019-nation-u-s-current-american-indian-alaska-native-native-hawaiian-area
 
+Upload the shapefile to s3://<S3 bucket>/input_data
+
+### US Protected Areas Database (US-PAD)
+
+Unable to intersect these data with records because of the complexity of the shapefiles.
+Next time will try using AWS Redshift with a "flattened" version of the data.
+
+Try:
+* PAD-US 3.0 Vector Analysis File https://www.sciencebase.gov/catalog/item/6196b9ffd34eb622f691aca7
+* PAD-US 3.0 Raster Analysis File https://www.sciencebase.gov/catalog/item/6196bc01d34eb622f691acb5
+
+These are "flattened" though spatial analysis prioritized by GAP Status Code
+(ie GAP 1 > GAP 2 > GAP > 3 > GAP 4), these are found on bottom of
+https://www.usgs.gov/programs/gap-analysis-project/science/pad-us-data-download page.
+
+The vector datasets are available only as ESRI Geodatabases.  The raster datasets are
+Erdas Imagine format.  It appears to contain integers between 0 and 92, but may have
+additional attributes for those classifications. Try both in AWS Redshift.
+
+Upload the raster and vector flattened zip files (test which works best later) to
+s3://<S3 bucket>/input_data
+
+## 4. Resolve RIIS records to GBIF accepted taxa
+
+Run this locally until it is converted to an AWS step.  Make sure that the
+data/config/process_gbif.json file is present.  From the bison repo top directory,
+making sure the virtual environment is activated, run:
+
+  ```commandline
+  python process_gbif.py --config_file=data/config/process_gbif.json resolve
+  ```
+
+Upload the output file (like data/input/US-RIIS_MasterList_2021_annotated_2024-02-01.csv
+with current date string) to s3://<S3 bucket>/input_data
+
+
+## Redshift steps
+
+For all redshift steps, do the following with the designated script:
+
+* In AWS Redshift console, open `Query Editor`, and choose the button `Script Editor`.
+* Open existing or Create a new script (with +) and copy in the appropriate script.
+* Update the date string this processing step with the first day of the current month,
+  for example, replace all occurrences of 2024_01_01 with 2024_02_01.
+* Run
+
+## 5. Subset GBIF data to BISON (AWS Redshift)
+
+GBIF Input
+
+* Use the Global Biodiversity Information Facility (GBIF) Species Occurrences on the
+  AWS Open Data Registry (ODR) in S3. https://registry.opendata.aws/gbif/
+* These data are updated on the first day of every month, with the date string in
+  the S3 address.
+* The date string is appended to all outputs, and referenced in the subset scripts
+  (Redshift and Glue)
+* The data are available in each region, stay within the same AWS ODR region as the
+  BISON bucket.
+
+### Redshift subset (3 min)
+
+* Perform Redshift steps, using script: `aws_script/rs_subset_gbif`
+
+### Glue subset (works but 10-15 hours)
+
+* In AWS Glue console, open `ETL jobs`, and choose the button `Script Editor`.
+* Open existing or Upload the script `aws_script/glue_subset_gbif.sql`
+* Run
+* If this method is used, must still load the results into Redshift for steps 7, 8
+
+## 6. Load ancillary inputs to from AWS S3 to AWS Redshift
+
+* Perform Redshift steps, using script:  `aws_script/rs_load_ancillary_data.sql`
+
+## 7. Annotate BISON subset with regions and RIIS status (AWS Redshift)
+
+* Perform Redshift steps, using script:  `aws_script/rs_intersect_append.sql`
+* Takes 1-3 minutes per intersection into a temp table
+  plus  1-6 min to use the temp table to annotate the bison subset
+
+## 8. Summarize BISON subset by regions then export to S3 (AWS Redshift)
+
+* Perform Redshift steps, using script: `aws_scripts/rs_aggregate_export`
+* Outputs annotated records as CSV files in bucket/folder
+  s3://bison-321942852011-us-east-1/out_data
+  * aiannh_lists_<datestr>_000.csv
+  * state_lists_<datestr>_000.csv
+  * county_lists_<datestr>_000.csv
+  * aiannh_counts_<datestr>_000.csv
+  * state_counts_<datestr>_000.csv
+  * county_counts_<datestr>_000.csv
+
+## 9. Create Presence Absence Matrix (PAM) and compute statistics (local)
+
+* On a local machine, with the virtual environment activated, run the script
+  aws_scripts/bison_matrix_stats.py
+
+  ```commandline
+  python aws_scripts/bison_matrix_stats.py
+  ```
+
+
 # Project setup
 
 ## Dependencies
-Docker
+Amazon Web Services account with access to EC2, S3, Glue, and Redshift
 
 ## Develop and Test
 
@@ -108,179 +209,6 @@ pip3 install -r requirements.txt
 pip3 install -r requirements-test.txt
 ```
 
-### Data layout
-
-* For local setup and testing, create directories to mimic the volumes created by the Dockerfile.
-* Create a local /volumes/bison directory.  Everything contained in this
-  directory will be a symlink to the repository or to the large data directory discussed next.
-* Identify a directory with plenty of space, and create directories to contain
-  large data files
-  * input:
-    * big_data/gbif
-    * big_data/geodata
-  * temporary processing files:
-    * big_data/process
-  * final output files:
-    * big_data/output
-* Example below with large data directory /mnt/sata8/bison/2023
-
-```shell
-astewart@murderbot:/mnt/sata8/bison/2023$ ll
-...
-drwxrwxr-x 3 astewart astewart 4096 Feb 15 12:07 big_data/
-```
-
-* In the big_data directory, place the gbif occurrence file
-
-```shell
-astewart@murderbot:/mnt/sata8/bison/2023$ ll big_data/
-total 68
-drwxrwxr-x  6 astewart astewart  4096 Mar  1 16:33 ./
-drwxrwxr-x  4 astewart astewart  4096 Mar  1 16:33 ../
-drwxrwxr-x  2 astewart astewart  4096 Mar  1 12:02 gbif/
-drwxrwxr-x 15 astewart astewart  4096 Feb  9 16:05 geodata/
-drwxrwxr-x  2 astewart astewart 45056 Feb 27 15:50 output/
-drwxrwxr-x  2 astewart astewart  4096 Feb 27 14:50 process/
-```
-
-* In the big_data/geodata directory, place all geospatial data files.  All data within
-  this directory will be referenced by relative filenames
-
-```shell
-astewart@badenov:/tank/bison/2023$ ll big_data/geodata/census
-total 33184
-drwxrwxr-x 2 astewart astewart     4096 Feb  9  2023 ./
-drwxrwxr-x 5 astewart astewart     4096 Sep 12 15:25 ../
--rw-rw---- 1 astewart astewart        5 Apr  8  2022 cb_2021_us_aiannh_500k.cpg
--rw-rw---- 1 astewart astewart   183362 Apr  8  2022 cb_2021_us_aiannh_500k.dbf
--rw-rw---- 1 astewart astewart      165 Apr  8  2022 cb_2021_us_aiannh_500k.prj
--rw-rw---- 1 astewart astewart  2207408 Apr  8  2022 cb_2021_us_aiannh_500k.shp
--rwxrwxrwx 1 astewart astewart    37370 Apr  8  2022 cb_2021_us_aiannh_500k.shp.ea.iso.xml*
--rwxrwxrwx 1 astewart astewart    35993 Apr  8  2022 cb_2021_us_aiannh_500k.shp.iso.xml*
--rw-rw---- 1 astewart astewart     5732 Apr  8  2022 cb_2021_us_aiannh_500k.shx
--rw-rw-r-- 1 astewart astewart  1517895 Jan 26  2023 cb_2021_us_aiannh_500k.zip
--rw-rw---- 1 astewart astewart        5 Apr  8  2022 cb_2021_us_county_500k.cpg
--rw-rw---- 1 astewart astewart  1180828 Apr  8  2022 cb_2021_us_county_500k.dbf
--rw-rw---- 1 astewart astewart      165 Apr  8  2022 cb_2021_us_county_500k.prj
--rw-rw---- 1 astewart astewart 16837620 Apr  8  2022 cb_2021_us_county_500k.shp
--rwxrwxrwx 1 astewart astewart    26550 Apr  8  2022 cb_2021_us_county_500k.shp.ea.iso.xml*
--rwxrwxrwx 1 astewart astewart    35074 Apr  8  2022 cb_2021_us_county_500k.shp.iso.xml*
--rw-rw---- 1 astewart astewart    25972 Apr  8  2022 cb_2021_us_county_500k.shx
--rw-rw-r-- 1 astewart astewart 11838247 Feb  9  2023 cb_2021_us_county_500k.zip
-```
-
-* In the /volumes/bison directory create symbolic links to the large directory:
-  * big_data
-
-* and to the local repository
-  * config (bison/data/config)
-  * input (bison/data/input)
-  * tests (bison/tests/data)
-
-* for the following results:
-
-```shell
-astewart@murderbot:/volumes/bison$ ll
-total 8
-drwxrwxr-x 2 astewart astewart 4096 Mar  1 16:35 ./
-drwxr-xr-x 5 astewart astewart 4096 Jan 31 15:47 ../
-lrwxrwxrwx 1 astewart astewart   30 Feb 16 09:48 big_data -> /mnt/sata8/bison/2023/big_data/
-lrwxrwxrwx 1 astewart astewart   36 Feb 15 12:13 config -> /home/astewart/git/bison/data/config/
-lrwxrwxrwx 1 astewart astewart   35 Feb 15 12:34 input -> /home/astewart/git/bison/data/input/
-lrwxrwxrwx 1 astewart astewart   35 Feb 15 12:16 tests -> /home/astewart/git/bison/tests/data/
-```
-
-### Pre-commit
-
-* Instructions in [.pre-commit-config.yaml](.pre-commit-config.yaml)
-* When running a commit (and the pre-commit hooks), if files are modified, make sure to
-  restage them, then run commit again to ensure that changes are saved.
-
-### Local Testing
-
-* Include execution of tests in pre-commit hooks, example in
-  [Specify7](https://github.com/specify/specify7/blob/production/.pre-commit-config.yaml)
-
-* Create test file with first 100K records + header
-
-```commandline
-head -n 10001 occurrence.txt > gbif_2023-01-26_10k.csv
-```
-
-# Run all processes on GBIF data
-
-## Subset GBIF file
-
-Chunk the large GBIF occurrence data file into smaller subsets:
-
-```commandline
-python process_gbif.py chunk data/config/process_gbif.json
-```
-
-## Annotate RIIS with GBIF Taxa
-
-Annotate USGS RIIS records with GBIF Accepted Taxa, in order to link GBIF occurrence
-   records with RIIS records using taxon and location.
-
-```commandline
-python process_gbif.py resolve data/config/process_gbif.json
-```
-
-## Annotate GBIF with RIIS and locations
-
-Annotate GBIF occurrence records (each subset file) with:
-   * state, for assigning RIIS determination and summarizing
-   * other geospatial regions for summarizing
-   * RIIS determinations using state and taxon contained in both GBIF and RIIS records
-
-```commandline
-python process_gbif.py annotate data/config/process_gbif.json
-```
-
-## Summarize annotations
-
-Summarize annotated GBIF occurrence records (each subset file), by:
-   * location type (state, county, American Indian, Alaskan Native, and Native Hawaiian
-     lands (AIANNH), and US-Protected Areas Database (PAD)).
-   * location value
-   * combined RIIS region and taxon key (RIIS region: AK, HI, L48)
-   * scientific name, species name (for convenience in final aggregation outputs)
-   * count
-
-Then summarize the summaries into a single file, and aggregate summary into files of
-species and counts for each region:
-
-```commandline
-python process_gbif.py summarize data/config/process_gbif.json
-```
-
-## Create a heat matrix
-
-Create a 2d matrix of counties (rows) by species (columns) with a count for each species
-found at that location.
-
-```commandline
-python process_gbif.py heat_matrix data/config/process_gbif.json
-```
-
-## Create a Presence-Absence Matrix (PAM) for counties x species, then compute statistics
-
-Convert the heat matrix into a binary PAM, and compute diversity statistics: overall
-diversity of the entire region (gamma), county diversities (alpha) and county
-diversities (alpha) and total diversity to county diversities (beta).  In addition,
-compute species statistics: range size (omega) and mean proportional range size
-(omega_proportional).
-
-```commandline
-python process_gbif.py pam_stats data/config/process_gbif.json
-```
-
-## Compute heatmatrix, PAM, stats
-
-Stats references for alpha, beta, gamma diversity:
-* https://www.frontiersin.org/articles/10.3389/fpls.2022.839407/full
-* https://specifydev.slack.com/archives/DQSAVMMHN/p1693260539704259
-* https://bio.libretexts.org/Bookshelves/Ecology/Biodiversity_(Bynum)/7%3A_Alpha_Beta_and_Gamma_Diversity
 
 # Documentation
 

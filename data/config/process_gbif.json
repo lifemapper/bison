@@ -1,9 +1,16 @@
 {
-    "riis_filename": "/volumes/bison/input/US-RIIS_MasterList_2021.csv",
-    "gbif_filename": "/volumes/bison/big_data/gbif/gbif_2023-08-23.csv",
-    "do_split": true,
-    "run_parallel": true,
-    "geo_path": "/volumes/bison/big_data/geodata",
-    "process_path": "/volumes/bison/big_data/process",
-    "output_path": "/volumes/bison/big_data/output"
+    "riis_filename": "data/input/US-RIIS_MasterList_2021.csv",
+    "gbif_filename": "/",
+    "do_split": false,
+    "run_parallel": false,
+    "geo_path": "/",
+    "process_path": "data/output",
+    "output_path": "data/output",
+
+    "gbif_filename_saveme": "/volumes/bison/big_data/gbif/gbif_2023-08-23.csv",
+    "do_split_saveme": true,
+    "run_parallel_saveme": true,
+    "geo_path_saveme": "/volumes/bison/big_data/geodata",
+    "process_path_saveme": "/volumes/bison/big_data/process",
+    "output_path_saveme": "/volumes/bison/big_data/output"
 }
