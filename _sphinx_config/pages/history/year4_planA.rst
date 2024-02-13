@@ -2,34 +2,29 @@
 Year 4, 2022-2023
 ####################
 2023, Year 4 SOW specifies building the project as a Docker application, so that USGS
-personnel can run the analyses on their desktop machines, whether using a Windows, Mac,
-or Linux operating system.
+personnel can run the analyses where they choose, whether using a Windows, Mac,
+or Linux operating system.  All processing is done in a Docker container on a local or
+remote machine.
 
-The initial processes include annotating **GBIF occurrence data** from the
-US, with designations from the **US Registry of Introduced and Invasive Species**
-(RIIS), then summarizing the data by different regions, then aggregating data by a
-geospatial grid of counties, and computing biodiversity statistics.
+The overall goals include annotating a subset of **GBIF occurrence data** with
+designations from the **US Registry of Introduced and Invasive Species**
+(RIIS), then summarizing the data by different regions and RIIS status, and finally
+aggregating data counts by species into a geospatial grid of counties, and computing
+biodiversity statistics.
 
-Regions include **US Census state and county boundaries**.  States are required
-in order to identify whether the occurrence of a particular species falls within the
-a RIIS region (Alaska, Hawaii, or Lower 48), where it is identified as "Introduced"
-or "Invasive".  Region summaries include both state and county boundaries.
-
-Regions also include **American Indian, Alaskan Native, and Native Hawaiian** (AIANNH)
-regions and **US Federal Protected Areas** (US‐PAD).
-
-All regions (state, county, AIANNH, PAD) will be summarized by count and proportion
-for species, occurrences, and RIIS status.
+Regions include **US Census state and county boundaries**,
+**American Indian, Alaskan Native, and Native Hawaiian** (AIANNH) regions and
+**US Federal Protected Areas** (US‐PAD).  All regions (state, county, AIANNH, PAD) will
+be summarized by count and proportion for species, occurrences, and RIIS status.
 
 **********************
 Installation
 **********************
 
 LMBison can be run either locally on a powerful machine with a large amount of storage,
-or on AWS.  The workflow is different for each of these options.
+or in a Docker container on AWS.  In either case, Docker is required.
 
-
-Hardware requirements
+Local Hardware Requirements
 ==========================
 
 Data processing for BISON annotation, summary, and statistics requires a powerful
@@ -463,12 +458,17 @@ Annotate GBIF with RIIS and locations
 
 Annotate GBIF occurrence records (each subset file) with:
    * state, for assigning RIIS determination and summarizing
-   * other geospatial regions for summarizing
+   * county, AIANNH, and PAD geospatial regions for summarizing
    * RIIS determinations using state and taxon contained in both GBIF and RIIS records
 
+States are used, not only for summaries, but also to identify whether the occurrence of
+a particular species falls within a RIIS region (Alaska, Hawaii, or Lower 48), where it
+is identified as "Introduced" or "Invasive".  Region summaries include both state and
+county boundaries.
+
 Occasionally a point will intersect with a county envelope (created for a spatial
-index) but not be contained within the returned geometry.  In that case, return the
-values from the geometry nearest to the point.
+index) but not be contained within the returned geometry.  In that case, the program
+returns the values from the geometry nearest to the point.
 
     ```commandline
     python process_gbif.py annotate data/config/process_gbif.json

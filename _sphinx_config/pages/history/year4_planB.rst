@@ -25,6 +25,9 @@ for species, occurrences, and RIIS status.
 Installation
 **********************
 
+The resource intensive steps in this workflow use AWS, while the first and last steps
+are only implemented locally.
+
 Hardware requirements
 ==========================
 
