@@ -11,6 +11,7 @@ Current
     :maxdepth: 2
 
     pages/about
+    pages/history/year4_planB
     pages/year5
 
 History
@@ -21,7 +22,6 @@ History
 
     pages/history/year3
     pages/history/year4_planA
-    pages/history/year4_planB
 
 
 * :ref:`genindex`
