@@ -294,7 +294,7 @@ For this step, we will
     $ python ./aws_scripts/bison_annotate_riis.py --riis_file=data/input/US-RIIS_MasterList_2021.csv
 
 
-Step 2: (Local to AWS) Upload input data to AWS S3
+Step 2: (Local to AWS) Upload ancillary input data to AWS S3
 -----------------------------------------------
 **Move to Amazon S3**: In the AWS S3 console interface, upload the following data file
 to the **<BISON bucket>/input_data** folder:
@@ -308,12 +308,18 @@ to the **<BISON bucket>/input_data** folder:
 Step 3: (AWS) Subset GBIF data into Amazon Redshift
 -----------------------------------------------
 
+Mount the GBIF data directly from the Amazon Open Data Registry into Redshift for
+filtering into a BISON subset for processing.
+
 In the AWS Redshift console interface, open the "query editor", and paste in the
 contents of the file **aws_scripts/rs_subset_gbif.sql**.  Run the script to mount GBIF
 data, filter GBIF data into a **BISON subset** table, and unmount the GBIF data.
 
 Step 4: (AWS) Load input data from S3 into Amazon Redshift
 -------------------------------------------------------
+
+Mount the input data uploaded to S3 in Step 2 to Redshift for later processing with
+the BISON subset.
 
 In the AWS Redshift console interface, open the "query editor", and paste in the
 contents of the file **aws_scripts/rs_load_ancillary_data.sql**.  Run the script to load
@@ -322,6 +328,10 @@ county, AIANNH, and RIIS data into tables.
 Step 5: (AWS) In Amazon Redshift, annotate BISON subset, and write to S3
 -------------------------------------------------------------------------------------
 
+Intersect the ancillary geospatial datasets with the BISON subset, and join BISON
+records with annotated RIIS records to annotate BISON with geospatial regions and
+RIIS status.
+
 In the AWS Redshift console interface, open the "query editor", and paste in the
 contents of the file **aws_scripts/rs_intersect_append.sql**.  Run the script to
 annotate BISON records with county, state, and AIANNH regions and RIIS determinations,
@@ -329,6 +339,10 @@ then export data in CSV format to the **<BISON bucket>/annotated_records** folde
 
 Step 4: (AWS) Summarize annotations
 -------------------------------
+
+Summarize BISON records by region and RIIS status, with counts of occurrences and
+species.  Create lists of species for regions, including RIIS status and occurrence
+counts.
 
 In the AWS Redshift console interface, open the "query editor", and paste in the
 contents of the file **aws_scripts/rs_aggregate_export.sql**.  Run the script to
@@ -357,7 +371,3 @@ Stats references for alpha, beta, gamma diversity:
 * https://www.frontiersin.org/articles/10.3389/fpls.2022.839407/full
 * https://specifydev.slack.com/archives/DQSAVMMHN/p1693260539704259
 * https://bio.libretexts.org/Bookshelves/Ecology/Biodiversity_(Bynum)/7%3A_Alpha_Beta_and_Gamma_Diversity
-
-###########################
-Development and Testing
-###########################
