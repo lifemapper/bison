@@ -25,7 +25,7 @@ Project setup
 * For a development virtual environment and production build, use a python virtual
   environment.  Install and activate:
 
-::
+.. code-block::
 
     python3 -m venv venv
     . venv/bin/activate
@@ -50,6 +50,11 @@ USGS RIIS
 * United States Register of Introduced and Invasive Species (US-RIIS)
   https://doi.org/10.5066/P95XL09Q
 * Test USGS input files
+
+.. code-block::
+
+    python3 test/test_RIIS.py
+    python3 test/test_taxonomy.py
 
 
 Census data for determining point county/state
@@ -78,6 +83,11 @@ and (for all commands except resolve, the original input GBIF filename.  Ensure 
 the virtual environment has been activated (the command prompt will be preceded by
 "(venv)").
 
+.. code-block::
+
+    . venv/bin/activate
+    (venv) $
+
 The constant BIG_DATA_PATH is set in the bison/common/constants.py file and specifies
 both the location of the original input data file, and the location of logfiles and
 data outputs.  Set this variable to an appropriate location (with enough disk space)
@@ -87,13 +97,13 @@ on the computer running the processes.
 .............................................
 
 * Command: split
-* Input: gbif_2022-05-19.csv
-* Output: list of files of pattern gbif_2022-05-19_chunk-<start_line>-<stop_line>_raw.csv
+* Input: gbif_<yyyy-mm-dd>.csv
+* Output: list of files of pattern gbif_<yyyy-mm-dd>_chunk-<start_line>-<stop_line>_raw.csv
 
-```commandline
-. venv/bin/activate
-python  process_gbif.py  split  --gbif_filename=gbif_2022-05-19.csv
-```
+.. code-block::
+
+    (venv) $ python  process_gbif.py  split  --gbif_filename=gbif_<yyyy-mm-dd>.csv
+
 
 This step prepares the GBIF data by splitting it into smaller chunks for easier
 processing.  We split the data into chunks based on the number of processors
@@ -114,10 +124,10 @@ RIIS Data: https://www.sciencebase.gov/catalog/item/6357fcfed34ebe4425031fb6
 * Input: US-RIIS_MasterList.csv
 * Output: US-US-RIIS_MasterList_updated_gbif.csv
 
-```commandline
-. venv/bin/activate
-python  process_gbif.py  resolve  --riis_filename=data/US-RIIS_MasterList.csv
-```
+.. code-block::
+
+    (venv) $ python  process_gbif.py  resolve  --riis_filename=data/US-RIIS_MasterList.csv
+
 
 This step prepares the US-RIIS data ("US-RIIS_MasterList.csv") by resolving each
 record's scientificName to the acceptedScientificName in the GBIF Backbone Taxonomy.
@@ -138,13 +148,14 @@ This step appends 3 fields to the US-RIIS data:
 ## 3. Annotate DwC records
 
 * Command: annotate
-* Input: gbif_2022-05-19.csv
-* Output: list of files of pattern gbif_2022-05-19_chunk-<start_line>-<stop_line>_annotated.csv
+* Input: gbif_<yyyy-mm-dd>.csv
+* Output: list of files of pattern
+  gbif_<yyyy-mm-dd>_chunk-<start_line>-<stop_line>_annotated.csv, each with new fields
+  added and filled where possible.
 
-```commandline
-. venv/bin/activate
-python  process_gbif.py  annotate  --gbif_filename=gbif_2022-05-19.csv
-```
+.. code-block::
+
+    (venv) $ python  process_gbif.py  annotate  --gbif_filename=gbif_<yyyy-mm-dd>.csv
 
 This step annotates all GBIF DwC records with 5 additional fields, of 3 categories:
 
@@ -178,8 +189,36 @@ This step then writes out the annotated, flagged records.
 3. Summarize each file of annotated DwC records
 .............................................
 
-This step summarizes each annotated chunk by county and state, then writes out a summary
-for each file
+This step summarizes each annotated chunk by county, state, and RIIS status, then writes
+out a summary for each chunked, annotated file
+
+* Command: summarize
+* Input: gbif_<yyyy-mm-dd>.csv
+* Output: list of files of pattern
+  gbif_<yyyy-mm-dd>_chunk-<start_line>-<stop_line>_summary.csv AND a full summary in
+  gbif_<yyyy-mm-dd>_summary.csv
+
+.. code-block::
+
+    (venv) $ python  process_gbif.py  summarize  --gbif_filename=gbif_<yyyy-mm-dd>.csv
+
+
+
+3. Aggregate summarized chunks
+.............................................
+
+This step aggregates the summarized chunk files, and writes the summaries for each state
+and county
+
+* Command: aggregate
+* Input: gbif_<yyyy-mm-dd>_summary.csv
+* Output: list of files of pattern
+  <region_type>-<region>.csv, i.e. state_KS.csv, county_KS-Douglas.csv  AND
+  a RIIS summary in file gbif_<yyyy-mm-dd>_riis_summary.csv
+
+.. code-block::
+
+    (venv) $ python  process_gbif.py  aggregate  --gbif_filename=gbif_<yyyy-mm-dd>.csv
 
 --------------
 Development
@@ -198,9 +237,9 @@ Documentation
 * Auto-generate readthedocs:
   https://docs.readthedocs.io/en/stable/intro/getting-started-with-mkdocs.html
 
-```commandline
-(venv)$ pip3 install mkdocs
-```
+.. code-block::
+
+    (venv) $ pip3 install -r requirements-docs.txt
 
 Testing
 .............................................
@@ -210,6 +249,7 @@ Testing
 
 * Create test file with first 100K records + header
 
-```commandline
-head -n 100001 0090372-210914110416597.csv > gbif_2022-01-07_100k.csv
-```
+.. code-block::
+
+    $ head -n 100001 0090372-210914110416597.csv > gbif_2022-01-07_100k.csv
+    (venv) $ pip3 install -r requirements-test.txt
