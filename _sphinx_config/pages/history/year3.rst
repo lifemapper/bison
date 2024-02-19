@@ -27,9 +27,9 @@ Project setup
 
 .. code-block::
 
-    python3 -m venv venv
-    . venv/bin/activate
-    pip3 install -r requirements.txt
+    $ python3 -m venv venv
+    $ . venv/bin/activate
+    (venv) $ pip3 install -r requirements.txt
 
 Data Inputs
 --------------
@@ -53,8 +53,8 @@ USGS RIIS
 
 .. code-block::
 
-    python3 test/test_RIIS.py
-    python3 test/test_taxonomy.py
+    (venv) $ python3 test/test_RIIS.py
+    (venv) $ python3 test/test_taxonomy.py
 
 
 Census data for determining point county/state
@@ -85,7 +85,7 @@ the virtual environment has been activated (the command prompt will be preceded 
 
 .. code-block::
 
-    . venv/bin/activate
+    $ . venv/bin/activate
     (venv) $
 
 The constant BIG_DATA_PATH is set in the bison/common/constants.py file and specifies
@@ -204,7 +204,7 @@ out a summary for each chunked, annotated file
 
 
 
-3. Aggregate summarized chunks
+4. Aggregate summarized chunks
 .............................................
 
 This step aggregates the summarized chunk files, and writes the summaries for each state
@@ -220,7 +220,7 @@ and county
 
     (venv) $ python  process_gbif.py  aggregate  --gbif_filename=gbif_<yyyy-mm-dd>.csv
 
---------------
+
 Development
 --------------
 
