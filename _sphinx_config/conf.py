@@ -20,7 +20,7 @@ sys.path.insert(0, os.path.abspath('../..'))
 
 # -- Project information -----------------------------------------------------
 project = 'LmBISON documentation'
-copyright = '2023, LmBISON Team'
+copyright = '2024, LmBISON Team'
 author = 'LmBISON Team'
 
 # The full version, including alpha/beta/rc tags
@@ -53,6 +53,9 @@ templates_path = ['_templates']
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
 exclude_patterns = []
+
+# -- LmBISON added -----------------------------------------------------------
+pygments_style = 'sphinx'
 
 
 # -- Options for HTML output -------------------------------------------------

@@ -50,16 +50,16 @@ IAM_role DEFAULT;
 SELECT COUNT(*) FROM riis_2024_02_01;
 SELECT * FROM riis_2024_02_01 LIMIT 10;
 
--- -------------------------------------------------------------------------------------
--- US Protected Areas Database (US-PAD)
--- -------------------------------------------------------------------------------------
-DROP TABLE pad;
-CREATE TABLE pad (
-);
-
-COPY pad FROM 's3://bison-321942852011-us-east-1/input_data/region/pad/PADUS3_0VectorAnalysisFile_ClipCensus.zip'
-FORMAT SHAPEFILE
-IAM_role DEFAULT;
+---- -------------------------------------------------------------------------------------
+---- US Protected Areas Database (US-PAD)
+---- -------------------------------------------------------------------------------------
+--DROP TABLE pad;
+--CREATE TABLE pad (
+--);
+--
+--COPY pad FROM 's3://bison-321942852011-us-east-1/input_data/pad/PADUS3_0VectorAnalysisFile_ClipCensus.zip'
+--FORMAT SHAPEFILE
+--IAM_role DEFAULT;
 
 -- -------------------------------------------------------------------------------------
 -- American Indian, Alaskan Native, Native Hawaiian lands (AIANNH)

@@ -9,11 +9,7 @@
 * Include execution of tests in pre-commit hooks, example in
   [Specify7](https://github.com/specify/specify7/blob/production/.pre-commit-config.yaml)
 
-* Create test file with first 100K records + header
 
-```commandline
-head -n 10001 occurrence.txt > gbif_2023-01-26_10k.csv
-```
 # AWS prep
 
 ## Local machine for testing
