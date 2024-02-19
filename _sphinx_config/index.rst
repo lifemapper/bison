@@ -11,6 +11,7 @@ Current
 .. toctree::
     :maxdepth: 2
 
+    pages/about
     pages/year5
 
 History
@@ -19,7 +20,6 @@ History
 .. toctree::
     :maxdepth: 2
 
-    pages/about
     pages/history/year4_planB
     pages/history/year4_planA
     pages/history/year3

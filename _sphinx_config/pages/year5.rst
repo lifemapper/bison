@@ -1,5 +1,5 @@
 #######################
-Year 5, 2023-2024
+Year 5, 2024
 #######################
 
 2023, Year 5 SOW specifies building the project as an AWS application, so that USGS

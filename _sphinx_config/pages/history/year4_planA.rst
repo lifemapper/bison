@@ -1,5 +1,5 @@
 ####################
-Year 4, 2022-2023
+Year 4, Part 1, 2023
 ####################
 2023, Year 4 SOW specifies building the project as a Docker application, so that USGS
 personnel can run the analyses where they choose, whether using a Windows, Mac,
@@ -311,7 +311,8 @@ level of the local repository.  Required parameters include:
 * output_path (str): Destination directory for output data.
 
 Step 1: Annotate RIIS with GBIF Taxa
--------------------------------
+==========================
+
 We determine the Introduced and Invasive Species status of a GBIF record by first
 resolving the scientificName in the US Registry of Introduced and Invasive Species
 (RIIS) to the closest matching name in GBIF.
@@ -327,7 +328,8 @@ For this step, we will
 
 
 Step 2: Split large GBIF data into manageable files
--------------------------------
+==========================
+
 We split the large GBIF data file into smaller chunks to reduce the memory footprint
 of each process, allow for easier debugging, and facilitate parallel processing for
 time-intensive, but not CPU-intensive, data processes.
@@ -338,7 +340,8 @@ time-intensive, but not CPU-intensive, data processes.
 
 
 Step 3: Annotate GBIF records with RIIS determinations and geographical regions
--------------------------------
+==========================
+
 Annotate GBIF occurrence records (each subset file) with:
    * state
    * county
@@ -364,7 +367,7 @@ At this point, further work went towards developing a solution on AWS.
     $ python process_gbif.py  --config_file=data/config/process_gbif.json  annotate
 
 Step 4: Summarize annotations
--------------------------------
+==========================
 
 Summarize annotated GBIF occurrence records (each subset file), by:
    * location type (state, county, American Indian, Alaskan Native, and Native Hawaiian
@@ -382,7 +385,7 @@ into files of species and counts for each region:
     $ python process_gbif.py   --config_file=data/config/process_gbif.json  summarize
 
 Step 5: Create a heat matrix for counties x species
-----------------------------------------------------
+==========================
 
 Create a 2d matrix of counties (rows) by species (columns) with a count for each species
 found at that location.
@@ -393,7 +396,7 @@ found at that location.
 
 
 Step 6: Create a Presence-Absence Matrix (PAM) and compute stats
------------------------------------------------------------------------
+==========================
 
 Convert the heat matrix into a binary PAM, and compute diversity statistics: overall
 diversity of the entire region (gamma), county diversities (alpha) and county
@@ -410,9 +413,9 @@ Stats references for alpha, beta, gamma diversity:
 * https://specifydev.slack.com/archives/DQSAVMMHN/p1693260539704259
 * https://bio.libretexts.org/Bookshelves/Ecology/Biodiversity_(Bynum)/7%3A_Alpha_Beta_and_Gamma_Diversity
 
-###########################
+**********************
 Development and Testing
-###########################
+**********************
 
 Create expected file structure
 ==========================
