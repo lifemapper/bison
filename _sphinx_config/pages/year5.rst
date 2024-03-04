@@ -267,7 +267,7 @@ Glue
 
     * In Job Details tab, Advanced Properties, Job Parameters add
         key --additional-python-modules
-        value  s3://bison-321942852011-us-east-1/lib/SQLAlchemy-2.0.23.tar.gz
+        value  s3://<bucket_name>/lib/SQLAlchemy-2.0.23.tar.gz
 
 Experiment
 ---------------------------

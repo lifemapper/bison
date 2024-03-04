@@ -16,19 +16,18 @@ Overview
 
 2. Create a VPC.
 
-   * The default one is fine for now, it is vpc-09d4c9a0524b17382
+   * The default one is fine for now
 
 3. Run AWS Batch first-run wizard to
 
    * set up roles
 
-     Batch role (not yet created):
-     arn:aws:iam::321942852011:role/aws-service-role/batch.amazonaws.com/AWSServiceRoleForBatch
+     Create role, include Batch permissions: AWSServiceRoleForBatch
 
    * create a compute environment (EC2)
 
      * https://docs.aws.amazon.com/batch/latest/userguide/getting-started-ec2.html
-     * https://us-east-1.console.aws.amazon.com/batch/home?region=us-east-1#wizard
+     * AWS Console, Services, AWS Batch
        * choose EC2, r7g.medium AMI
 
    * Create Batch resources
@@ -46,8 +45,11 @@ Overview
 
    * docker pull ghcr.io/osgeo/gdal:alpine-small-latest
 
-Workflow:
+Old Workflow:
 -------------
+
+Creates EC2 spot image to download requested data directly from GBIF, save to S3,
+index in Glue database.
 
 Prep:
 
@@ -62,7 +64,6 @@ Input data acquisition:
 * Create EC2 spot image
 
   * download data from GBIF
-    Test bison dataset from 9/25/2023:  0006607-230918134249559
   * copy to S3
 
 Input data prep:
@@ -142,7 +143,6 @@ Amazon S3
 -----------------------------------------
 
  * Use Glue to Subset GBIF ODR data into local bucket
-   arn:aws:s3:::bison-321942852011-us-east-1
  * Crawl GBIF data s3://gbif-open-data-us-east-1/occurrence/2023-11-01/occurrence.parquet/
    to create gbif-odr-occurrence_parquet table in Data Catalog tables
 
@@ -152,9 +152,9 @@ Amazon RDS, PostgreSQL, bison-db-test
     * Create JDBC connection from Glue, then TestConnection
 
         InvalidInputException: VPC S3 endpoint validation failed for SubnetId:
-        subnet-0861208f72b8eac53. VPC: vpc-09d4c9a0524b17382. Reason: Could not find
-        S3 endpoint or NAT gateway for subnetId: subnet-0861208f72b8eac53 in Vpc
-        vpc-09d4c9a0524b17382
+        subnet-xxx. VPC: vpc-xxx. Reason: Could not find
+        S3 endpoint or NAT gateway for subnetId: subnet-xxx in Vpc
+        vpc-xxx
 
 AWS Glue Data Catalog
 -----------------------------------------
@@ -165,9 +165,10 @@ AWS Glue Data Catalog
 
 * To connect to RDS, add Glue/Data Catalog/Connection
 
-    * endpoint: bison-db-test.cqvncffkwz9t.us-east-1.rds.amazonaws.com
-    * dbname: bison_db_test
-    * connection url: jdbc:postgresql://bison-db-test.cqvncffkwz9t.us-east-1.rds.amazonaws.com:5432/bison_db_test
+    * endpoint: <db_name>.<db_id>.<region>.rds.amazonaws.com
+    * dbname: <db_name>
+    * connection url:
+        jdbc:postgresql://<db_name>.<db_id>.<region>.rds.amazonaws.com:5432/<db_name>
 
     * "InvalidInputException: Unable to resolve any valid connection"
       Docs point to error logs in /aws-glue/testconnection/output, but this does not exist
