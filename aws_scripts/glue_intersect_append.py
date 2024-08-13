@@ -1,4 +1,4 @@
-"""Glue script to read S3 point data, RDS polygon data, append enclosing value to points."""
+"""OBSOLETE Glue script to read S3 point data, RDS polygon data, annotate points."""
 # from awsglue.transforms import *
 from awsglue.utils import getResolvedOptions
 from awsglue.context import GlueContext
