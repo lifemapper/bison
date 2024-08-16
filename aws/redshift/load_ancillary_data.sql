@@ -54,13 +54,62 @@ SELECT * FROM riis_2024_08_01 LIMIT 10;
 ---- -------------------------------------------------------------------------------------
 ---- US Protected Areas Database (US-PAD)
 ---- -------------------------------------------------------------------------------------
---DROP TABLE pad;
---CREATE TABLE pad (
---);
---
---COPY pad FROM 's3://bison-321942852011-us-east-1/input_data/pad/PADUS3_0VectorAnalysisFile_ClipCensus.zip'
---FORMAT SHAPEFILE
---IAM_role DEFAULT;
+DROP TABLE pad;
+CREATE TABLE pad (
+   SHAPE     GEOMETRY,
+   OBJECTID  INTEGER,
+   Mang_Type VARCHAR(max),
+   Mang_Name VARCHAR(max),
+   Loc_Ds    VARCHAR(max),
+   Unit_Nm   VARCHAR(max),
+   GAP_Sts   VARCHAR(max),
+   GIS_Acres VARCHAR(max)
+);
+
+COPY pad FROM 's3://bison-321942852011-us-east-1/input_data/pad_4.0_gap_4326.shp'
+FORMAT SHAPEFILE
+SIMPLIFY AUTO
+IAM_role DEFAULT;
+
+SELECT start_time, line_number, column_name, column_type, error_message FROM sys_load_error_detail WHERE query = pg_last_copy_id();
+
+DROP TABLE pad1;
+CREATE TABLE pad1 (
+    SHAPE     GEOMETRY,
+    OBJECTID  INTEGER,
+    FID_Vector  INTEGER,
+    FID_GAP_St  INTEGER,
+    FeatClass  VARCHAR(max),
+    Category  VARCHAR(max),
+    Mang_Type  VARCHAR(max),
+    Mang_Name  VARCHAR(max),
+    Des_Tp  VARCHAR(max),
+    Loc_Ds  VARCHAR(max),
+    Unit_Nm  VARCHAR(max),
+    Agg_Src  VARCHAR(max),
+    Pub_Access  VARCHAR(max),
+    GAP_Sts  VARCHAR(max),
+    IUCN_Cat  VARCHAR(max),
+    GAP_Sts_Pr  INTEGER,
+    COUNT_OBJE  INTEGER,
+    ShL_ShA  VARCHAR(max),
+    DupShL_ShA  INTEGER,
+    ORIG_FID  INTEGER,
+    RevOID  INTEGER,
+    Shp_AreaDu  INTEGER,
+    GIS_Acres  INTEGER,
+    SHAPE_Leng  FLOAT,
+    SHAPE_Area  FLOAT
+);
+
+COPY pad1 FROM 's3://bison-321942852011-us-east-1/input_data/pad_4.0_gap1_4326.shp'
+FORMAT SHAPEFILE
+SIMPLIFY AUTO
+IAM_role DEFAULT;
+
+SELECT query_id, start_time, line_number, column_name, column_type, error_message FROM sys_load_error_detail WHERE query_id = pg_last_copy_id();
+
+SELECT count(*) FROM pad1;
 
 -- -------------------------------------------------------------------------------------
 -- American Indian, Alaskan Native, Native Hawaiian lands (AIANNH)

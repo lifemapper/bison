@@ -1,7 +1,7 @@
 # Obsolete.  Docker implementation is inadequate for geospatial intersection of
 # large datasets.
 
-FROM osgeo/gdal:ubuntu-small-latest as backend
+FROM osgeo/gdal:alpine-small-3.6.3 as backend
 
 ARG BIG_DATA=/
 
