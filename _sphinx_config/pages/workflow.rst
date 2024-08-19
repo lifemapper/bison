@@ -48,33 +48,7 @@ Load ancillary data
   * Run the `CREATE TABLE` command to create an empty table in Redshift,
     and the following `COPY` command to load the data into Redshift.
 
-* PAD data:
 
-  * Look at the metadata using ogrinfo::
-
-      ogrinfo -al -so -geom=SUMMARY PADUS4_0VectorAnalysis_GAP_PADUS_Only_ClipCENSUS.gdb
-
-  * Subset the geodatabase into shapefile, each with a GAP status of 1 or 2::
-
-    ogr2ogr \
-        -of "ESRI Shapefile" \
-        -progress \
-        -skipfailures \
-        -where "GAP_Sts = '1'" \
-        pad_4.0_gap1.shp  PADUS4_0VectorAnalysis_GAP_PADUS_Only_ClipCENSUS.gdb  \
-        -nlt polygon \
-        -lco ENCODING=UTF-8
-
-        -where "GAP_Sts = '1' OR GAP_Sts = '2'" \
-        -select SHAPE,OBJECTID,Mang_Type,Mang_Name,Loc_Ds,Unit_Nm,GAP_Sts,GIS_Acres \
-
-  * Reproject each shapefile to EPSG:4326::
-
-    ogr2ogr \
-        -of "ESRI Shapefile" \
-        -t_srs "EPSG:4326" \
-        pad_4.0_gap1_4326.shp  pad_4.0_gap1.shp \
-        -lco ENCODING=UTF-8
 
 Subset GBIF data
 ===================
@@ -101,10 +75,53 @@ Troubleshooting
 PAD
 -----
 
-Still 3 errors with COPY command into Redshift::
+* Look at the metadata using ogrinfo::
 
-    On line 1, column `objectid1`: "Invalid digit, Value 'E', Pos 10, Type: Integer"
-    On line 31284: "Compass I/O exception: Invalid hexadecimal character(s) found"
-    On line 41539, column `shape`:
-      "Geometry size: 1089416 is larger than maximum supported size: 1048447"
+      ogrinfo -al -so -geom=SUMMARY PADUS4_0VectorAnalysis_GAP_PADUS_Only_ClipCENSUS.gdb
 
+* Subset the geodatabase into shapefile, each with a GAP status of 1 or 2::
+
+    ogr2ogr \
+        -of "ESRI Shapefile" \
+        -progress \
+        -skipfailures \
+        -where "GAP_Sts = '1'" \
+        pad_4.0_gap1b.shp  PADUS4_0VectorAnalysis_GAP_PADUS_Only_ClipCENSUS.gdb  \
+        -nlt polygon \
+        -lco ENCODING=UTF-8
+
+        -where "GAP_Sts = '1' OR GAP_Sts = '2'" \
+        -select SHAPE,OBJECTID,Mang_Type,Mang_Name,Loc_Ds,Unit_Nm,GAP_Sts,GIS_Acres \
+
+* Reproject each shapefile to EPSG:4326::
+
+    ogr2ogr \
+        -of "ESRI Shapefile" \
+        -t_srs "EPSG:4326" \
+        pad_4.0_gap1_4326.shp  pad_4.0_gap1.shp \
+        -lco ENCODING=UTF-8
+
+* Create an empty table in Redshift::
+
+    CREATE TABLE pad1 (
+       SHAPE     GEOMETRY,
+       OBJECTID  INTEGER,
+       Mang_Type VARCHAR(max),
+       Mang_Name VARCHAR(max),
+       Loc_Ds    VARCHAR(max),
+       Unit_Nm   VARCHAR(max),
+       GAP_Sts   VARCHAR(max),
+       GIS_Acres VARCHAR(max)
+    );
+
+
+* Fill table from S3::
+
+    COPY pad1 FROM 's3://bison-321942852011-us-east-1/input_data/pad_4.0_gap1_4326.shp'
+    FORMAT SHAPEFILE
+    SIMPLIFY AUTO
+    IAM_role DEFAULT;
+
+* Always error, even when reducing the number of records or using all fields::
+
+    Compass I/O exception: Invalid hexadecimal character(s) found
