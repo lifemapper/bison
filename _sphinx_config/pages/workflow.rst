@@ -31,6 +31,43 @@ Get ancillary data
     * Unzip locally to PADUS4_0VectorAnalysis_GAP_PADUS_Only_ClipCENSUS.gdb, a
       directory containing a geodatabase.
 
+* USGS Registry of Introduced and Invasive Species
+
+  * Current data, version 2, is from 2022::
+
+    * https://www.sciencebase.gov/catalog/item/62d59ae5d34e87fffb2dda99
+    * https://www.invasivespeciesinfo.gov/resource/11555
+    * Simpson, A., Fuller, P., Faccenda, K., Evenhuis, N., Matsunaga, J., and
+      Bowser, M., 2022, United States Register of Introduced and Invasive Species
+      (US-RIIS) (ver. 2.0, November 2022): U.S. Geological Survey data release,
+      https://doi.org/10.5066/P9KFFTOD.
+    * Data files:
+      * USRIISv2_MasterList.csv: contains a record for any species determined to be
+        Introduced or Invasive for a US region.  Regions are limited to Alaska, Hawaii,
+        and the Continental US (AK, HI, L48). A species may be designated as Introduced or
+        Invasive for one or more of these regions, with a record for each.
+      * USRIISv2_AuthorityReferences.csv: contains citations for the RIIS designations
+        in the MasterList.
+      * US-RIISv2_DataDictionary.csv: contains full descriptions of the data in each
+        field in the MasterList.
+
+    * Categories in establishmentMeans field are:
+
+      * introduced (alien, exotic, non-native, nonindigenous)
+      * introduced: assisted colonization
+      * introduced (alien, exotic, non-native, nonindigenous); introduced: assisted colonization
+
+    * Categories in degreeOfEstablishment field are:
+
+      * established (category C3)
+      * invasive (category D2)
+      * widespread invasive (category E)
+
+
+
+
+
+
 Load ancillary data
 ===================
 

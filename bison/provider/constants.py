@@ -2,7 +2,7 @@
 LINENO_FLD = "LINENO"
 
 _data_dir = "/home/astewart/git/bison/data"
-RIIS_FILENAME = f"{_data_dir}/US-RIIS_MasterList_2021.csv"
+RIIS_FILENAME = f"{_data_dir}/USRIISv2_MasterList.csv"
 
 
 # .............................................................................
@@ -18,39 +18,16 @@ class RIIS_DATA:
     DATA_EXT = "csv"
     DELIMITER = ","
     QUOTECHAR = '"'
-    # Metadata about fields
-    DATA_DICT_FNAME = "US_RIIS_DataDictionary"
-    # Authority References Metadata.
-    AUTHORITY_FNAME = "US-RIIS_AuthorityReferences"
-    AUTHORITY_KEY = "Authority"
-    AUTHORITY_DATA_COUNT = 5951
-    AUTHORITY_HEADER = [
-        "Authority",
-        "associatedReferences",
-        "Source Type",
-        "Source",
-        "Version",
-        "Reference Author",
-        "Title",
-        "Publication Name",
-        "Listed Publication Date",
-        "Publisher",
-        "Publication Place",
-        "ISBN",
-        "ISSN",
-        "Pages",
-        "Publication Remarks",
-    ]
     # Introduced or Invasive Species List.
     SPECIES_GEO_KEY = "occurrenceID"
-    GBIF_KEY = "GBIF taxonKey"
-    ITIS_KEY = "ITIS TSN"
+    GBIF_KEY = "GBIF_taxonKey"
+    ITIS_KEY = "ITIS_TSN"
     LOCALITY_FLD = "locality"
     KINGDOM_FLD = "kingdom"
     SCINAME_FLD = "scientificName"
     SCIAUTHOR_FLD = "scientificNameAuthorship"
     RANK_FLD = "taxonRank"
-    ASSESSMENT_FLD = "Introduced or Invasive"
+    ASSESSMENT_FLD = "degreeOfEstablishment"
     TAXON_AUTHORITY_FLD = "taxonomicStatus"
     SPECIES_GEO_HEADER = [
         "locality",
@@ -58,27 +35,32 @@ class RIIS_DATA:
         "scientificNameAuthorship",
         "vernacularName",
         "taxonRank",
-        "Introduced or Invasive",
+        "establishmentMeans",
+        "degreeOfEstablishment",
+        "isHybrid",
+        "pathway",
+        "habitat",
         "Biocontrol",
         "associatedTaxa",
-        "Approximate Introduction Date",
+        "eventRemarks",
         "IntroDateNumber",
-        "Other Names",
+        "taxonRemarks",
         "kingdom",
-        "phylum",
-        "class",
+        "phylum	class",
         "order",
         "family",
         "taxonomicStatus",
-        "ITIS TSN",
-        "GBIF taxonKey",
+        "ITIS_TSN",
+        "GBIF_taxonKey",
+        "taxonID",
         "Authority",
+        "WebLink",
         "associatedReferences",
-        "Acquisition Date",
+        "eventDate",
         "modified",
-        "Update Remarks",
+        "Update_Remarks",
         "occurrenceRemarks",
-        "occurrenceID",
+        "occurrenceID"
     ]
 
 
