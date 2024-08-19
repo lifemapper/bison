@@ -29,6 +29,11 @@ class RIIS_DATA:
     RANK_FLD = "taxonRank"
     ASSESSMENT_FLD = "degreeOfEstablishment"
     TAXON_AUTHORITY_FLD = "taxonomicStatus"
+    RIIS_STATUS = {
+        "established (category C3)": "established",
+        "invasive (category D2)": "invasive",
+        "widespread invasive (category E)": "widespread invasive"
+    }
     SPECIES_GEO_HEADER = [
         "locality",
         "scientificName",

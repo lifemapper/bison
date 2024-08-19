@@ -33,7 +33,7 @@ Get ancillary data
 
 * USGS Registry of Introduced and Invasive Species
 
-  * Current data, version 2, is from 2022::
+  * Current data, version 2, is from 2022:
 
     * https://www.sciencebase.gov/catalog/item/62d59ae5d34e87fffb2dda99
     * https://www.invasivespeciesinfo.gov/resource/11555
@@ -63,7 +63,8 @@ Get ancillary data
       * invasive (category D2)
       * widespread invasive (category E)
 
-
+Annotate RIIS Data with GBIF Accepted Taxa
+==========================================
 
 
 

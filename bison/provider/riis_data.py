@@ -565,7 +565,7 @@ class RIIS:
                 msgdict[key] = [msg]
 
     # ...............................................
-    def _find_current_accepted_taxon(self, gbif_svc, sciname, kingdom, taxkey):
+    def _find_current_accepted_taxon(self, gbif_svc, sciname, kingdom):
         # Query GBIF with the name/kingdom
         gbifrec = gbif_svc.query_by_name(sciname, kingdom=kingdom)
 
@@ -619,11 +619,11 @@ class RIIS:
                     # Try to match, if match is not 'accepted', repeat with returned
                     # accepted keys
                     data = reclist[0].data
+                    old_key = data[RIIS_DATA.GBIF_KEY]
                     try:
                         new_key, new_name = self._find_current_accepted_taxon(
                             gbif_svc, data[RIIS_DATA.SCINAME_FLD],
-                            data[RIIS_DATA.KINGDOM_FLD],
-                            data[RIIS_DATA.GBIF_KEY])
+                            data[RIIS_DATA.KINGDOM_FLD])
                     except Exception as e:
                         err = f"Failed to get GBIF accepted taxon for" \
                               f" {data[RIIS_DATA.SCINAME_FLD]}, {e}"
@@ -631,6 +631,11 @@ class RIIS:
                         self._log.log(
                             err, refname=self.__class__.__name__, log_level=ERROR)
                     else:
+                        if new_key != old_key:
+                            self._add_msg(
+                                msgdict, name,
+                                f"RIIS GBIF taxonKey {old_key} <> resolved "
+                                f"taxonKey {new_key}")
                         name_count += 1
                         # Annotate all records for this name with GBIF accepted key/sciname
                         for rec in reclist:
