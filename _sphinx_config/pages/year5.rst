@@ -118,48 +118,22 @@ https://catalog.data.gov/dataset/tiger-line-shapefile-current-nation-u-s-america
 Protected Areas Database, US-PAD (not currently used)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-U.S. Geological Survey (USGS) Gap Analysis Project (GAP), 2022, Protected Areas Database
-of the United States (PAD-US) 3.0: U.S. Geological Survey data release,
-https://doi.org/10.5066/P9Q9LQ4B.
 
-The US-PAD dataset proved too complex to intersect at an acceptable speed.  Intersecting
-with 900 million records was projected to take 60 days.  I tested this data in
-multiple implementations (local machine or Docker containers) and with multiple versions
-of the data (split by Dept of Interior, DOI, regions, or by states) and with multiple
-Docker configurations, with no success.  For this reason, US-PAD was abandoned until a
-good solution can be found.
+U.S. Geological Survey (USGS) Gap Analysis Project (GAP), 2024, Protected Areas Database
+of the United States (PAD-US) 4.0: U.S. Geological Survey data release,
+https://doi.org/10.5066/P96WBCHS.
 
-The next configuration to try will use different AWS tools.  I was unable to insert
-these data into AWS RDS, PostgreSQL with PostGIS (other polygon datasets succeeded).
+Mark Wiltermuth, USGS, suggested the "flattened" dataset, now on version 4.0.
+PAD-US 4.0 Vector Analysis and Summary Statistics .
+https://www.sciencebase.gov/catalog/item/652d4ebbd34e44db0e2ee458
 
-The PAD data is divided into datasets by Department of Interior (DOI) region, but
-those datasets are still too large and complex.
-Download the PAD data for states, this also removes the need for another intersect.
+This dataset is in ESRI geodatabase format in Data is in SRS
+EPSG:102039 - USA Contiguous Albers Equal Area Conic - USGS Version.
 
-Project the dataset to EPSG:4326 with commands like A sample script is in
-`project_doi_pad.sh <../../bison/data/preprocess/project_doi_pad.sh>`_
-
-Reported problems with projected dataset:
-* TopologyException: side location conflict
-* Invalid polygon with 3 points instead of 0 or >= 4
-
-* US_PAD for DOI regions 1-12
-    * https://www.sciencebase.gov/catalog/item/62226321d34ee0c6b38b6be3
-    * Metadata: https://www.sciencebase.gov/catalog/item/622262c8d34ee0c6b38b6bcf
-    * Citation:
-        U.S. Geological Survey (USGS) Gap Analysis Project (GAP), 2022,
-        Protected Areas Database of the United States (PAD-US) 3.0:
-        U.S. Geological Survey data release, https://doi.org/10.5066/P9Q9LQ4B.
-    * Geographic areas in separate shapefiles for Designation, Easement, Fee,
-      Proclamation, Marine
-    * target GAP status 1-3
-        * 1 - managed for biodiversity - disturbance events proceed or are mimicked
-        * 2 - managed for biodiversity - disturbance events suppressed
-        * 3 - managed for multiple uses - subject to extractive (e.g. mining or logging) or OHV use
-        * 4 - no known mandate for biodiversity protection
-  * Citation: U.S. Geological Survey (USGS) Gap Analysis Project (GAP), 2022, Protected
-    Areas Database of the United States (PAD-US) 3.0: U.S. Geological Survey data
-    release, https://doi.org/10.5066/P9Q9LQ4B.
+All geospatial intersections are performed in Amazon Redshift on the unprojected
+occurrence data (aka EPSG:4326).  Redshift only takes CSV or shapefile format.  I
+transformed a subset of the data where GAP_Sts = 1 (or more) into a shapefile using
+the ogr2ogr tool, then projected it to EPSG 4326.
 
 
 ******************

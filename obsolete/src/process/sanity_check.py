@@ -1,9 +1,9 @@
 """Common classes for adding USGS RIIS info to GBIF occurrences."""
 import logging
 
-from bison.common.constants import (
+from obsolete.src.common.constants2 import (
     APPEND_TO_DWC, GBIF, LMBISON, REGION)
-from bison.common.util import get_csv_dict_reader
+from obsolete.src.common.util import get_csv_dict_reader
 from bison.provider.gbif_data import DwcData
 
 

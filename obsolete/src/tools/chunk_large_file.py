@@ -2,9 +2,9 @@
 import json
 import os
 
-from bison.common.constants import CONFIG_PARAM
-from bison.common.util import Chunker
-from bison.tools._config_parser import get_common_arguments
+from obsolete.src.common.constants2 import CONFIG_PARAM
+from obsolete.src.common.util import Chunker
+from obsolete.src.tools._config_parser import get_common_arguments
 
 DESCRIPTION = """\
 Split a CSV file containing GBIF DwC occurrence records into smaller files. """

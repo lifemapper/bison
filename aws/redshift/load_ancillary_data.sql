@@ -3,7 +3,6 @@
 --   containing the current date (first day of current month),
 --   i.e. US-RIIS_MasterList_2021_annotated_2024_02_01.csv'
 -- Load US Registry of Introduced and Invasive Species (US-RIIS)
--- First crawl data with Glue Crawler to get fields
 -- Must use underscores in table name, no dash
 -- -------------------------------------------------------------------------------------
 -- US Registry of Introduced and Invasive Species (US-RIIS)

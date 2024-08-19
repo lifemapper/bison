@@ -3,10 +3,10 @@ import json
 import os
 from datetime import datetime
 
-from bison.common.constants import CONFIG_PARAM, LMBISON_PROCESS
-from bison.common.util import BisonNameOp
-from bison.process.annotate import Annotator
-from bison.tools._config_parser import get_common_arguments
+from obsolete.src.common.constants2 import CONFIG_PARAM, LMBISON_PROCESS
+from obsolete.src.common.util import BisonNameOp
+from obsolete.src.process.annotate import Annotator
+from obsolete.src.tools._config_parser import get_common_arguments
 
 script_name = os.path.splitext(os.path.basename(__file__))[0]
 DESCRIPTION = """\

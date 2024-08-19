@@ -3,7 +3,7 @@ import argparse
 import json
 import os
 
-from bison.common.constants import COMMANDS, CONFIG_PARAM
+from obsolete.src.common.constants2 import COMMANDS, CONFIG_PARAM
 from bison.common.log import Logger
 
 

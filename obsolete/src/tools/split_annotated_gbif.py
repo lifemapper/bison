@@ -4,8 +4,8 @@ import json
 import os
 from datetime import datetime
 
-from bison.common.constants import CONFIG_PARAM
-from bison.tools._config_parser import get_common_arguments
+from obsolete.src.common.constants2 import CONFIG_PARAM
+from obsolete.src.tools._config_parser import get_common_arguments
 
 from lmpy.data_preparation.occurrence_splitter import (
     DEFAULT_MAX_WRITERS, get_writer_key_from_fields_func, get_writer_filename_func,

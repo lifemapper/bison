@@ -5,7 +5,7 @@ from logging import INFO, DEBUG, ERROR
 from osgeo import ogr
 import rtree
 
-from bison.common.constants import REGION
+from obsolete.src.common.constants2 import REGION
 
 
 # .............................................................................

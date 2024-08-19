@@ -3,9 +3,9 @@ from datetime import datetime
 import json
 import os
 
-from bison.common.constants import CONFIG_PARAM
-from bison.process.aggregate import Aggregator
-from bison.tools._config_parser import get_common_arguments
+from obsolete.src.common.constants2 import CONFIG_PARAM
+from obsolete.src.process.aggregate import Aggregator
+from obsolete.src.tools._config_parser import get_common_arguments
 
 DESCRIPTION = """\
 Count summary occurrences from all aggregated summaries and compare to known counts. """

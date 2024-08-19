@@ -5,7 +5,7 @@ from logging import ERROR
 import os
 
 from bison.provider.riis_data import RIIS
-from aws_scripts.bison_ec2_utils import (get_date_str, get_logger)
+from bison.common.util import (BisonNameOp, get_logger, get_today_str)
 script_name = os.path.splitext(os.path.basename(__file__))[0]
 DESCRIPTION = """Execute one or more steps of annotating GBIF data with RIIS
                 assessments, and summarizing by species, county, and state"""
@@ -58,9 +58,10 @@ def resolve_riis_taxa(
             output files.
     """
     nnsl = RIIS(riis_filename, logger=logger)
+    annotated_filename = BisonNameOp.get_annotated_riis_filename(riis_filename)
     # Update species data
     try:
-        report = nnsl.resolve_riis_to_gbif_taxa(overwrite=overwrite)
+        report = nnsl.resolve_riis_to_gbif_taxa(annotated_filename, overwrite=overwrite)
     except Exception as e:
         logger.log(
             f"Unexpected failure {e} in resolve_riis_taxa", refname=script_name,
@@ -91,7 +92,7 @@ if __name__ == '__main__':
     pth, tmp = os.path.split(riis_file)
     base_riis_name, ext = os.path.splitext(tmp)
 
-    log_name = os.path.join(f"{script_name}_{get_date_str()}")
+    log_name = os.path.join(f"{script_name}_{get_today_str()}")
     logger = get_logger(log_name, log_dir=pth)
 
     report = resolve_riis_taxa(riis_file, logger)

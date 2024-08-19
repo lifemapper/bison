@@ -1,12 +1,11 @@
 """Common classes for BISON RIIS data processing."""
-import csv
 from logging import INFO, DEBUG, ERROR, WARNING
 import os
 
-from bison.common.constants import (
-    APPEND_TO_RIIS, LMBISON_PROCESS, ERR_SEPARATOR, GBIF, LINENO_FLD, REPORT, RIIS_DATA)
-from bison.common.util import (
-    BisonNameOp, get_csv_dict_reader, get_csv_dict_writer, get_fields_from_header)
+from bison.common.constants import ENCODING, REPORT
+from bison.common.util import get_csv_dict_reader, get_csv_dict_writer, BisonNameOp
+
+from bison.provider.constants import APPEND_TO_RIIS, GBIF, LINENO_FLD, RIIS_DATA
 from bison.provider.gbif_api import GbifSvc
 
 
@@ -253,10 +252,17 @@ class RIIS:
         Args:
             riis_filename (str): Path to the RIIS datafile, with or without annotations.
             logger (object): logger for writing messages to file and console
+
+        Raises:
+            FileNotFoundError: on missing datafile
         """
+        # Test file
+        if not os.path.exists(riis_filename):
+            raise FileNotFoundError(f"File {riis_filename} does not exist")
+
         self._riis_filename = riis_filename
-        header_flds = get_fields_from_header(riis_filename, delimiter=RIIS_DATA.DELIMITER)
-        if APPEND_TO_RIIS.GBIF_KEY in header_flds:
+        self._header_flds = self._get_fields(riis_filename, delimiter=RIIS_DATA.DELIMITER)
+        if APPEND_TO_RIIS.GBIF_KEY in self._header_flds:
             self._is_annotated = True
         else:
             self._is_annotated = False
@@ -281,6 +287,25 @@ class RIIS:
             self._log.log(msg, refname=refname, log_level=log_level)
         else:
             print(msg)
+
+    # ...............................................
+    def _get_fields(self, csvfile, delimiter):
+        # GBIF data and output files all has the default, utf-8, encoding
+        # RIIS data is unknown
+        try:
+            f = open(csvfile, "r", newline="", encoding=ENCODING)
+        except Exception:
+            raise
+        else:
+            line = f.readline()
+            line = line.strip()
+            fields = line.split(delimiter)
+        finally:
+            try:
+                f.close()
+            except Exception:
+                pass
+        return fields
 
     # ...............................................
     def _read_authorities(self) -> set:
@@ -308,14 +333,13 @@ class RIIS:
         return self._is_annotated
 
     # ...............................................
-    @property
-    def annotated_riis_header(self):
+    def get_annotated_data_fields(self):
         """Construct the expected header for the resolved RIIS.
 
         Returns:
             updated_riis_header: fieldnames for the updated file
         """
-        header = RIIS_DATA.SPECIES_GEO_HEADER.copy()
+        header = self._header_flds.copy()
         header.append(APPEND_TO_RIIS.GBIF_KEY)
         header.append(APPEND_TO_RIIS.GBIF_SCINAME)
         header.append(LINENO_FLD)
@@ -394,7 +418,6 @@ class RIIS:
             occurrenceId.
 
         Raises:
-            FileNotFoundError: on missing input filename
             Exception: on unexpected, missing, or out-of-order header elements
             Exception: on unknown read error
         """
@@ -403,20 +426,12 @@ class RIIS:
         self.by_taxon = {}
         self.by_riis_id = {}
 
-        # Test file and header
-        if not os.path.exists(self._riis_filename):
-            raise FileNotFoundError(f"File {self._riis_filename} does not exist")
-        if self._is_annotated is True:
-            expected_header = self.annotated_riis_header
-        else:
-            expected_header = RIIS_DATA.SPECIES_GEO_HEADER
-        # Clean header of non-ascii characters
-        good_header = self._clean_header(self._riis_filename, expected_header)
-        if good_header is None:
-            raise Exception(f"Unexpected file header found in {self._riis_filename}")
+        header = self._header_flds
+        # if self._is_annotated is False:
+        #     header = self.get_annotated_data_fields()
 
         rdr, inf = get_csv_dict_reader(
-            self._riis_filename, RIIS_DATA.DELIMITER, fieldnames=good_header,
+            self._riis_filename, RIIS_DATA.DELIMITER, fieldnames=header,
             quote_none=False)
         self._log.log(
             f"Reading RIIS from {self._riis_filename}", refname=self.__class__.__name__)
@@ -567,10 +582,11 @@ class RIIS:
         return new_key, new_name
 
     # ...............................................
-    def resolve_riis_to_gbif_taxa(self, overwrite=False):
+    def resolve_riis_to_gbif_taxa(self, output_filename, overwrite=False):
         """Annotate RIIS records with GBIF accepted taxon name/key, write to file.
 
         Args:
+            output_filename (str): Full path to the annotated output file.
             overwrite (bool): Flag indicating to overwrite existing resolved file.
 
         Returns:
@@ -590,11 +606,10 @@ class RIIS:
         report[REPORT.RIIS_IDENTIFIER] = len(self.by_riis_id)
         report[REPORT.RIIS_TAXA] = len(self.by_taxon)
 
-        out_filename = BisonNameOp.get_annotated_riis_filename(self._riis_filename)
-        report[REPORT.OUTFILE] = out_filename
+        report[REPORT.OUTFILE] = output_filename
 
         name_count = rec_count = out_rec_count = 0
-        if overwrite is True or not os.path.exists(out_filename):
+        if overwrite is True or not os.path.exists(output_filename):
             gbif_svc = GbifSvc()
             # TODO: does resolution replace the key in by_taxon dictionary from USGS
             #  sciname with GBIF sciname?
@@ -633,15 +648,15 @@ class RIIS:
                 self._add_msg(msgdict, "unknown_error", f"{e}")
                 raise
 
-            out_rec_count = self._write_resolved_riis(out_filename, overwrite=overwrite)
+            out_rec_count = self._write_resolved_riis(output_filename, overwrite=overwrite)
 
         # Use pre-resolved data
         else:
-            self.__init__(out_filename, self._log)
+            self.__init__(output_filename, self._log)
             self.read_riis()
 
         # Report new or existing contents
-        report[REPORT.PROCESS] = LMBISON_PROCESS.RESOLVE["postfix"]
+        # report[REPORT.PROCESS] = LMBISON_PROCESS.RESOLVE["postfix"]
         # Summary of outputs
         report[REPORT.SUMMARY] = {
             REPORT.RIIS_IDENTIFIER: len(self.by_riis_id),
@@ -685,7 +700,7 @@ class RIIS:
                 raise Exception(
                     "RIIS records have not been resolved to GBIF accepted taxa")
 
-        new_header = self.annotated_riis_header
+        new_header = self.get_annotated_data_fields()
         try:
             writer, outf = get_csv_dict_writer(
                 out_filename, new_header, RIIS_DATA.DELIMITER, fmode="w",
@@ -734,49 +749,6 @@ class RIIS:
         better_name = "".join(good)
         return better_name
 
-    # ...............................................
-    def _clean_header(self, fname, expected_header):
-        """Return a cleaned version of the header, or False if errors are not fixable.
-
-        Correct any fieldnames with non-ascii characters, and print warnings.  Print
-        errors if the actual header does not contain the same fieldnames, in the same
-        order, as the expected_header.
-
-        Args:
-            fname (str): CSV data file containing header to check
-            expected_header (list): list of fieldnames expected for the data file
-
-        Returns:
-             False if header has unexpected fields, otherwise a list of fieldnames from
-                the actual header, stripped of non-ascii characters
-        """
-        with open(fname, "r", newline="") as csvfile:
-            rdr = csv.reader(csvfile, delimiter=RIIS_DATA.DELIMITER)
-            header = next(rdr)
-        # Test header length
-        fld_count = len(header)
-        if fld_count != len(expected_header):
-            self._log.log(
-                ERR_SEPARATOR, refname=self.__class__.__name__, log_level=ERROR)
-            self._log.log(
-                f"[Error] Header has {fld_count} fields, != {len(expected_header)} " +
-                "expected", refname=self.__class__.__name__, log_level=ERROR)
-
-        good_header = []
-        for i in range(len(header)):
-            # Test header fieldnames, correct if necessary
-            good_fieldname = self._only_ascii(header[i])
-            good_header.append(good_fieldname)
-
-            if good_fieldname != expected_header[i]:
-                self._log.log(
-                    ERR_SEPARATOR, refname=self.__class__.__name__, log_level=ERROR)
-                self._log.log(
-                    f"[Error] Header {header[i]} != {expected_header[i]} expected",
-                    refname=self.__class__.__name__, log_level=ERROR)
-                good_header = None
-        return good_header
-
 
 # .............................................................................
 def resolve_riis_taxa(riis_filename, logger, overwrite=True):
@@ -798,9 +770,10 @@ def resolve_riis_taxa(riis_filename, logger, overwrite=True):
         refname: {}
     }
     riis = RIIS(riis_filename, logger)
+    annotated_filename = BisonNameOp.get_annotated_riis_filename(riis_filename)
     # Update species data
     try:
-        report = riis.resolve_riis_to_gbif_taxa(overwrite=overwrite)
+        report = riis.resolve_riis_to_gbif_taxa(annotated_filename, overwrite=overwrite)
         rec_count = report[REPORT.RECORDS_UPDATED]
         name_count = report[REPORT.TAXA_RESOLVED]
         out_rec_count = report[REPORT.RECORDS_OUTPUT]

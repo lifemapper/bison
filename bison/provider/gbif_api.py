@@ -1,7 +1,7 @@
 """Module to query GBIF APIs and return data."""
 import requests
 
-from bison.common.constants import GBIF
+from obsolete.src.common.constants2 import GBIF
 from bison.provider.api import APISvc
 
 NEWLINE = "\n"

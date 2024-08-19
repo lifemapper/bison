@@ -5,11 +5,11 @@ import os
 from datetime import datetime
 import multiprocessing
 
-from bison.common.constants import (
+from obsolete.src.common.constants2 import (
     APPEND_TO_DWC, LMBISON_PROCESS, ENCODING, EXTRA_CSV_FIELD, GBIF, LMBISON, REGION,
     REPORT, US_STATES)
 from bison.common.log import Logger
-from bison.common.util import (
+from obsolete.src.common.util import (
     available_cpu_count, BisonKey, BisonNameOp, get_csv_dict_reader,
     get_csv_dict_writer, get_csv_writer, get_fields_from_header, ready_filename)
 from bison.provider.gbif_data import DwcData

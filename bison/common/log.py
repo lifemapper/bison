@@ -3,7 +3,7 @@ import logging
 import os
 import sys
 
-from bison.common.constants import LOG
+from obsolete.src.common.constants2 import LOG
 
 
 # .....................................................................................

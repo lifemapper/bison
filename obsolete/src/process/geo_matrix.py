@@ -8,7 +8,7 @@ from osgeo import ogr
 import sys
 
 from bison.common.log import Logger
-from bison.common.util import BisonKey, ready_filename
+from obsolete.src.common.util import BisonKey, ready_filename
 
 
 # .............................................................................

@@ -2,8 +2,8 @@
 import json
 import os
 
-from bison.common.constants import CONFIG_PARAM
-from bison.tools._config_parser import get_common_arguments
+from obsolete.src.common.constants2 import CONFIG_PARAM
+from obsolete.src.tools._config_parser import get_common_arguments
 
 from lmpy.matrix import Matrix
 from lmpy.spatial.map import rasterize_geospatial_matrix

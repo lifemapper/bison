@@ -5,18 +5,20 @@ import json
 import os
 import time
 
-from bison.common.constants import (
+from bison.common.util import BisonNameOp
+
+from obsolete.src.common.constants2 import (
     APPEND_TO_DWC, LMBISON_PROCESS, GBIF, ENCODING, EXTRA_CSV_FIELD, LOG, PARAMETERS,
     REGION, REPORT)
-from bison.common.util import (
-    BisonNameOp, Chunker, delete_file, get_csv_dict_reader)
-from bison.process.aggregate import Aggregator
-from bison.process.annotate import (Annotator, parallel_annotate)
-from bison.process.geoindex import (GeoResolver, GeoException)
-from bison.process.geo_matrix import SiteMatrix
-from bison.process.sanity_check import Counter
+from obsolete.src.common.util import (
+    Chunker, delete_file, get_csv_dict_reader)
+from obsolete.src.process.aggregate import Aggregator
+from obsolete.src.process.annotate import (Annotator, parallel_annotate)
+from obsolete.src.process.geoindex import (GeoResolver, GeoException)
+from obsolete.src.process.geo_matrix import SiteMatrix
+from obsolete.src.process.sanity_check import Counter
 from bison.provider.riis_data import RIIS
-from bison.tools._config_parser import get_common_arguments
+from obsolete.src.tools._config_parser import get_common_arguments
 
 script_name = os.path.splitext(os.path.basename(__file__))[0]
 DESCRIPTION = """Execute one or more steps of annotating GBIF data with RIIS
@@ -71,9 +73,10 @@ def a_resolve_riis_taxa(
             output files.
     """
     nnsl = RIIS(riis_filename, logger=logger)
+    annotated_filename = BisonNameOp.get_annotated_riis_filename(riis_filename)
     # Update species data
     try:
-        report = nnsl.resolve_riis_to_gbif_taxa(overwrite=overwrite)
+        report = nnsl.resolve_riis_to_gbif_taxa(annotated_filename, overwrite=overwrite)
     except Exception as e:
         logger.log(
             f"Unexpected failure {e} in resolve_riis_taxa", refname=script_name,

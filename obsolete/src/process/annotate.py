@@ -5,11 +5,11 @@ import os
 from logging import ERROR
 import time
 
-from bison.common.constants import (
+from obsolete.src.common.constants2 import (
     APPEND_TO_DWC, ENCODING, GBIF, LMBISON_PROCESS, LOG, REGION, REPORT)
 from bison.common.log import Logger
-from bison.common.util import (available_cpu_count, BisonNameOp, get_csv_dict_writer)
-from bison.process.geoindex import get_geo_resolvers
+from obsolete.src.common.util import (available_cpu_count, BisonNameOp, get_csv_dict_writer)
+from obsolete.src.process.geoindex import get_geo_resolvers
 from bison.provider.gbif_data import DwcData
 from bison.provider.riis_data import RIIS
 

@@ -2,11 +2,11 @@
 import os
 from rtree.index import Index as rtree_index
 
-from bison.common.constants import APPEND_TO_DWC, PARAMETERS, REPORT
+from obsolete.src.common.constants2 import APPEND_TO_DWC, PARAMETERS, REPORT
 from bison.common.log import Logger
-from bison.common.util import BisonNameOp, Chunker, get_fields_from_header
-from bison.process.annotate import Annotator
-from bison.tools._config_parser import process_arguments_from_file
+from obsolete.src.common.util import BisonNameOp, Chunker, get_fields_from_header
+from obsolete.src.process.annotate import Annotator
+from obsolete.src.tools._config_parser import process_arguments_from_file
 
 logger = Logger(os.path.splitext(os.path.basename(__file__))[0])
 config_filename = "/volumes/bison/tests/config/test_process_gbif.json"

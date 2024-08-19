@@ -1,9 +1,9 @@
 """Tests for the Aggregator processes."""
 import os
 
-from bison.common.constants import PARAMETERS
+from obsolete.src.common.constants2 import PARAMETERS
 from bison.common.log import Logger
-from bison.tools._config_parser import process_arguments_from_file
+from obsolete.src.tools._config_parser import process_arguments_from_file
 
 logger = Logger(os.path.splitext(os.path.basename(__file__))[0])
 config_filename = "/volumes/bison/tests/config/test_process_gbif.json"

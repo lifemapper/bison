@@ -1,8 +1,8 @@
 """Module to test the contents of the input GBIF csv occurrence data file."""
 import os
-from bison.common.constants import GBIF, PARAMETERS
+from obsolete.src.common.constants2 import GBIF, PARAMETERS
 from bison.common.log import Logger
-from bison.tools._config_parser import process_arguments_from_file
+from obsolete.src.tools._config_parser import process_arguments_from_file
 from bison.provider.gbif_data import DwcData
 
 logger = Logger(os.path.splitext(os.path.basename(__file__))[0])

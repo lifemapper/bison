@@ -1,16 +1,650 @@
-"""Common file handling tools used in various BISON modules."""
+"""Tools to use either locally or on EC2 to initiate BISON AWS EC2 Instances."""
+# --------------------------------------------------------------------------------------
+# Imports
+# --------------------------------------------------------------------------------------
+import base64
+import boto3
+from botocore.exceptions import ClientError
 import csv
-import datetime
-import glob
+import datetime as DT
 import logging
-import math
+from logging.handlers import RotatingFileHandler
+import pandas
 import os
-from osgeo import ogr
-import subprocess
-import sys
+from sys import maxsize
 
 from bison.common.constants import (
-    AGGREGATOR_DELIMITER, LMBISON_PROCESS, ENCODING, EXTRA_CSV_FIELD, GBIF)
+    ENCODING, INSTANCE_TYPE, KEY_NAME, LOGFILE_MAX_BYTES, LOG_FORMAT, LOG_DATE_FORMAT,
+    PROJ_NAME, REGION, SECURITY_GROUP_ID, SPOT_TEMPLATE_BASENAME, USER_DATA_TOKEN)
+
+
+# --------------------------------------------------------------------------------------
+# Methods for constructing and instantiating EC2 instances
+# --------------------------------------------------------------------------------------
+# ----------------------------------------------------
+def get_secret(secret_name, region):
+    """Get a secret from the Secrets Manager for connection authentication.
+
+    Args:
+        secret_name: name of the secret to retrieve.
+        region: AWS region containint the secret.
+
+    Returns:
+        a dictionary containing the secret data.
+
+    Raises:
+        ClientError:  an AWS error in communication.
+    """
+    # Create a Secrets Manager client
+    session = boto3.session.Session()
+    client = session.client(service_name="secretsmanager", region_name=region)
+    try:
+        secret_value_response = client.get_secret_value(SecretId=secret_name)
+    except ClientError as e:
+        # For a list of exceptions thrown, see
+        # https://docs.aws.amazon.com/secretsmanager/latest/apireference/API_GetSecretValue.html
+        raise (e)
+    # Decrypts secret using the associated KMS key.
+    secret_str = secret_value_response["SecretString"]
+    return eval(secret_str)
+
+
+# ----------------------------------------------------
+def create_spot_launch_template_name(desc_str=None):
+    """Create a name identifier for a Spot Launch Template.
+
+    Args:
+        desc_str (str): optional descriptor to include in the name.
+
+    Returns:
+        template_name (str): name for identifying this Spot Launch Template.
+    """
+    if desc_str is None:
+        template_name = f"{PROJ_NAME}_{SPOT_TEMPLATE_BASENAME}"
+    else:
+        template_name = f"{PROJ_NAME}_{desc_str}_{SPOT_TEMPLATE_BASENAME}"
+    return template_name
+
+
+# ----------------------------------------------------
+def define_spot_launch_template_data(
+        template_name, user_data_filename, script_filename,
+        token_to_replace=USER_DATA_TOKEN):
+    """Create the configuration data for a Spot Launch Template.
+
+    Args:
+        template_name: unique name for this Spot Launch Template.
+        user_data_filename: full filename for script to be included in the
+            template and executed on Spot instantiation.
+        script_filename: full filename for script to be inserted into user_data file.
+        token_to_replace: string within the user_data_filename which will be replaced
+            by the text in the script filename.
+
+    Returns:
+        launch_template_data (dict): Dictionary of configuration data for the template.
+    """
+    user_data_64 = get_user_data(
+        user_data_filename, script_filename, token_to_replace=token_to_replace)
+    launch_template_data = {
+        "EbsOptimized": True,
+        "IamInstanceProfile":
+            {"Name": "AmazonEMR-InstanceProfile-20230404T163626"},
+            #  "Arn":
+            #      "arn:aws:iam::321942852011:instance-profile/AmazonEMR-InstanceProfile-20230404T163626",
+            # },
+        "BlockDeviceMappings": [
+            {
+                "DeviceName": "/dev/sda1",
+                "Ebs": {
+                    "Encrypted": False,
+                    "DeleteOnTermination": True,
+                    # "SnapshotId": "snap-0a6ff81ccbe3194d1",
+                    "VolumeSize": 50, "VolumeType": "gp2"
+                }
+            }],
+        "NetworkInterfaces": [
+            {
+                "AssociatePublicIpAddress": True,
+                "DeleteOnTermination": True,
+                "Description": "",
+                "DeviceIndex": 0,
+                "Groups": [SECURITY_GROUP_ID],
+                "InterfaceType": "interface",
+                "Ipv6Addresses": [],
+                # "PrivateIpAddresses": [
+                #     {"Primary": True, "PrivateIpAddress": "172.31.16.201"}
+                # ],
+                # "SubnetId": "subnet-0beb8b03a44442eef",
+                # "NetworkCardIndex": 0
+            }],
+        "ImageId": "ami-0a0c8eebcdd6dcbd0",
+        "InstanceType": INSTANCE_TYPE,
+        "KeyName": KEY_NAME,
+        "Monitoring": {"Enabled": False},
+        "Placement": {
+            "AvailabilityZone": "us-east-1c", "GroupName": "", "Tenancy": "default"},
+        "DisableApiTermination": False,
+        "InstanceInitiatedShutdownBehavior": "terminate",
+        "UserData": user_data_64,
+        "TagSpecifications": [
+            {
+                "ResourceType": "instance",
+                "Tags": [{"Key": "TemplateName", "Value": template_name}]
+            }],
+        "InstanceMarketOptions": {
+            "MarketType": "spot",
+            "SpotOptions": {
+                "MaxPrice": "0.033600",
+                "SpotInstanceType": "one-time",
+                "InstanceInterruptionBehavior": "terminate"
+            }},
+        "CreditSpecification": {"CpuCredits": "unlimited"},
+        "CpuOptions": {"CoreCount": 2, "ThreadsPerCore": 1},
+        "CapacityReservationSpecification": {"CapacityReservationPreference": "open"},
+        "HibernationOptions": {"Configured": False},
+        "MetadataOptions": {
+            "HttpTokens": "optional",
+            "HttpPutResponseHopLimit": 1,
+            "HttpEndpoint": "enabled",
+            "HttpProtocolIpv6": "disabled",
+            "InstanceMetadataTags": "disabled"},
+        "EnclaveOptions": {"Enabled": False},
+        "PrivateDnsNameOptions": {
+            "HostnameType": "ip-name",
+            "EnableResourceNameDnsARecord": True,
+            "EnableResourceNameDnsAAAARecord": False},
+        "MaintenanceOptions": {"AutoRecovery": "default"},
+        "DisableApiStop": False
+    }
+    return launch_template_data
+
+
+# ----------------------------------------------------
+def get_user_data(
+        user_data_filename, script_filename=None, token_to_replace=USER_DATA_TOKEN):
+    """Return the EC2 user_data script as a Base64 encoded string.
+
+    Args:
+        user_data_filename: Filename containing the user-data script to be executed on
+            EC2 instantiation.
+        script_filename: Filename containing a python script to be written to a file on
+            the EC2 instantiation.
+        token_to_replace: string within the user_data_filename which will be replaced
+            by the text in the script filename.
+
+    Returns:
+        A Base64-encoded string of the user_data file to create on an EC2 instance.
+    """
+    # Insert an external script if provided
+    if script_filename is not None:
+        fill_user_data_script(user_data_filename, script_filename, token_to_replace)
+    try:
+        with open(user_data_filename, "r") as infile:
+            script_text = infile.read()
+    except Exception:
+        return None
+    else:
+        text_bytes = script_text.encode("ascii")
+        text_base64_bytes = base64.b64encode(text_bytes)
+        base64_script_text = text_base64_bytes.decode("ascii")
+        return base64_script_text
+
+
+# ----------------------------------------------------
+def fill_user_data_script(
+        user_data_filename, script_filename, token_to_replace):
+    """Fill the EC2 user_data script with a python script in another file.
+
+    Args:
+        user_data_filename: Filename containing the user-data script to be executed on
+            EC2 instantiation.
+        script_filename: Filename containing a python script to be written to a file on
+            the EC2 instantiation.
+        token_to_replace: string within the user_data_filename which will be replaced
+            by the text in the script filename.
+
+    Postcondition:
+        The user_data file contains the text of the script file.
+    """
+    # Safely read the input filename using 'with'
+    with open(user_data_filename) as f:
+        s = f.read()
+        if token_to_replace not in s:
+            print(f"{token_to_replace} not found in {user_data_filename}.")
+            return
+
+    with open(script_filename) as sf:
+        script = sf.read()
+
+    # Safely write the changed content, if found in the file
+    with open(user_data_filename, "w") as uf:
+        print(
+            f"Changing {token_to_replace} in {user_data_filename} to contents in "
+            f"{script_filename}")
+        s = s.replace(token_to_replace, script)
+        uf.write(s)
+
+
+# ----------------------------------------------------
+def create_token(type=None):
+    """Create a token to name and identify an AWS resource.
+
+    Args:
+        type (str): optional descriptor to include in the token string.
+
+    Returns:
+        token(str): token for AWS resource identification.
+    """
+    if type is None:
+        type = PROJ_NAME
+    token = f"{type}_{DT.datetime.now().timestamp()}"
+    return token
+
+
+# ----------------------------------------------------
+def get_today_str():
+    """Get a string representation of the current date.
+
+    Returns:
+        date_str(str): string representing date in YYYY-MM-DD format.
+    """
+    n = DT.datetime.now()
+    date_str = f"{n.year}_{n.month:02d}_{n.day:02d}"
+    return date_str
+
+
+# ----------------------------------------------------
+def get_current_datadate_str():
+    """Get a string representation of the first day of the current month.
+
+    Returns:
+        date_str(str): string representing date in YYYY-MM-DD format.
+    """
+    n = DT.datetime.now()
+    date_str = f"{n.year}_{n.month:02d}_01"
+    # TODO: delete this testing-only value
+    date_str = "2024_08_01"
+    return date_str
+
+
+# ----------------------------------------------------
+def get_previous_datadate_str():
+    """Get a string representation of the first day of the previous month.
+
+    Returns:
+        date_str(str): string representing date in YYYY-MM-DD format.
+    """
+    n = DT.datetime.now()
+    yr = n.year
+    mo = n.month - 1
+    if n.month == 0:
+        mo = 12
+        yr -= 1
+    date_str = f"{yr}_{mo:02d}_01"
+    return date_str
+
+
+# ----------------------------------------------------
+def create_spot_launch_template(
+        ec2_client, template_name, user_data_filename, insert_script_filename=None,
+        overwrite=False):
+    """Create an EC2 Spot Instance Launch template on AWS.
+
+    Args:
+        ec2_client: an object for communicating with EC2.
+        template_name: name for the launch template0
+        user_data_filename: script to be installed and run on EC2 instantiation.
+        insert_script_filename: optional script to be inserted into user_data_filename.
+        overwrite: flag indicating whether to use an existing template with this name,
+            or create a new
+
+    Returns:
+        success: boolean flag indicating the success of creating launch template.
+    """
+    success = False
+    if overwrite is True:
+        delete_launch_template(template_name)
+    template = get_launch_template(template_name)
+    if template is not None:
+        success = True
+    else:
+        spot_template_data = define_spot_launch_template_data(
+            template_name, user_data_filename, insert_script_filename)
+        template_token = create_token("template")
+        try:
+            response = ec2_client.create_launch_template(
+                DryRun=False,
+                ClientToken=template_token,
+                LaunchTemplateName=template_name,
+                VersionDescription="Spot for GBIF/BISON process",
+                LaunchTemplateData=spot_template_data
+            )
+        except ClientError as e:
+            print(f"Failed to create launch template {template_name}, ({e})")
+        else:
+            success = (response["ResponseMetadata"]["HTTPStatusCode"] == 200)
+    return success
+
+
+# ----------------------------------------------------
+def upload_trigger_to_s3(trigger_name, s3_bucket, s3_bucket_path, region=REGION):
+    """Upload a file to S3 which will trigger a workflow.
+
+    Args:
+        trigger_name: Name of workflow to trigger.
+        s3_bucket: name of the S3 bucket destination.
+        s3_bucket_path: the data destination inside the S3 bucket (without filename).
+        region: AWS region to query.
+
+    Returns:
+        s3_filename: the URI to the file in the S3 bucket.
+    """
+    filename = f"{trigger_name}.txt"
+    with open(filename, "r") as f:
+        f.write("go!")
+    s3_client = boto3.client("s3", region_name=region)
+    obj_name = f"{s3_bucket_path}/{filename}"
+    try:
+        s3_client.upload_file(filename, s3_bucket, obj_name)
+    except ClientError as e:
+        print(f"Failed to upload {obj_name} to {s3_bucket}, ({e})")
+    else:
+        s3_filename = f"s3://{s3_bucket}/{obj_name}"
+        print(f"Successfully uploaded {filename} to {s3_filename}")
+    return s3_filename
+
+
+# # ----------------------------------------------------
+# def write_dataframe_to_s3_parquet(df, bucket, parquet_path, region=REGION):
+#     """Convert DataFrame to Parquet format and upload to S3.
+#
+#     Args:
+#         df: pandas DataFrame containing data.
+#         bucket: name of the S3 bucket destination.
+#         parquet_path: the data destination inside the S3 bucket
+#         region: AWS region to query.
+#     """
+#     s3_client = boto3.client("s3", region_name=region)
+#     parquet_buffer = io.BytesIO()
+#     df.to_parquet(parquet_buffer, engine="pyarrow")
+#     parquet_buffer.seek(0)
+#     s3_client.upload_fileobj(parquet_buffer, bucket, parquet_path)
+
+
+# ----------------------------------------------------
+def upload_to_s3(local_filename, bucket, s3_path, region=REGION):
+    """Upload a file to S3.
+
+    Args:
+        local_filename: Full path to local file for upload.
+        bucket: name of the S3 bucket destination.
+        s3_path: the data destination inside the S3 bucket (without filename).
+        region: AWS region to query.
+    """
+    s3_client = boto3.client("s3", region_name=region)
+    filename = os.path.split(local_filename)[1]
+    s3_client.upload_file(local_filename, bucket, s3_path)
+    print(f"Successfully uploaded {filename} to s3://{bucket}/{s3_path}")
+
+
+# ----------------------------------------------------
+def get_instance(instance_id, region=REGION):
+    """Describe an EC2 instance with instance_id.
+
+    Args:
+        instance_id: EC2 instance identifier.
+        region: AWS region to query.
+
+    Returns:
+        instance: metadata for the EC2 instance
+    """
+    ec2_client = boto3.client("ec2", region_name=region)
+    response = ec2_client.describe_instances(
+        InstanceIds=[instance_id],
+        DryRun=False,
+    )
+    try:
+        instance = response["Reservations"][0]["Instances"][0]
+    except Exception:
+        instance = None
+    return instance
+
+
+# ----------------------------------------------------
+def run_instance_spot(ec2_client, template_name):
+    """Run an EC2 Spot Instance on AWS.
+
+    Args:
+        ec2_client: an object for communicating with EC2.
+        template_name: name for the launch template to be used for instantiation.
+
+    Returns:
+        instance_id: unique identifier of the new Spot instance.
+    """
+    instance_id = None
+    spot_token = create_token(type="spot")
+    instance_name = create_token()
+    try:
+        response = ec2_client.run_instances(
+            # KeyName=key_name,
+            ClientToken=spot_token,
+            MinCount=1, MaxCount=1,
+            LaunchTemplate={"LaunchTemplateName": template_name, "Version": "1"},
+            TagSpecifications=[
+                {
+                    "ResourceType": "instance",
+                    "Tags": [
+                        {"Key": "Name", "Value": instance_name},
+                        {"Key": "TemplateName", "Value": template_name}
+                    ]
+                }
+            ]
+        )
+    except ClientError as e:
+        print(f"Failed to instantiate Spot instance {spot_token}, ({e})")
+    else:
+        try:
+            instance = response["Instances"][0]
+        except KeyError:
+            print("No instance returned")
+        else:
+            instance_id = instance["InstanceId"]
+    return instance_id
+
+
+# --------------------------------------------------------------------------------------
+# Tools for experimentation
+# --------------------------------------------------------------------------------------
+
+# ----------------------------------------------------upload_to_s3
+def _print_inst_info(reservation):
+    resid = reservation["ReservationId"]
+    inst = reservation["Instances"][0]
+    print(f"ReservationId: {resid}")
+    name = temp_id = None
+    try:
+        tags = inst["Tags"]
+    except Exception:
+        pass
+    else:
+        for t in tags:
+            if t["Key"] == "Name":
+                name = t["Value"]
+            if t["Key"] == "aws:ec2launchtemplate:id":
+                temp_id = t["Value"]
+    ip = inst["PublicIpAddress"]
+    state = inst["State"]["Name"]
+    print(f"Instance name: {name}, template: {temp_id}, IP: {ip}, state: {state}")
+
+
+# ----------------------------------------------------
+def find_instances(key_name, launch_template_name):
+    """Describe all EC2 instances with name or launch_template_id.
+
+    Args:
+        key_name: EC2 instance name
+        launch_template_name: EC2 launch template name
+
+    Returns:
+        instances: list of metadata for EC2 instances
+    """
+    ec2_client = boto3.client("ec2")
+    filters = []
+    if launch_template_name is not None:
+        filters.append({"Name": "tag:TemplateName", "Values": [launch_template_name]})
+    if key_name is not None:
+        filters.append({"Name": "key-name", "Values": [key_name]})
+    response = ec2_client.describe_instances(
+        Filters=filters,
+        DryRun=False,
+        MaxResults=123,
+        # NextToken="string"
+    )
+    instances = []
+    try:
+        ress = response["Reservations"]
+    except Exception:
+        pass
+    else:
+        for res in ress:
+            _print_inst_info(res)
+            instances.extend(res["Instances"])
+    return instances
+
+
+# ----------------------------------------------------
+def get_launch_template_from_instance(instance_id, region=REGION):
+    """Return a JSON formatted template from an existing EC2 instance.
+
+    Args:
+        instance_id: unique identifier for the selected EC2 instance.
+        region: AWS region to query.
+
+    Returns:
+        launch_template_data: a JSON formatted launch template.
+    """
+    ec2_client = boto3.client("ec2", region_name=region)
+    launch_template_data = ec2_client.get_launch_template_data(InstanceId=instance_id)
+    return launch_template_data
+
+
+# --------------------------------------------------------------------------------------
+# On local machine: Describe the launch_template with the template_name
+def get_launch_template(template_name, region=REGION):
+    """Return a JSON formatted template for a template_name.
+
+    Args:
+        template_name: unique name for the requested template.
+        region: AWS region to query.
+
+    Returns:
+        launch_template_data: a JSON formatted launch template.
+    """
+    ec2_client = boto3.client("ec2", region_name=region)
+    lnch_temp = None
+    # Find pre-existing template
+    try:
+        response = ec2_client.describe_launch_templates(
+            LaunchTemplateNames=[template_name],
+        )
+    except Exception:
+        pass
+    else:
+        # LaunchTemplateName is unique
+        try:
+            lnch_temp = response["LaunchTemplates"][0]
+        except Exception:
+            pass
+    return lnch_temp
+
+
+# ----------------------------------------------------
+def delete_launch_template(template_name, region=REGION):
+    """Delete an EC2 launch template AWS.
+
+    Args:
+        template_name: name of the selected EC2 launch template.
+        region: AWS region to query.
+
+    Returns:
+        response: a JSON formatted AWS response.
+    """
+    response = None
+    ec2_client = boto3.client("ec2", region_name=region)
+    lnch_tmpl = get_launch_template(template_name)
+    if lnch_tmpl is not None:
+        response = ec2_client.delete_launch_template(LaunchTemplateName=template_name)
+    return response
+
+
+# ----------------------------------------------------
+def delete_instance(instance_id, region=REGION):
+    """Delete an EC2 instance.
+
+    Args:
+        instance_id: unique identifier for the selected EC2 instance.
+        region: AWS region to query.
+
+    Returns:
+        response: a JSON formatted AWS response.
+    """
+    ec2_client = boto3.client("ec2", region_name=region)
+    response = ec2_client.delete_instance(InstanceId=instance_id)
+    return response
+
+
+# ----------------------------------------------------
+def get_logger(log_name, log_dir=None, log_level=logging.INFO):
+    """Get a logger for writing logging messages to file and console.
+
+    Args:
+        log_name: Name for the log object and output log file.
+        log_dir: absolute path for the logfile.
+        log_level: logging constant error level (logging.INFO, logging.DEBUG,
+                logging.WARNING, logging.ERROR)
+
+    Returns:
+        logger: logging.Logger object
+    """
+    filename = f"{log_name}.log"
+    if log_dir is not None:
+        filename = os.path.join(log_dir, f"{filename}")
+        os.makedirs(log_dir, exist_ok=True)
+    # create file handler
+    handler = RotatingFileHandler(
+        filename, mode="w", maxBytes=LOGFILE_MAX_BYTES, backupCount=10,
+        encoding="utf-8"
+    )
+    formatter = logging.Formatter(LOG_FORMAT, LOG_DATE_FORMAT)
+    handler.setLevel(log_level)
+    handler.setFormatter(formatter)
+    # Get logger
+    logger = logging.getLogger(log_name)
+    logger.setLevel(logging.DEBUG)
+    # Add handler to logger
+    logger.addHandler(handler)
+    logger.propagate = False
+    return logger
+
+
+# ----------------------------------------------------
+def create_dataframe_from_gbifcsv_s3_bucket(bucket, csv_path, region=REGION):
+    """Read CSV data from S3 into a pandas DataFrame.
+
+    Args:
+        bucket: name of the bucket containing the CSV data.
+        csv_path: the CSV object name with enclosing S3 bucket folders.
+        region: AWS region to query.
+
+    Returns:
+        df: pandas DataFrame containing the CSV data.
+    """
+    s3_client = boto3.client("s3", region_name=region)
+    s3_obj = s3_client.get_object(Bucket=bucket, Key=csv_path)
+    df = pandas.read_csv(
+        s3_obj["Body"], delimiter="\t", encoding="utf-8", low_memory=False,
+        quoting=csv.QUOTE_NONE)
+    return df
 
 
 # ...............................................
@@ -98,43 +732,6 @@ def ready_filename(fullfilename, overwrite=True):
 
 
 # .............................................................................
-def get_csv_writer(datafile, delimiter, header=None, fmode="w", overwrite=True):
-    """Create a CSV writer.
-
-    Args:
-        datafile: output CSV file for writing
-        delimiter: field separator
-        header: list of fieldnames to be written as the first line
-        fmode: Write ('w') or append ('a')
-        overwrite (bool): True to delete an existing file before write
-
-    Returns:
-        writer (csv.writer) ready to write
-        f (file handle)
-
-    Raises:
-        Exception: on failure to create a csv writer
-        FileExistsError: on existing file if overwrite is False
-    """
-    if fmode not in ("w", "a"):
-        raise Exception("File mode must be 'w' (write) or 'a' (append)")
-
-    if ready_filename(datafile, overwrite=overwrite):
-        csv.field_size_limit(sys.maxsize)
-        try:
-            f = open(datafile, fmode, newline="", encoding=ENCODING)
-            writer = csv.writer(f, delimiter=delimiter, quoting=csv.QUOTE_MINIMAL)
-            if header is not None:
-                writer.writerow(header)
-        except Exception as e:
-            raise e
-    else:
-        raise FileExistsError
-
-    return writer, f
-
-
-# .............................................................................
 def get_csv_dict_writer(
         csvfile, header, delimiter, fmode="w", encoding=ENCODING, extrasaction="ignore",
         overwrite=True):
@@ -162,7 +759,7 @@ def get_csv_dict_writer(
     if fmode not in ("w", "a"):
         raise Exception("File mode must be 'w' (write) or 'a' (append)")
     if ready_filename(csvfile, overwrite=overwrite):
-        csv.field_size_limit(sys.maxsize)
+        csv.field_size_limit(maxsize)
         try:
             f = open(csvfile, fmode, newline="", encoding=encoding)
         except Exception as e:
@@ -179,7 +776,7 @@ def get_csv_dict_writer(
 # .............................................................................
 def get_csv_dict_reader(
         csvfile, delimiter, fieldnames=None, encoding=ENCODING, quote_none=False,
-        restkey=EXTRA_CSV_FIELD):
+        restkey="rest"):
     """Create a CSV dictionary reader from a file with a fieldname header.
 
     Args:
@@ -200,7 +797,7 @@ def get_csv_dict_reader(
         FileNotFoundError: on missing csvfile
         PermissionError: on improper permissions on csvfile
     """
-    csv.field_size_limit(sys.maxsize)
+    csv.field_size_limit(maxsize)
 
     if quote_none is True:
         quoting = csv.QUOTE_NONE
@@ -226,888 +823,26 @@ def get_csv_dict_reader(
 
 
 # .............................................................................
-def _check_existence(filename_or_pattern):
-    is_pattern = True
-    # Wildcards?
-    try:
-        filename_or_pattern.index("*")
-    except ValueError:
-        try:
-            filename_or_pattern.index("?")
-        except ValueError:
-            is_pattern = False
-    if is_pattern:
-        files = glob.glob(filename_or_pattern)
-        if len(files) == 0:
-            raise FileNotFoundError(f"No files match the pattern {filename_or_pattern}")
-    elif not os.path.exists(filename_or_pattern):
-        raise FileNotFoundError(f"File {filename_or_pattern} does not exist")
-
-    return is_pattern
-
-
-# .............................................................................
-def _parse_wc_output(subproc_output):
-    # Return has list of byte-strings, the first contains one or more output lines, the last byte-string is empty.
-    # Multiple matching files will produce multiple lines, with total on the last line
-    output = subproc_output[0]
-    lines = output.split(b"\n")
-    # The last line is empty
-    lines = lines[:-1]
-    line_of_interest = None
-    # Find and split line of interest
-    if len(lines) == 1:
-        line_of_interest = lines[0]
-    else:
-        for ln in lines:
-            try:
-                ln.index(b"total")
-            except ValueError:
-                pass
-            else:
-                line_of_interest = ln
-    if line_of_interest is None:
-        raise Exception(f"Failed to get line with results from {subproc_output}")
-    elts = line_of_interest.strip().split(b" ")
-    # Count is first element in line
-    tmp = elts[0]
-    try:
-        line_count = int(tmp)
-    except ValueError:
-        raise Exception(f"First element on results line {line_of_interest} is not an integer")
-    return line_count
-
-
-# .............................................................................
-def _parse_cat_output(subproc_output):
-    # Return has list of byte-strings, the first contains one or more output lines, the last byte-string is empty.
-    # Multiple matching files will produce multiple lines, with total on the last line
-    output = subproc_output[0]
-    lines = output.split(b"\n")
-    line_of_interest = lines[0]
-    if line_of_interest is None:
-        raise Exception(f"Failed to get line with results from {subproc_output}")
-    elts = line_of_interest.strip().split(b"\t")
-    # Count is first element in line
-    tmp = elts[0]
-    try:
-        line_count = int(tmp)
-    except ValueError:
-        raise Exception(f"First element on results line {line_of_interest} is not an integer")
-    return line_count
-
-
-# .............................................................................
-def count_lines(filename_or_pattern, grep_strings=None):
-    """Find total number of lines in a file.
-
-    Args:
-        filename_or_pattern (str): filepath, with or without wildcards, to count lines for
-        grep_strings (list): list of strings to find in lines
-
-    Returns:
-        line_count (int): number of lines in the file containing all of the strings in str_list
-
-    Raises:
-        FileNotFoundError: file pattern matches no files
-        FileNotFoundError: file does not exist
-
-    Assumptions:
-        Existence of the command line tool "grep".
-        Existence of the command line tool "wc"
-        Output of "wc" consists of one or more lines with the pattern: <count>  <filename>
-            If more than one file is being examined, the last line will have the pattern: <count>  total
-    """
-    line_count = None
-    try:
-        _check_existence(filename_or_pattern)
-    except FileNotFoundError:
-        raise
-
-    # Assemble bash command
-    if grep_strings is not None:
-        # start with grep command
-        st = grep_strings.pop(0)
-        cmd = f"grep {st} {filename_or_pattern} | "
-        # add additional grep commands
-        while len(grep_strings) > 0:
-            st = grep_strings.pop(0)
-            cmd += f"grep {st} | "
-        # count output produced from greps
-        cmd += "wc -l"
-    else:
-        # count all lines
-        cmd = f"wc -l {filename_or_pattern}"
-
-    # Run command in a shell
-    sp = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    sp_outs = sp.communicate()
-
-    # Retrieve the total count
-    line_count = _parse_wc_output(sp_outs)
-
-    return line_count
-
-
-# .............................................................................
-def get_site_headers_from_shapefile(site_id_fld, x_fld, y_fld, shape_filename):
-    """Create row headers from FID, longitude, latitude for features in a shapefile.
-
-    Args:
-        site_id_fld: Fieldname containing the site id or FID.
-        x_fld: Fieldname containing the longitude coordinate.
-        y_fld: Fieldname containing the latitude coordinate.
-        shape_filename: Filename of the shapefile to read.
-
-    Returns:
-        site_headers: list of tuples containing (site_id, x, y)
-
-    Raises:
-        Exception: on failure to read a feature from which to get FID and coordinates.
-    """
-    site_headers = []
-    driver = ogr.GetDriverByName("ESRI Shapefile")
-    data_src = driver.Open(shape_filename, 0)
-    lyr = data_src.GetLayer()
-    feat_count = lyr.GetFeatureCount()
-    print(f"Opened {shape_filename} with {feat_count} features")
-    lyr_def = lyr.GetLayerDefn()
-    site_id_idx = lyr_def.GetFieldIndex(site_id_fld)
-    x_idx = lyr_def.GetFieldIndex(x_fld)
-    y_idx = lyr_def.GetFieldIndex(y_fld)
-    for fid in range(0, feat_count):
-        try:
-            feat = lyr.GetFeature(fid)
-            site_id = int(feat.GetFieldAsString(site_id_idx))
-            x = float(feat.GetFieldAsString(x_idx))
-            y = float(feat.GetFieldAsString(y_idx))
-            site_headers.append((site_id, x, y))
-        except Exception as e:
-            raise Exception(
-                f"Error, failed to read features in {shape_filename}: {e}")
-    return site_headers
-
-
-# .............................................................................
-def count_lines_with_cat(filename_or_pattern):
-    """Find total number of lines in a file.
-
-    Args:
-        filename_or_pattern (str): filepath, with or without wildcards, to count lines for
-
-    Returns:
-        line_count (int): number of lines in the file
-
-    Raises:
-        FileNotFoundError: file pattern matches no files
-        FileNotFoundError: file does not exist
-
-    Assumptions:
-        Existence of the command line tool "cat".
-        Existence of the command line tool "tail"
-    """
-    line_count = None
-    try:
-        _check_existence(filename_or_pattern)
-    except FileNotFoundError:
-        raise
-    cmd = f"cat -n {filename_or_pattern} | tail -n1"
-
-    # Run command in a shell
-    sp = subprocess.Popen(
-        cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    sp_outs = sp.communicate()
-
-    # Retrieve the total count
-    line_count = _parse_cat_output(sp_outs)
-
-    return line_count
-
-
-# .............................................................................
-def available_cpu_count():
-    """Number of available virtual or physical CPUs on this system.
-
-    Returns:
-        int for the number of CPUs available
-
-    Raises:
-        Exception: on failure of all CPU count queries.
-
-    Notes:
-        code from https://stackoverflow.com/questions/1006289
-    """
-    # Python 2.6+
-    try:
-        import multiprocessing
-        return multiprocessing.cpu_count()
-    except (ImportError, NotImplementedError):
-        pass
-
-    # https://github.com/giampaolo/psutil
-    try:
-        import psutil
-        return psutil.cpu_count()   # psutil.NUM_CPUS on old versions
-    except (ImportError, AttributeError):
-        pass
-
-    # POSIX
-    try:
-        res = int(os.sysconf('SC_NPROCESSORS_ONLN'))
-        if res > 0:
-            return res
-    except (AttributeError, ValueError):
-        pass
-
-    # Windows
-    try:
-        res = int(os.environ['NUMBER_OF_PROCESSORS'])
-        if res > 0:
-            return res
-    except (KeyError, ValueError):
-        pass
-
-    # Linux
-    try:
-        res = open('/proc/cpuinfo').read().count('processor\t:')
-        if res > 0:
-            return res
-    except IOError:
-        pass
-
-    raise Exception('Can not determine number of CPUs on this system')
-
-
-# .............................................................................
-def get_fields_from_header(csvfile, delimiter=GBIF.DWCA_DELIMITER, encoding="utf-8"):
-    """Find fields in a header in a delimited text file.
-
-    Args:
-        csvfile (str): comma/tab-delimited file with header
-        delimiter (str): single character delimiter between fields
-        encoding (str): encoding of the file
-
-    Returns:
-        list: of strings indicating fieldnames
-
-    Raises:
-        FileNotFoundError: file does not exist
-        Exception: unknown read error
-    """
-    fields = []
-    try:
-        _check_existence(csvfile)
-    except FileNotFoundError:
-        raise
-
-    # Open file and read first line
-    try:
-        f = open(csvfile, "r", newline="", encoding=encoding)
-        line = f.readline()
-        line = line.strip()
-        fields = line.split(delimiter)
-    except Exception:
-        raise
-    finally:
-        f.close()
-
-    return fields
-
-
-class BisonKey():
-    """Compound key to use as unique identifier."""
-    @staticmethod
-    def get_compound_key(*values):
-        """Construct a compound key for dictionaries.
-
-        Args:
-            values (list): values for a compound key.
-
-        Returns:
-             str combining part1 and part2 to use as a dictionary key.
-        """
-        key = None
-        for val in values:
-            if val != "na":
-                if key is None:
-                    key = val
-                else:
-                    key += f"{AGGREGATOR_DELIMITER}{val}"
-            else:
-                pass
-        return key
-
-    # ...............................................
-    @staticmethod
-    def parse_compound_key(compound_key):
-        """Parse a compound key into its elements.
-
-        Args:
-            compound_key (str): key combining one or more elements.
-
-        Returns:
-            values (list): list of elements of compound key.
-        """
-        parts = compound_key.split(AGGREGATOR_DELIMITER)
-        return parts
-
-
-# .............................................................................
-class Chunker():
-    """Class for splitting CSV data into similar sized chunks of records."""
-    @staticmethod
-    def identify_chunks(big_csv_filename, chunk_count):
-        """Determine the start and stop lines in a large file to be split.
-
-        The purpose of chunking the files is to split the large file into more
-        manageable chunks that can be processed concurrently by the CPUs on the local
-        machine.
-
-        Args:
-            big_csv_filename (str): Full path to the original large CSV file of records
-            chunk_count (int): Number of smaller files to split large file into.
-                Defaults to the number of available CPUs minus 2.
-
-        Returns:
-            start_stop_pairs: a list of tuples, containing pairs of line numbers in the
-                original file that will be the first and last record of a subset chunk
-                of the file.
-        """
-        if chunk_count is None:
-            chunk_count = available_cpu_count() - 2
-        start_stop_pairs = []
-
-        # in_base_filename, ext = os.path.splitext(big_csv_filename)
-        if big_csv_filename.endswith(GBIF.INPUT_DATA):
-            # shortcut
-            rec_count = GBIF.INPUT_LINE_COUNT - 1
-        else:
-            rec_count = count_lines(big_csv_filename) - 1
-        chunk_size = math.ceil(rec_count / chunk_count)
-
-        start = 1
-        stop = chunk_size
-        start_stop_pairs.append((start, stop))
-
-        while stop < rec_count:
-            # chunk_filename = f"{in_base_filename}_chunk-{start}-{stop}{ext}"
-
-            # Advance for next chunk
-            start = stop + 1
-            stop = min((start + chunk_size - 1), rec_count)
-            start_stop_pairs.append((start, stop))
-
-        return start_stop_pairs, rec_count, chunk_size
-
-    # .............................................................................
-    @staticmethod
-    def identify_chunk_files(big_csv_filename, chunk_count, output_path):
-        """Construct filenames for smaller files subset from a large file.
-
-        Args:
-            big_csv_filename (str): Full path to the original large CSV file of records
-            chunk_count (int): Number of smaller files to split large file into.
-                Defaults to the number of available CPUs minus 2.
-            output_path (str): Destination directory for subset files.
-
-        Returns:
-            chunk_filenames: a list of chunk filenames
-        """
-        if chunk_count is None:
-            chunk_count = available_cpu_count() - 2
-        chunk_filenames = []
-        basename, ext = os.path.splitext(os.path.basename(big_csv_filename))
-        boundary_pairs, _rec_count, _chunk_size = Chunker.identify_chunks(
-            big_csv_filename, chunk_count)
-        for (start, stop) in boundary_pairs:
-            chunk_fname = BisonNameOp.get_chunk_filename(
-                basename, ext, start, stop)
-            chunk_filenames.append(os.path.join(output_path, chunk_fname))
-        return chunk_filenames
-
-    # .............................................................................
-    @staticmethod
-    def cleanup_obsolete_chunks(
-            boundary_pairs, output_path, basename, ext, overwrite):
-        """Delete existing chunk files if any are missing or if overwrite is True.
-
-        Args:
-            boundary_pairs (list): List of pairs of record numbers corresponding
-                to the first and last record in a subset chunk of the original data.
-            output_path (str): Destination directory for chunk files.
-            basename (str): Base filename for chunk files.
-            ext (str): File extension for chunk files.
-            overwrite (bool): Flag indicating whether to overwrite existing chunked
-                files. If only some of the chunk files exist, delete them all before
-                writing new files, regardless of this flag.
-        """
-        # Check if rewrite needed
-        missing_chunks = []
-        existing_chunks = []
-        for (start, stop) in boundary_pairs:
-            chunk_basefilename = BisonNameOp.get_chunk_filename(
-                basename, ext, start, stop)
-            chunk_fname = os.path.join(output_path, chunk_basefilename)
-            if os.path.exists(chunk_fname):
-                existing_chunks.append(chunk_fname)
-            else:
-                missing_chunks.append(chunk_fname)
-        if overwrite is True or len(missing_chunks) > 0:
-            for fn in existing_chunks:
-                delete_file(fn)
-
-    # .............................................................................
-    @staticmethod
-    def chunk_files(
-            big_csv_filename, chunk_count, output_path, logger, overwrite=False):
-        """Split a large input csv file into multiple smaller input csv files.
-
-        Args:
-            big_csv_filename (str): Full path to the original large CSV file of records
-            chunk_count (int): Number of smaller files to split large file into.  Defaults
-                to the number of available CPUs minus 2.
-            output_path (str): Destination directory for chunked files.
-            logger (object): logger for writing messages to file and console
-            overwrite (bool): Flag indicating whether to overwrite existing chunked
-                files. If only some of the chunk files exist, delete them all before
-                writing new files, regardless of this flag.
-
-        Returns:
-            chunk_filenames: a list of chunk filenames
-
-        Raises:
-            Exception: on failure to open or write to a chunk file
-            Exception: on failure to open or read the big_csv_filename
-
-        Note:
-            Write chunk file records exactly as read, no corrections applied.
-        """
-        refname = "chunk_files"
-        inpath, base_filename = os.path.split(big_csv_filename)
-        basename, ext = os.path.splitext(base_filename)
-        chunk_filenames = []
-        if chunk_count is None:
-            chunk_count = available_cpu_count() - 2
-        boundary_pairs, rec_count, chunk_size = Chunker.identify_chunks(
-            big_csv_filename, chunk_count)
-        Chunker.cleanup_obsolete_chunks(
-            boundary_pairs, output_path, basename, ext, overwrite)
-
-        try:
-            bigf = open(big_csv_filename, 'r', newline="", encoding='utf-8')
-            header = bigf.readline()
-            line = bigf.readline()
-            big_recno = 1
-
-            for (start, stop) in boundary_pairs:
-                chunk_basefilename = BisonNameOp.get_chunk_filename(
-                    basename, ext, start, stop)
-                chunk_fname = os.path.join(output_path, chunk_basefilename)
-
-                try:
-                    # Start writing the smaller file
-                    chunkf = open(chunk_fname, 'w', newline="", encoding='utf-8')
-                    chunkf.write('{}'.format(header))
-
-                    while big_recno <= stop and line:
-                        try:
-                            # Write last line to chunk file
-                            chunkf.write(f"{line}")
-                        except Exception as e:
-                            # Log error and move on
-                            logger.log(
-                                f"Failed on bigfile {big_csv_filename} line number "
-                                f"{big_recno} writing to {chunk_fname}: {e}",
-                                refname=refname, log_level=logging.ERROR)
-                        # If bigfile still has lines, get next one
-                        if line:
-                            line = bigf.readline()
-                            big_recno += 1
-                        else:
-                            big_recno = stop + 1
-
-                except Exception as e:
-                    print(f"Failed opening or writing to {chunk_fname}: {e}")
-                    raise
-                finally:
-                    # After got to stop, close and add filename to list
-                    chunkf.close()
-                    logger.log(
-                        f"Wrote lines {start} to {stop} to {chunk_fname}", refname=refname)
-                    chunk_filenames.append(chunk_fname)
-
-        except Exception as e:
-            logger.log(
-                f"Failed to read bigfile {big_csv_filename}: {e}", refname=refname,
-                log_level=logging.ERROR)
-            raise
-        finally:
-            bigf.close()
-        report = {
-            "large_filename": big_csv_filename,
-            "chunked_files": chunk_filenames,
-            "record_count": rec_count,
-            "chunk_size": chunk_size
-        }
-
-        return report
-
-
-# .............................................................................
 class BisonNameOp():
     """Class for constructing filenames following a pattern for different processes."""
     separator = "_"
 
     # ----------------------------------------------------
     @staticmethod
-    def get_current_date_str():
-        """Get a string representation of the first day of the current month.
-
-        Note:
-            this replicates a standalone function in aws_scripts.bison_ec2_utils, and
-            is intended to ensure that the RIIS records are resolved to the currently
-            accepted taxon each time the data is processed. This datestr matches that
-            of the most current GBIF data in the AWS Open Data Registry.
-
-        Returns:
-            date_str(str): string representing date in YYYY-MM-DD format.
-        """
-        n = datetime.datetime.now()
-        date_str = f"{n.year}-{n.month:02d}-01"
-        return date_str
-
-    # ----------------------------------------------------
-    @staticmethod
-    def get_annotated_riis_filename(input_riis_filename, outpath=None):
-        """Construct a filename for a chunk of CSV records.
+    def get_annotated_riis_filename(input_riis_filename):
+        """Construct a filename for current annotated version of the USGS RIIS records.
 
         Args:
             input_riis_filename (str): full filename of the original RIIS data.
-            outpath (str): destination directory for the annotated RIIS data.  Defaults
-                to the same path as the input file if not provided.
 
         Returns:
             out_filename: full filename for the output file.
         """
-        inpath, fname = os.path.split(input_riis_filename)
-        if outpath is None:
-            outpath = inpath
+        pth, fname = os.path.split(input_riis_filename)
         basename, _ = os.path.splitext(fname)
-        datestr = BisonNameOp.get_current_date_str()
-        out_filename = os.path.join(outpath, f"{basename}_annotated_{datestr}.csv")
+        datestr = get_current_datadate_str()
+        out_filename = os.path.join(pth, f"{basename}_annotated_{datestr}.csv")
         return out_filename
-
-    # ----------------------------------------------------
-    @staticmethod
-    def get_chunk_filename(basename, ext, start, stop):
-        """Construct a filename for a chunk of CSV records.
-
-        Args:
-            basename (str): base filename of the original large CSV data.
-            ext (str): extension of the filename
-            start (int): record number in original file of first record for data chunk.
-            stop (int): record number in original file of last record for data chunk.
-
-        Returns:
-            str: base filename for the subset file.
-
-        Note:
-            File will always start with basename,
-            followed by chunk
-            followed by process step completed (if any)
-        """
-        postfix = LMBISON_PROCESS.CHUNK['postfix']
-        sep = BisonNameOp.separator
-        chunkfix = f"{LMBISON_PROCESS.CHUNK['prefix']}-{start}-{stop}"
-        return f"{basename}{sep}{chunkfix}{sep}{postfix}{ext}"
-
-    # .............................................................................
-    @staticmethod
-    def get_process_outfilename(
-            in_filename, outpath=None, postfix=None, step_or_process=None):
-        """Construct output filename for the next processing step of the given file.
-
-        Args:
-            in_filename (str): base or full filename of CSV data.
-            outpath (str): destination directory for output filename
-            postfix (str): final string for a filename, indicating the data type.
-            step_or_process (int or lmbison.common.constants.DWC_PROCESS):
-                stage of processing completed on the output file.
-
-        Returns:
-            out_fname: base or full filename of output file, given the input filename.
-                If the input filename reflects the final processing step, the method
-                returns None
-
-        Note:
-            The input filename is parsed for process step, and the output filename will
-            be constructed for the next step.
-
-            File will always start with basename, followed by chunk,
-                followed by process step completed (if any)
-        """
-        sep = BisonNameOp.separator
-        pth, basename, orig_ext, chunk, old_postfix = BisonNameOp.parse_process_filename(
-            in_filename)
-        if chunk is not None:
-            basename = f"{basename}{sep}{chunk}"
-        # If step is not provided, get the step after that of the input file.
-        if postfix is None:
-            if step_or_process is None:
-                step_or_process = LMBISON_PROCESS.get_next_process(postfix=old_postfix)
-            postfix = step_or_process["postfix"]
-        # all outputs are CSV files
-        ext = ".csv"
-        outbasename = f"{basename}{sep}{postfix}{ext}"
-        # If outpath is not provided, use the same path as the input file.
-        if outpath is None:
-            outpath = pth
-        outfname = os.path.join(outpath, outbasename)
-        return outfname
-
-    # .............................................................................
-    @staticmethod
-    def get_update_outfilename(in_filename, version=None):
-        """Construct output filename for the next processing step of the given file.
-
-        Args:
-            in_filename (str): full filename of CSV data.
-            version (str): version number to append to filename
-
-        Returns:
-            out_fname: base or full filename of output file, given the input filename.
-                If the input filename reflects the final processing step, the method
-                returns None
-        """
-        sep = BisonNameOp.separator
-        pth, basename, orig_ext, chunk, _ = BisonNameOp.parse_process_filename(
-            in_filename)
-        if chunk is not None:
-            basename = f"{basename}{sep}{chunk}"
-        basename = f"{basename}{sep}update"
-        if version is not None:
-            basename = f"{basename}{version}"
-        fname = f"{basename}{orig_ext}"
-        outfname = os.path.join(pth, fname)
-        return outfname
-
-    # .............................................................................
-    @staticmethod
-    def get_recsbyval_outfilename(in_filename, value, outpath=None):
-        """Construct output filename for the next processing step of the given file.
-
-        Args:
-            in_filename (str): full filename of CSV data.
-            value (str): value to append to filename
-            outpath (str): path for filename.  If None, input path is used.
-
-        Returns:
-            out_fname: base or full filename of output file, given the input filename.
-                If the input filename reflects the final processing step, the method
-                returns None
-        """
-        sep = BisonNameOp.separator
-        pth, basename, orig_ext, chunk, old_postfix = BisonNameOp.parse_process_filename(
-            in_filename)
-        if outpath is None:
-            outpath = pth
-
-        fname = f"{basename}{sep}{value}{orig_ext}"
-        outfname = os.path.join(outpath, fname)
-        return outfname
-
-    # .............................................................................
-    @staticmethod
-    def _get_process_base_filename(in_filename, step_or_process=None):
-        """Construct output base filename for this processing step of the given file.
-
-        Args:
-            in_filename (str): base or full filename of CSV data.
-            step_or_process (int or lmbison.common.constants.DWC_PROCESS):
-                stage of processing completed on the output file.
-
-        Returns:
-            base_filename: base filename without path or extension.
-
-        Note:
-            The input filename is parsed for process step.
-
-            File will always start with basename, followed by chunk,
-                followed by process step completed (if any)
-        """
-        sep = BisonNameOp.separator
-        pth, basename, ext, chunk, postfix = BisonNameOp.parse_process_filename(
-            in_filename)
-
-        # If step is not provided, get the step of the input file.
-        if step_or_process is None:
-            step_or_process = LMBISON_PROCESS.get_process(postfix=postfix)
-        if chunk is not None:
-            basename = f"{basename}{sep}{chunk}"
-
-        pname = step_or_process["postfix"]
-        base_filename = f"{basename}{sep}{pname}"
-
-        return base_filename
-
-    # .............................................................................
-    @staticmethod
-    def get_process_logfilename(in_filename, log_path=None, step_or_process=None):
-        """Construct output filename for the next processing step of the given file.
-
-        Args:
-            in_filename (str): base or full filename of CSV data.
-            log_path (str): Destination directory for log files.
-            step_or_process (int or lmbison.common.constants.DWC_PROCESS):
-                stage of processing completed on the output file.
-
-        Returns:
-            logname: name for logger
-            log_filename: full filename for logging output
-
-        Note:
-            The input filename is parsed for process step.
-
-            File will always start with basename, followed by chunk,
-                followed by process step completed (if any)
-        """
-        base_filename = BisonNameOp._get_process_base_filename(
-            in_filename, step_or_process=step_or_process)
-        log_fname = os.path.join(log_path, f"{base_filename}.log")
-
-        return base_filename, log_fname
-
-    # .............................................................................
-    @staticmethod
-    def get_process_report_filename(in_filename, output_path=None, step_or_process=None):
-        """Construct output filename for the next processing step of the given file.
-
-        Args:
-            in_filename (str): base or full filename of CSV data.
-            output_path (str): Destination directory for report files.
-            step_or_process (int or lmbison.common.constants.DWC_PROCESS):
-                stage of processing completed on the output file.
-
-        Returns:
-            logname: name for logger
-            log_filename: full filename for logging output
-
-        Note:
-            The input filename is parsed for process step.
-
-            File will always start with basename, followed by chunk,
-                followed by process step completed (if any)
-        """
-        base_filename = BisonNameOp._get_process_base_filename(
-            in_filename, step_or_process=step_or_process)
-        rpt_fname = os.path.join(output_path, f"{base_filename}.rpt")
-
-        return rpt_fname
-
-    # .............................................................................
-    @staticmethod
-    def parse_process_filename(filename):
-        """Parse a filename into path, basename, chunk, processing step, extension.
-
-        Args:
-            filename (str): A filename used in processing
-
-        Returns:
-            path: file path of the filename, if included
-            basename: basename of the filename
-            ext: extension of the filename
-            chunk: the chunk string, chunk-<start>-<stop>, where start and stop indicate
-                the record (line+1) numbers in the original datafile.
-            process_postfix: the postfix of the file, indicating which stage of
-                processing has been completed.
-
-        Note:
-            Filename will contain, in this order:
-                1. basename (>= 1 parts)
-                2. chunk (if chunked)
-                3. process step completed
-        """
-        chunk = None
-        process_postfix = None
-        sep = BisonNameOp.separator
-        poss_postfixes = LMBISON_PROCESS.postfixes()
-        # path will be None if filename is basefilename
-        path, fname = os.path.split(filename)
-        basefname, ext = os.path.splitext(fname)
-        parts = basefname.split(sep)
-        # File will always start with basename
-        basename = parts.pop(0)
-        for p in parts:
-            # if still part of basename
-            if p.startswith(LMBISON_PROCESS.CHUNK["prefix"]):
-                chunk = p
-            else:
-                if p in poss_postfixes:
-                    process_postfix = p
-                else:
-                    # Add to basename
-                    basename = f"{basename}{sep}{p}"
-        return path, basename, ext, chunk, process_postfix
-
-    # ...............................................
-    @classmethod
-    def get_combined_summary_name(cls, summary_filename_list, outpath=None):
-        """Construct a filename for the summarized version of annotated csvfile.
-
-        Args:
-            summary_filename_list (list): full filename(s) of subset summary files for
-                this data.
-            outpath (str): full directory path for output filename.
-
-        Returns:
-            outfname: output filename derived from the summarized GBIF DWC filename
-        """
-        sep = BisonNameOp.separator
-        path, basename, ext, chunk, postfix = BisonNameOp.parse_process_filename(
-            summary_filename_list[0]
-        )
-        postfix = LMBISON_PROCESS.COMBINE["postfix"]
-        outbasename = f"{basename}{sep}{postfix}{ext}"
-        # If outpath is not provided, use the same path as the input file.
-        if outpath is None:
-            outpath = path
-        outfname = os.path.join(outpath, outbasename)
-        return outfname
-
-    # ...............................................
-    @staticmethod
-    def get_location_summary_name(outpath, region_type, region):
-        """Construct a filename for the summary file for a region.
-
-        Args:
-            outpath (str): full directory path for output filename.
-            region_type (str): file prefix indicating region type
-            region (str): name of region
-
-        Returns:
-            outfname: output filename derived from the state and county
-        """
-        basename = f"{region_type}_{region}.csv"
-        outfname = os.path.join(outpath, basename)
-        return outfname
-
-    # ...............................................
-    @staticmethod
-    def get_assessment_summary_name(csvfile, outpath):
-        """Construct a filename for the RIIS assessment summary file.
-
-        Args:
-            csvfile (str): full filename of one subset summary file (of one or more) for
-                this data.
-            outpath (str): full directory path for output filename.
-
-        Returns:
-            outfname: output filename
-        """
-        _path, basename, ext, _chunk, _postfix = BisonNameOp.parse_process_filename(
-            csvfile)
-        outfname = os.path.join(outpath, f"{basename}_riis_summary{ext}")
-        return outfname
 
     # ...............................................
     @staticmethod
@@ -1124,21 +859,3 @@ class BisonNameOp():
         """
         grid_fname = os.path.join(outpath, f"grid_{basename}_{resolution}.shp")
         return grid_fname
-
-
-# .............................................................................
-__all__ = [
-    "available_cpu_count",
-    "BisonKey",
-    "BisonNameOp",
-    "Chunker",
-    "count_lines",
-    "count_lines_with_cat",
-    "delete_file",
-    "get_csv_dict_reader",
-    "get_csv_dict_writer",
-    "get_csv_writer",
-    "get_fields_from_header",
-    "get_site_headers_from_shapefile",
-    "ready_filename"
-]

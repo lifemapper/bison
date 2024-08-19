@@ -34,4 +34,4 @@ tests/data/process/gbif10k_2023-01-26_chunk-9001-10000_raw.csv
 diversity_stats_2024_02_01.csv
 site_stats_2024_02_01.csv
 species_stats_2024_02_01.csv
-data/input/US-RIIS_MasterList_2021_annotated_2023-09.csv
+obsolete/data/input/US-RIIS_MasterList_2021_annotated_2023-09.csv
