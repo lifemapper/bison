@@ -1,4 +1,5 @@
 """Script to read RIIS records from a file, annotate them, then output to a file."""
+import json
 from logging import INFO, ERROR
 import os
 
@@ -32,7 +33,7 @@ if __name__ == '__main__':
             f"Unexpected failure {e} in {script_name}", refname=script_name,
             log_level=ERROR)
     else:
-        logger.log(report)
+        logger.log(json.dumps(report))
         logger.log(
             f"Found {report[REPORT.SUMMARY][REPORT.RIIS_IDENTIFIER]} names, "
             f"{report[REPORT.SUMMARY][REPORT.TAXA_RESOLVED]} resolved, "

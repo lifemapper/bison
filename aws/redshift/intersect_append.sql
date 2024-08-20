@@ -37,35 +37,35 @@ ALTER TABLE public.bison_2024_08_01
 -- -------------------------------------------------------------------------------------
 -- TODO: can we fill annotation fields directly?
 -- Create temp table with county values
-CREATE TABLE public.tmp_subset_x_census AS
-	SELECT subset.gbifid, county.stusps, county.name
-	FROM county, public.bison_2024_08_01 as subset
-	WHERE ST_intersects(ST_SetSRID(subset.geom, 4326), ST_SetSRID(county.shape, 4326));
+CREATE TABLE public.tmp_bison_x_county AS
+	SELECT bison.gbifid, county2023.stusps, county2023.namelsad
+	FROM county2023, public.bison_2024_08_01 as bison
+	WHERE ST_intersects(ST_SetSRID(bison.geom, 4326), ST_SetSRID(county2023.shape, 4326));
 -- Add census values to BISON subset
-UPDATE public.bison_2024_08_01 AS subset
-	SET census_state = temp.stusps, census_county = temp.name
-	FROM tmp_subset_x_census AS temp
-	WHERE subset.gbifid = temp.gbifid;
+UPDATE public.bison_2024_08_01 AS bison
+	SET census_state = tmp.stusps, census_county = tmp.namelsad
+	FROM tmp_bison_x_county AS tmp
+	WHERE bison.gbifid = tmp.gbifid;
 
 -- Create temp table with aiannh values
-CREATE TABLE public.tmp_subset_x_aiannh AS
-	SELECT subset.gbifid, aiannh.namelsad, aiannh.geoid
-	FROM aiannh, public.bison_2024_08_01 as subset
-	WHERE ST_intersects(ST_SetSRID(subset.geom, 4326), ST_SetSRID(aiannh.shape, 4326));
+CREATE TABLE public.tmp_bison_x_aiannh AS
+	SELECT bison.gbifid, aiannh2023.namelsad, aiannh2023.geoid
+	FROM aiannh2023, public.bison_2024_08_01 as bison
+	WHERE ST_intersects(ST_SetSRID(bison.geom, 4326), ST_SetSRID(aiannh2023.shape, 4326));
 -- Add aiannh values to BISON subset
-UPDATE public.bison_2024_08_01 AS subset
-	SET aiannh_name = temp.namelsad, aiannh_geoid = temp.geoid
-	FROM tmp_subset_x_aiannh AS temp
-	WHERE subset.gbifid = temp.gbifid;
+UPDATE public.bison_2024_08_01 AS bison
+	SET aiannh_name = tmp.namelsad, aiannh_geoid = tmp.geoid
+	FROM tmp_bison_x_aiannh AS tmp
+	WHERE bison.gbifid = tmp.gbifid;
 
 -- Verify counts
-SELECT COUNT(*) FROM public.tmp_subset_x_census;
-SELECT COUNT(*) FROM public.tmp_subset_x_aiannh;
+SELECT COUNT(*) FROM public.tmp_bison_x_county;
+SELECT COUNT(*) FROM public.tmp_bison_x_aiannh;
 SELECT COUNT(*) FROM public.bison_2024_08_01;
 
 -- Cleanup temp tables
-DROP TABLE public.tmp_subset_x_census;
-DROP TABLE public.tmp_subset_x_aiannh;
+DROP TABLE public.tmp_bison_x_county;
+DROP TABLE public.tmp_bison_x_aiannh;
 
 
 -- -------------------------------------------------------------------------------------
@@ -82,8 +82,8 @@ UPDATE public.bison_2024_08_01
 -- Annotate records with matching RIIS region + GBIF taxonkey
 UPDATE public.bison_2024_08_01
 	SET riis_occurrence_id = riis.occurrenceid,
-	    riis_assessment = riis.introduced_or_invasive
-	FROM riis_2024_02_01 as riis
+	    riis_assessment = riis.degreeofestablishment
+	FROM riisv2_2024_08_01 as riis
 	WHERE riis.locality = riis_region
 	  AND riis.gbif_res_taxonkey = taxonkey;
 
@@ -113,7 +113,7 @@ SELECT COUNT(*) FROM public.bison_2024_08_01
 -- Note: this only exports records resolved to county/state
 UNLOAD (
     'SELECT * FROM public.bison_2024_08_01 WHERE census_state IS NOT NULL')
-    TO 's3://bison-321942852011-us-east-1/annotated_records/bison_2024_02_01_'
+    TO 's3://bison-321942852011-us-east-1/annotated_records/bison_2024_08_01_'
     IAM_role DEFAULT
     CSV DELIMITER AS '\t'
     manifest

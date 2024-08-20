@@ -305,6 +305,5 @@ US Registry for Introduced and Invasive Species (RIIS):
 
 In the RIIS_DATA class:
     * Edit the filename in DATA_DICT_FNAME
-    * Check the file header, and if necessary, edit the fields in SPECIES_GEO_HEADER and
-      matching fields in SPECIES_GEO_KEY, GBIF_KEY, ITIS_KEY, LOCALITY_FLD, KINGDOM_FLD,
-      SCINAME_FLD, SCIAUTHOR_FLD, RANK_FLD, ASSESSMENT_FLD, TAXON_AUTHORITY_FLD.
+    * Check the file header, and if necessary, edit the fields in RIIS_DATA if
+      changed.

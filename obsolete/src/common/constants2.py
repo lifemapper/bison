@@ -809,9 +809,9 @@ class RIIS_DATA:
     DELIMITER = ","
     QUOTECHAR = '"'
     # Metadata about fields
-    DATA_DICT_FNAME = "US_RIIS_DataDictionary"
+    DATA_DICT_FNAME = "US-RIISv2_DataDictionary.csv"
     # Authority References Metadata.
-    AUTHORITY_FNAME = "US-RIIS_AuthorityReferences"
+    AUTHORITY_FNAME = "USRIISv2_AuthorityReferences.csv"
     AUTHORITY_KEY = "Authority"
     AUTHORITY_DATA_COUNT = 5951
     AUTHORITY_HEADER = [

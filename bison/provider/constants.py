@@ -18,55 +18,59 @@ class RIIS_DATA:
     DATA_EXT = "csv"
     DELIMITER = ","
     QUOTECHAR = '"'
-    # Introduced or Invasive Species List.
-    SPECIES_GEO_KEY = "occurrenceID"
+    # RIIS Identifier
+    RIIS_ID = "occurrenceID"
+    # USGS resolution of GBIF accepted taxon (may be obsolete)
     GBIF_KEY = "GBIF_taxonKey"
-    ITIS_KEY = "ITIS_TSN"
+    # ITIS_KEY = "ITIS_TSN"
+    # Region: AK, HI, L48
     LOCALITY_FLD = "locality"
+    # Assist with taxonomic resolution
     KINGDOM_FLD = "kingdom"
     SCINAME_FLD = "scientificName"
     SCIAUTHOR_FLD = "scientificNameAuthorship"
     RANK_FLD = "taxonRank"
+    # Introduced or invasive status
     ASSESSMENT_FLD = "degreeOfEstablishment"
-    TAXON_AUTHORITY_FLD = "taxonomicStatus"
     RIIS_STATUS = {
         "established (category C3)": "established",
         "invasive (category D2)": "invasive",
         "widespread invasive (category E)": "widespread invasive"
     }
-    SPECIES_GEO_HEADER = [
-        "locality",
-        "scientificName",
-        "scientificNameAuthorship",
-        "vernacularName",
-        "taxonRank",
-        "establishmentMeans",
-        "degreeOfEstablishment",
-        "isHybrid",
-        "pathway",
-        "habitat",
-        "Biocontrol",
-        "associatedTaxa",
-        "eventRemarks",
-        "IntroDateNumber",
-        "taxonRemarks",
-        "kingdom",
-        "phylum	class",
-        "order",
-        "family",
-        "taxonomicStatus",
-        "ITIS_TSN",
-        "GBIF_taxonKey",
-        "taxonID",
-        "Authority",
-        "WebLink",
-        "associatedReferences",
-        "eventDate",
-        "modified",
-        "Update_Remarks",
-        "occurrenceRemarks",
-        "occurrenceID"
-    ]
+    # SPECIES_GEO_HEADER = [
+    #     "locality",
+    #     "scientificName",
+    #     "scientificNameAuthorship",
+    #     "vernacularName",
+    #     "taxonRank",
+    #     "establishmentMeans",
+    #     "degreeOfEstablishment",
+    #     "isHybrid",
+    #     "pathway",
+    #     "habitat",
+    #     "Biocontrol",
+    #     "associatedTaxa",
+    #     "eventRemarks",
+    #     "IntroDateNumber",
+    #     "taxonRemarks",
+    #     "kingdom",
+    #     "phylum",
+    #     "class",
+    #     "order",
+    #     "family",
+    #     "taxonomicStatus",
+    #     "ITIS_TSN",
+    #     "GBIF_taxonKey",
+    #     "taxonID",
+    #     "Authority",
+    #     "WebLink",
+    #     "associatedReferences",
+    #     "eventDate",
+    #     "modified",
+    #     "Update_Remarks",
+    #     "occurrenceRemarks",
+    #     "occurrenceID"
+    # ]
 
 
 # .............................................................................

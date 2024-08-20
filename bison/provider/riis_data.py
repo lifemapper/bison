@@ -48,28 +48,15 @@ class RIISRec():
             record[RIIS_DATA.SCINAME_FLD], record[RIIS_DATA.SCIAUTHOR_FLD])
 
         # Set missing GBIF or ITIS key to -1
-        for fld in (RIIS_DATA.GBIF_KEY, RIIS_DATA.ITIS_KEY):
-            taxon_key = record[fld]
-            if not taxon_key:
-                taxon_key = -1
-            else:
-                try:
-                    taxon_key = int(taxon_key)
-                except ValueError:
-                    raise
-            self.data[fld] = taxon_key
-
-        # # Edit taxonomy authority to trim "Accepted "
-        # prefix = 'Accepted '
-        # start_idx = len(prefix)
-        # taxon_authority = record[RIIS_DATA.TAXON_AUTHORITY_FLD]
-        # try:
-        #     is_accepted = taxon_authority.startswith(prefix)
-        # except AttributeError:
-        #     pass
-        # else:
-        #     if is_accepted:
-        #         self.data[RIIS_DATA.TAXON_AUTHORITY_FLD] = taxon_authority[start_idx:]
+        taxon_key = record[RIIS_DATA.GBIF_KEY]
+        if not taxon_key:
+            taxon_key = -1
+        else:
+            try:
+                taxon_key = int(taxon_key)
+            except ValueError:
+                raise
+        self.data[RIIS_DATA.GBIF_KEY] = taxon_key
 
     # ...............................................
     @property
@@ -93,13 +80,13 @@ class RIISRec():
 
     # ...............................................
     @property
-    def occurrence_id(self):
+    def riis_id(self):
         """Public property for RIIS occurrenceID value.
 
         Returns:
             RIIS occurrence_id value
         """
-        return self.data[RIIS_DATA.SPECIES_GEO_KEY]
+        return self.data[RIIS_DATA.RIIS_ID]
 
     # ...............................................
     @property
@@ -149,11 +136,13 @@ class RIISRec():
             True if self and rrec scientific name, author, kingdom, GBIF key,
                 ITIS TSN, assessment, and location match.
         """
-        return (self.is_name_match(rrec)
-                and self.data[RIIS_DATA.GBIF_KEY] == rrec.data[RIIS_DATA.GBIF_KEY]
-                and self.data[RIIS_DATA.ITIS_KEY] == rrec.data[RIIS_DATA.ITIS_KEY]
-                and self.data[RIIS_DATA.ASSESSMENT_FLD] == rrec.data[RIIS_DATA.ASSESSMENT_FLD]
-                and self.data[RIIS_DATA.LOCALITY_FLD] == rrec.data[RIIS_DATA.LOCALITY_FLD])
+        result = (
+            self.is_name_match(rrec)
+            and self.data[RIIS_DATA.GBIF_KEY] == rrec.data[RIIS_DATA.GBIF_KEY]
+            and self.data[RIIS_DATA.ASSESSMENT_FLD] == rrec.data[RIIS_DATA.ASSESSMENT_FLD]
+            and self.data[RIIS_DATA.LOCALITY_FLD] == rrec.data[RIIS_DATA.LOCALITY_FLD]
+        )
+        return result
 
     # ...............................................
     def is_duplicate_locality(self, rrec):
@@ -165,8 +154,10 @@ class RIISRec():
         Returns:
             True if self and rrec scientific name, author, kingdom, and location match.
         """
-        return (self.is_name_match(rrec)
-                and self.data[RIIS_DATA.LOCALITY_FLD] == rrec.data[RIIS_DATA.LOCALITY_FLD])
+        return (
+            self.is_name_match(rrec) and
+            self.data[RIIS_DATA.LOCALITY_FLD] == rrec.data[RIIS_DATA.LOCALITY_FLD]
+        )
 
     # ...............................................
     def is_assessment_locality_match(self, rrec):
@@ -178,8 +169,10 @@ class RIISRec():
         Returns:
             True if self and rrec assessment and location match.
         """
-        return (self.data[RIIS_DATA.ASSESSMENT_FLD] == rrec.data[RIIS_DATA.ASSESSMENT_FLD]
-                and self.data[RIIS_DATA.LOCALITY_FLD] == rrec.data[RIIS_DATA.LOCALITY_FLD])
+        return (
+            self.data[RIIS_DATA.ASSESSMENT_FLD] == rrec.data[RIIS_DATA.ASSESSMENT_FLD]
+            and self.data[RIIS_DATA.LOCALITY_FLD] == rrec.data[RIIS_DATA.LOCALITY_FLD]
+        )
 
     # ...............................................
     def is_gbif_match(self, rrec):
@@ -194,18 +187,6 @@ class RIISRec():
         return (self.data[RIIS_DATA.GBIF_KEY] == rrec.data[RIIS_DATA.GBIF_KEY])
 
     # ...............................................
-    def is_itis_match(self, rrec):
-        """Test equality of ITIS TSN.
-
-        Args:
-            rrec (bison.riis.RIISRec): object containing a USGS RIIS record
-
-        Returns:
-            True if self and rrec ITIS TSN match.
-        """
-        return (self.data[RIIS_DATA.ITIS_KEY] == rrec.data[RIIS_DATA.ITIS_KEY])
-
-    # ...............................................
     def consistent_gbif_resolution(self):
         """Test equality of existing and new gbif taxon key resolution.
 
@@ -213,32 +194,6 @@ class RIISRec():
             True if self and rrec GBIF key match.
         """
         return (self.data[RIIS_DATA.GBIF_KEY] == self.data[APPEND_TO_RIIS.GBIF_KEY])
-
-    # ...............................................
-    def is_taxauthority_match(self, rrec):
-        """Test equality of taxon authority and authority key.
-
-        Args:
-            rrec (bison.riis.RIIS_DATARec): object containing a USGS RIIS record
-
-        Returns:
-            True if self and rrec name authority are both GBIF and GBIF keys match
-            or authority are both ITIS and the ITIS TSNs match.
-        """
-        # Test GBIF match
-        if (
-                self.data[RIIS_DATA.TAXON_AUTHORITY_FLD] == "Accepted GBIF"
-                and rrec.data[RIIS_DATA.TAXON_AUTHORITY_FLD] == "Accepted GBIF"
-                and self.data[RIIS_DATA.GBIF_KEY] == rrec.data[RIIS_DATA.GBIF_KEY]
-        ):
-            return True
-        # Test ITIS match
-        else:
-            return (
-                self.data[RIIS_DATA.TAXON_AUTHORITY_FLD] == "Accepted ITIS"
-                and rrec.data[RIIS_DATA.TAXON_AUTHORITY_FLD] == "Accepted ITIS"
-                and self.data[RIIS_DATA.ITIS_KEY] == rrec.data[RIIS_DATA.ITIS_KEY]
-            )
 
 
 # .............................................................................
@@ -307,20 +262,20 @@ class RIIS:
                 pass
         return fields
 
-    # ...............................................
-    def _read_authorities(self) -> set:
-        """Assemble a set of unique authority identifiers for joining the MasterList.
-
-        Returns:
-            Set of authority identifiers valid for use as foreign keys in related datasets.
-        """
-        datapath, _ = os.path.split(self._riis_filename)
-        auth_fname = f"{os.path.join(datapath, RIIS_DATA.AUTHORITY_FNAME)}.{RIIS_DATA.DATA_EXT}"
-        authorities = set()
-        rdr, f = get_csv_dict_reader(auth_fname, RIIS_DATA.DELIMITER)
-        for row in rdr:
-            authorities.add(row[RIIS_DATA.AUTHORITY_KEY])
-        return authorities
+    # # ...............................................
+    # def _read_authorities(self) -> set:
+    #     """Assemble a set of unique authority identifiers for joining the MasterList.
+    #
+    #     Returns:
+    #         Set of authority identifiers valid for use as foreign keys in related datasets.
+    #     """
+    #     datapath, _ = os.path.split(self._riis_filename)
+    #     auth_fname = f"{os.path.join(datapath, RIIS_DATA.AUTHORITY_FNAME)}.{RIIS_DATA.DATA_EXT}"
+    #     authorities = set()
+    #     rdr, f = get_csv_dict_reader(auth_fname, RIIS_DATA.DELIMITER)
+    #     for row in rdr:
+    #         authorities.add(row[RIIS_DATA.AUTHORITY_KEY])
+    #     return authorities
 
     # ...............................................
     # @property
@@ -404,7 +359,7 @@ class RIIS:
         for riis in riis_recs:
             if region == riis.locality:
                 assess = riis.assessment
-                recid = riis.occurrence_id
+                recid = riis.riis_id
         return assess, recid
 
     # ...............................................
@@ -467,7 +422,7 @@ class RIIS:
                         self.by_taxon[index] = [rec]
 
                     # Also index on RIIS occurrenceID
-                    riis_id = row[RIIS_DATA.SPECIES_GEO_KEY]
+                    riis_id = row[RIIS_DATA.RIIS_ID]
                     self.by_riis_id[riis_id] = rec
         except Exception:
             raise
@@ -642,7 +597,7 @@ class RIIS:
                             # Update record in dictionary riis_by_species with name keys
                             rec.update_data(new_key, new_name)
                             # Update dictionary riis_by_id with Occid keys
-                            self.by_riis_id[rec.data[RIIS_DATA.SPECIES_GEO_KEY]] = rec
+                            self.by_riis_id[rec.data[RIIS_DATA.RIIS_ID]] = rec
                             rec_count += 1
 
                         if (name_count % 1000) == 0:

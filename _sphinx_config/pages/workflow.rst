@@ -66,8 +66,12 @@ Get ancillary data
 Annotate RIIS Data with GBIF Accepted Taxa
 ==========================================
 
-
-
+Run bison/tools/annotate_riis.py to annotate the file with the GBIF taxonKey and
+scientificName for the currently accepted name for each record.  The annotated file
+will be created in the same directory, and have the basename appended with
+"_annotated_yyyy_mm_dd.csv" where yyyy_mm_dd is the first day of the current month.
+This ensures that the RIIS data and the current GBIF data that have the same date
+appended and taxonomic resolutions are current.
 
 Load ancillary data
 ===================
@@ -86,6 +90,9 @@ Load ancillary data
   * Run the `CREATE TABLE` command to create an empty table in Redshift,
     and the following `COPY` command to load the data into Redshift.
 
+* Annotated RIIS data
+
+  * upload the annotated RIIS CSV file to S3.
 
 
 Subset GBIF data
