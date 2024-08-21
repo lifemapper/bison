@@ -1,0 +1,59 @@
+# syntax=docker/dockerfile:1
+# ........................................................
+# Backend base image
+#FROM python:3.12.3-alpine3.20 as base
+FROM python:3.12-slim-bookworm as base
+
+LABEL maintainer="KU Biodiversity Institute <github.com/lifemapper/bison>"
+
+RUN apt-get update
+RUN apt-get install -y awscli
+RUN apt-get install -y gcc
+RUN apt-get install -y git
+RUN apt-get install -y vim
+
+RUN addgroup --gid 888 bison \
+ && adduser --ingroup bison --uid 888 bison
+
+RUN mkdir -p /home/bison \
+ && chown bison.bison /home/bison
+
+RUN mkdir -p /scratch-path/log \
+ && mkdir -p /scratch-path/sessions \
+ && chown -R bison.bison /scratch-path
+
+WORKDIR /home/bison
+USER bison
+
+COPY --chown=bison:bison ./requirements.txt .
+
+RUN python3 -m venv venv \
+ && venv/bin/pip install --upgrade pip \
+ && venv/bin/pip install --no-cache-dir -r ./requirements.txt
+
+# This assumes that the bison repository is present on the host machine and \
+# docker is run from the top of directory (with bison subdir directly below).
+COPY --chown=bison:bison ./bison ./bison
+
+
+# ........................................................
+# Development flask image from base
+FROM base as dev-flask
+# Install dev dependencies for debugging
+RUN venv/bin/pip install debugpy
+
+# Keeps Python from generating .pyc files in the container
+ENV PYTHONDONTWRITEBYTECODE 1
+# Turns off buffering for easier container logging
+ENV PYTHONUNBUFFERED 1
+ENV FLASK_ENV=development
+CMD venv/bin/python -m debugpy --listen 0.0.0.0:${DEBUG_PORT} -m ${FLASK_MANAGE} run --host=0.0.0.0
+
+
+# ........................................................
+# Production flask image from base
+FROM base as flask
+
+COPY --chown=bison:bison ./flask_app ./flask_app
+ENV FLASK_ENV=production
+CMD venv/bin/python -m gunicorn -w 4 --bind 0.0.0.0:5000 ${FLASK_APP}

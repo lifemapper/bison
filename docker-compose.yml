@@ -1,0 +1,57 @@
+version: "3.9"
+services:
+
+  analyst:
+    build:
+      context: ./.
+      target: flask
+    networks:
+      - nginx
+    environment:
+      - FLASK_APP=flask_app.bison.routes:app
+    env_file:
+      ./.env.conf
+    restart: unless-stopped
+    volumes:
+      # bind mount from EC2 instance
+      # This assumes that the /etc/letsencrypt directory is present with certificates
+      # on the host machine.
+      # TODO: Ensure that running docker with sudo allows this mount.
+      - /etc/letsencrypt/live/bison.spcoco.org:/etc/letsencrypt/live/bison.spcoco.org:ro
+      # volumes
+      - "scratch-path:/scratch-path"
+
+
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    depends_on:
+      - bison
+
+    networks:
+      - nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - "static-files:/volumes/static-files:ro"
+
+      - "./config/nginx.conf:/etc/nginx/conf.d/default.conf:ro"
+      - "./config/fullchain.pem:/etc/letsencrypt/fullchain.pem:ro"
+      - "./config/privkey.pem:/etc/letsencrypt/privkey.pem:ro"
+
+
+  front-end:
+    build:
+      context: ./.
+      target: front-end
+    volumes:
+      - "webpack-output:/home/node/dist"
+
+volumes:
+  scratch-path:
+  static-files:
+  webpack-output:
+
+networks:
+  nginx:
