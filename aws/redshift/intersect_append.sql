@@ -90,7 +90,8 @@ UPDATE public.bison_2024_08_01
 -- Annotate non-matching records to presumed native
 UPDATE public.bison_2024_08_01
 	SET riis_assessment = 'presumed_native'
-	WHERE census_state IS NOT NULL AND riis_occurrence_id IS NULL;
+	WHERE riis_region IS NOT NULL AND riis_occurrence_id IS NULL;
+
 
 -- -------------------------------------------------------------------------------------
 -- Misc Queries
@@ -107,16 +108,27 @@ SELECT COUNT(*) FROM public.bison_2024_08_01
     WHERE census_state IS NOT NULL AND riis_occurrence_id IS NOT NULL;
 
 -- -------------------------------------------------------------------------------------
--- Export data
+-- Export annotated data records resolved to county/state
 -- -------------------------------------------------------------------------------------
 -- Write to S3 as tab-delimited CSV
--- Note: this only exports records resolved to county/state
+-- Takes ~ minutes for ~100 million records
 UNLOAD (
     'SELECT * FROM public.bison_2024_08_01 WHERE census_state IS NOT NULL')
     TO 's3://bison-321942852011-us-east-1/annotated_records/bison_2024_08_01_'
     IAM_role DEFAULT
     CSV DELIMITER AS '\t'
-    manifest
-    HEADER;
+    HEADER
+    PARALLEL OFF;
 
--- Note: Parquet does not support Geometry
+-- Write to S3 as Parquet format
+-- Parquet format with PARALLEL OFF appends <slice #>_part_<part #>.parquet to the name
+--    prefix.  The first digits (xx) indicate the slice number.
+-- Parquet does not allow geometry export, so delete column first (make sure
+--    decimallongitude, decimallatitude fields exist in table).
+ALTER TABLE public.bison_2024_08_01 DROP COLUMN geom;
+UNLOAD (
+    'SELECT * FROM public.bison_2024_08_01 WHERE census_state IS NOT NULL')
+    TO 's3://bison-321942852011-us-east-1/annotated_records/bison_2024_08_01_'
+    IAM_role DEFAULT
+    FORMAT AS Parquet
+    PARALLEL OFF;

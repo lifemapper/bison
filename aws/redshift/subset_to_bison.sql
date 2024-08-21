@@ -79,11 +79,12 @@ CREATE EXTERNAL TABLE redshift_spectrum.occurrence_2024_08_01_parquet (
 -- Drop previous table;
 DROP TABLE IF EXISTS public.bison_2024_07_01;
 -- Create a BISON table with a subset of records and subset of fields
+-- TODO: This includes lat/lon, allowing final export to Parquet after deleting geom
 CREATE TABLE public.bison_2024_08_01 AS
 	SELECT
 		gbifid, datasetkey, species, taxonrank, scientificname, countrycode, stateprovince,
 		occurrencestatus, publishingorgkey, day, month, year, taxonkey, specieskey,
-		basisofrecord,
+		basisofrecord, decimallongitude, decimallatitude,
 		ST_Makepoint(decimallongitude, decimallatitude) as geom
 	FROM redshift_spectrum.occurrence_2024_08_01_parquet
 	WHERE decimallatitude IS NOT NULL

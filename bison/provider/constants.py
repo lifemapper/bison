@@ -37,40 +37,6 @@ class RIIS_DATA:
         "invasive (category D2)": "invasive",
         "widespread invasive (category E)": "widespread invasive"
     }
-    # SPECIES_GEO_HEADER = [
-    #     "locality",
-    #     "scientificName",
-    #     "scientificNameAuthorship",
-    #     "vernacularName",
-    #     "taxonRank",
-    #     "establishmentMeans",
-    #     "degreeOfEstablishment",
-    #     "isHybrid",
-    #     "pathway",
-    #     "habitat",
-    #     "Biocontrol",
-    #     "associatedTaxa",
-    #     "eventRemarks",
-    #     "IntroDateNumber",
-    #     "taxonRemarks",
-    #     "kingdom",
-    #     "phylum",
-    #     "class",
-    #     "order",
-    #     "family",
-    #     "taxonomicStatus",
-    #     "ITIS_TSN",
-    #     "GBIF_taxonKey",
-    #     "taxonID",
-    #     "Authority",
-    #     "WebLink",
-    #     "associatedReferences",
-    #     "eventDate",
-    #     "modified",
-    #     "Update_Remarks",
-    #     "occurrenceRemarks",
-    #     "occurrenceID"
-    # ]
 
 
 # .............................................................................
