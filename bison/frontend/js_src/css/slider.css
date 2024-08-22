@@ -1,0 +1,110 @@
+.slider {
+  display: flex;
+  align-items: center;
+  column-gap: var(--half-size);
+  padding: var(--half-size) 0;
+
+  --bg-active: #13bb49;
+  --bg-inactive: #b32d2d;
+  --bg-control: var(--b2);
+}
+
+.slider input[type="number"] {
+  border: var(--border-size) solid var(--t2);
+  background: var(--b2);
+  width: calc(var(--double-size) * 2);
+  height: var(--double-size);
+}
+
+.slider-inputs {
+  position: relative;
+  width: calc(var(--double-size) * 5);
+  height: var(--double-size);
+}
+
+.slider-inputs input {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: var(--size);
+  pointer-events: none;
+  overflow: hidden;
+  padding: 0;
+  margin: var(--half-size) 0;
+  -webkit-appearance: none;
+  background-color: transparent;
+}
+
+.slider-inputs input.max {
+  background-color: var(--bg-inactive);
+}
+
+.slider-inputs input::-webkit-slider-thumb {
+  width: var(--half-size);
+  height: var(--size);
+  position: relative;
+  z-index: 1;
+  background: var(--bg-control);
+  --box-shadow-color: var(--bg-inactive);
+  box-shadow: -80px 0 0 80px var(--box-shadow-color);
+  -webkit-appearance: none;
+  cursor: ew-resize;
+  pointer-events: all;
+}
+
+.slider-inputs input.max::-webkit-slider-thumb {
+  --box-shadow-color: var(--bg-active);
+}
+
+.slider-inputs input::-webkit-slider-runnable-track {
+  color: var(--bg-active);
+  -webkit-appearance: none;
+}
+
+
+.slider-inputs input::-moz-range-thumb {
+
+  width: var(--half-size);
+  height: var(--size);
+  position: relative;
+  z-index: 10;
+  background: var(--bg-control);
+  --box-shadow-color: var(--bg-inactive);
+  box-shadow: -80px 0 0 80px var(--box-shadow-color);
+  -moz-appearance: none;
+  border-radius: 0;
+  cursor: ew-resize;
+  pointer-events: all;
+}
+
+.slider-inputs input.max::-moz-range-thumb {
+  --box-shadow-color: var(--bg-active);
+}
+
+.slider-inputs input::-moz-range-track {
+  position: relative;
+  z-index: -1;
+  width: 100%;
+  height: 100%;
+  background: none;
+  border: 0;
+  --background-color: var(--bg-inactive);
+  -moz-appearance: none;
+}
+
+.slider-inputs input::-moz-range-track {
+  -moz-appearance: none;
+  background: none;
+  border: 0;
+}
+
+.slider-inputs input::-moz-focus-outer {
+  border: 0;
+  -moz-appearance: none;
+}
+
+.slider-inputs input::-moz-range-progress {
+  background-color: var(--bg-active);
+  -moz-appearance: none;
+}

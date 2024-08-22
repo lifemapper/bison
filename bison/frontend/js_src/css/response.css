@@ -1,0 +1,79 @@
+.hidden {
+  display: none !important;
+}
+
+.checkbox-with-indicator input:checked ~ span::before {
+  content: 'True';
+  color: var(--green);
+}
+
+.checkbox-with-indicator input:not(:checked) ~ span::before {
+  content: 'False';
+  color: var(--red);
+}
+
+.collapsed {
+  cursor: pointer;
+}
+
+.collapsed .value::after {
+  content: '(collapsed)';
+}
+
+.collapsed:hover > .value::after {
+  color: var(--t1);
+}
+
+.collapsed > .value > * {
+  display: none !important;
+}
+
+.list-of-fields {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-auto-rows: auto;
+  row-gap: 0.5rem;
+  column-gap: 0.5rem;
+}
+
+.list-of-values > .field:not(:last-child) > * {
+  border-bottom: 1px solid var(--b3);
+  padding-bottom: 1rem;
+}
+
+.field {
+  display: contents;
+}
+
+.label {
+  line-height: 2rem;
+  min-width: calc(var(--double-size) * 2);
+}
+
+.textbox {
+  width: 100%;
+  min-width: calc(var(--double-size) * 3);
+  padding: 0.5rem;
+  border: 1px solid var(--b3);
+  border-radius: 3px;
+  background: var(--b2);
+}
+
+.value {
+  display: flex;
+  align-items: center;
+}
+
+.value > * {
+  flex: 1;
+}
+
+input[type='date'] {
+  background: transparent;
+  border: none;
+  pointer-events: none;
+  font-family: inherit;
+  font-size: inherit;
+  padding: 0;
+  color: inherit;
+}

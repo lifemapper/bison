@@ -22,17 +22,19 @@ RUN mkdir -p /scratch-path/log \
  && mkdir -p /scratch-path/sessions \
  && chown -R bison.bison /scratch-path
 
+# Run everything as the user 'bison'
 WORKDIR /home/bison
 USER bison
 
 COPY --chown=bison:bison ./requirements.txt .
 
+# Set up a virtual environment
 RUN python3 -m venv venv \
  && venv/bin/pip install --upgrade pip \
  && venv/bin/pip install --no-cache-dir -r ./requirements.txt
 
-# This assumes that the bison repository is present on the host machine and \
-# docker is run from the top of directory (with bison subdir directly below).
+# This assumes that the bison repository is present on the host machine and
+# docker is run from the top of the repo directory (with bison subdir directly below).
 COPY --chown=bison:bison ./bison ./bison
 
 
@@ -47,6 +49,7 @@ ENV PYTHONDONTWRITEBYTECODE 1
 # Turns off buffering for easier container logging
 ENV PYTHONUNBUFFERED 1
 ENV FLASK_ENV=development
+# Logs in the window where the docker command is executed
 CMD venv/bin/python -m debugpy --listen 0.0.0.0:${DEBUG_PORT} -m ${FLASK_MANAGE} run --host=0.0.0.0
 
 
@@ -57,3 +60,27 @@ FROM base as flask
 COPY --chown=bison:bison ./flask_app ./flask_app
 ENV FLASK_ENV=production
 CMD venv/bin/python -m gunicorn -w 4 --bind 0.0.0.0:5000 ${FLASK_APP}
+
+# ........................................................
+# Frontend base image (for development)
+FROM node:16.10.0-buster as base-front-end
+
+LABEL maintainer="Specify Collections Consortium <github.com/specify>"
+
+USER node
+WORKDIR /home/node
+
+COPY --chown=node:node bison/frontend/js_src/package*.json ./
+RUN npm install
+
+RUN mkdir dist \
+ && chown node:node dist
+
+#COPY --chown=node:node sppy/frontend/js_src .
+
+
+# ........................................................
+# Frontend image (for production) from base-front-end
+FROM base-front-end as front-end
+
+RUN npm run build

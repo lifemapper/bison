@@ -1,0 +1,69 @@
+table {
+  border-collapse: collapse;
+  --b-header: #bef;
+  --b-first-cell: #7cf;
+}
+
+thead td {
+  background: var(--b-first-cell);
+}
+
+@media only screen and (min-width: 768px) {
+  thead td, table.issues th {
+    width: calc(var(--double-size) * 5);
+  }
+  table {
+    table-layout: fixed;
+    width: 100%;
+  }
+}
+
+thead td, th {
+  border: var(--border-size) solid var(--t3);
+}
+
+thead th {
+  font-size: var(--size);
+}
+
+thead th {
+  font-size: calc(var(--size) * 1.2);
+}
+
+th {
+  background: var(--b-header);
+}
+
+thead th > div {
+  display: flex;
+  column-gap: var(--half-size);
+  justify-content: center;
+  align-items: center;
+  padding: var(--half-size);
+  flex-wrap: wrap;
+}
+
+thead span {
+  display: contents;
+}
+
+thead img {
+  height: var(--icon-size);
+}
+
+tbody th {
+  text-align: left;
+}
+
+tbody th, tbody td {
+  padding: var(--quarter-size);
+  border: var(--border-size) solid var(--border-color);
+}
+
+tbody td {
+  word-break: break-word;
+}
+
+table.data tr:not(.identical) td {
+  color: var(--red);
+}

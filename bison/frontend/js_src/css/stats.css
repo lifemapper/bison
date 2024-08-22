@@ -1,0 +1,9 @@
+#change-collection select {
+  padding: var(--half-size);
+}
+
+@media only screen and (max-width: 767px) {
+  #change-collection select {
+    width: 100%;
+  }
+}

@@ -1,0 +1,21 @@
+header {
+  display: flex;
+  align-items: baseline;
+  column-gap: var(--half-size);
+  justify-content: space-between;
+  flex-wrap: wrap;
+  font-weight: normal;
+  flex-direction: row-reverse;
+  font-size: calc(var(--size) * 1.2);
+  padding-bottom: var(--size);
+}
+
+@media only screen and (max-width: 767px) {
+  header {
+    flex-direction: column;
+  }
+}
+
+header img {
+  height: var(--double-size);
+}

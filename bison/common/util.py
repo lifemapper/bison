@@ -11,7 +11,8 @@ import logging
 from logging.handlers import RotatingFileHandler
 import pandas
 import os
-from sys import maxsize
+import sys
+import traceback
 
 from bison.common.constants import (
     ENCODING, INSTANCE_TYPE, KEY_NAME, LOGFILE_MAX_BYTES, LOG_FORMAT, LOG_DATE_FORMAT,
@@ -759,7 +760,7 @@ def get_csv_dict_writer(
     if fmode not in ("w", "a"):
         raise Exception("File mode must be 'w' (write) or 'a' (append)")
     if ready_filename(csvfile, overwrite=overwrite):
-        csv.field_size_limit(maxsize)
+        csv.field_size_limit(sys.maxsize)
         try:
             f = open(csvfile, fmode, newline="", encoding=encoding)
         except Exception as e:
@@ -797,7 +798,7 @@ def get_csv_dict_reader(
         FileNotFoundError: on missing csvfile
         PermissionError: on improper permissions on csvfile
     """
-    csv.field_size_limit(maxsize)
+    csv.field_size_limit(sys.maxsize)
 
     if quote_none is True:
         quoting = csv.QUOTE_NONE
@@ -820,6 +821,100 @@ def get_csv_dict_reader(
         rdr = csv.DictReader(f, quoting=quoting, delimiter=delimiter, restkey=restkey)
 
     return rdr, f
+
+
+# ..........................
+def get_traceback():
+    """Get the traceback for this exception.
+
+    Returns:
+        trcbk: traceback of steps executed before an exception
+    """
+    exc_type, exc_val, this_traceback = sys.exc_info()
+    tb = traceback.format_exception(exc_type, exc_val, this_traceback)
+    tblines = []
+    cr = "\n"
+    for line in tb:
+        line = line.rstrip(cr)
+        parts = line.split(cr)
+        tblines.extend(parts)
+    trcbk = cr.join(tblines)
+    return trcbk
+
+
+# ...............................................
+def combine_errinfo(errinfo1, errinfo2):
+    """Combine 2 dictionaries with keys `error`, `warning` and `info`.
+
+    Args:
+        errinfo1: dictionary of errors
+        errinfo2: dictionary of errors
+
+    Returns:
+        dictionary of errors
+    """
+    errinfo = {}
+    for key in ("error", "warning", "info"):
+        try:
+            lst = errinfo1[key]
+        except KeyError:
+            lst = []
+        try:
+            lst2 = errinfo2[key]
+        except KeyError:
+            lst2 = []
+
+        if lst or lst2:
+            lst.extend(lst2)
+            errinfo[key] = lst
+    return errinfo
+
+
+# ...............................................
+def add_errinfo(errinfo, key, val_lst):
+    """Add to a dictionary with keys `error`, `warning` and `info`.
+
+    Args:
+        errinfo: dictionary of errors
+        key: error type, `error`, `warning` or `info`
+        val_lst: error message or list of errors
+
+    Returns:
+        updated dictionary of errors
+    """
+    if errinfo is None:
+        errinfo = {}
+    if key in ("error", "warning", "info"):
+        if isinstance(val_lst, str):
+            val_lst = [val_lst]
+        try:
+            errinfo[key].extend(val_lst)
+        except KeyError:
+            errinfo[key] = val_lst
+    return errinfo
+
+
+# ......................................................
+def prettify_object(print_obj):
+    """Format an object for output.
+
+    Args:
+        print_obj (obj): Object to pretty print in output
+
+    Returns:
+        formatted string representation of object
+
+    Note: this splits a string containing spaces in a list to multiple strings in the
+        list.
+    """
+    # Used only in local debugging
+    from io import StringIO
+    from pprint import pp
+
+    strm = StringIO()
+    pp(print_obj, stream=strm)
+    obj_str = strm.getvalue()
+    return obj_str
 
 
 # .............................................................................

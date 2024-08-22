@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Setup module for lmbison."""
+"""Setup module for bison."""
 from setuptools import setup, find_packages
 
 
@@ -10,20 +10,23 @@ with open("LICENSE") as f:
     license = f.read()
 
 setup(
-    name="lmbison",
-    version="0.5.0",
-    description="Package of Lifemapper-Bison objects and tools",
+    name="bison",
+    version="2.0",
+    description="Package of Bison objects and tools",
     long_description=readme,
-    author="Specify Systems Lifemapper Team",
+    author="Specify Systems Team",
     author_email="aimee.stewart@ku.edu",
     url="https://github.com/lifemapper/bison",
     license=license,
-    packages=find_packages(exclude=("tests", "docs")),
+    packages=find_packages(exclude=("obsolete", "tests", "docs")),
     install_requires=[
+        "boto3",
+        "fastparquet",
         "gdal",
         "numpy",
         "pandas",
         "requests",
         "rtree",
+        "s3fs"
     ],
 )
