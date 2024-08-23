@@ -48,7 +48,7 @@ RUN venv/bin/pip install debugpy
 ENV PYTHONDONTWRITEBYTECODE 1
 # Turns off buffering for easier container logging
 ENV PYTHONUNBUFFERED 1
-ENV FLASK_ENV=development
+ENV FLASK_DEBUG=True
 # Logs in the window where the docker command is executed
 CMD venv/bin/python -m debugpy --listen 0.0.0.0:${DEBUG_PORT} -m ${FLASK_MANAGE} run --host=0.0.0.0
 
@@ -58,7 +58,7 @@ CMD venv/bin/python -m debugpy --listen 0.0.0.0:${DEBUG_PORT} -m ${FLASK_MANAGE}
 FROM base as flask
 
 COPY --chown=bison:bison ./flask_app ./flask_app
-ENV FLASK_ENV=production
+#ENV FLASK_ENV=production
 CMD venv/bin/python -m gunicorn -w 4 --bind 0.0.0.0:5000 ${FLASK_APP}
 
 # ........................................................
@@ -76,7 +76,7 @@ RUN npm install
 RUN mkdir dist \
  && chown node:node dist
 
-#COPY --chown=node:node sppy/frontend/js_src .
+COPY --chown=node:node bison/frontend/js_src .
 
 
 # ........................................................

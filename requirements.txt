@@ -1,9 +1,15 @@
-# Python3.8
-boto3
-fastparquet
+# gdal (must be in system python, fails in virtenv)
+flask
+gunicorn==20.1.0
 numpy
+scipy
 pandas
 requests
-s3fs
-# gdal (must be in system python, fails in virtenv)
+Werkzeug==2.2.2
 rtree
+# AWS
+awscli
+botocore
+boto3>=1.34.60
+s3fs
+fastparquet

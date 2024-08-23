@@ -138,10 +138,10 @@ class BisonOutput(object):
         """Print a formatted string of the elements in an S2nOutput query response.
 
         Args:
-            response_dict: flask_app.broker.s2n_type.S2nOutput._response dictionary
+            response_dict: bison.common.constants.BisonOutput._response dictionary
             do_print_rec: True to print each record in the response.
         """
-        print("*** Analyst output ***")
+        print("*** Bison output ***")
         for name, attelt in response_dict.items():
             try:
                 if name == "records" and do_print_rec:

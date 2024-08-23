@@ -1,0 +1,23 @@
+version: "3.9"
+services:
+
+  bison:
+    build:
+      context: ./.
+      target: dev-flask
+    ports:
+      - "5001:5001"
+    environment:
+      - FLASK_APP=flask_app.bison.routes:app
+      - FLASK_MANAGE=flask_app.bison.manage
+      - DEBUG_PORT=5001
+    volumes:
+      - "./flask_app/:/home/bison/flask_app/"
+
+  front-end:
+    build:
+      context: ./.
+      target: base-front-end
+    command: ["npm", "run", "watch"]
+    volumes:
+      - "./bison/frontend/js_src/lib/:/home/node/lib/"

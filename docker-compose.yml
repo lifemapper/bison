@@ -15,6 +15,8 @@ services:
     volumes:
       # volumes
       - "scratch-path:/scratch-path"
+      - "webpack-output:/volumes/webpack-output"
+      - "static-files:/home/specify/sppy/frontend/static"
 
 
   nginx:

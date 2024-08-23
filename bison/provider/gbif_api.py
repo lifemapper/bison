@@ -1,8 +1,8 @@
 """Module to query GBIF APIs and return data."""
 import requests
 
-from obsolete.src.common.constants2 import GBIF
 from bison.provider.api import APISvc
+from bison.provider.constants import GBIF
 
 NEWLINE = "\n"
 CR_RETURN = "\r"
@@ -110,8 +110,6 @@ class GbifSvc(APISvc):
         Returns:
             a dictionary of name elements, with possible alternate matches
         """
-        # for replaceStr, withStr in GBIF.URL_ESCAPES:
-        #     sciname = sciname.replace(replaceStr, withStr)
         url = "{}?name={}".format(GBIF.FUZZY_TAXON_URL(), sciname)
         if kingdom:
             url = "{}&kingdom={}".format(url, kingdom)

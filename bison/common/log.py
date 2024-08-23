@@ -3,7 +3,13 @@ import logging
 import os
 import sys
 
-from obsolete.src.common.constants2 import LOG
+# .............................................................................
+DIR = "log"
+INTERVAL = 1000000
+FORMAT = " ".join(["%(asctime)s", "%(levelname)-8s", "%(message)s"])
+DATE_FORMAT = '%d %b %Y %H:%M'
+FILE_MAX_BYTES = 52000000
+FILE_BACKUP_COUNT = 5
 
 
 # .....................................................................................
@@ -40,7 +46,7 @@ class Logger:
         self.logger = logging.getLogger(logger_name)
         self.logger.setLevel(logging.DEBUG)
 
-        formatter = logging.Formatter(LOG.FORMAT, LOG.DATE_FORMAT)
+        formatter = logging.Formatter(FORMAT, DATE_FORMAT)
         for handler in handlers:
             handler.setLevel(self.log_level)
             handler.setFormatter(formatter)

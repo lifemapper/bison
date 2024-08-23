@@ -6,13 +6,13 @@ from flask_app.common.constants import (
     STATIC_DIR, TEMPLATE_DIR)
 from flask_app.common.constants import APIEndpoint
 
-analyst_blueprint = Blueprint(
-    "analyst", __name__, template_folder=TEMPLATE_DIR, static_folder=STATIC_DIR,
+bison_blueprint = Blueprint(
+    "bison", __name__, template_folder=TEMPLATE_DIR, static_folder=STATIC_DIR,
     static_url_path="/static")
 
 app = Flask(__name__)
 app.config["JSON_SORT_KEYS"] = False
-app.register_blueprint(analyst_blueprint)
+app.register_blueprint(bison_blueprint)
 
 
 # .....................................................................................
