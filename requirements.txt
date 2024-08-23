@@ -1,11 +1,11 @@
 # gdal (must be in system python, fails in virtenv)
 flask
-gunicorn==20.1.0
+gunicorn>=22.0.0
 numpy
 scipy
 pandas
 requests
-Werkzeug==2.2.2
+Werkzeug>=3.0.3
 rtree
 # AWS
 awscli
