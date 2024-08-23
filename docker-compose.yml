@@ -13,10 +13,12 @@ services:
       ./.env.conf
     restart: unless-stopped
     volumes:
+      # bind mount
+      - /home/ubuntu/aws_data:/volumes/aws_data
       # volumes
       - "scratch-path:/scratch-path"
       - "webpack-output:/volumes/webpack-output"
-      - "static-files:/home/specify/sppy/frontend/static"
+      - "static-files:/home/bison/bison/frontend/static"
 
 
   nginx:

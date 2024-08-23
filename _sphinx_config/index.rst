@@ -12,7 +12,15 @@ Current
     :maxdepth: 2
 
     pages/about
-    pages/year5
+    pages/workflow
+
+Using BISON
+------------
+
+.. toctree::
+    :maxdepth: 2
+
+    pages/interaction/about
 
 History
 ------------
@@ -23,5 +31,7 @@ History
     pages/history/year4_planB
     pages/history/year4_planA
     pages/history/year3
+    pages/history/year5
+    pages/history/aws_experiments
 
 * :ref:`genindex`

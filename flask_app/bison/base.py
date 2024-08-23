@@ -10,14 +10,14 @@ from flask_app.common.constants import APIEndpoint, APIService, BisonOutput
 
 try:
     # For docker deployment
-    DOWNLOAD_PATH = os.environ["WORKING_DIRECTORY"]
+    WORKING_PATH = os.environ["WORKING_DIRECTORY"]
     # Read-only volume
-    INPUT_DATA_PATH = os.environ["AWS_DATA_DIRECTORY"]
+    AWS_INPUT_PATH = os.environ["AWS_DATA_DIRECTORY"]
 except KeyError:
     # For local debugging
-    DOWNLOAD_PATH = '/tmp'
-    INPUT_DATA_PATH = DOWNLOAD_PATH
-LOG_PATH = os.path.join(DOWNLOAD_PATH, "log")
+    WORKING_PATH = '/tmp'
+    AWS_INPUT_PATH = WORKING_PATH
+LOG_PATH = os.path.join(WORKING_PATH, "log")
 
 app = Flask(__name__)
 
