@@ -5,7 +5,7 @@ numpy
 scipy
 pandas
 requests
-Werkzeug==2.2.2
+Werkzeug==3.0.3
 rtree
 # AWS
 awscli
