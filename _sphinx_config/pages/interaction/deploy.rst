@@ -1,11 +1,10 @@
-Deploy Specify Network
+Deploy BISON
 ##############################
 
-Create an EC2 instance
-========================
-
-Install BISON code
+Setup AWS resources
 =======================================
+
+`AWS Resource Setup <aws/aws_setup>`_.
 
 from Github repo in /home/ubuntu/
 

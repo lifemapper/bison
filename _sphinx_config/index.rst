@@ -14,6 +14,14 @@ Current
     pages/about
     pages/workflow
 
+Setup AWS
+------------
+
+.. toctree::
+    :maxdepth: 2
+
+    pages/aws/aws_setup
+
 Using BISON
 ------------
 
