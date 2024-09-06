@@ -27,12 +27,12 @@
           "arn": "arn:aws:s3:::bison-321942852011-us-east-1"
         },
         "object": {
-          "key": "bison_trigger_object.txt",
-          "size": 10,
+          "key": "bison_trigger_gbif_subset.txt",
+          "size": 11,
           "eTag": "27aaaa2e22208910dca498d5a1fe31a0",
           "sequencer": "0A1B2C3D4E5F678901"
         }
       }
     }
   ]
-}test_trigger_event.json
+}

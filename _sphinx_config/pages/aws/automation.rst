@@ -10,7 +10,7 @@ Create lambda function to initiate processing
   * The lambda function will delete the new file, and test the existence of
     GBIF data for the current month
 
-    * TODO: change to mount GBIF data in Redshift, subset, dismount
+    * TODO: change to mount GBIF data in Redshift, subset, unmount
 
 Edit the execution role for lambda function
 --------------------------------------------
@@ -19,6 +19,7 @@ Edit the execution role for lambda function
 * Open in a new window and under Permissions policies, Add permissions
 
   * bison_s3_policy
+  * redshift_glue_policy
 
 Create trigger to initiate lambda function
 ------------------------------------------------
@@ -54,3 +55,14 @@ AWS lambda function that queries Redshift
 --------------------------------------------
 
 https://repost.aws/knowledge-center/redshift-lambda-function-queries
+
+https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/redshift-data/client/execute_statement.html
+
+* Connect to a serverless workgroup (bison), namespace (bison), database name (dev)
+
+* When connecting to a serverless workgroup, specify the workgroup name and database
+  name. The database user name is derived from the IAM identity. For example,
+  arn:iam::123456789012:user:foo has the database user name IAM:foo. Also, permission
+  to call the redshift-serverless:GetCredentials operation is required.
+* need redshift:GetClusterCredentialsWithIAM permission for temporary authentication
+  with a role
