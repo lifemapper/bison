@@ -5,6 +5,7 @@ import botocore
 import botocore.session as bc
 from botocore.client import Config
 from datetime import datetime
+import time
 
 print('Loading function')
 
@@ -13,16 +14,18 @@ workgroup = "bison"
 database = "dev"
 dbuser = "IAM:aimee.stewart"
 dbuser = "arn:aws:iam::321942852011:role/service-role/bison_subset_gbif_lambda-role-9i5qvpux"
+# Lambda limit = 15 minutes = 900 seconds
 timeout = 900
+waittime = 10
 
 # Define the public bucket and file to query
 gbif_bucket = f"gbif-open-data-{region}"
 gbif_datestr = f"{datetime.now().year}-{datetime.now().month:02d}-01"
 parquet_key = f"occurrence/{gbif_datestr}/occurrence.parquet"
 bison_datestr = gbif_datestr.replace("-", "_")
+
 pub_schema = "public"
 external_schema = "redshift_spectrum"
-
 gbif_odr_data = f"s3://{gbif_bucket}/{parquet_key}/"
 mounted_gbif_name = f"{external_schema}.occurrence_{bison_datestr}_parquet"
 subset_bison_name = f"{pub_schema}.bison_{bison_datestr}"
@@ -102,7 +105,6 @@ subset_stmt = f"""
             ('HUMAN_OBSERVATION', 'OBSERVATION', 'OCCURRENCE', 'PRESERVED_SPECIMEN');
 """
 
-
 list_external_tables_stmt = f"""
     SELECT reloid AS tableid, nspname as schemaname, relname as tablename, relcreationtime
     FROM pg_class_info cls LEFT JOIN pg_namespace ns ON cls.relnamespace=ns.oid
@@ -142,114 +144,58 @@ client_redshift = session.client("redshift-data", config=config)
 def lambda_handler(event, context):
     print("*** Entered lambda_handler")
     # -------------------------------------
-    # Mount GBIF data
+    # Submit SQL statements
     try:
-        mount_response = client_redshift.execute_statement(
-            WorkgroupName=workgroup, Database=database, Sql=mount_stmt)
-        print(f"*** {mounted_gbif_name} mount successfully executed")
+        submit_result = client_redshift.batch_execute_statement(
+            WorkgroupName=workgroup,
+            Database=database,
+            Sqls=[
+                list_public_tables_stmt,
+            ],
+            StatementName='bison_batch_test',
+            WithEvent=True)
+        print("*** Batch execute returned")
 
     except botocore.exceptions.ConnectionError as e:
         client_redshift_1 = session.client("redshift-data", config=config)
-        mount_response = client_redshift_1.batch_execute_statement(
-            WorkgroupName=workgroup, Database=database, DbUser=dbuser, Sql=mount_stmt)
-        print(f"*** {mounted_gbif_name} mount after reestablishing the connection")
+        submit_result = client_redshift_1.batch_execute_statement(
+            WorkgroupName=workgroup,
+            Database=database,
+            Sqls=[
+                list_public_tables_stmt,
+            ],
+            StatementName='bison_batch_test',
+            WithEvent=True)
+        print("*** Batch execute returned after reestablishing the connection")
 
     except Exception as e:
         raise Exception(e)
 
-    print(str(mount_response))
-    curr_id = mount_response['Id']
+    for k, v in submit_result.items():
+        print(f"***     {k} = {v}")
+    curr_id = submit_result['Id']
     print(f"*** id = {curr_id}")
-    describe_response = client_redshift.describe_statement(Id=curr_id)
-    print(str(describe_response))
 
-    # # -------------------------------------
-    # # Mount GBIF data
-    # try:
-    #     mount_response = client_redshift.execute_statement(
-    #         WorkgroupName=workgroup, Database=database, Sql=mount_stmt)
-    #     print(f"*** {mounted_gbif_name} mount successfully executed")
-    #
-    # except botocore.exceptions.ConnectionError as e:
-    #     client_redshift_1 = session.client("redshift-data", config=config)
-    #     mount_response = client_redshift_1.execute_statement(
-    #         WorkgroupName=workgroup, Database=database, DbUser=dbuser, Sql=mount_stmt)
-    #     print(f"*** {mounted_gbif_name} mount after reestablishing the connection")
-    #
-    # except Exception as e:
-    #     raise Exception(e)
-    #
-    # print(str(mount_response))
-    # curr_id = mount_response['Id']
-    # print(f"*** id = {curr_id}")
-    # describe_response = client_redshift.describe_statement(Id=curr_id)
-    # print(str(describe_response))
-    # # -------------------------------------
-    # # Wait for success
-    #
-    # # -------------------------------------
-    # # Count GBIF records
-    # try:
-    #     count_gbif_response = client_redshift.execute_statement(
-    #         WorkgroupName=workgroup, Database=database, Sql=count_gbif_stmt)
-    #     print("*** GBIF count successfully executed")
-    #
-    # except botocore.exceptions.ConnectionError as e:
-    #     client_redshift_1 = session.client("redshift-data", config=config)
-    #     count_gbif_response = client_redshift_1.execute_statement(
-    #         WorkgroupName=workgroup, Database=database, DbUser=dbuser, Sql=mount_stmt)
-    #     print("*** GBIF count after reestablishing the connection")
-    #
-    # except Exception as e:
-    #     raise Exception(e)
-    #
-    # print(str(count_gbif_response))
-    # curr_id = count_gbif_response['Id']
-    # describe_response = client_redshift.describe_statement(Id=curr_id)
-    # print(f"*** id = {curr_id}")
-    # print(str(describe_response))
-    # # -------------------------------------
-    # # Subset GBIF data for BISON
-    # try:
-    #     subset_response = client_redshift.execute_statement(
-    #         WorkgroupName=workgroup, Database=database, Sql=subset_stmt)
-    #     print(f"*** Subset to {subset_bison_name} successfully executed")
-    #
-    # except botocore.exceptions.ConnectionError as e:
-    #     client_redshift_1 = session.client("redshift-data", config=config)
-    #     subset_response = client_redshift_1.execute_statement(
-    #         WorkgroupName=workgroup, Database=database, DbUser=dbuser, Sql=subset_stmt)
-    #     print(f"*** Subset to {subset_bison_name} after reestablishing the connection")
-    #
-    # except Exception as e:
-    #     raise Exception(e)
-    #
-    # print(f"*** id = {subset_response['Id']}")
-    # print(str(subset_response))
-    # # -------------------------------------
-    # # Count BISON records
-    # try:
-    #     count_bison_response = client_redshift.execute_statement(
-    #         WorkgroupName=workgroup, Database=database, DbUser=dbuser, Sql=count_bison_stmt)
-    #     print("*** BISON count successfully executed")
-    #
-    # except botocore.exceptions.ConnectionError as e:
-    #     client_redshift_1 = session.client("redshift-data", config=config)
-    #     count_bison_response = client_redshift_1.execute_statement(
-    #         WorkgroupName=workgroup, Database=database, Sql=count_bison_stmt)
-    #     print("*** BISON count after reestablishing the connection")
-    #
-    # except Exception as e:
-    #     raise Exception(e)
-
-    print(f"*** id = {count_bison_response['Id']}")
-    print(str(count_bison_response))
     # -------------------------------------
-    # Place test file in bucket to indicate success
-    s3 = boto3.client('s3', region_name=region)
-    s3.put_object(Body=test_content, Bucket=bison_bucket, Key=test_fname)
+    # Loop til complete
+    elapsed_time = 0
+    while True and elapsed_time < timeout:
+        describe_result = client_redshift.describe_statement(Id=curr_id)
+        status = describe_result["Status"]
+        print(f"*** Query Status - {status} after {elapsed_time} seconds")
+        if (status == "FINISHED"):
+            break;
+        else:
+            time.sleep(waittime)
+            elapsed_time += waittime
+
+    # -------------------------------------
+    # Get statement output
+    # stmt_result = client_redshift.get_statement_result(Id=curr_id)
+    # for k, v in stmt_result.items():
+    #     print(f"***     {k} = {v}")
 
     return {
         'statusCode': 200,
-        'body': json.dumps(f"Lambda result: {str(mount_response)}")
+        'body': json.dumps(f"Lambda result: {str(submit_result)}")
     }
