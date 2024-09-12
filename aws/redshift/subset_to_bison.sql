@@ -1,3 +1,4 @@
+
 -- Mount S3 GBIF Open Data Registry as an external table, then subset it for BISON
 
 -------------------
@@ -10,14 +11,28 @@
 -- Mount GBIF
 -- -------------------------------------------------------------------------------------
 -- Create a schema for mounting external data
--- Throws error if pre-existing
-CREATE external schema redshift_spectrum
+-- Throws error if pre-existing??
+-- This also creates a new external database "dev", though it appears in the console to
+--    be the same "dev" database that contains the public schema.
+DROP EXTERNAL SCHEMA redshift_spectrum;
+CREATE EXTERNAL SCHEMA IF NOT EXISTS redshift_spectrum
     FROM data catalog
-    DATABASE dev
-    IAM_ROLE 'arn:aws:iam::321942852011:role/service-role/AmazonRedshift-CommandsAccessRole-20231129T105842'
+    DATABASE 'dev'
+    -- Same role as namespace
+    IAM_ROLE 'arn:aws:iam::321942852011:role/bison_redshift_s3_role'
     CREATE external database if NOT exists;
 
+-- If change IAM role, do this:
+--GRANT USAGE TO redshift_spectrum to "IAMR:bison_subset_gbif_lambda-role-9i5qvpux";
+GRANT ALL ON ALL TABLES IN SCHEMA redshift_spectrum
+    TO ROLE 'arn:aws:iam::321942852011:role/service-role/bison_subset_gbif_lambda-role-9i5qvpux';
+
+
+
 -- Mount a table of current GBIF ODR data in S3
+-- An error indicating that the "dev" database does not exist, refers to the external
+--    database, and may indicate that the role used by the command and/or namespace
+--    differs from the role granted to the schema upon creation.
 CREATE EXTERNAL TABLE redshift_spectrum.occurrence_2024_09_01_parquet (
     gbifid	VARCHAR(max),
     datasetkey	VARCHAR(max),
@@ -73,11 +88,12 @@ CREATE EXTERNAL TABLE redshift_spectrum.occurrence_2024_09_01_parquet (
     STORED AS PARQUET
     LOCATION 's3://gbif-open-data-us-east-1/occurrence/2024-09-01/occurrence.parquet/';
 
+
 -- -------------------------------------------------------------------------------------
 -- Subset for BISON
 -- -------------------------------------------------------------------------------------
 -- Drop previous table;
-DROP TABLE IF EXISTS public.bison_2024_07_01;
+DROP TABLE IF EXISTS public.bison_2024_08_01;
 -- Create a BISON table with a subset of records and subset of fields
 -- TODO: This includes lat/lon, allowing final export to Parquet after deleting geom
 CREATE TABLE public.bison_2024_09_01 AS
@@ -97,19 +113,6 @@ CREATE TABLE public.bison_2024_09_01 AS
 	  -- https://gbif.github.io/gbif-api/apidocs/org/gbif/api/vocabulary/BasisOfRecord.html
 	  AND basisofrecord IN
 	    ('HUMAN_OBSERVATION', 'OBSERVATION', 'OCCURRENCE', 'PRESERVED_SPECIMEN');
-
--- -------------------------------------------------------------------------------------
--- Misc Queries
--- -------------------------------------------------------------------------------------
--- Count records from full GBIF and BISON subset
-SELECT COUNT(*) from dev.redshift_spectrum.occurrence_2024_09_01_parquet;
-SELECT COUNT(*) FROM public.bison_2024_09_01;
-
--- List Redshift tables and creation times
-SELECT reloid AS tableid, nspname as schemaname, relname as tablename, relcreationtime
-FROM pg_class_info cls LEFT JOIN pg_namespace ns ON cls.relnamespace=ns.oid
-WHERE cls.relnamespace = ns.oid
-  AND schemaname = 'public';
 
 -- -------------------------------------------------------------------------------------
 -- Unmount original GBIF data

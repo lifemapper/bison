@@ -47,7 +47,7 @@ CREATE TABLE riisv2_2024_08_01 (
 );
 
 COPY riisv2_2024_08_01
-FROM 's3://bison-321942852011-us-east-1/input_data/USRIISv2_MasterList_annotated_2024_08_01.csv'
+FROM 's3://bison-321942852011-us-east-1/input/USRIISv2_MasterList_annotated_2024_08_01.csv'
 FORMAT CSV
 IAM_role DEFAULT;
 
@@ -75,7 +75,7 @@ CREATE TABLE aiannh2023 (
 );
 
 COPY aiannh2023
-FROM 's3://bison-321942852011-us-east-1/input_data/cb_2023_us_aiannh_500k.shp'
+FROM 's3://bison-321942852011-us-east-1/input/cb_2023_us_aiannh_500k.shp'
 FORMAT SHAPEFILE
 IAM_role DEFAULT;
 
@@ -103,7 +103,7 @@ CREATE TABLE county2023 (
 );
 
 COPY county2023
-FROM 's3://bison-321942852011-us-east-1/input_data/cb_2023_us_county_500k.shp'
+FROM 's3://bison-321942852011-us-east-1/input/cb_2023_us_county_500k.shp'
 FORMAT SHAPEFILE
 IAM_role DEFAULT;
 
@@ -126,13 +126,11 @@ CREATE TABLE pad1 (
    GIS_Acres VARCHAR(max)
 );
 
-COPY pad1 FROM 's3://bison-321942852011-us-east-1/input_data/pad_4.0_gap1_4326.shp'
+COPY pad1 FROM 's3://bison-321942852011-us-east-1/input/pad_4.0_gap1_4326.shp'
 FORMAT SHAPEFILE
 SIMPLIFY AUTO
 IAM_role DEFAULT;
 
-SELECT query_id, start_time, line_number, column_name, column_type, error_message
-    FROM sys_load_error_detail ORDER BY start_time DESC;
 
 ---- -------------------------------------------------------------------------------------
 ---- -------------------------------------------------------------------------------------

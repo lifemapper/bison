@@ -13,14 +13,29 @@ bison_redshift_s3_role
 
 * Policies:
 
+  * AmazonRedshiftAllCommandsFullAccess (AWS managed)
+  * AmazonRedshiftDataFullAccess (AWS managed)
+  * AmazonRedshiftFullAccess (AWS managed)
   * bison_s3_policy (read public/GBIF S3 data and read/write bison S3 data)
   * redshift_glue_policy.json (for Redshift interactions)
-  * AmazonRedshiftAllCommandsFullAccess (AWS managed)
+
   * AmazonS3FullAccess (AWS managed)
 
 * Trust policy:
 
   *
+
+bison_redshift_lambda_role
+------------------------
+
+Attach to BISON lambda functions
+
+  * AmazonRedshiftAllCommandsFullAccess (AWS managed)
+  * AmazonRedshiftDataFullAccess (AWS managed)
+  * AmazonRedshiftFullAccess (AWS managed)
+  * bison_lambda_log_policy (write CloudWatch logs to bison log groups)
+    TODO: add new log group for each lambda function
+  * bison_s3_policy (read public/GBIF S3 data and read/write bison S3 data)
 
 .. _bison_ec2_s3_role:
 

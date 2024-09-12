@@ -1,10 +1,8 @@
-import os
-import json
 import boto3
-import botocore
 import botocore.session as bc
 from botocore.client import Config
 from datetime import datetime
+import time
 
 print('Loading function')
 
@@ -12,16 +10,18 @@ region = "us-east-1"
 workgroup = "bison"
 database = "dev"
 dbuser = "IAM:aimee.stewart"
-dbuser = "arn:aws:iam::321942852011:role/service-role/bison_subset_gbif_lambda-role-9i5qvpux"
+dbuser = "arn:aws:iam::321942852011:role/service-role/bison_redshift_lambda_role"
 timeout = 900
+waittime = 2
+bison_bucket = 'bison-321942852011-us-east-1'
+pub_schema = "public"
+external_schema = "redshift_spectrum"
 
 # Define the public bucket and file to query
 gbif_bucket = f"gbif-open-data-{region}"
 gbif_datestr = f"{datetime.now().year}-{datetime.now().month:02d}-01"
 parquet_key = f"occurrence/{gbif_datestr}/occurrence.parquet"
 bison_datestr = gbif_datestr.replace("-", "_")
-pub_schema = "public"
-external_schema = "redshift_spectrum"
 
 gbif_odr_data = f"s3://{gbif_bucket}/{parquet_key}/"
 mounted_gbif_name = f"{external_schema}.occurrence_{bison_datestr}_parquet"
@@ -102,30 +102,11 @@ subset_stmt = f"""
             ('HUMAN_OBSERVATION', 'OBSERVATION', 'OCCURRENCE', 'PRESERVED_SPECIMEN');
 """
 
-
-list_external_tables_stmt = f"""
-    SELECT reloid AS tableid, nspname as schemaname, relname as tablename, relcreationtime
-    FROM pg_class_info cls LEFT JOIN pg_namespace ns ON cls.relnamespace=ns.oid
-    WHERE cls.relnamespace = ns.oid
-      AND schemaname = '{external_schema}';
-"""
-
-list_public_tables_stmt = f"""
-    SELECT reloid AS tableid, nspname as schemaname, relname as tablename, relcreationtime
-    FROM pg_class_info cls LEFT JOIN pg_namespace ns ON cls.relnamespace=ns.oid
-    WHERE cls.relnamespace = ns.oid
-      AND schemaname = '{pub_schema}';
-"""
-
 count_gbif_stmt = f"SELECT COUNT(*) from {mounted_gbif_name};"
 count_bison_stmt = f"SELECT COUNT(*) FROM {subset_bison_name};"
 unmount_stmt = f"DROP TABLE {mounted_gbif_name};"
-bison_bucket = 'bison-321942852011-us-east-1'
-test_fname = 'bison_trigger_success.txt'
-test_content = 'Success = True'
 
 session = boto3.session.Session()
-region = "us-east-1"
 
 # Initializing Botocore client
 bc_session = bc.get_session()
@@ -144,112 +125,41 @@ def lambda_handler(event, context):
     # -------------------------------------
     # Mount GBIF data
     try:
-        mount_response = client_redshift.execute_statement(
+        submit_result = client_redshift.execute_statement(
             WorkgroupName=workgroup, Database=database, Sql=mount_stmt)
-        print(f"*** {mounted_gbif_name} mount successfully executed")
-
-    except botocore.exceptions.ConnectionError as e:
-        client_redshift_1 = session.client("redshift-data", config=config)
-        mount_response = client_redshift_1.batch_execute_statement(
-            WorkgroupName=workgroup, Database=database, DbUser=dbuser, Sql=mount_stmt)
-        print(f"*** {mounted_gbif_name} mount after reestablishing the connection")
+        print("*** Mount submitted")
 
     except Exception as e:
         raise Exception(e)
 
-    print(str(mount_response))
-    curr_id = mount_response['Id']
+    curr_id = submit_result['Id']
     print(f"*** id = {curr_id}")
     describe_response = client_redshift.describe_statement(Id=curr_id)
     print(str(describe_response))
 
-    # # -------------------------------------
-    # # Mount GBIF data
-    # try:
-    #     mount_response = client_redshift.execute_statement(
-    #         WorkgroupName=workgroup, Database=database, Sql=mount_stmt)
-    #     print(f"*** {mounted_gbif_name} mount successfully executed")
-    #
-    # except botocore.exceptions.ConnectionError as e:
-    #     client_redshift_1 = session.client("redshift-data", config=config)
-    #     mount_response = client_redshift_1.execute_statement(
-    #         WorkgroupName=workgroup, Database=database, DbUser=dbuser, Sql=mount_stmt)
-    #     print(f"*** {mounted_gbif_name} mount after reestablishing the connection")
-    #
-    # except Exception as e:
-    #     raise Exception(e)
-    #
-    # print(str(mount_response))
-    # curr_id = mount_response['Id']
-    # print(f"*** id = {curr_id}")
-    # describe_response = client_redshift.describe_statement(Id=curr_id)
-    # print(str(describe_response))
-    # # -------------------------------------
-    # # Wait for success
-    #
-    # # -------------------------------------
-    # # Count GBIF records
-    # try:
-    #     count_gbif_response = client_redshift.execute_statement(
-    #         WorkgroupName=workgroup, Database=database, Sql=count_gbif_stmt)
-    #     print("*** GBIF count successfully executed")
-    #
-    # except botocore.exceptions.ConnectionError as e:
-    #     client_redshift_1 = session.client("redshift-data", config=config)
-    #     count_gbif_response = client_redshift_1.execute_statement(
-    #         WorkgroupName=workgroup, Database=database, DbUser=dbuser, Sql=mount_stmt)
-    #     print("*** GBIF count after reestablishing the connection")
-    #
-    # except Exception as e:
-    #     raise Exception(e)
-    #
-    # print(str(count_gbif_response))
-    # curr_id = count_gbif_response['Id']
-    # describe_response = client_redshift.describe_statement(Id=curr_id)
-    # print(f"*** id = {curr_id}")
-    # print(str(describe_response))
-    # # -------------------------------------
-    # # Subset GBIF data for BISON
-    # try:
-    #     subset_response = client_redshift.execute_statement(
-    #         WorkgroupName=workgroup, Database=database, Sql=subset_stmt)
-    #     print(f"*** Subset to {subset_bison_name} successfully executed")
-    #
-    # except botocore.exceptions.ConnectionError as e:
-    #     client_redshift_1 = session.client("redshift-data", config=config)
-    #     subset_response = client_redshift_1.execute_statement(
-    #         WorkgroupName=workgroup, Database=database, DbUser=dbuser, Sql=subset_stmt)
-    #     print(f"*** Subset to {subset_bison_name} after reestablishing the connection")
-    #
-    # except Exception as e:
-    #     raise Exception(e)
-    #
-    # print(f"*** id = {subset_response['Id']}")
-    # print(str(subset_response))
-    # # -------------------------------------
-    # # Count BISON records
-    # try:
-    #     count_bison_response = client_redshift.execute_statement(
-    #         WorkgroupName=workgroup, Database=database, DbUser=dbuser, Sql=count_bison_stmt)
-    #     print("*** BISON count successfully executed")
-    #
-    # except botocore.exceptions.ConnectionError as e:
-    #     client_redshift_1 = session.client("redshift-data", config=config)
-    #     count_bison_response = client_redshift_1.execute_statement(
-    #         WorkgroupName=workgroup, Database=database, Sql=count_bison_stmt)
-    #     print("*** BISON count after reestablishing the connection")
-    #
-    # except Exception as e:
-    #     raise Exception(e)
+    submit_id = submit_result['Id']
+    print(f"*** submit id = {submit_id}")
+    for k, v in submit_result.items():
+        print(f"***     {k} = {v}")
 
-    print(f"*** id = {count_bison_response['Id']}")
-    print(str(count_bison_response))
     # -------------------------------------
-    # Place test file in bucket to indicate success
-    s3 = boto3.client('s3', region_name=region)
-    s3.put_object(Body=test_content, Bucket=bison_bucket, Key=test_fname)
-
-    return {
-        'statusCode': 200,
-        'body': json.dumps(f"Lambda result: {str(mount_response)}")
-    }
+    # Loop til complete, then describe result
+    elapsed_time = 0
+    complete = False
+    while not complete and elapsed_time < 300:
+        try:
+            describe_result = client_redshift.describe_statement(Id=submit_id)
+            status = describe_result["Status"]
+            print(f"*** Query Status - {status} after {elapsed_time} seconds")
+            if status in ("ABORTED", "FAILED", "FINISHED"):
+                complete = True
+                desc_id = describe_result['Id']
+                print(f"*** desc id = {desc_id}")
+                for k, v in describe_result.items():
+                    print(f"***    {k} = {v}")
+            else:
+                time.sleep(waittime)
+                elapsed_time += waittime
+        except Exception as e:
+            print(f"Failed to describe_statement {e}")
+            complete = True
