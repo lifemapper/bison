@@ -6,7 +6,9 @@ Roles, Policies, Trust Relationships
 bison_redshift_s3_role
 ------------------------------
 
-* Trusted entity type: AWS Service
+Attach to BISON namespace (Redshift)
+* Regular role
+* Trust relationships: Service: "redshift.amazonaws.com"
 * for Redshift - Customizable
 
   * TODO: change to Redshift - Scheduler when automated
@@ -16,6 +18,7 @@ bison_redshift_s3_role
   * AmazonRedshiftAllCommandsFullAccess (AWS managed)
   * AmazonRedshiftDataFullAccess (AWS managed)
   * AmazonRedshiftFullAccess (AWS managed)
+  * bison_lambda_log_policy (write CloudWatch logs to bison log groups)
   * bison_s3_policy (read public/GBIF S3 data and read/write bison S3 data)
   * redshift_glue_policy.json (for Redshift interactions)
 
@@ -28,14 +31,12 @@ bison_redshift_s3_role
 bison_redshift_lambda_role
 ------------------------
 
-Attach to BISON lambda functions
+* Service role
+* Trust relationships: Services: ["lambda.amazonaws.com", "redshift.amazonaws.com"]
+* Attached to BISON lambda functions
+* Attach to BISON namespace (Redshift)
 
-  * AmazonRedshiftAllCommandsFullAccess (AWS managed)
-  * AmazonRedshiftDataFullAccess (AWS managed)
-  * AmazonRedshiftFullAccess (AWS managed)
-  * bison_lambda_log_policy (write CloudWatch logs to bison log groups)
-    TODO: add new log group for each lambda function
-  * bison_s3_policy (read public/GBIF S3 data and read/write bison S3 data)
+  * same as bison_redshift_s3_role
 
 .. _bison_ec2_s3_role:
 
@@ -52,3 +53,5 @@ bison_ec2_s3_role
 * Trust relationship:
 
   * ec2_s3_role_trust_policy.json edit trust policy for both ec2 and s3
+
+

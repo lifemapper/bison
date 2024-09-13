@@ -10,8 +10,7 @@ print('Loading function')
 region = "us-east-1"
 workgroup = "bison"
 database = "dev"
-dbuser = "IAM:aimee.stewart"
-dbuser = "arn:aws:iam::321942852011:role/service-role/bison_subset_gbif_lambda-role-9i5qvpux"
+iam_role = "arn:aws:iam::321942852011:role/service-role/bison_redshift_lambda_role"
 pub_schema = "public"
 external_schema = "redshift_spectrum"
 timeout = 900
@@ -26,6 +25,14 @@ bison_datestr = gbif_datestr.replace("-", "_")
 gbif_odr_data = f"s3://{gbif_bucket}/{parquet_key}/"
 mounted_gbif_name = f"{external_schema}.occurrence_{bison_datestr}_parquet"
 subset_bison_name = f"{pub_schema}.bison_{bison_datestr}"
+
+create_schema_stmt = f"""
+    CREATE EXTERNAL SCHEMA IF NOT EXISTS {external_schema}
+        FROM data catalog
+        DATABASE 'dev'
+        IAM_ROLE DEFAULT
+        CREATE external database IF NOT EXISTS;
+"""
 
 mount_stmt = f"""
     CREATE EXTERNAL TABLE {mounted_gbif_name} (
@@ -131,7 +138,7 @@ def lambda_handler(event, context):
     try:
         submit_result = client_redshift.execute_statement(
             WorkgroupName=workgroup, Database=database, Sql=mount_stmt)
-        print(f"*** Mount command submitted")
+        print(f"*** Command submitted")
 
     except Exception as e:
         raise Exception(e)
@@ -162,21 +169,6 @@ def lambda_handler(event, context):
         except Exception as e:
             print(f"Failed to describe_statement {e}")
             complete = True
-
-    # # # -------------------------------------
-    # # # IFF query, get statement output
-    # try:
-    #     stmt_result = client_redshift.get_statement_result(Id=submit_id)
-    # except Exception as e:
-    #     print(f"*** No get_statement_result {e}")
-    # else:
-    #     print("*** get_statement_result records")
-    #     try:
-    #         records = stmt_result["Records"]
-    #         for rec in records:
-    #             print(f"***     {rec}")
-    #     except Exception as e:
-    #         print(f"Failed to return records ({e})")
 
     return {
         'statusCode': 200,

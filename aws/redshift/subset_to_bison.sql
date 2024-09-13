@@ -19,14 +19,21 @@ CREATE EXTERNAL SCHEMA IF NOT EXISTS redshift_spectrum
     FROM data catalog
     DATABASE 'dev'
     -- Same role as namespace
-    IAM_ROLE 'arn:aws:iam::321942852011:role/bison_redshift_s3_role'
+--    IAM_ROLE 'arn:aws:iam::321942852011:role/service-role/bison_redshift_lambda_role'
+    IAM_ROLE default
     CREATE external database if NOT exists;
 
--- If change IAM role, do this:
---GRANT USAGE TO redshift_spectrum to "IAMR:bison_subset_gbif_lambda-role-9i5qvpux";
-GRANT ALL ON ALL TABLES IN SCHEMA redshift_spectrum
-    TO ROLE 'arn:aws:iam::321942852011:role/service-role/bison_subset_gbif_lambda-role-9i5qvpux';
+GRANT ASSUMEROLE
+       ON 'arn:aws:iam::321942852011:role/service-role/bison_redshift_lambda_role'
+       TO ROLE IAMR:bison_redshift_lambda_role
+       FOR ALL;
 
+---- If change IAM role, do this:
+----GRANT USAGE TO redshift_spectrum to "IAMR:bison_subset_gbif_lambda-role-9i5qvpux";
+--GRANT ALL ON ALL TABLES IN SCHEMA redshift_spectrum
+--    TO ROLE 'arn:aws:iam::321942852011:role/service-role/bison_subset_gbif_lambda-role-9i5qvpux';
+--GRANT ALL ON ALL TABLES IN SCHEMA redshift_spectrum
+--    TO ROLE 'arn:aws:iam::321942852011:role/service-role/bison_redshift_lambda_role';
 
 
 -- Mount a table of current GBIF ODR data in S3
