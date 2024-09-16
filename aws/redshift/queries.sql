@@ -16,9 +16,22 @@ WHERE cls.relnamespace = ns.oid
 SELECT * FROM svv_all_schemas WHERE database_name = 'dev'
 ORDER BY database_name, SCHEMA_NAME;
 
-select current_user;
+SELECT current_user;
+
+GRANT CREATE
+    ON DATABASE dev
+    TO IAMR:bison_redshift_lambda_role
+SELECT has_database_privilege('IAMR:bison_redshift_lambda_role', 'dev', 'create');
+
+GRANT ALL
+	ON SCHEMA public
+	TO IAMR:bison_redshift_lambda_role
+SELECT has_schema_privilege('IAMR:bison_redshift_lambda_role','public','usage');
+
+SELECT has_table_privilege( 'IAMR:bison_redshift_lambda_role', 'aiannh_counts_2024_08_01', 'usage')
+
 SELECT * FROM PG_USER_INFO;
 
 SHOW DATABASES FROM DATA CATALOG IAM_ROLE default ;
 SHOW SCHEMAS FROM DATABASE dev;
-SHOW TABLES FROM SCHEMA dev.public;
+SHOW TABLES FROM SCHEMA dev.public LIKE '%_2024_08_01';

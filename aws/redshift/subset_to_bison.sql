@@ -18,10 +18,10 @@ DROP EXTERNAL SCHEMA redshift_spectrum;
 CREATE EXTERNAL SCHEMA IF NOT EXISTS redshift_spectrum
     FROM data catalog
     DATABASE 'dev'
-    -- Same role as namespace
---    IAM_ROLE 'arn:aws:iam::321942852011:role/service-role/bison_redshift_lambda_role'
     IAM_ROLE default
     CREATE external database if NOT exists;
+
+'arn:aws:redshift-serverless:us-east-1:321942852011:namespace/75c14076-70c7-43c3-8a7e-53425e1eb43e'
 
 GRANT ASSUMEROLE
        ON 'arn:aws:iam::321942852011:role/service-role/bison_redshift_lambda_role'

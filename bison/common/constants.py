@@ -7,6 +7,8 @@ GBIF_ARN = "arn:aws:s3:::gbif-open-data-us-east-1"
 GBIF_ODR_FNAME = "occurrence.parquet"
 
 PROJ_BUCKET = f"{PROJ_NAME}-321942852011-us-east-1"
+PROJ_INPUT_PATH = "input"
+PROJ_ROLE = "arn:aws:iam::321942852011:role/service-role/bison_redshift_lambda_role"
 SPOT_TEMPLATE_BASENAME = "launch_template"
 
 KEY_NAME = "aimee-aws-key"

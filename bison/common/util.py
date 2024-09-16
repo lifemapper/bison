@@ -5,6 +5,7 @@
 import base64
 import boto3
 from botocore.exceptions import ClientError
+import botocore.session as bc
 import csv
 import datetime as DT
 import logging
@@ -16,7 +17,7 @@ import traceback
 
 from bison.common.constants import (
     ENCODING, INSTANCE_TYPE, KEY_NAME, LOGFILE_MAX_BYTES, LOG_FORMAT, LOG_DATE_FORMAT,
-    PROJ_NAME, REGION, SECURITY_GROUP_ID, SPOT_TEMPLATE_BASENAME, USER_DATA_TOKEN)
+    PROJ_NAME, REGION, SECURITY_GROUP_ID, SPOT_TEMPLATE_BASENAME, USER_DATA_TOKEN, PROJ_ROLE)
 
 
 # --------------------------------------------------------------------------------------
@@ -263,8 +264,7 @@ def get_current_datadate_str():
     """
     n = DT.datetime.now()
     date_str = f"{n.year}_{n.month:02d}_01"
-    # TODO: delete this testing-only value
-    date_str = "2024_08_01"
+    # date_str = "2024_08_01"
     return date_str
 
 
@@ -371,8 +371,6 @@ def upload_trigger_to_s3(trigger_name, s3_bucket, s3_bucket_path, region=REGION)
 #     parquet_buffer.seek(0)
 #     s3_client.upload_fileobj(parquet_buffer, bucket, parquet_path)
 
-
-# ----------------------------------------------------
 def upload_to_s3(local_filename, bucket, s3_path, region=REGION):
     """Upload a file to S3.
 
@@ -382,10 +380,24 @@ def upload_to_s3(local_filename, bucket, s3_path, region=REGION):
         s3_path: the data destination inside the S3 bucket (without filename).
         region: AWS region to query.
     """
-    s3_client = boto3.client("s3", region_name=region)
+    s3_client = boto3.client("ec2", region_name=region)
     filename = os.path.split(local_filename)[1]
     s3_client.upload_file(local_filename, bucket, s3_path)
     print(f"Successfully uploaded {filename} to s3://{bucket}/{s3_path}")
+
+
+# ----------------------------------------------------
+def _get_authenticated_session(region):
+    session = boto3.Session()
+    sts = session.client("sts", region_name=region)
+    response = sts.assume_role(
+        RoleArn=PROJ_ROLE, RoleSessionName="authenticated-bison-session")
+    creds = response['Credentials']
+    new_session = boto3.Session(
+        aws_access_key_id=creds['AccessKeyId'],
+        aws_secret_access_key=creds['SecretAccessKey'],
+        aws_session_token=creds['SessionToken'])
+    return new_session
 
 
 # ----------------------------------------------------

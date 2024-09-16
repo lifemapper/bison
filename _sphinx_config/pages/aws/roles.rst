@@ -8,10 +8,9 @@ bison_redshift_s3_role
 
 Attach to BISON namespace (Redshift)
 * Regular role
-* Trust relationships: Service: "redshift.amazonaws.com"
-* for Redshift - Customizable
+* Trust relationships
 
-  * TODO: change to Redshift - Scheduler when automated
+  * service: "redshift.amazonaws.com"
 
 * Policies:
 
@@ -24,19 +23,33 @@ Attach to BISON namespace (Redshift)
 
   * AmazonS3FullAccess (AWS managed)
 
-* Trust policy:
+* for Redshift - Customizable
 
-  *
+  * TODO: change to Redshift - Scheduler when automated
+
 
 bison_redshift_lambda_role
 ------------------------
 
 * Service role
-* Trust relationships: Services: ["lambda.amazonaws.com", "redshift.amazonaws.com"]
+* Trust relationships
+
+  * Services: ["lambda.amazonaws.com", "redshift.amazonaws.com"]
+
+* Policies:
+
+  * same as bison_redshift_s3_role
+
+* In Redshift, GRANT permissions to database::
+
+    GRANT CREATE
+        ON DATABASE dev
+        TO IAMR:bison_redshift_lambda_role
+
 * Attached to BISON lambda functions
 * Attach to BISON namespace (Redshift)
 
-  * same as bison_redshift_s3_role
+
 
 .. _bison_ec2_s3_role:
 
