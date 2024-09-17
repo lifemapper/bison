@@ -41,6 +41,7 @@ CREATE TABLE public.tmp_bison_x_county AS
 	SELECT bison.gbifid, county2023.stusps, county2023.namelsad
 	FROM county2023, public.bison_2024_08_01 as bison
 	WHERE ST_intersects(ST_SetSRID(bison.geom, 4326), ST_SetSRID(county2023.shape, 4326));
+
 -- Add census values to BISON subset
 UPDATE public.bison_2024_08_01 AS bison
 	SET census_state = tmp.stusps, census_county = tmp.namelsad
