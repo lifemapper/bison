@@ -35,3 +35,8 @@ SELECT * FROM PG_USER_INFO;
 SHOW DATABASES FROM DATA CATALOG IAM_ROLE default ;
 SHOW SCHEMAS FROM DATABASE dev;
 SHOW TABLES FROM SCHEMA dev.public LIKE '%_2024_08_01';
+
+SELECT gbifid, species, taxonkey, decimallongitude, decimallatitude, census_county, census_state, aiannh_name
+from bison_2024_09_01 WHERE aiannh_name IS NOT NULL LIMIT 10;
+
+SELECT count(*) from bison_2024_09_01 WHERE aiannh_name IS NOT NULL;

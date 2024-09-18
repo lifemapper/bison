@@ -181,15 +181,11 @@ for ttyp, tbl in ancillary_data.items():
         stmt = f"ALTER TABLE {bison_tbl} ADD COLUMN {bison_fld} {bison_typ} DEFAULT NULL;"
         COMMANDS.append((f"add_{bison_fld}", stmt))
 
-# Initializing Botocore client
+# Initialize Botocore session
 session = boto3.session.Session()
 bc_session = bc.get_session()
-session = boto3.Session(
-    botocore_session=bc_session,
-    region_name=region
-)
-
-# Initializing Redshift's client
+session = boto3.Session(botocore_session=bc_session, region_name=region)
+# Initialize Redshift client
 config = Config(connect_timeout=timeout, read_timeout=timeout)
 client_redshift = session.client("redshift-data", config=config)
 
@@ -209,7 +205,7 @@ def lambda_handler(event, context):
         submit_id = submit_result['Id']
 
         # -------------------------------------
-        # Loop til complete, then describe result
+        # Loop til complete, then get result status
         elapsed_time = 0
         complete = False
         while not complete:

@@ -162,17 +162,14 @@ fill_riis_stmt = f"""
         IAM_role DEFAULT;
 """
 
-# Initializing Botocore client
+# Initialize Botocore session
 session = boto3.session.Session()
 bc_session = bc.get_session()
-session = boto3.Session(
-    botocore_session=bc_session,
-    region_name=region
-)
-
-# Initializing Redshift's client
+session = boto3.Session(botocore_session=bc_session, region_name=region)
+# Initialize Redshift client
 config = Config(connect_timeout=timeout, read_timeout=timeout)
 client_redshift = session.client("redshift-data", config=config)
+
 COMMANDS = [
     ("query_tables", query_tables_stmt, None),
     ("create_aiannh", create_aiannh_stmt, aiannh_tbl),
@@ -200,7 +197,7 @@ def lambda_handler(event, context):
             submit_id = submit_result['Id']
 
             # -------------------------------------
-            # Loop til complete, then describe result
+            # Loop til complete, then get result status
             elapsed_time = 0
             complete = False
             while not complete:
