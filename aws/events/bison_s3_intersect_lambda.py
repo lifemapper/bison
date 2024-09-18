@@ -170,10 +170,10 @@ COMMANDS.extend([
     # ("fill_aiannh", fill_aiannh_stmt),
     # # 1 sec
     # ("drop_tmp_aiannh", drop_tmp_aiannh_stmt),
-    # # 11 sec
-    # ("update_akhi", update_akhi_stmt),
-    # # 42 sec
-    # ("update_l48", update_l48_stmt),
+    # 11 sec
+    ("update_akhi", update_akhi_stmt),
+    # 42 sec
+    ("update_l48", update_l48_stmt),
 
     ("update_assess", update_assess_stmt),
     ("update_presumed", update_presumed_stmt)

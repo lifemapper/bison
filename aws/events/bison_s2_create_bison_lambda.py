@@ -7,19 +7,23 @@ import time
 
 print('Loading function')
 
+# AWS region for all services
 region = "us-east-1"
+# Redshift settings
 workgroup = "bison"
 database = "dev"
 iam_role = "arn:aws:iam::321942852011:role/service-role/bison_redshift_lambda_role"
 db_user = "IAMR:bison_redshift_lambda_role"
 pub_schema = "public"
 external_schema = "redshift_spectrum"
+# S3 settings
+bison_bucket = "bison-321942852011-us-east-1"
+input_folder = "input"
+# Timeout/check results times
 timeout = 900
-waittime = 2
-test_fname = 'bison_trigger_success.txt'
-test_content = 'Success = True'
+waittime = 1
 
-# Get previous data date
+# Dataload filename postfixes
 yr = datetime.now().year
 mo = datetime.now().month
 prev_yr = yr
@@ -30,21 +34,22 @@ if mo == 1:
 bison_datestr = f"{yr}_{mo:02d}_01"
 old_bison_datestr = f"{prev_yr}_{prev_mo:02d}_01"
 
-# Define the public bucket and file to query
+# S3 GBIF bucket and file to query
 gbif_bucket = f"gbif-open-data-{region}"
 gbif_datestr = f"{yr}-{mo:02d}-01"
 parquet_key = f"occurrence/{gbif_datestr}/occurrence.parquet"
 # Define the bison bucket and table to create
-bison_bucket = 'bison-321942852011-us-east-1'
-subset_bison_name = f"{pub_schema}.bison_{bison_datestr}"
+bison_tbl = f"{pub_schema}.bison_{bison_datestr}"
 
 gbif_odr_data = f"s3://{gbif_bucket}/{parquet_key}/"
 mounted_gbif_name = f"{external_schema}.occurrence_{bison_datestr}_parquet"
 
+COMMANDS = []
+
 create_schema_stmt = f"""
     CREATE EXTERNAL SCHEMA IF NOT EXISTS {external_schema}
         FROM data catalog
-        DATABASE 'dev'
+        DATABASE '{database}'
         IAM_ROLE DEFAULT
         CREATE external database IF NOT EXISTS;
 """
@@ -107,7 +112,7 @@ mount_stmt = f"""
 """
 
 subset_stmt = f"""
-    CREATE TABLE IF NOT EXISTS {subset_bison_name} AS
+    CREATE TABLE {bison_tbl} AS
         SELECT
             gbifid, datasetkey, species, taxonrank, scientificname, countrycode, stateprovince,
             occurrencestatus, publishingorgkey, day, month, year, taxonkey, specieskey,
@@ -123,19 +128,58 @@ subset_stmt = f"""
           AND basisofrecord IN
             ('HUMAN_OBSERVATION', 'OBSERVATION', 'OCCURRENCE', 'PRESERVED_SPECIMEN');
 """
+
 count_gbif_stmt = f"SELECT COUNT(*) from {mounted_gbif_name};"
-count_bison_stmt = f"SELECT COUNT(*) FROM {subset_bison_name};"
+count_bison_stmt = f"SELECT COUNT(*) FROM {bison_tbl};"
 unmount_stmt = f"DROP TABLE {mounted_gbif_name};"
 
 COMMANDS = [
     ("schema", create_schema_stmt),
+    # 2 secs
     ("mount", mount_stmt),
+    # 5 secs
     ("query_mount", count_gbif_stmt),
+    # 1 min
     ("subset", subset_stmt),
+    # 2 secs
     ("query_subset", count_bison_stmt),
+    # 1 secs
     ("unmount", unmount_stmt)
 ]
-
+# Each fields tuple contains original fieldname, corresponding bison fieldname and type
+ancillary_data = {
+    "aiannh": {
+        "table": "aiannh2023",
+        "filename": "cb_2023_us_aiannh_500k.shp",
+        "fields": {
+            "name": ("namelsad", "aiannh_name", "VARCHAR(100)"),
+            "geoid": ("geoid", "aiannh_geoid", "VARCHAR(4)")
+        }
+    },
+    "county": {
+        "table": "county2023",
+        "filename": "cb_2023_us_county_500k.shp",
+        "fields": {
+            "state": ("stusps", "census_state", "VARCHAR(2)"),
+            "county": ("namelsad", "census_county", "VARCHAR(100)"),
+        }
+    },
+    "riis": {
+        "table": f"riisv2_{bison_datestr}",
+        "filename": f"USRIISv2_MasterList_annotated_{bison_datestr}.csv",
+        "fields": {
+            "locality": ("locality", "riis_region", "VARCHAR(3)"),
+            "occid": ("occurrenceid", "riis_occurrence_id", "VARCHAR(50)"),
+            "assess": ("degreeofestablishment", "riis_assessment", "VARCHAR(50)")
+        }
+    }
+}
+# Add fields for annotations to BISON table
+for ttyp, tbl in ancillary_data.items():
+    for (orig_fld, bison_fld, bison_typ) in tbl["fields"].values():
+        # 1-2 secs
+        stmt = f"ALTER TABLE {bison_tbl} ADD COLUMN {bison_fld} {bison_typ} DEFAULT NULL;"
+        COMMANDS.append((f"add_{bison_fld}", stmt))
 
 # Initializing Botocore client
 session = boto3.session.Session()
@@ -156,37 +200,41 @@ def lambda_handler(event, context):
         try:
             submit_result = client_redshift.execute_statement(
                 WorkgroupName=workgroup, Database=database, Sql=stmt)
-
         except Exception as e:
             raise Exception(e)
 
+        print("*** ......................")
         print(f"*** {cmd.upper()} command submitted")
+        print(f"***    {stmt}")
         submit_id = submit_result['Id']
 
         # -------------------------------------
         # Loop til complete, then describe result
         elapsed_time = 0
         complete = False
-        while not complete and elapsed_time < 300:
+        while not complete:
             try:
                 describe_result = client_redshift.describe_statement(Id=submit_id)
+            except Exception as e:
+                complete = True
+                print(f"Failed to describe_statement {e}")
+            else:
                 status = describe_result["Status"]
                 if status in ("ABORTED", "FAILED", "FINISHED"):
-                    print(f"*** Query Status - {status} after {elapsed_time} seconds")
                     complete = True
+                    print(f"*** Status - {status} after {elapsed_time} seconds")
                     if status == "FAILED":
-                        print(f"***    FAILED results of {stmt}")
-                        for k, v in describe_result:
-                            print(f"***    {k}: {v}")
+                        try:
+                            err = describe_result["Error"]
+                        except Exception:
+                            err = "Unknown Error"
+                        print(f"***    FAILED: {err}")
                 else:
                     time.sleep(waittime)
                     elapsed_time += waittime
-            except Exception as e:
-                print(f"Failed to describe_statement {e}")
-                complete = True
 
         # -------------------------------------
-        # IFF query, get statement output
+        # IF query for count, get statement output
         if cmd.startswith("query"):
             try:
                 stmt_result = client_redshift.get_statement_result(Id=submit_id)
@@ -195,11 +243,10 @@ def lambda_handler(event, context):
             else:
                 try:
                     records = stmt_result["Records"]
-                    for rec in records:
-                        print(f"***     {rec}")
                 except Exception as e:
                     print(f"Failed to return records ({e})")
-
+                else:
+                    print(f"***     COUNT = {records[0][0]['longValue']}")
 
     return {
         'statusCode': 200,
