@@ -1,3 +1,5 @@
+"""Lambda function to create bison records by subsetting public GBIF data."""
+# Set lambda timeout to 3 minutes.
 import json
 import boto3
 import botocore.session as bc
@@ -175,8 +177,8 @@ ancillary_data = {
     }
 }
 # Add fields for annotations to BISON table
-for ttyp, tbl in ancillary_data.items():
-    for (orig_fld, bison_fld, bison_typ) in tbl["fields"].values():
+for _ttyp, tbl in ancillary_data.items():
+    for (_orig_fld, bison_fld, bison_typ) in tbl["fields"].values():
         # 1-2 secs
         stmt = f"ALTER TABLE {bison_tbl} ADD COLUMN {bison_fld} {bison_typ} DEFAULT NULL;"
         COMMANDS.append((f"add_{bison_fld}", stmt))
@@ -189,8 +191,21 @@ session = boto3.Session(botocore_session=bc_session, region_name=region)
 config = Config(connect_timeout=timeout, read_timeout=timeout)
 client_redshift = session.client("redshift-data", config=config)
 
-# -----------------------------------------------------
+
+# --------------------------------------------------------------------------------------
 def lambda_handler(event, context):
+    """Subset GBIF data to a Redshift table, then add fields to it.
+
+    Args:
+        event: AWS event triggering this function.
+        context: AWS context of the event.
+
+    Returns:
+        JSON object
+
+    Raises:
+        Exception: on failure to execute Redshift command.
+    """
     for (cmd, stmt) in COMMANDS:
         # -------------------------------------
         try:
@@ -246,5 +261,5 @@ def lambda_handler(event, context):
 
     return {
         'statusCode': 200,
-        'body': json.dumps(f"Lambda result logged")
+        'body': json.dumps("Lambda result logged")
     }

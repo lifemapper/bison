@@ -28,5 +28,3 @@ CREATE EXTERNAL SCHEMA IF NOT EXISTS redshift_spectrum
     DATABASE 'dev'
     IAM_ROLE default
     CREATE external database if NOT exists;
-
-

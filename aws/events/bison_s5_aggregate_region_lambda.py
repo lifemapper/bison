@@ -1,9 +1,10 @@
+"""Lambda function to aggregate counts and lists by region."""
+# Set lambda timeout to 5 minutes.
 import json
 import boto3
 import botocore.session as bc
 from botocore.client import Config
 from datetime import datetime
-import pprint
 import time
 
 print("*** Loading lambda function")
@@ -11,9 +12,9 @@ print("*** Loading lambda function")
 region = "us-east-1"
 workgroup = "bison"
 database = "dev"
+pub_schema = "public"
 iam_role = "arn:aws:iam::321942852011:role/service-role/bison_redshift_lambda_role"
 db_user = "IAMR:bison_redshift_lambda_role"
-pub_schema = "public"
 external_schema = "redshift_spectrum"
 timeout = 900
 waittime = 1
@@ -66,79 +67,80 @@ ancillary_data = {
 }
 
 join_fld = "gbifid"
+gbif_tx_fld = "taxonkey"
+gbif_sp_fld = "species"
+out_occcount_fld = "occ_count"
+out_spcount_fld = "species_count"
 # Get table, field names
 cty_data = ancillary_data["county"]
 b_st_fld = cty_data["fields"]["state"][1]
 b_cty_fld = cty_data["fields"]["county"][1]
+county_aggregate_tbl = f"county_counts_{bison_datestr}"
+county_list_tbl = f"county_lists_{bison_datestr}"
+state_aggregate_tbl = f"state_counts_{bison_datestr}"
+state_list_tbl = f"state_lists_{bison_datestr}"
+aiannh_data = ancillary_data["aiannh"]
+b_nm_fld = aiannh_data["fields"]["name"][1]
+b_gid_fld = aiannh_data["fields"]["geoid"][1]
+aiannh_aggregate_tbl = f"aiannh_counts_{bison_datestr}"
+aiannh_list_tbl = f"aiannh_lists_{bison_datestr}"
 # RIIS data
 riis_data = ancillary_data["riis"]
 b_loc_fld = riis_data["fields"]["locality"][1]
 b_occid_fld = riis_data["fields"]["occid"][1]
 b_ass_fld = riis_data["fields"]["assess"][1]
-# Aggregate occurrence, species counts, RIIS status by counties
-#   Note: include states bc county names are not unique
-county_species_occ_counts_tbl = f"county_counts_{bison_datestr}"
-aggregate_by_county_stmt = f"""
-	CREATE TABLE public.{county_species_occ_counts_tbl} AS
-        SELECT DISTINCT {b_cty_fld}, {b_st_fld}, {b_ass_fld},
-               COUNT(*) AS occ_count, COUNT(DISTINCT taxonkey) AS species_count
-        FROM  {bison_tbl} WHERE {b_st_fld} IS NOT NULL
-        GROUP BY {b_cty_fld}, {b_st_fld}, {b_ass_fld};
-	"""
-# Aggregate occurrence, species counts, RIIS status by states
-state_species_occ_counts_tbl = f"state_counts_{bison_datestr}"
-aggregate_by_state_stmt = f"""
-    CREATE TABLE public.{state_species_occ_counts_tbl} AS
-        SELECT DISTINCT {b_st_fld}, {b_ass_fld}
-               COUNT(*) AS occ_count, COUNT(DISTINCT taxonkey) AS species_count
+# Aggregate occurrence, species counts, RIIS status by state, county, aiannh
+state_aggregate_stmt = f"""
+    CREATE TABLE {pub_schema}.{state_aggregate_tbl} AS
+        SELECT DISTINCT {b_st_fld}, {b_ass_fld},
+            COUNT(*) AS occ_count, COUNT(DISTINCT {gbif_tx_fld}) AS {out_spcount_fld}
         FROM  {bison_tbl} WHERE {b_st_fld} IS NOT NULL
         GROUP BY {b_st_fld}, {b_ass_fld};
 """
-# Get table, field names
-aiannh_data = ancillary_data["aiannh"]
-b_nm_fld = aiannh_data["fields"]["name"][1]
-b_gid_fld = aiannh_data["fields"]["geoid"][1]
-
-aiannh_species_occ_counts_tbl = f"aiannh_counts_{bison_datestr}"
-aggregate_by_aiannh_stmt = f"""
-    CREATE TABLE public.{aiannh_species_occ_counts_tbl} AS
+# Note: in county agggregate, include states bc county names are not unique
+county_aggregate_stmt = f"""
+    CREATE TABLE public.{county_aggregate_tbl} AS
+        SELECT DISTINCT {b_cty_fld}, {b_st_fld}, {b_ass_fld},
+            COUNT(*) AS occ_count, COUNT(DISTINCT {gbif_tx_fld}) AS {out_spcount_fld}
+        FROM  {bison_tbl} WHERE {b_st_fld} IS NOT NULL
+        GROUP BY {b_cty_fld}, {b_st_fld}, {b_ass_fld};
+"""
+aiannh_aggregate_stmt = f"""
+    CREATE TABLE {pub_schema}.{aiannh_aggregate_tbl} AS
         SELECT DISTINCT {b_nm_fld}, {b_ass_fld},
-               COUNT(*) AS occ_count, COUNT(DISTINCT taxonkey) AS species_count
+            COUNT(*) AS occ_count, COUNT(DISTINCT {gbif_tx_fld}) AS {out_spcount_fld}
         FROM  {bison_tbl} WHERE {b_nm_fld} IS NOT NULL
         GROUP BY {b_nm_fld}, {b_ass_fld};
 """
-county_list_tbl = f"county_lists_{bison_datestr}"
-state_list_tbl = f"state_lists_{bison_datestr}"
-aiannh_list_tbl = f"aiannh_lists_{bison_datestr}"
-list_county_stmt = f"""
-    CREATE TABLE public.{county_list_tbl} AS
-        SELECT DISTINCT census_state, census_county, taxonkey, species, riis_assessment,
+# Create species lists with counts and RIIS status for state, county, aiannh
+state_lists_stmt = f"""
+    CREATE TABLE {pub_schema}.{state_list_tbl} AS
+        SELECT DISTINCT {b_st_fld}, {gbif_tx_fld}, {gbif_sp_fld}, {b_ass_fld},
             COUNT(*) AS occ_count
-        FROM  bison_2024_08_01 WHERE census_state IS NOT NULL
-        GROUP BY census_state, census_county, taxonkey, species, riis_assessment;
+        FROM  {bison_tbl} WHERE {b_st_fld} IS NOT NULL
+        GROUP BY {b_st_fld}, {gbif_tx_fld}, {gbif_sp_fld}, {b_ass_fld};
 """
+county_lists_stmt = f"""
+    CREATE TABLE {pub_schema}.{county_list_tbl} AS
+        SELECT DISTINCT {b_st_fld}, {b_cty_fld}, {gbif_tx_fld}, {gbif_sp_fld},
+            {b_ass_fld}, COUNT(*) AS occ_count
+        FROM  {bison_tbl} WHERE {b_st_fld} IS NOT NULL
+        GROUP BY {b_st_fld}, {b_cty_fld}, {gbif_tx_fld}, {gbif_sp_fld}, {b_ass_fld};
 """
-CREATE TABLE public.state_lists_2024_08_01 AS
-    SELECT DISTINCT census_state, taxonkey, species, riis_assessment,
-        COUNT(*) AS occ_count
-    FROM  bison_2024_08_01 WHERE census_state IS NOT NULL
-    GROUP BY census_state, taxonkey, species, riis_assessment;
-CREATE TABLE public.aiannh_lists_2024_08_01 AS
-    SELECT DISTINCT aiannh_name, taxonkey, species, riis_assessment,
-        COUNT(*) AS occ_count
-    FROM  bison_2024_08_01 WHERE census_state IS NOT NULL
-    GROUP BY aiannh_name, taxonkey, species, riis_assessment;
+aiannh_lists_stmt = f"""
+    CREATE TABLE {pub_schema}.{aiannh_list_tbl} AS
+        SELECT DISTINCT {b_nm_fld}, {gbif_tx_fld}, {gbif_sp_fld}, {b_ass_fld},
+            COUNT(*) AS occ_count
+        FROM  {bison_tbl} WHERE {b_st_fld} IS NOT NULL
+        GROUP BY {b_nm_fld}, {gbif_tx_fld}, {gbif_sp_fld}, {b_ass_fld};
 """
-# Add field commands, < 30 sec total
 COMMANDS.extend([
-    #
-    ("aggregate_county", aggregate_by_county_stmt),
-    #
-    ("aggregate_state", aggregate_by_state_stmt),
-    #
-	("aggregate_aiannh", aggregate_by_aiannh_stmt),
-    #
-
+    ("aggregate_state", state_aggregate_stmt),
+    ("aggregate_county", county_aggregate_stmt),
+    ("aggregate_aiannh", aiannh_aggregate_stmt),
+    ("list_state_species", state_lists_stmt),
+    ("list_county_species", county_lists_stmt),
+    ("list_aiannh_species", aiannh_lists_stmt),
     ]
 )
 
@@ -150,22 +152,37 @@ session = boto3.Session(botocore_session=bc_session, region_name=region)
 config = Config(connect_timeout=timeout, read_timeout=timeout)
 client_redshift = session.client("redshift-data", config=config)
 
+
+# --------------------------------------------------------------------------------------
 def lambda_handler(event, context):
+    """Aggregate BISON records to species/occurrence counts and species lists by region.
+
+    Args:
+        event: AWS event triggering this function.
+        context: AWS context of the event.
+
+    Returns:
+        JSON object
+
+    Raises:
+        Exception: on failure to execute Redshift command.
+    """
     # Execute the commmands in order
     for (cmd, stmt) in COMMANDS:
         # -------------------------------------
         try:
             submit_result = client_redshift.execute_statement(
                 WorkgroupName=workgroup, Database=database, Sql=stmt)
-        except Exception as e:
-            raise Exception(e)
+        except Exception:
+            raise
+
         print("*** ---------------------------------------")
         print(f"*** {cmd.upper()} command submitted")
         print(f"***    {stmt}")
         submit_id = submit_result['Id']
 
         # -------------------------------------
-        # Loop til complete, then describe result
+        # Loop til complete
         elapsed_time = 0
         complete = False
         while not complete:
@@ -176,20 +193,19 @@ def lambda_handler(event, context):
             else:
                 status = describe_result["Status"]
                 if status in ("ABORTED", "FAILED", "FINISHED"):
-                    if status in ("ABORTED", "FAILED", "FINISHED"):
-                        print(f"*** Status - {status} after {elapsed_time} seconds")
-                        complete = True
-                        if status == "FAILED":
-                            try:
-                                err = describe_result["Error"]
-                            except Exception:
-                                err = "Unknown Error"
-                            print(f"***    FAILED: {err}")
+                    print(f"*** Status - {status} after {elapsed_time} seconds")
+                    complete = True
+                    if status == "FAILED":
+                        try:
+                            err = describe_result["Error"]
+                        except Exception:
+                            err = "Unknown Error"
+                        print(f"***    FAILED: {err}")
                 else:
                     time.sleep(waittime)
                     elapsed_time += waittime
 
     return {
         'statusCode': 200,
-        'body': json.dumps(f"Lambda result logged")
+        'body': json.dumps("Lambda result logged")
     }

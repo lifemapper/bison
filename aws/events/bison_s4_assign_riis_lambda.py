@@ -1,9 +1,10 @@
+"""Lambda function to aggregate counts and lists by region."""
+# Set lambda timeout to 3 minutes.
 import json
 import boto3
 import botocore.session as bc
 from botocore.client import Config
 from datetime import datetime
-import pprint
 import time
 
 print("*** Loading lambda function")
@@ -131,15 +132,29 @@ session = boto3.Session(botocore_session=bc_session, region_name=region)
 config = Config(connect_timeout=timeout, read_timeout=timeout)
 client_redshift = session.client("redshift-data", config=config)
 
+
+# --------------------------------------------------------------------------------------
 def lambda_handler(event, context):
+    """Annotate BISON records with RIIS regions and status of species in record region.
+
+    Args:
+        event: AWS event triggering this function.
+        context: AWS context of the event.
+
+    Returns:
+        JSON object
+
+    Raises:
+        Exception: on failure to execute Redshift command.
+    """
     # Execute the commmands in order
     for (cmd, stmt) in COMMANDS:
         # -------------------------------------
         try:
             submit_result = client_redshift.execute_statement(
                 WorkgroupName=workgroup, Database=database, Sql=stmt)
-        except Exception as e:
-            raise Exception(e)
+        except Exception:
+            raise
 
         print("*** ---------------------------------------")
         print(f"*** {cmd.upper()} command submitted")
@@ -172,5 +187,5 @@ def lambda_handler(event, context):
 
     return {
         'statusCode': 200,
-        'body': json.dumps(f"Lambda result logged")
+        'body': json.dumps("Lambda result logged")
     }

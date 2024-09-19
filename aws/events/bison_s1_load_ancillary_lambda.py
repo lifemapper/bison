@@ -1,3 +1,5 @@
+"""Lambda function to load ancillary data - geospatial regions and RIIS."""
+# Set lambda timeout to 1 minute.
 import json
 import boto3
 import botocore.session as bc
@@ -118,41 +120,41 @@ riis_tbl = ancillary_data["riis"]["table"]
 riis_fname = ancillary_data["riis"]["filename"]
 create_riis_stmt = f"""
     CREATE TABLE IF NOT EXISTS {riis_tbl} (
-	locality	VARCHAR(max),
-	scientificname	VARCHAR(max),
-	scientificnameauthorship	VARCHAR(max),
-	vernacularname	VARCHAR(max),
-	taxonrank	VARCHAR(max),
-	establishmentmeans	VARCHAR(max),
-	degreeofestablishment	VARCHAR(max),
-	ishybrid	VARCHAR(max),
-	pathway	VARCHAR(max),
-	habitat	VARCHAR(max),
-	biocontrol	VARCHAR(max),
-	associatedtaxa	VARCHAR(max),
-	eventremarks	VARCHAR(max),
-	introdatenumber	VARCHAR(max),
-	taxonremarks	VARCHAR(max),
-	kingdom	VARCHAR(max),
-	phylum	VARCHAR(max),
-	class	VARCHAR(max),
-	_order	VARCHAR(max),
+    locality	VARCHAR(max),
+    scientificname	VARCHAR(max),
+    scientificnameauthorship	VARCHAR(max),
+    vernacularname	VARCHAR(max),
+    taxonrank	VARCHAR(max),
+    establishmentmeans	VARCHAR(max),
+    degreeofestablishment	VARCHAR(max),
+    ishybrid	VARCHAR(max),
+    pathway	VARCHAR(max),
+    habitat	VARCHAR(max),
+    biocontrol	VARCHAR(max),
+    associatedtaxa	VARCHAR(max),
+    eventremarks	VARCHAR(max),
+    introdatenumber	VARCHAR(max),
+    taxonremarks	VARCHAR(max),
+    kingdom	VARCHAR(max),
+    phylum	VARCHAR(max),
+    class	VARCHAR(max),
+    _order	VARCHAR(max),
     family	VARCHAR(max),
-	taxonomicstatus	VARCHAR(max),
-	itis_tsn	VARCHAR(max),
-	gbif_taxonkey	VARCHAR(max),
-	taxonid	VARCHAR(max),
-	authority	VARCHAR(max),
-	weblink	VARCHAR(max),
-	associatedreferences	VARCHAR(max),
-	eventdate	VARCHAR(max),
-	modified	VARCHAR(max),
-	update_remarks	VARCHAR(max),
-	occurrenceremarks	VARCHAR(max),
-	occurrenceid	VARCHAR(max),
-	gbif_res_taxonkey	VARCHAR(max),
-	gbif_res_scientificname	VARCHAR(max),
-	lineno	VARCHAR(max)
+    taxonomicstatus	VARCHAR(max),
+    itis_tsn	VARCHAR(max),
+    gbif_taxonkey	VARCHAR(max),
+    taxonid	VARCHAR(max),
+    authority	VARCHAR(max),
+    weblink	VARCHAR(max),
+    associatedreferences	VARCHAR(max),
+    eventdate	VARCHAR(max),
+    modified	VARCHAR(max),
+    update_remarks	VARCHAR(max),
+    occurrenceremarks	VARCHAR(max),
+    occurrenceid	VARCHAR(max),
+    gbif_res_taxonkey	VARCHAR(max),
+    gbif_res_scientificname	VARCHAR(max),
+    lineno	VARCHAR(max)
 );
 """
 fill_riis_stmt = f"""
@@ -180,8 +182,21 @@ COMMANDS = [
     ("fill_riis", fill_riis_stmt, riis_tbl)
 ]
 
-# -----------------------------------------------------
+
+# --------------------------------------------------------------------------------------
 def lambda_handler(event, context):
+    """Load ancillary bison input data from S3 to Redshift.
+
+    Args:
+        event: AWS event triggering this function.
+        context: AWS context of the event.
+
+    Returns:
+        JSON object
+
+    Raises:
+        Exception: on failure to execute Redshift command.
+    """
     tables_present = []
     for (cmd, stmt, tblname) in COMMANDS:
         if tblname is None or tblname not in tables_present:
@@ -242,5 +257,5 @@ def lambda_handler(event, context):
 
     return {
         'statusCode': 200,
-        'body': json.dumps(f"Lambda result logged")
+        'body': json.dumps("Lambda result logged")
     }

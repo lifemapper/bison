@@ -5,7 +5,6 @@
 import base64
 import boto3
 from botocore.exceptions import ClientError
-import botocore.session as bc
 import csv
 import datetime as DT
 import logging

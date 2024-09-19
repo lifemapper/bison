@@ -66,5 +66,3 @@ bison_ec2_s3_role
 * Trust relationship:
 
   * ec2_s3_role_trust_policy.json edit trust policy for both ec2 and s3
-
-

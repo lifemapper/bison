@@ -1,3 +1,5 @@
+"""Lambda function to delete temporary and previous month's tables."""
+# Set lambda timeout to 5 minutes.
 import json
 import boto3
 import botocore.session as bc
@@ -50,7 +52,6 @@ QUERY_COMMANDS = (
         f"SHOW TABLES FROM SCHEMA {database}.{pub_schema} "
         f"LIKE '{tmp_prefix}%{bison_datestr}';"
     )
-
 )
 
 # Initialize Botocore session
@@ -61,8 +62,22 @@ session = boto3.Session(botocore_session=bc_session, region_name=region)
 config = Config(connect_timeout=timeout, read_timeout=timeout)
 client_redshift = session.client("redshift-data", config=config)
 
-# -----------------------------------------------------
+
+# --------------------------------------------------------------------------------------
 def lambda_handler(event, context):
+    """Delete previous month data and current month temporary tables.
+
+    Args:
+        event: AWS event triggering this function.
+        context: AWS context of the event.
+
+    Returns:
+        JSON object
+
+    Raises:
+        Exception: on failure to execute Redshift query command.
+        Exception: on failure to execute Redshift drop command.
+    """
     tables = []
     for cmd, stmt in QUERY_COMMANDS:
         # -------------------------------------
@@ -163,5 +178,5 @@ def lambda_handler(event, context):
 
     return {
         'statusCode': 200,
-        'body': json.dumps(f"Lambda result logged")
+        'body': json.dumps("Lambda result logged")
     }
