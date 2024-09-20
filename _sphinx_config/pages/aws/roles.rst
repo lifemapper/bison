@@ -17,8 +17,9 @@ Attach to BISON namespace (Redshift)
   * AmazonRedshiftAllCommandsFullAccess (AWS managed)
   * AmazonRedshiftDataFullAccess (AWS managed)
   * AmazonRedshiftFullAccess (AWS managed)
-  * bison_lambda_log_policy (write CloudWatch logs to bison log groups)
-  * bison_s3_policy (read public/GBIF S3 data and read/write bison S3 data)
+  * bison_invoke_lambda_policy (invoke lambda functions starting with `bison`)
+  * bison_lambda_log_policy (write CloudWatch logs to log groups starting with `bison`)
+  * bison_s3_policy (read public/GBIF S3 data and read/write S3 data in bison bucket)
   * redshift_glue_policy.json (for Redshift interactions)
 
   * AmazonS3FullAccess (AWS managed)
@@ -27,6 +28,21 @@ Attach to BISON namespace (Redshift)
 
   * TODO: change to Redshift - Scheduler when automated
 
+{
+	"Version": "2012-10-17",
+	"Statement": [
+		{
+			"Effect": "Allow",
+			"Action": [
+				"lambda:InvokeFunction"
+			],
+			"Resource": [
+				"arn:aws:lambda:us-east-1:321942852011:function:bison_s0_test_schedule:*",
+				"arn:aws:lambda:us-east-1:321942852011:function:bison_s0_test_schedule"
+			]
+		}
+	]
+}
 
 bison_redshift_lambda_role
 ------------------------
