@@ -73,6 +73,28 @@ will be created in the same directory, and have the basename appended with
 This ensures that the RIIS data and the current GBIF data that have the same date
 appended and taxonomic resolutions are current.
 
+Resolve RIIS data
+=======================
+
+Add GBIF accepted taxa to RIIS data records of RIIS introduced/invasive status for
+species by region (AK, HI, L48).  This provides a field to match on, as all GBIF records
+include the accepted taxon.
+
+This step is initiated by an EventBridge Schedule, and:
+
+* Creates and launches an EC2 instance
+* The "userdata" in the EC2 instance runs a script which:
+
+  * pulls a Docker image containing BISON code from the Specify Docker Hub
+  * starts the Docker instance
+  * initiates the "annotate_riis" command.
+  * when the annotation is complete, it uploads the annotated RIIS file to S3
+
+* TODO: The update of the annotated RIIS file on S3 is an event which triggers:
+
+  * stop the EC2 instance.
+  * initiate the next step.
+
 Load ancillary data
 ===================
 

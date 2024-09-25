@@ -61,26 +61,26 @@ COPY --chown=bison:bison ./flask_app ./flask_app
 #ENV FLASK_ENV=production
 CMD venv/bin/python -m gunicorn -w 4 --bind 0.0.0.0:5000 ${FLASK_APP}
 
-# ........................................................
-# Frontend base image (for development)
-FROM node:16.10.0-buster as base-front-end
-
-LABEL maintainer="Specify Collections Consortium <github.com/specify>"
-
-USER node
-WORKDIR /home/node
-
-COPY --chown=node:node bison/frontend/js_src/package*.json ./
-RUN npm install
-
-RUN mkdir dist \
- && chown node:node dist
-
-COPY --chown=node:node bison/frontend/js_src .
-
-
-# ........................................................
-# Frontend image (for production) from base-front-end
-FROM base-front-end as front-end
-
-RUN npm run build
+## ........................................................
+## Frontend base image (for development)
+#FROM node:16.10.0-buster as base-front-end
+#
+#LABEL maintainer="Specify Collections Consortium <github.com/specify>"
+#
+#USER node
+#WORKDIR /home/node
+#
+#COPY --chown=node:node bison/frontend/js_src/package*.json ./
+#RUN npm install
+#
+#RUN mkdir dist \
+# && chown node:node dist
+#
+#COPY --chown=node:node bison/frontend/js_src .
+#
+#
+## ........................................................
+## Frontend image (for production) from base-front-end
+#FROM base-front-end as front-end
+#
+#RUN npm run build

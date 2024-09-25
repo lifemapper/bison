@@ -1,4 +1,4 @@
-"""Data preparation and analyses tools."""
+"""Tools to be called from a Docker container in an EC2 instance."""
 from . import annotate_riis
 
 __all__ = [

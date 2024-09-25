@@ -3,14 +3,9 @@ import json
 from logging import INFO, ERROR
 import os
 
-from bison.common.constants import (
-    # PROJ_BUCKET, PROJ_INPUT_PATH, REGION,
-    REPORT)
+from bison.common.constants import (PROJ_BUCKET, PROJ_INPUT_PATH, REGION, REPORT)
 from bison.common.log import Logger
-from bison.common.util import (
-    BisonNameOp, get_today_str,
-    # upload_to_s3
-)
+from bison.common.util import (BisonNameOp, get_today_str, upload_to_s3)
 
 from bison.provider.constants import RIIS_FILENAME
 from bison.provider.riis_data import RIIS
@@ -47,4 +42,4 @@ if __name__ == '__main__':
             f"of total {report[REPORT.RIIS_IDENTIFIER]} from {RIIS_FILENAME} "
             f"to {report[REPORT.OUTFILE]}.", refname=script_name)
 
-    # upload_to_s3(annotated_filename, PROJ_BUCKET, PROJ_INPUT_PATH, region=REGION)
+    upload_to_s3(annotated_filename, PROJ_BUCKET, PROJ_INPUT_PATH, region=REGION)

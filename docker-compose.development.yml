@@ -14,10 +14,10 @@ services:
     volumes:
       - "./flask_app/:/home/bison/flask_app/"
 
-  front-end:
-    build:
-      context: ./.
-      target: base-front-end
-    command: ["npm", "run", "watch"]
-    volumes:
-      - "./bison/frontend/js_src/lib/:/home/node/lib/"
+#  front-end:
+#    build:
+#      context: ./.
+#      target: base-front-end
+#    command: ["npm", "run", "watch"]
+#    volumes:
+#      - "./bison/frontend/js_src/lib/:/home/node/lib/"
