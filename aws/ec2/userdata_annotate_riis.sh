@@ -15,4 +15,4 @@ git clone https://github.com/lifemapper/bison.git
 sudo docker compose up -d
 #sudo docker compose -f docker-compose.development.yml -f docker-compose.yml  up
 # Executes from /home/bison directory, which contains bison code
-sudo docker exec bison-bison-1 venv/bin/python bison/tools/annotate_riis.py
+sudo docker exec bison-bison-1 venv/bin/python -m bison/tools/annotate_riis

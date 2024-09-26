@@ -36,6 +36,7 @@ RUN python3 -m venv venv \
 # This assumes that the bison repository is present on the host machine and
 # docker is run from the top of the repo directory (with bison subdir directly below).
 COPY --chown=bison:bison ./bison ./bison
+COPY --chown=bison:bison ./data ./data
 
 
 # ........................................................

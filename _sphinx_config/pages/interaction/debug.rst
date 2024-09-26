@@ -26,6 +26,26 @@ flask run
 * Flask will auto-update on file save.
 * Refresh browser after changes
 
+Local debugging of python scripts
+--------------------------------------
+
+* Step 1, annotate RIIS with GBIF accepted taxa:
+
+  * directly run script to annotate RIIS in EC2 docker container.  The script will
+    execute from the /home/bison directory, which contains the venv (python virtual
+    environment) and bison directories::
+
+     sudo docker exec bison-bison-1 venv/bin/python bison/tools/annotate_riis.py
+
+  * If script fails, try interacting with the container directly.::
+
+    sudo docker exec -it bison-bison-1 /bin/sh
+    $ pwd
+    /home/bison
+    $ venv/bin/python
+
+
+* Step 7.
 
 Run Docker containers (development)
 -------------------------------------------

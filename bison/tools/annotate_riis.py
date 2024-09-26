@@ -11,8 +11,7 @@ from bison.provider.constants import RIIS_FILENAME
 from bison.provider.riis_data import RIIS
 
 # .............................................................................
-# Press the green button in the gutter to run the script.
-if __name__ == '__main__':
+def annotate_riis():
     """Resolve and write GBIF accepted names and taxonKeys in RIIS records."""
     script_name = os.path.splitext(os.path.basename(__file__))[0]
     log_name = f"{script_name}_{get_today_str()}"
@@ -42,4 +41,11 @@ if __name__ == '__main__':
             f"of total {report[REPORT.RIIS_IDENTIFIER]} from {RIIS_FILENAME} "
             f"to {report[REPORT.OUTFILE]}.", refname=script_name)
 
+    return annotated_filename
+
+# .............................................................................
+# Press the green button in the gutter to run the script.
+if __name__ == '__main__':
+    """Resolve and write GBIF accepted names and taxonKeys in RIIS records."""
+    annotated_filename = annotate_riis()
     upload_to_s3(annotated_filename, PROJ_BUCKET, PROJ_INPUT_PATH, region=REGION)

@@ -1,8 +1,7 @@
 """Constants used to annotate USGS RIIS data with GBIF accepted taxon names and keys."""
 LINENO_FLD = "LINENO"
 
-_data_dir = "/home/astewart/git/bison/data"
-RIIS_FILENAME = f"{_data_dir}/USRIISv2_MasterList.csv"
+RIIS_FILENAME = f"./data/USRIISv2_MasterList.csv"
 
 
 # .............................................................................
