@@ -535,7 +535,7 @@ upload_to_s3(ds_sum_filename, PROJ_BUCKET, SUMMARY_FOLDER, REGION)
 # .................................
 # Download data and recreate 2 summary matrices to test for corruption
 # .................................
-# Species Summary 
+# Species Summary
 sp_table = Summaries.get_table(spsum_table_type, data_datestr)
 sp_zip_fname = f"{sp_table['fname']}.zip"
 sp_zip_filename = download_from_s3(
@@ -546,7 +546,7 @@ sp_dataframe, sp_meta_dict, sp_table_type, data_datestr = \
     SummaryMatrix.uncompress_zipped_data(
         sp_zip_filename, local_path=local_path, overwrite=overwrite)
 
-# Dataset Summary 
+# Dataset Summary
 ds_table = Summaries.get_table(dssum_table_type, data_datestr)
 ds_zip_fname = f"{ds_table['fname']}.zip"
 ds_zip_filename = download_from_s3(

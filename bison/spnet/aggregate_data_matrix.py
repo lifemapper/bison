@@ -5,6 +5,8 @@ from numpy import integer as np_int, floating as np_float, ndarray
 import os
 from zipfile import ZipFile
 
+from bison.common.constants import SNKeys, SUMMARY
+
 # from sppy.tools.s2n.constants import (SNKeys, Summaries)
 # from sppy.tools.util.logtools import logit
 
@@ -35,7 +37,7 @@ class _AggregateDataMatrix:
         """
         self._table_type = table_type
         self._data_datestr = data_datestr
-        self._table = Summaries.get_table(table_type, datestr=data_datestr)
+        self._table = SUMMARY.get_table(table_type, datestr=data_datestr)
         self._keys = SNKeys.get_keys_for_table(table_type)
         self._logger = logger
         self._report = {}
@@ -50,9 +52,9 @@ class _AggregateDataMatrix:
     def data_datestr(self):
         return self._data_datestr
 
-    # ...............................................
-    def _logme(self, msg, refname="", log_level=INFO):
-        logit(self._logger, msg, refname=refname, log_level=log_level)
+    # # ...............................................
+    # def _logme(self, msg, refname="", log_level=INFO):
+    #     logit(self._logger, msg, refname=refname, log_level=log_level)
 
     # ...............................................
     def _get_input_files(self, local_path="/tmp"):
