@@ -3,11 +3,11 @@ import json
 from logging import INFO, ERROR
 import os
 
-from bison.common.constants import (PROJ_BUCKET, PROJ_INPUT_PATH, REGION, REPORT)
+from bison.common.constants import (S3_BUCKET, S3_IN_DIR, REGION, REPORT)
 from bison.common.log import Logger
-from bison.common.util import (BisonNameOp, get_today_str, upload_to_s3)
+from bison.common.util import (get_current_datadate_str, get_today_str, upload_to_s3)
 
-from bison.provider.constants import RIIS_FILENAME
+from bison.provider.constants import INPUT_RIIS_FILENAME
 from bison.provider.riis_data import RIIS
 
 # .............................................................................
@@ -21,9 +21,10 @@ def annotate_riis():
     logger = Logger(
         log_name, log_filename=log_filename, log_console=True, log_level=INFO)
 
-    annotated_filename = BisonNameOp.get_annotated_riis_filename(RIIS_FILENAME)
+    datestr = get_current_datadate_str()
+    annotated_filename = RIIS.get_annotated_riis_filename(INPUT_RIIS_FILENAME, datestr)
 
-    nnsl = RIIS(RIIS_FILENAME, logger=logger)
+    nnsl = RIIS(INPUT_RIIS_FILENAME, logger=logger)
     # Update species data
     try:
         report = nnsl.resolve_riis_to_gbif_taxa(annotated_filename, overwrite=True)
@@ -38,7 +39,7 @@ def annotate_riis():
             f"{report[REPORT.SUMMARY][REPORT.TAXA_RESOLVED]} resolved, "
             f"{report[REPORT.SUMMARY][REPORT.RECORDS_UPDATED]} updated, "
             f"{report[REPORT.SUMMARY][REPORT.RECORDS_OUTPUT]} written "
-            f"of total {report[REPORT.RIIS_IDENTIFIER]} from {RIIS_FILENAME} "
+            f"of total {report[REPORT.RIIS_IDENTIFIER]} from {INPUT_RIIS_FILENAME} "
             f"to {report[REPORT.OUTFILE]}.", refname=script_name)
 
     return annotated_filename
@@ -48,4 +49,4 @@ def annotate_riis():
 if __name__ == '__main__':
     """Resolve and write GBIF accepted names and taxonKeys in RIIS records."""
     annotated_filename = annotate_riis()
-    upload_to_s3(annotated_filename, PROJ_BUCKET, PROJ_INPUT_PATH, region=REGION)
+    upload_to_s3(annotated_filename, S3_BUCKET, S3_IN_DIR, region=REGION)

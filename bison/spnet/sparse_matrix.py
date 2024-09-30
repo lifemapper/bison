@@ -6,10 +6,8 @@ from pandas.api.types import CategoricalDtype
 import random
 import scipy.sparse
 
-from sppy.aws.aws_constants import PROJ_BUCKET
-from sppy.tools.s2n.aggregate_data_matrix import _AggregateDataMatrix
-from sppy.tools.s2n.constants import (DATASET_GBIF_KEY, SNKeys, Summaries)
-from sppy.tools.s2n.spnet import SpNetAnalyses
+from bison.common.constants import (PROJ_BUCKET, SNKeys, SUMMARY)
+from bison.spnet.aggregate_data_matrix import _AggregateDataMatrix
 
 
 # .............................................................................
@@ -465,9 +463,6 @@ class SparseMatrix(_AggregateDataMatrix):
             row, axis=0, is_max=True)
         minval, min_col_labels = self.get_extreme_val_labels_for_vector(
             row, axis=0, is_max=False)
-        # Get dataset labels, if column is dataset, for datasets with max occurrences
-        # of species.  Datasets with only 1 occurrence is often large number
-        names = self._lookup_dataset_names(max_col_labels)
 
         stats = {
             self._keys[SNKeys.ROW_LABEL]: row_label,
@@ -478,7 +473,7 @@ class SparseMatrix(_AggregateDataMatrix):
             # Return min/max count in this species and datasets for that count
             self._keys[SNKeys.ROW_MIN_TOTAL]: minval,
             self._keys[SNKeys.ROW_MAX_TOTAL]: maxval,
-            self._keys[SNKeys.ROW_MAX_TOTAL_LABELS]: names
+            self._keys[SNKeys.ROW_MAX_TOTAL_LABELS]: max_col_labels
         }
 
         return stats
@@ -599,12 +594,7 @@ class SparseMatrix(_AggregateDataMatrix):
         minval, min_row_labels = self.get_extreme_val_labels_for_vector(
             col, axis=1, is_max=False)
 
-        # Add dataset titles if column label contains dataset_keys/GUIDs
-        name = self._lookup_dataset_names([col_label])
-        if isinstance(name, dict):
-            stats[self._keys[SNKeys.COL_LABEL]] = name
-        else:
-            stats[self._keys[SNKeys.COL_LABEL]] = col_label
+        stats[self._keys[SNKeys.COL_LABEL]] = col_label
 
         # Count of non-zero rows (Species) within this column (Dataset)
         stats[self._keys[SNKeys.COL_COUNT]] = self.convert_np_vals_for_json(col.nnz)
@@ -622,15 +612,6 @@ class SparseMatrix(_AggregateDataMatrix):
         return stats
 
     # ...............................................
-    def _lookup_dataset_names(self, labels):
-        if self._table["column"] != DATASET_GBIF_KEY:
-            names = labels
-        else:
-            spnet = SpNetAnalyses(PROJ_BUCKET)
-            names = spnet.lookup_dataset_names(labels)
-        return names
-
-    # ...............................................
     def get_all_column_stats(self):
         """Return stats (min, max, mean, median) of totals and counts for all columns.
 
@@ -646,7 +627,6 @@ class SparseMatrix(_AggregateDataMatrix):
         max_total = all_totals.max()
         max_total_labels = self.get_labels_for_val_in_vector(
             all_totals, max_total, axis=0)
-        max_total_names = self._lookup_dataset_names(max_total_labels)
 
         # Get number of non-zero rows for every column (row, numpy.ndarray)
         all_counts = self._coo_array.getnnz(axis=0)
@@ -657,7 +637,6 @@ class SparseMatrix(_AggregateDataMatrix):
         max_count = all_counts.max()
         max_count_labels = self.get_labels_for_val_in_vector(
             all_counts, max_count, axis=0)
-        max_count_names = self._lookup_dataset_names(max_count_labels)
 
         # Count rows with at least one non-zero entry (all rows)
         col_count = self._coo_array.shape[1]
@@ -675,7 +654,7 @@ class SparseMatrix(_AggregateDataMatrix):
 
             self._keys[SNKeys.COLS_MAX_COUNT]:
                 self.convert_np_vals_for_json(max_count),
-            self._keys[SNKeys.COLS_MAX_COUNT_LABELS]: max_count_names,
+            self._keys[SNKeys.COLS_MAX_COUNT_LABELS]: max_count_labels,
 
             # Total occurrences
             self._keys[SNKeys.COLS_TOTAL]:
@@ -690,7 +669,7 @@ class SparseMatrix(_AggregateDataMatrix):
                 self.convert_np_vals_for_json(np.median(all_totals, axis=1)[0, 0]),
 
             self._keys[SNKeys.COLS_MAX_TOTAL]: self.convert_np_vals_for_json(max_total),
-            self._keys[SNKeys.COLS_MAX_TOTAL_LABELS]: max_total_names,
+            self._keys[SNKeys.COLS_MAX_TOTAL_LABELS]: max_total_labels,
         }
         return all_col_stats
 
@@ -837,7 +816,7 @@ class SparseMatrix(_AggregateDataMatrix):
             raise Exception(msg)
 
         # Save table data and categories to json locally
-        metadata = Summaries.get_table(self._table_type)
+        metadata = SUMMARY.get_table(self._table_type)
         metadata["row"] = self._row_categ.categories.tolist()
         metadata["column"] = self._col_categ.categories.tolist()
         try:

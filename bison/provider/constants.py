@@ -1,8 +1,8 @@
 """Constants used to annotate USGS RIIS data with GBIF accepted taxon names and keys."""
 LINENO_FLD = "LINENO"
 
-RIIS_FILENAME = f"./data/USRIISv2_MasterList.csv"
-
+RIIS_BASENAME = "USRIISv2_MasterList"
+INPUT_RIIS_FILENAME = f"./data/{RIIS_BASENAME}.csv"
 
 # .............................................................................
 class APPEND_TO_RIIS:

@@ -3,10 +3,10 @@ from collections import OrderedDict
 from logging import ERROR
 import pandas as pd
 
-from sppy.tools.s2n.aggregate_data_matrix import _AggregateDataMatrix
-from sppy.tools.s2n.constants import (
-    MATRIX_SEPARATOR, SNKeys, SUMMARY_FIELDS, Summaries)
-from sppy.tools.util.logtools import logit
+from bison.common.constants import (
+    COUNT_FLD, CSV_DELIMITER, SNKeys, TOTAL_FLD, SUMMARY
+)
+from bison.spnet.aggregate_data_matrix import _AggregateDataMatrix
 
 
 # .............................................................................
@@ -59,8 +59,8 @@ class SummaryMatrix(_AggregateDataMatrix):
         # Row counts and totals (count along axis 1, each column)
         totals = sp_mtx.get_totals(axis=axis)
         counts = sp_mtx.get_counts(axis=axis)
-        data = {SUMMARY_FIELDS.COUNT: counts, SUMMARY_FIELDS.TOTAL: totals}
-        input_table_meta = Summaries.get_table(sp_mtx.table_type)
+        data = {COUNT_FLD: counts, TOTAL_FLD: totals}
+        input_table_meta = SUMMARY.get_table(sp_mtx.table_type)
 
         # Axis 0 summarizes each column (down axis 0) of sparse matrix
         if axis == 0:
@@ -136,14 +136,13 @@ class SummaryMatrix(_AggregateDataMatrix):
 
         # Save matrix to csv locally
         try:
-            self._df.to_csv(mtx_fname, sep=MATRIX_SEPARATOR)
+            self._df.to_csv(mtx_fname, sep=CSV_DELIMITER)
         except Exception as e:
             msg = f"Failed to write {mtx_fname}: {e}"
-            self._logme(msg, log_level=ERROR)
             raise Exception(msg)
 
         # Save table data and categories to json locally
-        metadata = Summaries.get_table(self._table_type)
+        metadata = SUMMARY.get_table(self._table_type)
         try:
             self._dump_metadata(metadata, meta_fname)
         except Exception:
@@ -214,7 +213,7 @@ class SummaryMatrix(_AggregateDataMatrix):
         """
         # Read dataframe from local CSV file
         try:
-            dataframe = pd.read_csv(mtx_filename, sep=MATRIX_SEPARATOR, index_col=0)
+            dataframe = pd.read_csv(mtx_filename, sep=CSV_DELIMITER, index_col=0)
         except Exception as e:
             raise Exception(f"Failed to load {mtx_filename}: {e}")
         # Read JSON dictionary as string
@@ -239,8 +238,8 @@ class SummaryMatrix(_AggregateDataMatrix):
         measures = self._df.loc[summary_key]
         stats = {
             self._keys[SNKeys.ONE_LABEL]: summary_key,
-            self._keys[SNKeys.ONE_COUNT]: measures.loc[SUMMARY_FIELDS.COUNT],
-            self._keys[SNKeys.ONE_TOTAL]: measures.loc[SUMMARY_FIELDS.TOTAL]
+            self._keys[SNKeys.ONE_COUNT]: measures.loc[COUNT_FLD],
+            self._keys[SNKeys.ONE_TOTAL]: measures.loc[TOTAL_FLD]
         }
         return stats
 
@@ -288,50 +287,3 @@ class SummaryMatrix(_AggregateDataMatrix):
             for other_fld in measure_flds:
                 ordered_rec_dict[k][other_fld] = rec_dict[other_fld][k]
         return ordered_rec_dict
-
-    # ...............................................
-    def _logme(self, msg, refname="", log_level=None):
-        logit(self._logger, msg, refname=refname, log_level=log_level)
-
-
-"""
-import pandas as pd
-import scipy
-from sppy.aws.sparse_matrix import *
-
-d = {
-    'a': [10, 0, 1, 6, 0],
-    'b': [0, 2, 13, 0, 2],
-    'c': [5, 0, 0, 0, 6],
-    'd': [0, 0, 15, 0, 0]
-}
-
-df = pd.DataFrame(data=d)
-df.index = ['u', 'v', 'x', 'y', 'z']
-
-sp_mtx = scipy.sparse.coo_array(df)
-
-axis = 0
-totals0 = sp_mtx.sum(axis=axis)
-counts0 = sp_mtx.getnnz(axis=axis)
-idx0 = df.columns
-data0 = {"counts": counts0, "totals": totals0}
-sdf0 = pd.DataFrame(data=data0, index=idx0)
-
-limit = 3
-order="descending"
-
-sorted_df = sdf0.sort_values(by=COUNT_FLD, axis=0, ascending=(order == "ascending"))
-recs_df = sorted_df.head(limit)
-
-axis = 1
-totals1 = sp_mtx.sum(axis=axis)
-counts1 = sp_mtx.getnnz(axis=axis)
-idx1 = df.index
-data1 = {"counts": counts1, "totals": totals1}
-sdf1 = pd.DataFrame(data=data1, index=idx1)
-
-sorted_df = sdf1.sort_values(by=COUNT_FLD, axis=0, ascending=(order == "ascending"))
-recs_df = sorted_df.head(limit)
-
-"""

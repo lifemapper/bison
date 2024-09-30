@@ -3,7 +3,9 @@ from logging import INFO, DEBUG, ERROR, WARNING
 import os
 
 from bison.common.constants import ENCODING, REPORT
-from bison.common.util import get_csv_dict_reader, get_csv_dict_writer, BisonNameOp
+from bison.common.util import (
+    get_csv_dict_reader, get_csv_dict_writer, get_current_datadate_str
+)
 
 from bison.provider.constants import APPEND_TO_RIIS, GBIF, LINENO_FLD, RIIS_DATA
 from bison.provider.gbif_api import GbifSvc
@@ -227,6 +229,26 @@ class RIIS:
         self.by_taxon = None
         self.by_riis_id = None
         self.bad_species = None
+
+    # ----------------------------------------------------
+    @classmethod
+    def get_annotated_riis_filename(cls, input_riis_filename, datestr):
+        """Construct a filename for current annotated version of the USGS RIIS records.
+
+        Args:
+            input_riis_filename (str): full or base filename of the original RIIS data.
+
+        Returns:
+            out_filename: full filename for the output file.
+
+        Note:
+            If only the basename is provided, the filename with extension but no path
+                will be returned.
+        """
+        pth, fname = os.path.split(input_riis_filename)
+        basename, _ = os.path.splitext(fname)
+        out_filename = os.path.join(pth, f"{basename}_annotated_{datestr}.csv")
+        return out_filename
 
     # ...............................................
     def logit(self, msg, refname=None, log_level=INFO):
@@ -730,7 +752,8 @@ def resolve_riis_taxa(riis_filename, logger, overwrite=True):
         refname: {}
     }
     riis = RIIS(riis_filename, logger)
-    annotated_filename = BisonNameOp.get_annotated_riis_filename(riis_filename)
+    datestr =  get_current_datadate_str()
+    annotated_filename = RIIS.get_annotated_riis_filename(riis_filename, datestr)
     # Update species data
     try:
         report = riis.resolve_riis_to_gbif_taxa(annotated_filename, overwrite=overwrite)
