@@ -131,22 +131,22 @@ aiannh_aggregate_stmt = f"""
 # Create species lists with counts and RIIS status for state, county, aiannh
 state_lists_stmt = f"""
     CREATE TABLE {pub_schema}.{state_list_tbl} AS
-        SELECT DISTINCT {b_st_fld}, taxonkey_species, {gbif_tx_fld}, {gbif_sp_fld}, 
+        SELECT DISTINCT {b_st_fld}, taxonkey_species, {gbif_tx_fld}, {gbif_sp_fld},
             {b_ass_fld}, COUNT(*) AS occ_count
         FROM  {bison_tbl} WHERE {b_st_fld} IS NOT NULL
         GROUP BY {b_st_fld}, taxonkey_species, {gbif_tx_fld}, {gbif_sp_fld}, {b_ass_fld};
 """
 county_lists_stmt = f"""
     CREATE TABLE {pub_schema}.{county_list_tbl} AS
-        SELECT DISTINCT {b_stcty_fld}, {b_st_fld}, {b_cty_fld}, taxonkey_species, 
+        SELECT DISTINCT {b_stcty_fld}, {b_st_fld}, {b_cty_fld}, taxonkey_species,
             {gbif_tx_fld}, {gbif_sp_fld}, {b_ass_fld}, COUNT(*) AS occ_count
         FROM  {bison_tbl} WHERE {b_st_fld} IS NOT NULL
-        GROUP BY {b_st_fld}, {b_cty_fld}, taxonkey_species, {gbif_tx_fld}, 
+        GROUP BY {b_st_fld}, {b_cty_fld}, taxonkey_species, {gbif_tx_fld},
                  {gbif_sp_fld}, {b_ass_fld};
 """
 aiannh_lists_stmt = f"""
     CREATE TABLE {pub_schema}.{aiannh_list_tbl} AS
-        SELECT DISTINCT {b_nm_fld}, taxonkey_species, {gbif_tx_fld}, {gbif_sp_fld}, 
+        SELECT DISTINCT {b_nm_fld}, taxonkey_species, {gbif_tx_fld}, {gbif_sp_fld},
             {b_ass_fld}, COUNT(*) AS occ_count
         FROM  {bison_tbl} WHERE {b_st_fld} IS NOT NULL
         GROUP BY {b_nm_fld}, taxonkey_species, {gbif_tx_fld}, {gbif_sp_fld}, {b_ass_fld};

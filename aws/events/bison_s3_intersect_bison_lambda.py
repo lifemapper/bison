@@ -93,7 +93,7 @@ intersect_county_tmp_stmt = f"""
 # Fill county, state BISON fields with intersection results
 fill_county_stmt = f"""
     UPDATE {bison_tbl} AS bison
-        SET {b_st_fld} = tmp.{st_fld}, 
+        SET {b_st_fld} = tmp.{st_fld},
             {b_cty_fld} = tmp.{cty_fld},
             {b_stcty_fld} = tmp.{st_fld} || ' ' || tmp.{cty_fld}
         FROM {tmp_county_tbl} AS tmp
