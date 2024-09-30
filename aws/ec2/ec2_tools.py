@@ -7,7 +7,7 @@ import io
 import json
 import os
 import pandas
-# from pprint import pp
+from pprint import pp
 
 # --------------------------------------------------------------------------------------
 # Constants for GBIF data, local dev machine, EC2, S3
@@ -61,6 +61,7 @@ launch_template_config = {
         "LaunchTemplateName": bison_ec2_template_name,
         "Version": "1"}
 }
+
 
 
 # --------------------------------------------------------------------------------------
@@ -441,31 +442,32 @@ def get_instance(instance_id):
 # --------------------------------------------------------------------------------------
 # Main
 # --------------------------------------------------------------------------------------
-# if __name__ == '__main__':
-    # # -------  Find or create template -------
-    # # Adds the script to the spot template
-    # success = create_spot_launch_template(
-    #         spot_template_name, security_group_id, script_filename, key_name)
-    #
-    # # -------  Run instance from template -------
-    # # Runs the script on instantiation
-    # instance_id = run_instance_spot(instance_basename, spot_template_name)
-    #
-    # instance = get_instance(instance_id)
-    # ip = instance["PublicIpAddress"]
-    #
-    # # Get an existing launch template
-    # launch_template_file = "/tmp/bison_launch_template.json"
-    # bison_dev_instance_id = "i-0cc438734534bb505"
-    # launch_template = get_launch_template_from_instance(bison_dev_instance_id)
-    # # Make easier to read
-    # json_str = json.dumps(launch_template, indent=4)
-    # with open(launch_template_file, "w") as outf:
-    #     outf.write(json_str)
-    #
-    # # Edit this launch template
-    #
-    # # Upload new launch template
-    #
-    # create_spot_launch_template(
-    #     spot_template_name, security_group_id, script_filename, key_name)
+if __name__ == '__main__':
+
+# # -------  Find or create template -------
+# # Adds the script to the spot template
+# success = create_spot_launch_template(
+#         spot_template_name, security_group_id, script_filename, key_name)
+#
+# # -------  Run instance from template -------
+# # Runs the script on instantiation
+# instance_id = run_instance_spot(instance_basename, spot_template_name)
+#
+# instance = get_instance(instance_id)
+# ip = instance["PublicIpAddress"]
+
+    # Get an existing launch template
+    launch_template_file = "/tmp/bison_launch_template.json"
+    bison_dev_instance_id = "i-0cc438734534bb505"
+    launch_template = get_launch_template_from_instance(bison_dev_instance_id)
+    # Make easier to read
+    json_str = json.dumps(launch_template, indent=4)
+    with open(launch_template_file, "w") as outf:
+        outf.write(json_str)
+
+    # Edit this launch template
+
+    # Upload new launch template
+
+    create_spot_launch_template(
+        spot_template_name, security_group_id, script_filename, key_name)
