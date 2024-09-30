@@ -119,6 +119,7 @@ subset_stmt = f"""
             gbifid, datasetkey, species, taxonrank, scientificname, countrycode, stateprovince,
             occurrencestatus, publishingorgkey, day, month, year, taxonkey, specieskey,
             basisofrecord, decimallongitude, decimallatitude,
+            (taxonkey || ' ' || species) as taxonkey_species
             ST_Makepoint(decimallongitude, decimallatitude) as geom
         FROM redshift_spectrum.occurrence_{bison_datestr}_parquet
         WHERE decimallatitude IS NOT NULL
@@ -164,6 +165,7 @@ ancillary_data = {
         "fields": {
             "state": ("stusps", "census_state", "VARCHAR(2)"),
             "county": ("namelsad", "census_county", "VARCHAR(100)"),
+            "state_county": (None, "census_st_cty", "VARCHAR(102)")
         }
     },
     "riis": {
@@ -182,6 +184,13 @@ for _ttyp, tbl in ancillary_data.items():
         # 1-2 secs
         stmt = f"ALTER TABLE {bison_tbl} ADD COLUMN {bison_fld} {bison_typ} DEFAULT NULL;"
         COMMANDS.append((f"add_{bison_fld}", stmt))
+
+# alter_stcty_stmt = \
+#     f"ALTER TABLE {bison_tbl} ADD COLUMN census_state_county VARCHAR(102) DEFAULT NULL;"
+# alter_spkey_stmt = \
+#     f"ALTER TABLE {bison_tbl} ADD COLUMN taxonkey_species VARCHAR(max) DEFAULT NULL;"
+# update_spkey_stmt = \
+#     f"UPDATE {bison_tbl} SET taxonkey_species = (taxonkey || ' ' ||  species);"
 
 # Initialize Botocore session
 session = boto3.session.Session()

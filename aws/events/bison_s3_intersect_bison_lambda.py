@@ -57,6 +57,7 @@ ancillary_data = {
         "fields": {
             "state": ("stusps", "census_state", "VARCHAR(2)"),
             "county": ("namelsad", "census_county", "VARCHAR(100)"),
+            "state_county": (None, "census_st_cty", "VARCHAR(102)")
         }
     },
     "riis": {
@@ -78,6 +79,7 @@ st_fld = cty_data["fields"]["state"][0]
 cty_fld = cty_data["fields"]["county"][0]
 b_st_fld = cty_data["fields"]["state"][1]
 b_cty_fld = cty_data["fields"]["county"][1]
+b_stcty_fld = cty_data["fields"]["state_county"][1]
 # Drop table if exists
 drop_county_tmp_stmt = f"DROP TABLE IF EXISTS {pub_schema}.{tmp_county_tbl};"
 # Intersect county polygons with BISON records
@@ -91,7 +93,9 @@ intersect_county_tmp_stmt = f"""
 # Fill county, state BISON fields with intersection results
 fill_county_stmt = f"""
     UPDATE {bison_tbl} AS bison
-        SET {b_st_fld} = tmp.{st_fld}, {b_cty_fld} = tmp.{cty_fld}
+        SET {b_st_fld} = tmp.{st_fld}, 
+            {b_cty_fld} = tmp.{cty_fld},
+            {b_stcty_fld} = tmp.{st_fld} || ' ' || tmp.{cty_fld}
         FROM {tmp_county_tbl} AS tmp
         WHERE bison.{join_fld} = tmp.{join_fld};
     """

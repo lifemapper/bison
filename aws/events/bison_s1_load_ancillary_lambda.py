@@ -52,6 +52,7 @@ ancillary_data = {
         "fields": {
             "state": ("stusps", "census_state", "VARCHAR(2)"),
             "county": ("namelsad", "census_county", "VARCHAR(100)"),
+            "state_county": (None, "census_st_cty", "VARCHAR(102)")
         }
     },
     "riis": {

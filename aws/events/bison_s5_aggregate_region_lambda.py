@@ -53,11 +53,14 @@ ancillary_data = {
         "fields": {
             "state": ("stusps", "census_state", "VARCHAR(2)"),
             "county": ("namelsad", "census_county", "VARCHAR(100)"),
+            "state_county": (None, "census_st_cty", "VARCHAR(102)")
         }
     },
     "riis": {
         "table": f"riisv2_{bison_datestr}",
-        "filename": "{riis_prefix}{bison_datestr}.csv",
+        # in S3; filename constructed with
+        #   BisonNameOp.get_annotated_riis_filename(RIIS_BASENAME)
+        "filename": f"USRIISv2_MasterList_annotated_{bison_datestr}.csv",
         "fields": {
             "locality": ("locality", "riis_region", "VARCHAR(3)"),
             "occid": ("occurrenceid", "riis_occurrence_id", "VARCHAR(50)"),
@@ -71,25 +74,35 @@ gbif_tx_fld = "taxonkey"
 gbif_sp_fld = "species"
 out_occcount_fld = "occ_count"
 out_spcount_fld = "species_count"
+
 # Get table, field names
 cty_data = ancillary_data["county"]
 b_st_fld = cty_data["fields"]["state"][1]
 b_cty_fld = cty_data["fields"]["county"][1]
+b_stcty_fld = cty_data["fields"]["state_county"][1]
+
 county_aggregate_tbl = f"county_counts_{bison_datestr}"
-county_list_tbl = f"county_lists_{bison_datestr}"
+county_list_tbl = f"county-x-species_lists_{bison_datestr}"
+
 state_aggregate_tbl = f"state_counts_{bison_datestr}"
-state_list_tbl = f"state_lists_{bison_datestr}"
+state_list_tbl = f"state-x-species_lists_{bison_datestr}"
+
 aiannh_data = ancillary_data["aiannh"]
 b_nm_fld = aiannh_data["fields"]["name"][1]
 b_gid_fld = aiannh_data["fields"]["geoid"][1]
+
 aiannh_aggregate_tbl = f"aiannh_counts_{bison_datestr}"
-aiannh_list_tbl = f"aiannh_lists_{bison_datestr}"
+aiannh_list_tbl = f"aiannh-x-species_lists_{bison_datestr}"
+
 # RIIS data
 riis_data = ancillary_data["riis"]
 b_loc_fld = riis_data["fields"]["locality"][1]
 b_occid_fld = riis_data["fields"]["occid"][1]
 b_ass_fld = riis_data["fields"]["assess"][1]
-# Aggregate occurrence, species counts, RIIS status by state, county, aiannh
+# ...............................................
+# Aggregate counts by region
+# ...............................................
+# Aggregate occurrence, species counts, RIIS status by region
 state_aggregate_stmt = f"""
     CREATE TABLE {pub_schema}.{state_aggregate_tbl} AS
         SELECT DISTINCT {b_st_fld}, {b_ass_fld},
@@ -100,10 +113,10 @@ state_aggregate_stmt = f"""
 # Note: in county agggregate, include states bc county names are not unique
 county_aggregate_stmt = f"""
     CREATE TABLE public.{county_aggregate_tbl} AS
-        SELECT DISTINCT {b_cty_fld}, {b_st_fld}, {b_ass_fld},
+        SELECT DISTINCT {b_stcty_fld}, {b_cty_fld}, {b_st_fld}, {b_ass_fld},
             COUNT(*) AS occ_count, COUNT(DISTINCT {gbif_tx_fld}) AS {out_spcount_fld}
         FROM  {bison_tbl} WHERE {b_st_fld} IS NOT NULL
-        GROUP BY {b_cty_fld}, {b_st_fld}, {b_ass_fld};
+        GROUP BY {b_stcty_fld}, {b_cty_fld}, {b_st_fld}, {b_ass_fld};
 """
 aiannh_aggregate_stmt = f"""
     CREATE TABLE {pub_schema}.{aiannh_aggregate_tbl} AS
@@ -112,27 +125,31 @@ aiannh_aggregate_stmt = f"""
         FROM  {bison_tbl} WHERE {b_nm_fld} IS NOT NULL
         GROUP BY {b_nm_fld}, {b_ass_fld};
 """
+# ...............................................
+# Records of species, assessment, occ_count by region
+# ...............................................
 # Create species lists with counts and RIIS status for state, county, aiannh
 state_lists_stmt = f"""
     CREATE TABLE {pub_schema}.{state_list_tbl} AS
-        SELECT DISTINCT {b_st_fld}, {gbif_tx_fld}, {gbif_sp_fld}, {b_ass_fld},
-            COUNT(*) AS occ_count
+        SELECT DISTINCT {b_st_fld}, taxonkey_species, {gbif_tx_fld}, {gbif_sp_fld}, 
+            {b_ass_fld}, COUNT(*) AS occ_count
         FROM  {bison_tbl} WHERE {b_st_fld} IS NOT NULL
-        GROUP BY {b_st_fld}, {gbif_tx_fld}, {gbif_sp_fld}, {b_ass_fld};
+        GROUP BY {b_st_fld}, taxonkey_species, {gbif_tx_fld}, {gbif_sp_fld}, {b_ass_fld};
 """
 county_lists_stmt = f"""
     CREATE TABLE {pub_schema}.{county_list_tbl} AS
-        SELECT DISTINCT {b_st_fld}, {b_cty_fld}, {gbif_tx_fld}, {gbif_sp_fld},
-            {b_ass_fld}, COUNT(*) AS occ_count
+        SELECT DISTINCT {b_stcty_fld}, {b_st_fld}, {b_cty_fld}, taxonkey_species, 
+            {gbif_tx_fld}, {gbif_sp_fld}, {b_ass_fld}, COUNT(*) AS occ_count
         FROM  {bison_tbl} WHERE {b_st_fld} IS NOT NULL
-        GROUP BY {b_st_fld}, {b_cty_fld}, {gbif_tx_fld}, {gbif_sp_fld}, {b_ass_fld};
+        GROUP BY {b_st_fld}, {b_cty_fld}, taxonkey_species, {gbif_tx_fld}, 
+                 {gbif_sp_fld}, {b_ass_fld};
 """
 aiannh_lists_stmt = f"""
     CREATE TABLE {pub_schema}.{aiannh_list_tbl} AS
-        SELECT DISTINCT {b_nm_fld}, {gbif_tx_fld}, {gbif_sp_fld}, {b_ass_fld},
-            COUNT(*) AS occ_count
+        SELECT DISTINCT {b_nm_fld}, taxonkey_species, {gbif_tx_fld}, {gbif_sp_fld}, 
+            {b_ass_fld}, COUNT(*) AS occ_count
         FROM  {bison_tbl} WHERE {b_st_fld} IS NOT NULL
-        GROUP BY {b_nm_fld}, {gbif_tx_fld}, {gbif_sp_fld}, {b_ass_fld};
+        GROUP BY {b_nm_fld}, taxonkey_species, {gbif_tx_fld}, {gbif_sp_fld}, {b_ass_fld};
 """
 COMMANDS.extend([
     ("aggregate_state", state_aggregate_stmt),
