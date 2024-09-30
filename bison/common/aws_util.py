@@ -575,4 +575,3 @@ class s3:
                     logit(logger, f"Downloaded from S3 to {local_filename}")
 
         return local_filename
-

@@ -527,6 +527,3 @@ def prettify_object(print_obj):
     pp(print_obj, stream=strm)
     obj_str = strm.getvalue()
     return obj_str
-
-
-
