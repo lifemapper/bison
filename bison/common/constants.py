@@ -183,7 +183,7 @@ class SUMMARY:
             meta1 = {
                 "code": name1,
                 "fname": f"{name1}{cls.sep}{cls.dt_token}",
-                "aggregate_type": "species_summary",
+                "aggregate_type": f"{SPECIES_DIM['name']}_summary",
                 # Axis 0, matches row (axis 0) in SPECIES_<dimension>_MATRIX
                 "row": SPECIES_DIM["key_fld"],
             }
@@ -246,6 +246,17 @@ class SUMMARY:
 
     # ...............................................
     @classmethod
+    def parse_table_type(cls, table_type):
+        tbl = cls.get_table(table_type)
+        parts = table_type.split("_")
+        if len(parts) == 2:
+            datacontents, datetype = parts
+        else:
+            raise Exception(f"Failed to parse {table_type} into datacontents, datetype.")
+        return datacontents, datetype
+
+    # ...............................................
+    @classmethod
     def tables(cls, datestr=None):
         """All tables of species and occurrence counts, summaries, and matrices.
 
@@ -290,6 +301,34 @@ class SUMMARY:
             fname_tmpl = cpy_table["fname"]
             cpy_table["fname"] = fname_tmpl.replace(cls.dt_token, datestr)
         return cpy_table
+
+    # ...............................................
+    @classmethod
+    def get_tabletype_from_filename_prefix(cls, datacontents, datatype):
+        """Get the table type from the file prefixes.
+
+        Args:
+            datacontents (str): first part of filename indicating data in table.
+            datatype (str): second part of filename indicating form of data in table
+                (records, lists, matrix, etc).
+
+        Returns:
+            table_type (SUMMARY_TABLE_TYPES type): type of table.
+
+        Raises:
+            Exception: on invalid file prefix.
+        """
+        tables = cls.tables()
+        table_type = None
+        for key, meta in tables.items():
+            fname = meta["fname"]
+            contents, dtp, _, _ = cls._parse_filename(fname)
+            if datacontents == contents and datatype == dtp:
+                table_type = key
+        if table_type is None:
+            raise Exception(
+                f"Table with filename prefix {datacontents}_{datatype} does not exist")
+        return table_type
 
     # ...............................................
     @classmethod
