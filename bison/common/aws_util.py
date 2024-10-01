@@ -4,9 +4,13 @@
 # --------------------------------------------------------------------------------------
 import base64
 import boto3
-from botocore.exceptions import ClientError
+from botocore.exceptions import ClientError, SSLError
+from csv import QUOTE_NONE
 import datetime as DT
+from io import BytesIO
 import os
+import pandas
+from time import sleep
 
 from bison.common.constants import (
     INSTANCE_TYPE, KEY_NAME, REGION, SECURITY_GROUP_ID, USER_DATA_TOKEN, WORKFLOW_ROLE
@@ -14,8 +18,12 @@ from bison.common.constants import (
 
 
 # .............................................................................
-class aws:
+class AWS:
     """Class for working with AWS tools."""
+    # ----------------------------------------------------
+    def __init__(self, region=REGION):
+        self._client = boto3.client("ec2", region=region)
+
     # ----------------------------------------------------
     @classmethod
     def get_secret(cls, secret_name, region):
@@ -47,15 +55,17 @@ class aws:
     # ----------------------------------------------------
     @classmethod
     def get_authenticated_session(cls, region):
-        session = boto3.Session()
+        # Get credentials with first session
+        session = boto3.session.Session()
         sts = session.client("sts", region_name=region)
         response = sts.assume_role(
             RoleArn=WORKFLOW_ROLE, RoleSessionName="authenticated-bison-session")
-        creds = response['Credentials']
-        new_session = boto3.Session(
-            aws_access_key_id=creds['AccessKeyId'],
-            aws_secret_access_key=creds['SecretAccessKey'],
-            aws_session_token=creds['SessionToken'])
+        creds = response["Credentials"]
+        # Initiate new authenticated session with credentials
+        new_session = boto3.session.Session(
+            aws_access_key_id=creds["AccessKeyId"],
+            aws_secret_access_key=creds["SecretAccessKey"],
+            aws_session_token=creds["SessionToken"])
         return new_session
 
 
@@ -63,12 +73,12 @@ class aws:
 # Methods for constructing and instantiating EC2 instances
 # --------------------------------------------------------------------------------------
 # .............................................................................
-class ec2:
+class EC2:
     """Class for creating and manipulating ec2 instances."""
     TEMPLATE_BASENAME = "launch_template"
     # ----------------------------------------------------
     def __init__(self, region=REGION):
-        self.client = boto3.client("ec2", region=region)
+        self._client = boto3.client("ec2", region=region)
 
     # ----------------------------------------------------
     def create_spot_launch_template_name(self, proj_prefix, desc_str=None):
@@ -235,15 +245,25 @@ class ec2:
                 print(f"{token_to_replace} not found in {user_data_filename}.")
                 return
 
-        with open(script_filename) as sf:
-            script = sf.read()
+        # with open(script_filename) as sf:
+        #     script = sf.read()
+        base64_script_text = None
+        try:
+            with open(script_filename, "r") as infile:
+                script_text = infile.read()
+        except Exception:
+            pass
+        else:
+            text_bytes = script_text.encode("ascii")
+            text_base64_bytes = base64.b64encode(text_bytes)
+            base64_script_text = text_base64_bytes.decode("ascii")
 
         # Safely write the changed content, if found in the file
         with open(user_data_filename, "w") as uf:
             print(
                 f"Changing {token_to_replace} in {user_data_filename} to contents in "
                 f"{script_filename}")
-            s = s.replace(token_to_replace, script)
+            s = s.replace(token_to_replace, base64_script_text)
             uf.write(s)
 
     # ----------------------------------------------------
@@ -265,12 +285,11 @@ class ec2:
     # ----------------------------------------------------
     @classmethod
     def create_spot_launch_template(
-        self, ec2_client, template_name, user_data_filename, description=None,
+        self, template_name, user_data_filename, description=None,
             insert_script_filename=None, overwrite=False):
         """Create an EC2 Spot Instance Launch template on AWS.
 
         Args:
-            ec2_client: an object for communicating with EC2.
             template_name: name for the launch template0
             user_data_filename: script to be installed and run on EC2 instantiation.
             description: user-supplied name defining the template.
@@ -292,7 +311,7 @@ class ec2:
                 template_name, user_data_filename, insert_script_filename)
             template_token = self.create_token("template")
             try:
-                response = ec2_client.create_launch_template(
+                response = self._client.create_launch_template(
                     DryRun=False,
                     ClientToken=template_token,
                     LaunchTemplateName=template_name,
@@ -317,7 +336,7 @@ class ec2:
         Returns:
             instance: metadata for the EC2 instance
         """
-        response = self.client.describe_instances(
+        response = self._client.describe_instances(
             InstanceIds=[instance_id],
             DryRun=False,
         )
@@ -329,11 +348,10 @@ class ec2:
 
     # ----------------------------------------------------
     @classmethod
-    def run_instance_spot(self, ec2_client, template_name):
+    def run_instance_spot(self, template_name):
         """Run an EC2 Spot Instance on AWS.
 
         Args:
-            ec2_client: an object for communicating with EC2.
             template_name: name for the launch template to be used for instantiation.
 
         Returns:
@@ -343,7 +361,7 @@ class ec2:
         token = self.create_token()
         instance_name = self.create_token(type="ec2")
         try:
-            response = ec2_client.run_instances(
+            response = self._client.run_instances(
                 # KeyName=key_name,
                 ClientToken=token,
                 MinCount=1, MaxCount=1,
@@ -380,7 +398,7 @@ class ec2:
         Returns:
             launch_template_data: metadata to be used as an EC2 launch template.
         """
-        launch_template_data = self.client.get_launch_template_data(InstanceId=instance_id)
+        launch_template_data = self._client.get_launch_template_data(InstanceId=instance_id)
         return launch_template_data
 
     # ----------------------------------------------------
@@ -388,7 +406,7 @@ class ec2:
     def get_launch_template(self, template_name):
         lnch_temp = None
         try:
-            response = self.client.describe_launch_templates(
+            response = self._client.describe_launch_templates(
                 LaunchTemplateNames=[template_name])
         except Exception:
             pass
@@ -400,7 +418,6 @@ class ec2:
                 pass
         return lnch_temp
 
-
     # ----------------------------------------------------
     def delete_instance(self, instance_id):
         """Delete an EC2 instance.
@@ -411,9 +428,8 @@ class ec2:
         Returns:
             response: response from the server.
         """
-        response = self.client.delete_instance(InstanceId=instance_id)
+        response = self._client.delete_instance(InstanceId=instance_id)
         return response
-
 
     # --------------------------------------------------------------------------------------
     def find_instances(self, key_name, launch_template_name):
@@ -431,7 +447,7 @@ class ec2:
             filters.append({"Name": "tag:TemplateName", "Values": [launch_template_name]})
         if key_name is not None:
             filters.append({"Name": "key-name", "Values": [key_name]})
-        response = self.client.describe_instances(
+        response = self._client.describe_instances(
             Filters=filters,
             DryRun=False,
             MaxResults=123,
@@ -448,19 +464,21 @@ class ec2:
                 instances.extend(res["Instances"])
         return instances
 
+
 # --------------------------------------------------------------------------------------
 # Methods for moving data to and from S3 buckets
 # --------------------------------------------------------------------------------------
 # .............................................................................
-class s3:
+class S3:
     """Class for interacting with S3."""
     # ----------------------------------------------------
     def __init__(self, region=REGION):
-        self.client = boto3.client("s3", region=region)
+        self._region = region
+        self._client = boto3.client("s3", region=region)
 
     # ----------------------------------------------------
     def upload_trigger_to_s3(
-            self, trigger_name, s3_bucket, s3_bucket_path, region=REGION):
+            self, trigger_name, s3_bucket, s3_bucket_path):
         """Upload a file to S3 which will trigger a workflow.
 
         Args:
@@ -475,10 +493,9 @@ class s3:
         filename = f"{trigger_name}.txt"
         with open(filename, "r") as f:
             f.write("go!")
-        s3_client = boto3.client("s3", region_name=region)
         obj_name = f"{s3_bucket_path}/{filename}"
         try:
-            s3_client.upload_file(filename, s3_bucket, obj_name)
+            self._client.upload_file(filename, s3_bucket, obj_name)
         except ClientError as e:
             print(f"Failed to upload {obj_name} to {s3_bucket}, ({e})")
         else:
@@ -487,7 +504,7 @@ class s3:
         return s3_filename
 
     # ----------------------------------------------------
-    def write_dataframe_to_s3_parquet(self, df, bucket, parquet_path, region=REGION):
+    def write_dataframe_to_parquet(self, df, bucket, parquet_path, region=REGION):
         """Convert DataFrame to Parquet format and upload to S3.
 
         Args:
@@ -496,31 +513,85 @@ class s3:
             parquet_path: the data destination inside the S3 bucket
             region: AWS region to query.
         """
-        s3_client = boto3.client("s3", region_name=region)
-        parquet_buffer = io.BytesIO()
+        parquet_buffer = BytesIO()
         df.to_parquet(parquet_buffer, engine="pyarrow")
         parquet_buffer.seek(0)
-        s3_client.upload_fileobj(parquet_buffer, bucket, parquet_path)
+        self._client.upload_fileobj(parquet_buffer, bucket, parquet_path)
+
+    # .............................................................................
+    def get_parquet_to_pandas(self, bucket, bucket_path, filename, **args):
+        """Read a parquet file from a folder on S3 into a pd DataFrame.
+
+        Args:
+            bucket (str): Bucket identifier on S3.
+            bucket_path (str): Folder path to the S3 parquet data.
+            filename (str): Filename of parquet data to read from S3.
+            region (str): AWS region to query.
+            args: Additional arguments to be sent to the pd.read_parquet function.
+
+        Returns:
+            pd.DataFrame containing the tabular data.
+        """
+        dataframe = None
+        s3_key = f"{bucket_path}/{filename}"
+        try:
+            obj = self._client.get_object(Bucket=bucket, Key=s3_key)
+        except SSLError:
+            print(f"Failed with SSLError getting {bucket}/{s3_key} from S3")
+        except ClientError as e:
+            print(f"Failed to get {bucket}/{s3_key} from S3, ({e})")
+        else:
+            print(f"Read {bucket}/{s3_key} from S3")
+            dataframe = pandas.read_parquet(BytesIO(obj["Body"].read()), **args)
+        return dataframe
+
+    # .............................................................................
+    def get_multiple_parquets_to_pandas(self, bucket, bucket_path, **args):
+        """Read multiple parquets from a folder on S3 into a pd DataFrame.
+
+        Args:
+            bucket (str): Bucket identifier on S3.
+            bucket_path (str): Parent folder path to the S3 parquet data.
+            s3_conn (object): Connection to the S3 resource
+            args: Additional arguments to be sent to the pd.read_parquet function.
+
+        Returns:
+            pd.DataFrame containing the tabular data.
+        """
+        if not bucket_path.endswith("/"):
+            bucket_path = bucket_path + "/"
+        s3_conn = boto3.resource("s3", region_name=self._region)
+
+        s3_keys = [
+            item.key
+            for item in s3_conn.Bucket(bucket).objects.filter(Prefix=bucket_path)
+            if item.key.endswith(".parquet")]
+        if not s3_keys:
+            print(f"No parquet found in {bucket} {bucket_path}")
+            return None
+
+        dfs = [
+            self.get_parquet_to_pandas(bucket, bucket_path, key, **args)
+            for key in s3_keys
+        ]
+        return pandas.concat(dfs, ignore_index=True)
 
     # ----------------------------------------------------
-    def upload_to_s3(self, local_filename, bucket, s3_path, region=REGION):
+    def upload(self, local_filename, bucket, s3_path):
         """Upload a file to S3.
 
         Args:
             local_filename: Full path to local file for upload.
             bucket: name of the S3 bucket destination.
             s3_path: the data destination inside the S3 bucket (without filename).
-            region: AWS region to query.
         """
-        s3_client = boto3.client("ec2", region_name=region)
         filename = os.path.split(local_filename)[1]
-        s3_client.upload_file(local_filename, bucket, s3_path)
+        self._client.upload_file(local_filename, bucket, s3_path)
         print(f"Successfully uploaded {filename} to s3://{bucket}/{s3_path}")
 
     # ----------------------------------------------------
-    def download_from_s3(
-            self, bucket, bucket_path, filename, local_path, region=REGION, logger=None,
-            overwrite=True):
+    def download(
+            self, bucket, bucket_path, filename, local_path, overwrite=True):
         """Download a file from S3 to a local file.
 
         Args:
@@ -542,36 +613,66 @@ class s3:
         """
         local_filename = os.path.join(local_path, filename)
         obj_name = f"{bucket_path}/{filename}"
+        url = f"s3://{bucket}/{obj_name}"
         # Delete if needed
         if os.path.exists(local_filename):
             if overwrite is True:
                 os.remove(local_filename)
             else:
-                logit(logger, f"{local_filename} already exists")
+                print(f"{local_filename} already exists")
         # Download current
         if not os.path.exists(local_filename):
-            s3_client = boto3.client("s3", region_name=region)
             try:
-                s3_client.download_file(bucket, obj_name, local_filename)
+                self._client.download_file(bucket, obj_name, local_filename)
             except SSLError:
-                raise Exception(
-                    f"Failed with SSLError to download s3://{bucket}/{obj_name}")
+                raise Exception(f"Failed with SSLError to download {url}")
             except ClientError as e:
-                raise Exception(
-                    f"Failed with ClientError to download s3://{bucket}/{obj_name}, "
-                    f"({e})")
+                raise Exception(f"Failed with ClientError to download {url}, ({e})")
             except Exception as e:
                 raise Exception(
-                    f"Failed with unknown Exception to download s3://{bucket}/{obj_name}, "
-                    f"({e})")
+                    f"Failed with unknown Exception to download {url}, ({e})")
             else:
                 # Do not return until download to complete, allow max 5 min
                 count = 0
                 while not os.path.exists(local_filename) and count < 10:
                     sleep(seconds=30)
                 if not os.path.exists(local_filename):
-                    raise Exception(f"Failed to download from S3 to {local_filename}")
+                    raise Exception(f"Failed to download {url} to {local_filename}")
                 else:
-                    logit(logger, f"Downloaded from S3 to {local_filename}")
+                    print(f"Downloaded {url} to {local_filename}")
 
         return local_filename
+    # ----------------------------------------------------
+
+    # ----------------------------------------------------
+    def get_dataframe_from_csv(
+            self, bucket, csv_path, delimiter, encoding="utf-8", quoting=QUOTE_NONE):
+        """Get or create an EC2 launch template from an EC2 instance identifier.
+
+        Args:
+            bucket: name for an S3 bucket.
+            csv_path: bucket path, including object name, of CSV data of interest.
+
+        Returns:
+            df: pandas dataframe containing the tabular CSV data.
+        """
+        # Read CSV file from S3 into a pandas DataFrame
+        s3_obj = self._client.get_object(Bucket=bucket, Key=csv_path)
+        df = pandas.read_csv(
+            s3_obj["Body"], delimiter=delimiter, encoding=encoding, low_memory=False,
+            quoting=quoting)
+        return df
+
+    # ----------------------------------------------------
+    def write_dataframe_to_parquet(self, df, bucket, parquet_path):
+        """Write DataFrame to Parquet format and upload to S3.
+
+        Args:
+            df (pandas.DataFrame): tabular data to write on S3.
+            bucket (str): Bucket identifier on S3.
+            parquet_path (str): Destination path to the S3 parquet data.
+        """
+        parquet_buffer = BytesIO()
+        df.to_parquet(parquet_buffer, engine="pyarrow")
+        parquet_buffer.seek(0)
+        self._client.upload_fileobj(parquet_buffer, bucket, parquet_path)

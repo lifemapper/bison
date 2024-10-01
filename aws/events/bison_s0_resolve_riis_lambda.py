@@ -1,6 +1,5 @@
 """Lambda function to aggregate counts and lists by region."""
 # Set lambda timeout to 3 minutes.
-import json
 import boto3
 import botocore.session as bc
 from botocore.client import Config
@@ -30,6 +29,7 @@ config = Config(connect_timeout=timeout, read_timeout=timeout)
 client_ec2 = session.client("ec2", config=config)
 # ec2 = boto3.client('ec2', region_name=region)
 
+
 # --------------------------------------------------------------------------------------
 def lambda_handler(event, context):
     """Start an EC2 instance to resolve RIIS records, then write the results to S3.
@@ -52,8 +52,8 @@ def lambda_handler(event, context):
         MinCount=1
     )
 
-    print ("New instance created:")
+    print("New instance created:")
     instance_id = instance['Instances'][0]['InstanceId']
-    print (instance_id)
+    print(instance_id)
 
     return instance_id

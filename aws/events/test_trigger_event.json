@@ -1,8 +1,0 @@
-{
-  "Records": [
-      {
-          "Console": "test_trigger_event",
-          "Lambda": "bison_lambda_function"
-      }
-  ]
-}

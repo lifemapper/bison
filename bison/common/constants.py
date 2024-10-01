@@ -46,9 +46,10 @@ ERR_SEPARATOR = "------------"
 USER_DATA_TOKEN = "###SCRIPT_GOES_HERE###"
 
 COUNT_FLD = "count"
-TOTAL_FLD =  "total"
+TOTAL_FLD = "total"
 
 CSV_DELIMITER = ","
+
 
 # .............................................................................
 class REPORT:
@@ -351,16 +352,29 @@ class SUMMARY:
     # ...............................................
     @classmethod
     def parse_table_type(cls, table_type):
+        """Parse the table_type into datacontents (dim0, dim1) and datatype.
+
+        Args:
+            table_type: String identifying the type of data and dimensions.
+
+        Returns:
+            datacontents (str): type of data contents
+            dim0 (str): first dimension (rows/axis 0) of data in the table
+            dim1 (str): second dimension (columns/axis 1) of data in the table
+            datatype (str): type of data structure: summary table, stacked records
+                (lists or counts), or matrix.
+        """
         fn_parts = table_type.split(cls.sep)
-        if len(fn_parts) >= 2:
-            datacontents = fn_parts[0]
-            try:
-                dim0, dim1 = datacontents.split(cls.dim_sep)
-            except ValueError:
-                dim0 = dim1 = None
-            datatype = fn_parts[1]
+        if len(fn_parts) == 2:
+            datacontents, datatype = fn_parts
         else:
-            raise Exception(f"{table_type} does not follow the expected pattern")
+            raise Exception(f"Failed to parse {table_type} into datacontents, datetype.")
+        # Some data has 2 dimensions
+        dim_parts = datacontents.split(cls.dim_sep)
+        if dim_parts == 2:
+            dim0, dim1 = dim_parts
+        else:
+            dim0 = dim1 = None
         return datacontents, dim0, dim1, datatype
 
     # ...............................................
@@ -413,6 +427,7 @@ class SUMMARY:
         except Exception:
             raise
         return table_type, data_datestr
+
 
 # .............................................................................
 class SNKeys(Enum):
