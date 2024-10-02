@@ -3,58 +3,58 @@
 -- -------------------------------------------------------------------------------------
 -- Create counts of occurrences and species by RIIS status for each region
 -- -------------------------------------------------------------------------------------
-DROP TABLE public.county_counts_2024_08_01;
-DROP TABLE public.state_counts_2024_08_01;
-DROP TABLE public.aiannh_counts_2024_08_01;
+DROP TABLE public.county_counts_2024_09_01;
+DROP TABLE public.state_counts_2024_09_01;
+DROP TABLE public.aiannh_counts_2024_09_01;
 
-CREATE TABLE public.county_counts_2024_08_01 AS
+CREATE TABLE public.county_counts_2024_09_01 AS
     SELECT DISTINCT census_county, census_state, riis_assessment,
            COUNT(*) AS occ_count, COUNT(DISTINCT taxonkey) AS species_count
-    FROM  bison_2024_08_01 WHERE census_state IS NOT NULL
+    FROM  bison_2024_09_01 WHERE census_state IS NOT NULL
     GROUP BY census_county, census_state, riis_assessment;
-CREATE TABLE public.state_counts_2024_08_01 AS
+CREATE TABLE public.state_counts_2024_09_01 AS
     SELECT DISTINCT census_state, riis_assessment,
            COUNT(*) AS occ_count, COUNT(DISTINCT taxonkey) AS species_count
-    FROM  bison_2024_08_01 WHERE census_state IS NOT NULL
+    FROM  bison_2024_09_01 WHERE census_state IS NOT NULL
     GROUP BY census_state, riis_assessment;
-CREATE TABLE public.aiannh_counts_2024_08_01 AS
+CREATE TABLE public.aiannh_counts_2024_09_01 AS
     SELECT DISTINCT aiannh_name, riis_assessment,
            COUNT(*) AS occ_count, COUNT(DISTINCT taxonkey) AS species_count
-    FROM  bison_2024_08_01 WHERE census_state IS NOT NULL
+    FROM  bison_2024_09_01 WHERE census_state IS NOT NULL
     GROUP BY aiannh_name, riis_assessment;
 
 -- Check counts
-SELECT * from county_counts_2024_08_01 ORDER BY census_state, census_county, riis_assessment LIMIT 10;
-SELECT * from state_counts_2024_08_01 ORDER BY census_state, riis_assessment LIMIT 10;
-SELECT * from aiannh_counts_2024_08_01 ORDER BY aiannh_name, riis_assessment LIMIT 10;
+SELECT * from county_counts_2024_09_01 ORDER BY census_state, census_county, riis_assessment LIMIT 10;
+SELECT * from state_counts_2024_09_01 ORDER BY census_state, riis_assessment LIMIT 10;
+SELECT * from aiannh_counts_2024_09_01 ORDER BY aiannh_name, riis_assessment LIMIT 10;
 
 -- -------------------------------------------------------------------------------------
 -- Create lists of species for each region with counts
 -- -------------------------------------------------------------------------------------
-DROP TABLE public.county_lists_2024_08_01;
-DROP TABLE public.state_lists_2024_08_01;
-DROP TABLE public.aiannh_lists_2024_08_01;
+DROP TABLE public.county_lists_2024_09_01;
+DROP TABLE public.state_lists_2024_09_01;
+DROP TABLE public.aiannh_lists_2024_09_01;
 
-CREATE TABLE public.county_lists_2024_08_01 AS
+CREATE TABLE public.county_x_species_list_2024_09_01 AS
     SELECT DISTINCT census_state, census_county, taxonkey, species, riis_assessment,
         COUNT(*) AS occ_count
-    FROM  bison_2024_08_01 WHERE census_state IS NOT NULL
+    FROM  bison_2024_09_01 WHERE census_state IS NOT NULL
     GROUP BY census_state, census_county, taxonkey, species, riis_assessment;
-CREATE TABLE public.state_lists_2024_08_01 AS
+CREATE TABLE public.state_x_species_list_2024_09_01 AS
     SELECT DISTINCT census_state, taxonkey, species, riis_assessment,
         COUNT(*) AS occ_count
-    FROM  bison_2024_08_01 WHERE census_state IS NOT NULL
+    FROM  bison_2024_09_01 WHERE census_state IS NOT NULL
     GROUP BY census_state, taxonkey, species, riis_assessment;
-CREATE TABLE public.aiannh_lists_2024_08_01 AS
+CREATE TABLE public.aiannh_x_species_list_2024_09_01 AS
     SELECT DISTINCT aiannh_name, taxonkey, species, riis_assessment,
         COUNT(*) AS occ_count
-    FROM  bison_2024_08_01 WHERE census_state IS NOT NULL
+    FROM  bison_2024_09_01 WHERE census_state IS NOT NULL
     GROUP BY aiannh_name, taxonkey, species, riis_assessment;
 
 -- Check counts
-SELECT * from county_lists_2024_08_01 ORDER BY census_state, census_county, species LIMIT 10;
-SELECT * from state_lists_2024_08_01 ORDER BY census_state, species LIMIT 10;
-SELECT * from aiannh_lists_2024_08_01 ORDER BY aiannh_name, species LIMIT 10;
+SELECT * from county_lists_2024_09_01 ORDER BY census_state, census_county, species LIMIT 10;
+SELECT * from state_lists_2024_09_01 ORDER BY census_state, species LIMIT 10;
+SELECT * from aiannh_lists_2024_09_01 ORDER BY aiannh_name, species LIMIT 10;
 
 -- -------------------------------------------------------------------------------------
 -- Write data summaries to S3 as CSV for data delivery
@@ -71,52 +71,52 @@ SELECT * from aiannh_lists_2024_08_01 ORDER BY aiannh_name, species LIMIT 10;
 --    slice number.  If the file was large
 -- CSV allows download for simple viewing
 -- -------------------------------------------------------------------------------------
--- Count occurrences and species for RIIS assessment by region
-UNLOAD (
-    'SELECT * FROM county_counts_2024_08_01 ORDER BY census_state, census_county, riis_assessment')
-    TO 's3://bison-321942852011-us-east-1/out_data/county_counts_2024_08_01_'
-    IAM_role DEFAULT
-    FORMAT AS PARQUET
-    -- CSV DELIMITER AS '\t'
-    -- HEADER
-    PARALLEL OFF;
-UNLOAD (
-    'SELECT * FROM state_counts_2024_08_01 ORDER BY census_state, riis_assessment')
-    TO 's3://bison-321942852011-us-east-1/out_data/state_counts_2024_08_01_'
-    IAM_role DEFAULT
-    FORMAT AS PARQUET
-    PARALLEL OFF;
-UNLOAD (
-    'SELECT * FROM aiannh_counts_2024_08_01 ORDER BY aiannh_name, riis_assessment')
-    TO 's3://bison-321942852011-us-east-1/out_data/aiannh_counts_2024_08_01_'
-    IAM_role DEFAULT
-    FORMAT AS PARQUET
-    PARALLEL OFF;
+---- Count occurrences and species for RIIS assessment by region
+--UNLOAD (
+--    'SELECT * FROM county_counts_2024_09_01 ORDER BY census_state, census_county, riis_assessment')
+--    TO 's3://bison-321942852011-us-east-1/out_data/county_counts_2024_09_01_'
+--    IAM_role DEFAULT
+--    FORMAT AS PARQUET
+--    -- CSV DELIMITER AS '\t'
+--    -- HEADER
+--    PARALLEL OFF;
+--UNLOAD (
+--    'SELECT * FROM state_counts_2024_09_01 ORDER BY census_state, riis_assessment')
+--    TO 's3://bison-321942852011-us-east-1/out_data/state_counts_2024_09_01_'
+--    IAM_role DEFAULT
+--    FORMAT AS PARQUET
+--    PARALLEL OFF;
+--UNLOAD (
+--    'SELECT * FROM aiannh_counts_2024_09_01 ORDER BY aiannh_name, riis_assessment')
+--    TO 's3://bison-321942852011-us-east-1/out_data/aiannh_counts_2024_09_01_'
+--    IAM_role DEFAULT
+--    FORMAT AS PARQUET
+--    PARALLEL OFF;
 
 -- List species with riis status, occurrence and species counts, for each region
 UNLOAD (
-    'SELECT * FROM county_lists_2024_08_01 ORDER BY census_state, census_county, species')
-    TO 's3://bison-321942852011-us-east-1/out_data/county_lists_2024_08_01_'
+    'SELECT * FROM county_x_species_list_2024_09_01 ORDER BY state_county, species')
+    TO 's3://bison-321942852011-us-east-1/out_data/county-x-species_list_2024_09_01_'
     IAM_role DEFAULT
     FORMAT AS PARQUET
     PARALLEL OFF;
 UNLOAD (
-    'SELECT * FROM state_lists_2024_08_01 ORDER BY census_state, species')
-    TO 's3://bison-321942852011-us-east-1/out_data/state_lists_2024_08_01_'
+    'SELECT * FROM state_x_species_list_2024_09_01 ORDER BY census_state, species')
+    TO 's3://bison-321942852011-us-east-1/out_data/state-x-species_list_2024_09_01_'
     IAM_role DEFAULT
     FORMAT AS PARQUET
     PARALLEL OFF;
 UNLOAD (
-    'SELECT * FROM aiannh_lists_2024_08_01 ORDER BY aiannh_name, species')
-    TO 's3://bison-321942852011-us-east-1/out_data/aiannh_lists_2024_08_01_'
+    'SELECT * FROM aiannh_x_species_list_2024_09_01 ORDER BY aiannh_name, species')
+    TO 's3://bison-321942852011-us-east-1/out_data/aiannh-x-species_list_2024_09_01_'
     IAM_role DEFAULT
     FORMAT AS PARQUET
     PARALLEL OFF;
 
 -- Cleanup Redshift data summaries
-DROP TABLE public.county_counts_2024_08_01;
-DROP TABLE public.state_counts_2024_08_01;
-DROP TABLE public.aiannh_counts_2024_08_01;
-DROP TABLE public.county_lists_2024_08_01;
-DROP TABLE public.state_lists_2024_08_01;
-DROP TABLE public.aiannh_lists_2024_08_01;
+DROP TABLE public.county_counts_2024_09_01;
+DROP TABLE public.state_counts_2024_09_01;
+DROP TABLE public.aiannh_counts_2024_09_01;
+DROP TABLE public.county_lists_2024_09_01;
+DROP TABLE public.state_lists_2024_09_01;
+DROP TABLE public.aiannh_lists_2024_09_01;

@@ -34,6 +34,8 @@ bison_tbl = f"bison_{bison_datestr}"
 # Define the bison bucket and table to create
 bison_bucket = "bison-321942852011-us-east-1"
 input_folder = "input"
+output_folder = "output"
+s3_out = f"s3://{bison_bucket}/{output_folder}"
 
 COMMANDS = []
 
@@ -72,6 +74,8 @@ ancillary_data = {
 join_fld = "gbifid"
 gbif_tx_fld = "taxonkey"
 gbif_sp_fld = "species"
+unique_sp_fld = "taxonkey_species"
+unique_cty_fld = "state_county"
 out_occcount_fld = "occ_count"
 out_spcount_fld = "species_count"
 
@@ -82,17 +86,20 @@ b_cty_fld = cty_data["fields"]["county"][1]
 b_stcty_fld = cty_data["fields"]["state_county"][1]
 
 county_aggregate_tbl = f"county_counts_{bison_datestr}"
-county_list_tbl = f"county-x-species_lists_{bison_datestr}"
+county_list_tbl = f"county_x_species_list_{bison_datestr}"
+county_list_s3key = county_list_tbl.replace("_x_", "-x-")
 
 state_aggregate_tbl = f"state_counts_{bison_datestr}"
-state_list_tbl = f"state-x-species_lists_{bison_datestr}"
+state_list_tbl = f"state_x_species_list_{bison_datestr}"
+state_list_s3key = state_list_tbl.replace("_x_", "-x-")
 
 aiannh_data = ancillary_data["aiannh"]
 b_nm_fld = aiannh_data["fields"]["name"][1]
 b_gid_fld = aiannh_data["fields"]["geoid"][1]
 
 aiannh_aggregate_tbl = f"aiannh_counts_{bison_datestr}"
-aiannh_list_tbl = f"aiannh-x-species_lists_{bison_datestr}"
+aiannh_list_tbl = f"aiannh_x_species_list_{bison_datestr}"
+aiannh_list_s3key = aiannh_list_tbl.replace("_x_", "-x-")
 
 # RIIS data
 riis_data = ancillary_data["riis"]
@@ -106,22 +113,27 @@ b_ass_fld = riis_data["fields"]["assess"][1]
 state_aggregate_stmt = f"""
     CREATE TABLE {pub_schema}.{state_aggregate_tbl} AS
         SELECT DISTINCT {b_st_fld}, {b_ass_fld},
-            COUNT(*) AS occ_count, COUNT(DISTINCT {gbif_tx_fld}) AS {out_spcount_fld}
+            COUNT(*) AS {out_occcount_fld}, 
+            COUNT(DISTINCT {gbif_tx_fld}) AS {out_spcount_fld}
         FROM  {bison_tbl} WHERE {b_st_fld} IS NOT NULL
         GROUP BY {b_st_fld}, {b_ass_fld};
+"""
+state_agg_export_stmt = f"""
 """
 # Note: in county agggregate, include states bc county names are not unique
 county_aggregate_stmt = f"""
     CREATE TABLE public.{county_aggregate_tbl} AS
         SELECT DISTINCT {b_stcty_fld}, {b_cty_fld}, {b_st_fld}, {b_ass_fld},
-            COUNT(*) AS occ_count, COUNT(DISTINCT {gbif_tx_fld}) AS {out_spcount_fld}
+            COUNT(*) AS {out_occcount_fld}, 
+            COUNT(DISTINCT {gbif_tx_fld}) AS {out_spcount_fld}
         FROM  {bison_tbl} WHERE {b_st_fld} IS NOT NULL
         GROUP BY {b_stcty_fld}, {b_cty_fld}, {b_st_fld}, {b_ass_fld};
 """
 aiannh_aggregate_stmt = f"""
     CREATE TABLE {pub_schema}.{aiannh_aggregate_tbl} AS
         SELECT DISTINCT {b_nm_fld}, {b_ass_fld},
-            COUNT(*) AS occ_count, COUNT(DISTINCT {gbif_tx_fld}) AS {out_spcount_fld}
+            COUNT(*) AS {out_occcount_fld}, 
+            COUNT(DISTINCT {gbif_tx_fld}) AS {out_spcount_fld}
         FROM  {bison_tbl} WHERE {b_nm_fld} IS NOT NULL
         GROUP BY {b_nm_fld}, {b_ass_fld};
 """
@@ -129,35 +141,65 @@ aiannh_aggregate_stmt = f"""
 # Records of species, assessment, occ_count by region
 # ...............................................
 # Create species lists with counts and RIIS status for state, county, aiannh
-state_lists_stmt = f"""
+state_list_stmt = f"""
     CREATE TABLE {pub_schema}.{state_list_tbl} AS
-        SELECT DISTINCT {b_st_fld}, taxonkey_species, {gbif_tx_fld}, {gbif_sp_fld},
-            {b_ass_fld}, COUNT(*) AS occ_count
+        SELECT DISTINCT {b_st_fld}, {unique_sp_fld}, {gbif_tx_fld}, {gbif_sp_fld},
+            {b_ass_fld}, COUNT(*) AS {out_occcount_fld}
         FROM  {bison_tbl} WHERE {b_st_fld} IS NOT NULL
-        GROUP BY {b_st_fld}, taxonkey_species, {gbif_tx_fld}, {gbif_sp_fld}, {b_ass_fld};
+        GROUP BY {b_st_fld}, {unique_sp_fld}, {gbif_tx_fld}, {gbif_sp_fld}, {b_ass_fld};
 """
-county_lists_stmt = f"""
+state_list_export_stmt = f"""
+    UNLOAD (
+        'SELECT * FROM {pub_schema}.{state_list_tbl} ORDER BY {b_st_fld}, {gbif_sp_fld}')
+        TO '{s3_out}/{state_list_s3key}_'
+        IAM_role DEFAULT
+        FORMAT AS PARQUET
+        PARALLEL OFF;
+"""
+county_list_stmt = f"""
     CREATE TABLE {pub_schema}.{county_list_tbl} AS
-        SELECT DISTINCT {b_stcty_fld}, {b_st_fld}, {b_cty_fld}, taxonkey_species,
-            {gbif_tx_fld}, {gbif_sp_fld}, {b_ass_fld}, COUNT(*) AS occ_count
+        SELECT DISTINCT {b_stcty_fld}, {b_st_fld}, {b_cty_fld}, {unique_sp_fld},
+            {gbif_tx_fld}, {gbif_sp_fld}, {b_ass_fld}, COUNT(*) AS {out_occcount_fld}
         FROM  {bison_tbl} WHERE {b_st_fld} IS NOT NULL
-        GROUP BY {b_st_fld}, {b_cty_fld}, taxonkey_species, {gbif_tx_fld},
+        GROUP BY {b_stcty_fld}, {b_st_fld}, {b_cty_fld}, {unique_sp_fld}, {gbif_tx_fld},
                  {gbif_sp_fld}, {b_ass_fld};
 """
-aiannh_lists_stmt = f"""
+county_list_export_stmt = f"""
+    UNLOAD (
+        'SELECT * FROM {pub_schema}.{county_list_tbl} ORDER BY {unique_cty_fld}, {gbif_sp_fld}')
+        TO '{s3_out}/{county_list_s3key}_'
+        IAM_role DEFAULT
+        FORMAT AS PARQUET
+        PARALLEL OFF;
+"""
+aiannh_list_stmt = f"""
     CREATE TABLE {pub_schema}.{aiannh_list_tbl} AS
-        SELECT DISTINCT {b_nm_fld}, taxonkey_species, {gbif_tx_fld}, {gbif_sp_fld},
-            {b_ass_fld}, COUNT(*) AS occ_count
+        SELECT DISTINCT {b_nm_fld}, {unique_sp_fld}, {gbif_tx_fld}, {gbif_sp_fld},
+            {b_ass_fld}, COUNT(*) AS {out_occcount_fld}
         FROM  {bison_tbl} WHERE {b_st_fld} IS NOT NULL
-        GROUP BY {b_nm_fld}, taxonkey_species, {gbif_tx_fld}, {gbif_sp_fld}, {b_ass_fld};
+        GROUP BY {b_nm_fld}, {unique_sp_fld}, {gbif_tx_fld}, {gbif_sp_fld}, {b_ass_fld};
+"""
+aiannh_list_export_stmt = f"""
+    UNLOAD (
+        'SELECT * FROM {pub_schema}.{aiannh_list_tbl} ORDER BY {b_nm_fld}, {gbif_sp_fld}')
+        TO '{s3_out}/{aiannh_list_s3key}_'
+        IAM_role DEFAULT
+        FORMAT AS PARQUET
+        PARALLEL OFF;
 """
 COMMANDS.extend([
+    # Create tables of region with species counts, occurrence counts
     ("aggregate_state", state_aggregate_stmt),
     ("aggregate_county", county_aggregate_stmt),
     ("aggregate_aiannh", aiannh_aggregate_stmt),
-    ("list_state_species", state_lists_stmt),
-    ("list_county_species", county_lists_stmt),
-    ("list_aiannh_species", aiannh_lists_stmt),
+    # Create lists of region with species, riis status, occurrence counts
+    ("list_state_species", state_list_stmt),
+    ("list_county_species", county_list_stmt),
+    ("list_aiannh_species", aiannh_list_stmt),
+    # Export lists of region with species, riis status, occurrence counts to S3
+    ("export_state_species", state_list_export_stmt),
+    ("export_county_species", county_list_export_stmt),
+    ("export_aiannh_species", aiannh_list_export_stmt),
     ]
 )
 
