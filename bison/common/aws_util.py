@@ -4,7 +4,7 @@
 # --------------------------------------------------------------------------------------
 import base64
 import boto3
-from botocore.exceptions import ClientError, SSLError
+from botocore.exceptions import ClientError, NoCredentialsError, SSLError
 from csv import QUOTE_NONE
 import datetime as DT
 from io import BytesIO
@@ -12,7 +12,8 @@ import os
 import pandas
 from time import sleep
 
-from bison.common.constants import REGION, WORKFLOW_ROLE
+from bison.common.constants import (
+    REGION, WORKFLOW_ROLE, WORKFLOW_USER, WORKFLOW_SECRET_NAME)
 
 
 # .............................................................................
@@ -20,56 +21,87 @@ class AWS:
     """Class for working with AWS tools."""
 
     # ----------------------------------------------------
+    def __init__(self, region=REGION):
+        """Constructor for common ec2 operations.
+
+        Args:
+        """
+        self._region = region
+
+    # ----------------------------------------------------
     @classmethod
-    def get_secret(cls, secret_name, region):
+    def get_secret(cls, secret_name, region=REGION):
         """Get a secret from the Secrets Manager for connection authentication.
 
         Args:
             secret_name: name of the secret to retrieve.
-            region: AWS region containing the secret.
+            region: AWS region for the secret.
 
         Returns:
             a dictionary containing the secret data.
 
         Raises:
             ClientError:  an AWS error in communication.
+
+        Note: For a list of exceptions thrown, see
+        https://docs.aws.amazon.com/secretsmanager/latest/apireference/API_GetSecretValue.html
         """
         # Create a Secrets Manager client
-        session = boto3.session.Session()
-        client = session.client(service_name="secretsmanager", region_name=region)
+        tmp_session = boto3.session.Session()
+        client = tmp_session.client(service_name="secretsmanager", region_name=region)
         try:
             secret_value_response = client.get_secret_value(SecretId=secret_name)
         except ClientError as e:
-            # For a list of exceptions thrown, see
-            # https://docs.aws.amazon.com/secretsmanager/latest/apireference/API_GetSecretValue.html
             raise (e)
-        # Decrypts secret using the associated KMS key.
+        # Decrypt secret using the associated KMS key.
         secret_str = secret_value_response["SecretString"]
         return eval(secret_str)
 
     # ----------------------------------------------------
     @classmethod
-    def get_authenticated_session(cls, region):
+    def _assume_role(cls, profile, role, region):
+        session = boto3.session.Session(profile_name=profile)
+        sts = session.client("sts", region_name=region)
+        try:
+            response = sts.assume_role(
+                RoleArn=role, RoleSessionName="authenticated-bison-session")
+        except NoCredentialsError:
+            secret = cls.get_secret(WORKFLOW_SECRET_NAME, region=region)
+            sts = session.client(
+                "sts",
+                aws_access_key_id=secret["aws_access_key_id"],
+                aws_secret_access_key=secret["aws_secret_access_key"],
+                region_name=region
+            )
+            try:
+                response = sts.assume_role(
+                    RoleArn=role, RoleSessionName="authenticated-bison-session")
+            except Exception:
+                raise
+        return response
+
+    # ----------------------------------------------------
+    @classmethod
+    def get_authenticated_session(cls, profile, role, region=REGION):
         """Get an authenticated session for AWS clients.
 
         Args:
+            profile: local user profile with assume_role privilege on role
+            role: role with permissions for AWS operations.
             region: AWS region for the session.
 
         Returns:
-            new_session (boto3.session.Session): an authenticated session.
+            auth_session (boto3.session.Session): an authenticated session.
         """
-        # Get credentials with first session
-        session = boto3.session.Session()
-        sts = session.client("sts", region_name=region)
-        response = sts.assume_role(
-            RoleArn=WORKFLOW_ROLE, RoleSessionName="authenticated-bison-session")
+        response = cls._assume_role(profile, role, region)
         creds = response["Credentials"]
+
         # Initiate new authenticated session with credentials
-        new_session = boto3.session.Session(
+        auth_session = boto3.session.Session(
             aws_access_key_id=creds["AccessKeyId"],
             aws_secret_access_key=creds["SecretAccessKey"],
             aws_session_token=creds["SessionToken"])
-        return new_session
+        return auth_session
 
 
 # --------------------------------------------------------------------------------------
@@ -81,13 +113,14 @@ class EC2:
     TEMPLATE_BASENAME = "launch_template"
 
     # ----------------------------------------------------
-    def __init__(self, region=REGION):
+    def __init__(self, auth_session):
         """Constructor for common ec2 operations.
 
         Args:
-            region: AWS region for EC2 instances.
+            auth_session (boto3.session.Session): an authenticated session.
         """
-        self._client = boto3.client("ec2", region=region)
+        self._auth_session = auth_session
+        self._client = self._auth_session.client("ec2")
 
     # ----------------------------------------------------
     def create_spot_launch_template_name(self, proj_prefix, desc_str=None):
@@ -520,14 +553,14 @@ class EC2:
 class S3:
     """Class for interacting with S3."""
     # ----------------------------------------------------
-    def __init__(self, region=REGION):
+    def __init__(self, auth_session):
         """Constructor for common ec2 operations.
 
         Args:
-            region: AWS region of S3 buckets.
+            auth_session (boto3.session.Session): an authenticated session.
         """
-        self._region = region
-        self._client = boto3.client("s3", region=region)
+        self._auth_session = auth_session
+        self._client = self._auth_session.client("s3")
 
     # ----------------------------------------------------
     def upload_trigger_to_s3(
@@ -621,7 +654,7 @@ class S3:
         """
         if not bucket_path.endswith("/"):
             bucket_path = bucket_path + "/"
-        s3_conn = boto3.resource("s3", region_name=self._region)
+        s3_conn = self._auth_session.resource("s3")
 
         s3_keys = [
             item.key

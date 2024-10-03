@@ -48,9 +48,8 @@ bison_redshift_lambda_role
 ------------------------
 
 * Service role
-* Trust relationships
-
-  * Services: ["lambda.amazonaws.com", "redshift.amazonaws.com"]
+* Trust relationships:
+  ../../aws/bison_redshift_lambda_role_trusted_relationships.json
 
 * Policies:
 

@@ -3,7 +3,8 @@ from logging import INFO
 import os
 
 from bison.common.aws_util import S3
-from bison.common.constants import (TMP_PATH, S3_BUCKET, S3_SUMMARY_DIR, SUMMARY)
+from bison.common.constants import (
+    PROJ_NAME, TMP_PATH, S3_BUCKET, S3_SUMMARY_DIR, SUMMARY)
 from bison.common.log import Logger
 from bison.common.util import get_current_datadate_str
 from bison.spnet.sparse_matrix import SparseMatrix
@@ -409,3 +410,38 @@ if __name__ == "__main__":
     # .................................
     # TODO: Test dataset lookup for random labels in sparse matrix
     # .................................
+
+"""
+from bison.tools.build_test_aggregated_data import *
+from bison.common.constants import *
+import boto3
+
+profile =  "PROJ_NAME"
+role = WORKFLOW_ROLE
+secret_name = WORKFLOW_SECRET_NAME
+region = REGION
+
+data_datestr = get_current_datadate_str()
+overwrite = True
+dim0 = "species"
+dim1 = "county"
+stacked_table_type = f"{dim1}_list"
+mtx_table_type = f"{dim0}-x-{dim1}_matrix"
+
+local_path = "/tmp"
+# .................................
+# Create a logger
+# .................................
+script_name = "test_mtx"
+# Create logger with default INFO messages
+logger = Logger(
+    script_name, log_path=TMP_PATH, log_console=True, log_level=INFO)
+
+# .................................
+# Create a dataframe from stacked records
+# .................................
+# dim = "county"
+stk_col_label_for_axis0, stk_col_label_for_axis1, stk_col_label_for_val, stk_df = \
+    read_stacked_data_records(stacked_table_type, data_datestr)
+
+"""

@@ -4,6 +4,12 @@ AWS Resource Setup
 Create policies and roles
 ===========================================================
 
+The :ref:`_bison_redshift_lambda_role` allows access to the bison Redshift
+namespace/workgroup, lambda functions, EventBridge Scheduler, and S3 data.
+The Trusted Relationships on this policy allow each to
+
+The :ref:`_bison_redshift_lambda_role_trusted_relationships policy allow
+
 The :ref:`_bison_ec2_s3_role` allows an EC2 instance to access the public S3 data and
 the bison S3 bucket.  Its trust relationship grants AssumeRole to ec2 and s3 services.
 This role will be assigned to an EC2 instance that will initiate

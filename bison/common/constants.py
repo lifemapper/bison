@@ -18,6 +18,9 @@ S3_OUT_DIR = "output"
 S3_SUMMARY_DIR = "summary"
 
 WORKFLOW_ROLE = "arn:aws:iam::321942852011:role/service-role/bison_redshift_lambda_role"
+WORKFLOW_USER = "project.bison"
+WORKFLOW_SECRET_NAME = "bison_workflow_user"
+
 SPOT_TEMPLATE_BASENAME = "launch_template"
 
 KEY_NAME = "aimee-aws-key"
