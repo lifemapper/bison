@@ -1,13 +1,11 @@
 """Script to run locally or from an EC2 instance to compute PAM statistics from S3 data."""
-import boto3
-from botocore.exceptions import ClientError
 import datetime as DT
-import io
-import logging
-from logging.handlers import RotatingFileHandler
+from logging import ERROR
 import os
 import pandas
-import sys
+
+from bison.common.log import Logger
+from bison.common.aws_util import S3
 
 # Also in bison_ec2_constants, but provided here to avoid populating EC2 template with
 # multiple files for userdata.
@@ -24,194 +22,9 @@ datestr = f"{n.year}_{n.month:02d}_01"
 todaystr = f"{n.year}-{n.month:02d}-{n.day:02d}"
 
 species_county_list_fname = f"county_lists_{datestr}_000.parquet"
-# Log processing progress
-LOGINTERVAL = 1000000
-LOG_FORMAT = " ".join(["%(asctime)s", "%(levelname)-8s", "%(message)s"])
-LOG_DATE_FORMAT = "%d %b %Y %H:%M"
-LOGFILE_MAX_BYTES = 52000000
-LOGFILE_BACKUP_COUNT = 5
-
-LOCAL_OUTDIR = "/tmp"
 diversity_stats_dataname = os.path.join(LOCAL_OUTDIR, f"diversity_stats_{datestr}.csv")
 species_stats_dataname = os.path.join(LOCAL_OUTDIR, f"species_stats_{datestr}.csv")
 site_stats_dataname = os.path.join(LOCAL_OUTDIR, f"site_stats_{datestr}.csv")
-
-
-# .............................................................................
-def get_logger(log_name, log_dir=None, log_level=logging.INFO):
-    """Get a logger for saving messages to disk.
-
-    Args:
-        log_name: name of the logger and logfile
-        log_dir: path for the output logfile.
-        log_level: Minimum level for which to log messages
-
-    Returns:
-        logger (logging.Logger): logger instance.
-        filename (str): full path for output logfile.
-    """
-    filename = f"{log_name}.log"
-    if log_dir is not None:
-        filename = os.path.join(log_dir, f"{filename}")
-        os.makedirs(log_dir, exist_ok=True)
-    # create file handler
-    handlers = []
-    # for debugging in place
-    handlers.append(logging.StreamHandler(stream=sys.stdout))
-    # for saving onto S3
-    handler = RotatingFileHandler(
-        filename, mode="w", maxBytes=LOGFILE_MAX_BYTES, backupCount=10,
-        encoding="utf-8"
-    )
-    formatter = logging.Formatter(LOG_FORMAT, LOG_DATE_FORMAT)
-    handler.setLevel(log_level)
-    handler.setFormatter(formatter)
-    # Get logger
-    logger = logging.getLogger(log_name)
-    logger.setLevel(logging.DEBUG)
-    # Add handler to logger
-    logger.addHandler(handler)
-    logger.propagate = False
-    return logger, filename
-
-
-# .............................................................................
-def download_from_s3(bucket, bucket_path, filename, logger, overwrite=True):
-    """Download a file from S3 to a local file.
-
-    Args:
-        bucket (str): Bucket identifier on S3.
-        bucket_path (str): Folder path to the S3 parquet data.
-        filename (str): Filename of parquet data to read from S3.
-        logger (object): logger for saving relevant processing messages
-        overwrite (boolean):  flag indicating whether to overwrite an existing file.
-
-    Returns:
-        local_filename (str): full path to local filename containing downloaded data.
-    """
-    local_path = os.getcwd()
-    local_filename = os.path.join(local_path, filename)
-    if os.path.exists(local_filename):
-        if overwrite is True:
-            os.remove(local_filename)
-        else:
-            logger.log(logging.INFO, f"{local_filename} already exists")
-    else:
-        s3_client = boto3.client("s3")
-        try:
-            s3_client.download_file(bucket, f"{bucket_path}/{filename}", local_filename)
-        except ClientError as e:
-            logger.log(
-                logging.ERROR,
-                f"Failed to download {filename} from {bucket}/{bucket_path}, ({e})")
-        else:
-            logger.log(
-                logging.INFO, f"Downloaded {filename} from S3 to {local_filename}")
-    return local_filename
-
-
-# .............................................................................
-def read_s3_parquet_to_pandas(
-        bucket, bucket_path, filename, logger, s3_client=None, region=REGION, **args):
-    """Read a parquet file from a folder on S3 into a pandas DataFrame.
-
-    Args:
-        bucket (str): Bucket identifier on S3.
-        bucket_path (str): Folder path to the S3 parquet data.
-        filename (str): Filename of parquet data to read from S3.
-        logger (object): logger for saving relevant processing messages
-        s3_client (object): object for interacting with Amazon S3.
-        region (str): AWS region to query.
-        args: Additional arguments to be sent to the pandas.read_parquet function.
-
-    Returns:
-        pandas.DataFrame containing the tabular data.
-    """
-    if s3_client is None:
-        s3_client = boto3.client("s3", region_name=region)
-    s3_key = f"{bucket_path}/{filename}"
-    try:
-        obj = s3_client.get_object(Bucket=bucket, Key=s3_key)
-    except ClientError as e:
-        logger.log(logging.ERROR, f"Failed to get {bucket}/{s3_key} from S3, ({e})")
-    else:
-        logger.log(logging.INFO, f"Read {bucket}/{s3_key} from S3")
-    dataframe = pandas.read_parquet(io.BytesIO(obj["Body"].read()), **args)
-    return dataframe
-
-
-# .............................................................................
-def write_pandas_to_s3(
-        dataframe, bucket, bucket_path, filename, logger, format="csv", **args):
-    """Write a pandas DataFrame to CSV or parquet on S3.
-
-    Args:
-        dataframe (pandas.DataFrame): dataframe to write to S3.
-        bucket (str): Bucket identifier on S3.
-        bucket_path (str): Folder path to the S3 output data.
-        filename (str): Filename of output data to write to S3.
-        logger (object): logger for saving relevant processing messages
-        format (str): output format, "csv" and "parquet" supported.
-        args: Additional arguments to be sent to the pandas.read_parquet function.
-
-    Raises:
-        Exception: on format other than "csv" or "parquet"
-    """
-    target = f"s3://{bucket}/{bucket_path}/{filename}"
-    if format.lower() not in ("csv", "parquet"):
-        raise Exception(f"Format {format} not supported.")
-    if format.lower() == "csv":
-        try:
-            dataframe.to_csv(target)
-        except Exception as e:
-            logger.log(logging.ERROR, f"Failed to write {target} as csv: {e}")
-    else:
-        try:
-            dataframe.to_parquet(target)
-        except Exception as e:
-            logger.log(logging.ERROR, f"Failed to write {target} as parquet: {e}")
-
-
-# .............................................................................
-def read_s3_multiple_parquets_to_pandas(
-        bucket, bucket_path, logger, s3=None, s3_client=None, verbose=False,
-        region=REGION, **args):
-    """Read multiple parquets from a folder on S3 into a pandas DataFrame.
-
-    Args:
-        bucket (str): Bucket identifier on S3.
-        bucket_path (str): Parent folder path to the S3 parquet data.
-        logger (object): logger for saving relevant processing messages
-        s3 (object): Connection to the S3 resource
-        s3_client (object): object for interacting with Amazon S3.
-        verbose (boolean): flag indicating whether to log verbose messages
-        region: AWS region to query.
-        args: Additional arguments to be sent to the pandas.read_parquet function.
-
-    Returns:
-        pandas.DataFrame containing the tabular data.
-    """
-    if not bucket_path.endswith("/"):
-        bucket_path = bucket_path + "/"
-    if s3_client is None:
-        s3_client = boto3.client("s3", region_name=region)
-    if s3 is None:
-        s3 = boto3.resource("s3", region_name=region)
-    s3_keys = [
-        item.key for item in s3.Bucket(bucket).objects.filter(Prefix=bucket_path)
-        if item.key.endswith(".parquet")]
-    if not s3_keys:
-        logger.log(logging.ERROR, f"No parquet found in {bucket} {bucket_path}")
-    elif verbose:
-        logger.log(logging.INFO, "Load parquets:")
-        for p in s3_keys:
-            logger.log(logging.INFO, f"   {p}")
-    dfs = [
-        read_s3_parquet_to_pandas(
-            bucket, bucket_path, key, logger, s3_client=s3_client, region=region,
-            **args) for key in s3_keys
-    ]
-    return pandas.concat(dfs, ignore_index=True)
 
 
 # .............................................................................
@@ -284,43 +97,6 @@ def reframe_to_pam(heat_df, min_val):
     except AttributeError:
         pam_df = heat_df.applymap(lambda x: 1 if x >= min_val else 0)
     return pam_df
-
-
-# .............................................................................
-def upload_to_s3(full_filename, bucket, bucket_path, logger):
-    """Upload a file to S3.
-
-    Args:
-        full_filename (str): Full filename to the file to upload.
-        bucket (str): Bucket identifier on S3.
-        bucket_path (str): Parent folder path to the S3 parquet data.
-        logger (object): logger for saving relevant processing messages
-
-    Returns:
-        s3_filename (str): path including bucket, bucket_folder, and filename for the
-            uploaded data
-    """
-    s3_filename = None
-    s3_client = boto3.client("s3")
-    obj_name = os.path.basename(full_filename)
-    if bucket_path:
-        obj_name = f"{bucket_path}/{obj_name}"
-    try:
-        s3_client.upload_file(full_filename, bucket, obj_name)
-    except ClientError as e:
-        msg = f"Failed to upload {obj_name} to {bucket}, ({e})"
-        if logger is not None:
-            logger.log(logging.ERROR, msg)
-        else:
-            print(f"Error: {msg}")
-    else:
-        s3_filename = f"s3://{bucket}/{obj_name}"
-        msg = f"Uploaded {s3_filename} to S3"
-        if logger is not None:
-            logger.log(logging.INFO, msg)
-        else:
-            print(f"INFO: {msg}")
-    return s3_filename
 
 
 # .............................................................................
@@ -616,7 +392,7 @@ class SiteMatrix:
         try:
             self._pam_df.to_csv(filename)
         except Exception as e:
-            self.logger.log(logging.ERROR, f"Failed to write {filename}: {e}")
+            self.logger.log(f"Failed to write {filename}: {e}", log_level=ERROR)
 
 
 # --------------------------------------------------------------------------------------
@@ -625,12 +401,13 @@ class SiteMatrix:
 if __name__ == "__main__":
     # Create a logger
     script_name = os.path.splitext(os.path.basename(__file__))[0]
-    logger, log_filename = get_logger(f"{script_name}_{todaystr}")
+    logger = Logger(script_name)
+
+    s3 = S3()
 
     # Read directly into DataFrame
-    orig_df = read_s3_parquet_to_pandas(
-        BUCKET, BUCKET_PATH, species_county_list_fname, logger, s3_client=None
-    )
+    orig_df = s3.get_dataframe_from_parquet(
+        BUCKET, BUCKET_PATH, species_county_list_fname)
 
     heat_df = reframe_to_heatmatrix(orig_df, logger)
     pam_df = reframe_to_pam(heat_df, 1)
@@ -658,141 +435,4 @@ if __name__ == "__main__":
     species_stat_df.to_parquet(f"{s3_outpath}/species_stats_{datestr}.parquet")
 
     # Upload logfile to S3
-    s3_log_filename = upload_to_s3(log_filename, BUCKET, LOG_PATH, logger)
-
-"""
-from aws_scripts.bison_matrix_stats import (
-    read_s3_parquet_to_pandas,  reframe_to_heatmatrix, reframe_to_pam, get_logger,
-    SiteMatrix)
-
-import boto3
-from botocore.exceptions import ClientError
-import datetime as DT
-from importlib import reload
-import io
-import logging
-from logging.handlers import RotatingFileHandler
-import os
-import pandas
-import sys
-
-REGION = "us-east-1"
-BUCKET = f"bison-321942852011-{REGION}"
-BUCKET_PATH = "out_data"
-LOG_PATH = "log"
-
-n = DT.datetime.now()
-# underscores for Redshift data
-datestr = f"{n.year}_{n.month:02d}_01"
-todaystr = f"{n.year}_{n.month:02d}_{n.day:02d}"
-
-species_county_list_fname = f"county_lists_{datestr}_000.parquet"
-# Log processing progress
-LOGINTERVAL = 1000000
-LOG_FORMAT = " ".join(["%(asctime)s", "%(levelname)-8s", "%(message)s"])
-LOG_DATE_FORMAT = "%d %b %Y %H:%M"
-LOGFILE_MAX_BYTES = 52000000
-LOGFILE_BACKUP_COUNT = 5
-LOCAL_OUTDIR = "."
-
-s3_outpath = f"s3://{BUCKET}/{BUCKET_PATH}"
-
-# Create a logger
-script_name = "testing"
-logger, log_filename = get_logger(f"{script_name}_{todaystr}")
-
-orig_df = read_s3_parquet_to_pandas(
-    BUCKET, BUCKET_PATH, species_county_list_fname, logger, s3_client=None)
-heat_df = reframe_to_heatmatrix(orig_df, logger)
-pam_df = reframe_to_pam(heat_df, 1)
-
-# Pandas DataFrame matrix
-pam = SiteMatrix(pam_df, logger)
-diversity_df = pam.calculate_diversity_statistics()
-site_stat_df = pam.calculate_site_statistics()
-species_stat_df = pam.calculate_species_statistics()
-
-LOCAL_OUTDIR = "."
-diversity_stats_dataname = os.path.join(LOCAL_OUTDIR, f"diversity_stats_{datestr}.csv")
-species_stats_dataname = os.path.join(LOCAL_OUTDIR, f"species_stats_{datestr}.csv")
-site_stats_dataname = os.path.join(LOCAL_OUTDIR, f"site_stats_{datestr}.csv")
-
-diversity_df.to_csv(diversity_stats_dataname)
-site_stat_df.to_csv(site_stats_dataname)
-species_stat_df.to_csv(species_stats_dataname)
-
-diversity_df.to_csv(f"{s3_outpath}/diversity_stats_{datestr}.csv")
-site_stat_df.to_csv(f"{s3_outpath}/site_stats_{datestr}.csv")
-species_stat_df.to_csv(f"{s3_outpath}/species_stats_{datestr}.csv")
-
-diversity_df.to_parquet(f"{s3_outpath}/diversity_stats_{datestr}.parquet")
-site_stat_df.to_parquet(f"{s3_outpath}/site_stats_{datestr}.parquet")
-species_stat_df.to_parquet(f"{s3_outpath}/species_stats_{datestr}.parquet")
-
-
-
-
-# # new diversity stats
-# lande_new = pam.lande()
-# legendre_new = pam.legendre()
-# whittaker_new = pam.whittaker()
-# species_ct_new = pam.num_species
-# site_ct_new = pam.num_sites
-#
-# # new site stats
-# beta_new = pam.beta()
-# alpha_new = pam.alpha()
-# alpha_proportional_new = pam.alpha_proportional()
-# phi_new = pam.phi()
-# phi_average_proportional_new = pam.phi_average_proportional()
-#
-# # new species stats
-# omega_new = pam.omega()
-# omega_proportional_new = pam.omega_proportional()
-# psi_new = pam.psi()
-# psi_average_proportional_new = pam.psi_average_proportional()
-#
-# # OLD matrix
-# # create a multi-index for rows required by old-style SiteMatrix
-# full_idx = pandas.MultiIndex.from_arrays(
-#     [[i for i in range(len(pam_df.index))], pam_df.index], names=["row_idx", "region"])
-# pam_df.index = full_idx
-# pam_old = SiteMatrix(dataframe=pam_df, logger=logger)
-# pam_old._min_presence = 1
-#
-# # old diversity stats
-# lande_old = pam_old.lande()
-# legendre_old = pam_old.legendre()
-# whittaker_old = pam_old.whittaker()
-# species_ct_old = pam_old.num_species
-# site_ct_old = pam_old.num_sites
-# # old site stats
-# beta_old = pam_old.beta()
-# alpha_old = pam_old.alpha()
-# alpha_proportional_old = pam_old.alpha_proportional()
-# # old species stats
-# omega_old = pam_old.omega()
-# omega_proportional_old = pam_old.omega_proportional()
-# psi_old = pam_old.psi(),
-# psi_average_proportional_old = pam_old.psi_average_proportional()
-#
-# # COMPARE diversity stats
-# print(f"lande: old {lande_old} vs new {lande_new}")
-# print(f"legendre: old {legendre_old} vs new {legendre_new}")
-# print(f"whittaker: old {whittaker_old} vs new {whittaker_new}")
-# print(f"species_ct: old {species_ct_old} vs new {species_ct_new}")
-# print(f"site_ct: old {site_ct_old} vs new {site_ct_new}")
-# print(f"beta old = new: {beta_old.equals(beta_new)}")
-# print(f"alpha old = new: {alpha_old.equals(alpha_new)}")
-# print(f"alpha_proportional old = new: {alpha_proportional_old.equals(alpha_proportional_new)}")
-# print(f"omega old = new: {omega_old.equals(omega_new)}")
-# print(f"omega_proportional old = new: {omega_proportional_old.equals(omega_proportional_new)}")
-# print(f"psi old = new: {psi_old.equals(psi_new)}")
-# print(f"psi_average_proportional old = new: {psi_average_proportional_old.equals(psi_average_proportional_new)}")
-
-
-
-# Upload logfile to S3
-s3_log_filename = upload_to_s3(log_filename, BUCKET, LOG_PATH)
-
-"""
+    uploaded_s3name = s3.upload(logger.filename, BUCKET, LOG_PATH)

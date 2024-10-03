@@ -1,11 +1,12 @@
 """Matrix to summarize 2 dimensions of data by counts of a third in a sparse matrix."""
 import json
-from logging import ERROR, INFO
+from logging import ERROR
 from numpy import integer as np_int, floating as np_float, ndarray
 import os
 from zipfile import ZipFile
 
 from bison.common.constants import SNKeys, SUMMARY
+from bison.common.log import logit
 
 
 # .............................................................................
@@ -17,7 +18,8 @@ class _AggregateDataMatrix:
         """Constructor for species by dataset comparisons.
 
         Args:
-            table_type (sppy.tools.s2n.SUMMARY_TABLE_TYPES): type of aggregated data
+            table_type (code from bison.common.constants.SUMMARY): predefined type of
+                data indicating type and contents.
             data_datestr (str): date of the source data in YYYY_MM_DD format.
             logger (object): An optional local logger to use for logging output
                 with consistent options
@@ -49,9 +51,9 @@ class _AggregateDataMatrix:
     def data_datestr(self):
         return self._data_datestr
 
-    # # ...............................................
-    # def _logme(self, msg, refname="", log_level=INFO):
-    #     logit(self._logger, msg, refname=refname, log_level=log_level)
+    # ...............................................
+    def _logme(self, msg, refname="", log_level=None):
+        logit(msg, logger=self._logger, refname=refname, log_level=log_level)
 
     # ...............................................
     def _get_input_files(self, local_path="/tmp"):

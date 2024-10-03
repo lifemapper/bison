@@ -1,6 +1,5 @@
 """Matrix to summarize each of 2 dimensions of data by counts of the other and a third."""
 from collections import OrderedDict
-from logging import ERROR
 import pandas as pd
 
 from bison.common.constants import (

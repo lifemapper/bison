@@ -3,14 +3,11 @@ from logging import INFO
 import os
 
 from bison.common.aws_util import S3
-from bison.common.constants import (
-    TMP_PATH, REGION, S3_BUCKET, S3_SUMMARY_DIR, SUMMARY
-)
+from bison.common.constants import (TMP_PATH, S3_BUCKET, S3_SUMMARY_DIR, SUMMARY)
 from bison.common.log import Logger
-from bison.common.util import get_current_datadate_str, get_today_str
+from bison.common.util import get_current_datadate_str
 from bison.spnet.sparse_matrix import SparseMatrix
 from bison.spnet.summary_matrix import SummaryMatrix
-
 
 
 # ...............................................
@@ -74,14 +71,13 @@ def sum_stacked_data_vals_for_column(stacked_df, filter_label, filter_value, val
 
 
 # ...............................................
-def test_row_col_comparisons(agg_sparse_mtx, test_count=5, logger=None):
+def test_row_col_comparisons(agg_sparse_mtx, test_count=5):
     """Test row comparisons between 1 and all, and column comparisons between 1 and all.
 
     Args:
         agg_sparse_mtx (SparseMatrix): object containing a scipy.sparse.coo_array
             with 3 columns from the stacked_df arranged as rows and columns with values
         test_count (int): number of rows and columns to test.
-        logger (object): logger for saving relevant processing messages
 
     Postcondition:
         Printed information for successful or failed tests.
@@ -101,7 +97,7 @@ def test_row_col_comparisons(agg_sparse_mtx, test_count=5, logger=None):
 # ...............................................
 def test_stacked_to_aggregate_sum(
         stk_df, stk_axis_col_label, stk_val_col_label, agg_sparse_mtx, agg_axis=0,
-        test_count=5, logger=None):
+        test_count=5):
     """Test for equality of sums in stacked and aggregated dataframes.
 
     Args:
@@ -116,7 +112,6 @@ def test_stacked_to_aggregate_sum(
         agg_axis (int): Axis 0 (row) or 1 (column) that corresponds with the column
             label (stk_axis_col_label) in the original stacked data.
         test_count (int): number of rows and columns to test.
-        logger (object): logger for saving relevant processing messages
 
     Postcondition:
         Printed information for successful or failed tests.
@@ -147,7 +142,7 @@ def test_stacked_to_aggregate_sum(
 # ...............................................
 def test_stacked_to_aggregate_extremes(
         stk_df, stk_col_label_for_axis0, stk_col_label_for_axis1, stk_col_label_for_val,
-        agg_sparse_mtx, agg_axis=0, test_count=5, logger=None, is_max=True):
+        agg_sparse_mtx, agg_axis=0, test_count=5, is_max=True):
     """Test min/max counts for attributes in the sparse matrix vs. the stacked data.
 
     Args:
@@ -164,8 +159,10 @@ def test_stacked_to_aggregate_extremes(
         agg_axis (int): Axis 0 (row) or 1 (column) that corresponds with the column
             label (stk_axis_col_label) in the original stacked data.
         test_count (int): number of rows and columns to test.
-        logger (object): logger for saving relevant processing messages
         is_max (bool): flag indicating whether to test maximum (T) or minimum (F)
+
+    Raises:
+        IndexError: on failure to find row or column in matrix.
 
     Postcondition:
         Printed information for successful or failed tests.
@@ -198,6 +195,7 @@ def test_stacked_to_aggregate_extremes(
             vector, vct_idx = agg_sparse_mtx.get_vector_from_label(lbl, axis=agg_axis)
         except IndexError:
             raise
+
         agg_target_val, agg_labels = agg_sparse_mtx.get_extreme_val_labels_for_vector(
             vector, axis=agg_axis, is_max=is_max)
         print(f"Test vector {lbl} on axis {agg_axis}")
@@ -220,12 +218,13 @@ def test_stacked_to_aggregate_extremes(
 
 
 # ...............................................
-def read_stacked_data_records(table_type, data_datestr, logger):
+def read_stacked_data_records(table_type, data_datestr):
     """Read stacked records from S3, aggregate into a sparse matrix of species x dim.
 
     Args:
+        table_type (code from bison.common.constants.SUMMARY): predefined type of
+            data indicating type and contents.
         data_datestr (str): date of the current dataset, in YYYY_MM_DD format
-        logger (object): logger for saving relevant processing messages
 
     Returns:
         agg_sparse_mtx (bison.spnet.sparse_matrix.SparseMatrix): sparse matrix
@@ -243,9 +242,8 @@ def read_stacked_data_records(table_type, data_datestr, logger):
     pqt_fname = f"{stacked_record_table['fname']}.parquet"
     # Read stacked (record) data directly into DataFrame
     s3 = S3()
-    stk_df = s3.get_dataframe_from_csv(
-        S3_BUCKET, S3_SUMMARY_DIR, pqt_fname, logger, s3_client=None
-    )
+    stk_df = s3.get_dataframe_from_parquet(S3_BUCKET, S3_SUMMARY_DIR, pqt_fname)
+
     # .................................
     # Combine key and species fields to ensure uniqueness
     def _combine_columns(row):
@@ -274,18 +272,16 @@ if __name__ == "__main__":
     # Create a logger
     # .................................
     script_name = os.path.splitext(os.path.basename(__file__))[0]
-    todaystr = get_today_str()
-    log_name = f"{script_name}_{todaystr}"
     # Create logger with default INFO messages
     logger = Logger(
-        log_name, log_path=TMP_PATH, log_console=True, log_level=INFO)
+        script_name, log_path=TMP_PATH, log_console=True, log_level=INFO)
 
     # .................................
     # Create a dataframe from stacked records
     # .................................
     # dim = "county"
     stk_col_label_for_axis0, stk_col_label_for_axis1, stk_col_label_for_val, stk_df = \
-        read_stacked_data_records(stacked_table_type, data_datestr, logger)
+        read_stacked_data_records(stacked_table_type, data_datestr)
 
     # .................................
     # Create matrix from record data
@@ -302,7 +298,7 @@ if __name__ == "__main__":
         # Test stacked column used for axis 0/1 against sparse matrix axis 0/1
         test_stacked_to_aggregate_sum(
             stk_df, stk_lbl, stk_col_label_for_val, agg_sparse_mtx, agg_axis=axis,
-            test_count=5, logger=logger)
+            test_count=5)
 
     # Test min/max values for rows/columns
     for is_max in (False, True):
@@ -310,7 +306,7 @@ if __name__ == "__main__":
             test_stacked_to_aggregate_extremes(
                 stk_df, stk_col_label_for_axis0, stk_col_label_for_axis1,
                 stk_col_label_for_val, agg_sparse_mtx, agg_axis=axis, test_count=5,
-                logger=logger, is_max=is_max)
+                is_max=is_max)
 
     # .................................
     # Save sparse matrix to S3 then clear
@@ -350,7 +346,7 @@ if __name__ == "__main__":
         # Test stacked column used for axis 0/1 against sparse matrix axis 0/1
         test_stacked_to_aggregate_sum(
             stk_df, stk_lbl, stk_col_label_for_val, agg_sparse_mtx, agg_axis=axis,
-            test_count=5, logger=logger)
+            test_count=5)
 
     # Test min/max values for rows/columns
     for is_max in (False, True):
@@ -358,7 +354,7 @@ if __name__ == "__main__":
             test_stacked_to_aggregate_extremes(
                 stk_df, stk_col_label_for_axis0, stk_col_label_for_axis1,
                 stk_col_label_for_val, agg_sparse_mtx, agg_axis=axis, test_count=5,
-                logger=logger, is_max=is_max)
+                is_max=is_max)
 
     # .................................
     # Create a summary matrix for each dimension of sparse matrix and upload

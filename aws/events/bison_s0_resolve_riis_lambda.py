@@ -27,7 +27,6 @@ session = boto3.Session(botocore_session=bc_session, region_name=region)
 # Initialize Redshift client
 config = Config(connect_timeout=timeout, read_timeout=timeout)
 client_ec2 = session.client("ec2", config=config)
-# ec2 = boto3.client('ec2', region_name=region)
 
 
 # --------------------------------------------------------------------------------------
@@ -40,9 +39,6 @@ def lambda_handler(event, context):
 
     Returns:
         instance_id (number): ID of the EC2 instance started.
-
-    Raises:
-        Exception: on failure to start the EC2 instance
     """
     instance = client_ec2.run_instances(
         # ImageId=AMI,

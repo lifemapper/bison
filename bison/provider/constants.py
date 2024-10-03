@@ -4,6 +4,7 @@ LINENO_FLD = "LINENO"
 RIIS_BASENAME = "USRIISv2_MasterList"
 INPUT_RIIS_FILENAME = f"./data/{RIIS_BASENAME}.csv"
 
+
 # .............................................................................
 class APPEND_TO_RIIS:
     """New fields to add to RIIS records for GBIF accepted taxa and key values."""

@@ -5,7 +5,7 @@ import os
 from werkzeug.exceptions import BadRequest, InternalServerError
 
 from bison.common.log import Logger
-from bison.common.util import add_errinfo, get_today_str, get_traceback
+from bison.common.util import add_errinfo, get_traceback
 from flask_app.common.constants import APIEndpoint, APIService, BisonOutput
 
 try:
@@ -335,9 +335,7 @@ class _BisonService(object):
     @classmethod
     def _init_logger(cls):
         script_name = os.path.splitext(os.path.basename(__file__))[0]
-        todaystr = get_today_str()
-        log_name = f"{script_name}_{todaystr}"
-        logger = Logger(log_name, log_console=True, log_level=INFO)
+        logger = Logger(script_name, log_console=True, log_level=INFO)
         return logger
 
     # ...............................................

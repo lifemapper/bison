@@ -6,7 +6,7 @@ from pandas.api.types import CategoricalDtype
 import random
 import scipy.sparse
 
-from bison.common.constants import (PROJ_BUCKET, SNKeys, SUMMARY)
+from bison.common.constants import SNKeys, SUMMARY
 from bison.spnet.aggregate_data_matrix import _AggregateDataMatrix
 
 
@@ -333,9 +333,6 @@ class SparseMatrix(_AggregateDataMatrix):
         Returns:
             target: The minimum or maximum value for a column
             row_labels: The labels of the rows containing the target value
-
-        Raises:
-            Exception: on axis not in (0, 1)
         """
         # Returns row_idxs, col_idxs, vals of NNZ values in row
         row_idxs, col_idxs, vals = scipy.sparse.find(vector)
@@ -396,14 +393,10 @@ class SparseMatrix(_AggregateDataMatrix):
         Args:
             vector (numpy.array): 1 dimensional array for a row or column.
             target_val (int): value to search for in a row or column
-            axis (int): row (0) or column (1) header for extreme value and labels.
 
         Returns:
             target: The minimum or maximum value for a column
             row_labels: The labels of the rows containing the target value
-
-        Raises:
-            Exception: on axis not in (0, 1)
         """
         # Returns row_idxs, col_idxs, vals of NNZ values in row
         row_idxs, col_idxs, vals = scipy.sparse.find(vector)
@@ -727,23 +720,27 @@ class SparseMatrix(_AggregateDataMatrix):
             comparisons["Occurrences"] = {
                 self._keys[SNKeys.COL_TOTAL]: stats[self._keys[SNKeys.COL_TOTAL]],
                 self._keys[SNKeys.COLS_TOTAL]: all_stats[self._keys[SNKeys.COLS_TOTAL]],
-                self._keys[SNKeys.COLS_MIN]: all_stats[self._keys[SNKeys.COLS_MIN]],
-                self._keys[SNKeys.COLS_MAX]: all_stats[self._keys[SNKeys.COLS_MAX]],
-                self._keys[SNKeys.COLS_MEAN]: all_stats[self._keys[SNKeys.COLS_MEAN]],
-                self._keys[SNKeys.COLS_MEDIAN]: all_stats[self._keys[SNKeys.COLS_MEDIAN]]
+                self._keys[SNKeys.COLS_MIN_TOTAL]:
+                    all_stats[self._keys[SNKeys.COLS_MIN_TOTAL]],
+                self._keys[SNKeys.COLS_MAX_TOTAL]:
+                    all_stats[self._keys[SNKeys.COLS_MAX_TOTAL]],
+                self._keys[SNKeys.COLS_MEAN_TOTAL]:
+                    all_stats[self._keys[SNKeys.COLS_MEAN_TOTAL]],
+                self._keys[SNKeys.COLS_MEDIAN_TOTAL]:
+                    all_stats[self._keys[SNKeys.COLS_MEDIAN_TOTAL]]
             }
         if agg_type in ("axis", None):
             comparisons["Species"] = {
                 self._keys[SNKeys.COL_COUNT]: stats[self._keys[SNKeys.COL_COUNT]],
                 self._keys[SNKeys.COLS_COUNT]: all_stats[self._keys[SNKeys.COLS_COUNT]],
-                self._keys[SNKeys.COLS_COUNT_MIN]:
-                    all_stats[self._keys[SNKeys.COLS_COUNT_MIN]],
-                self._keys[SNKeys.COLS_COUNT_MAX]:
-                    all_stats[self._keys[SNKeys.COLS_COUNT_MAX]],
-                self._keys[SNKeys.COLS_COUNT_MEAN]:
-                    all_stats[self._keys[SNKeys.COLS_COUNT_MEAN]],
-                self._keys[SNKeys.COLS_COUNT_MEDIAN]:
-                    all_stats[self._keys[SNKeys.COLS_COUNT_MEDIAN]]
+                self._keys[SNKeys.COLS_MIN_COUNT]:
+                    all_stats[self._keys[SNKeys.COLS_MIN_COUNT]],
+                self._keys[SNKeys.COLS_MAX_COUNT]:
+                    all_stats[self._keys[SNKeys.COLS_MAX_COUNT]],
+                self._keys[SNKeys.COLS_MEAN_COUNT]:
+                    all_stats[self._keys[SNKeys.COLS_MEAN_COUNT]],
+                self._keys[SNKeys.COLS_MEDIAN_COUNT]:
+                    all_stats[self._keys[SNKeys.COLS_MEDIAN_COUNT]]
             }
         return comparisons
 
@@ -767,24 +764,27 @@ class SparseMatrix(_AggregateDataMatrix):
             comparisons["Occurrences"] = {
                 self._keys[SNKeys.ROW_TOTAL]: stats[self._keys[SNKeys.ROW_TOTAL]],
                 self._keys[SNKeys.ROWS_TOTAL]: all_stats[self._keys[SNKeys.ROWS_TOTAL]],
-                self._keys[SNKeys.ROWS_MIN]: all_stats[self._keys[SNKeys.ROWS_MIN]],
-                self._keys[SNKeys.ROWS_MAX]: all_stats[self._keys[SNKeys.ROWS_MAX]],
-                self._keys[SNKeys.ROWS_MEAN]: all_stats[self._keys[SNKeys.ROWS_MEAN]],
-                self._keys[SNKeys.ROWS_MEDIAN]:
-                    all_stats[self._keys[SNKeys.ROWS_MEDIAN]],
+                self._keys[SNKeys.ROWS_MIN_TOTAL]:
+                    all_stats[self._keys[SNKeys.ROWS_MIN_TOTAL]],
+                self._keys[SNKeys.ROWS_MAX_TOTAL]:
+                    all_stats[self._keys[SNKeys.ROWS_MAX_TOTAL]],
+                self._keys[SNKeys.ROWS_MEAN_TOTAL]:
+                    all_stats[self._keys[SNKeys.ROWS_MEAN_TOTAL]],
+                self._keys[SNKeys.ROWS_MEDIAN_TOTAL]:
+                    all_stats[self._keys[SNKeys.ROWS_MEDIAN_TOTAL]],
             }
         if agg_type in ("axis", None):
             comparisons["Datasets"] = {
                 self._keys[SNKeys.ROW_COUNT]: stats[self._keys[SNKeys.ROW_COUNT]],
                 self._keys[SNKeys.ROWS_COUNT]: all_stats[self._keys[SNKeys.ROWS_COUNT]],
-                self._keys[SNKeys.ROWS_COUNT_MIN]:
-                    all_stats[self._keys[SNKeys.ROWS_COUNT_MIN]],
-                self._keys[SNKeys.ROWS_COUNT_MAX]:
-                    all_stats[self._keys[SNKeys.ROWS_COUNT_MAX]],
-                self._keys[SNKeys.ROWS_COUNT_MEAN]:
-                    all_stats[self._keys[SNKeys.ROWS_COUNT_MEAN]],
-                self._keys[SNKeys.ROWS_COUNT_MEDIAN]:
-                    all_stats[self._keys[SNKeys.ROWS_COUNT_MEDIAN]]
+                self._keys[SNKeys.ROWS_MIN_COUNT]:
+                    all_stats[self._keys[SNKeys.ROWS_MIN_COUNT]],
+                self._keys[SNKeys.ROWS_MAX_COUNT]:
+                    all_stats[self._keys[SNKeys.ROWS_MAX_COUNT]],
+                self._keys[SNKeys.ROWS_MEAN_COUNT]:
+                    all_stats[self._keys[SNKeys.ROWS_MEAN_COUNT]],
+                self._keys[SNKeys.ROWS_MEDIAN_COUNT]:
+                    all_stats[self._keys[SNKeys.ROWS_MEDIAN_COUNT]]
             }
         return comparisons
 

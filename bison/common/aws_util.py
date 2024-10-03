@@ -12,17 +12,12 @@ import os
 import pandas
 from time import sleep
 
-from bison.common.constants import (
-    INSTANCE_TYPE, KEY_NAME, REGION, SECURITY_GROUP_ID, USER_DATA_TOKEN, WORKFLOW_ROLE
-)
+from bison.common.constants import REGION, WORKFLOW_ROLE
 
 
 # .............................................................................
 class AWS:
     """Class for working with AWS tools."""
-    # ----------------------------------------------------
-    def __init__(self, region=REGION):
-        self._client = boto3.client("ec2", region=region)
 
     # ----------------------------------------------------
     @classmethod
@@ -31,7 +26,7 @@ class AWS:
 
         Args:
             secret_name: name of the secret to retrieve.
-            region: AWS region containint the secret.
+            region: AWS region containing the secret.
 
         Returns:
             a dictionary containing the secret data.
@@ -55,6 +50,14 @@ class AWS:
     # ----------------------------------------------------
     @classmethod
     def get_authenticated_session(cls, region):
+        """Get an authenticated session for AWS clients.
+
+        Args:
+            region: AWS region for the session.
+
+        Returns:
+            new_session (boto3.session.Session): an authenticated session.
+        """
         # Get credentials with first session
         session = boto3.session.Session()
         sts = session.client("sts", region_name=region)
@@ -76,8 +79,14 @@ class AWS:
 class EC2:
     """Class for creating and manipulating ec2 instances."""
     TEMPLATE_BASENAME = "launch_template"
+
     # ----------------------------------------------------
     def __init__(self, region=REGION):
+        """Constructor for common ec2 operations.
+
+        Args:
+            region: AWS region for EC2 instances.
+        """
         self._client = boto3.client("ec2", region=region)
 
     # ----------------------------------------------------
@@ -85,6 +94,7 @@ class EC2:
         """Create a name identifier for a Spot Launch Template.
 
         Args:
+            proj_prefix (str): prefix for template name.
             desc_str (str): optional descriptor to include in the name.
 
         Returns:
@@ -96,97 +106,97 @@ class EC2:
             template_name = f"{proj_prefix}_{desc_str}_{self.TEMPLATE_BASENAME}"
         return template_name
 
-    # ----------------------------------------------------
-    def define_spot_launch_template_data(
-            self, template_name, user_data_filename, script_filename,
-            token_to_replace=USER_DATA_TOKEN):
-        """Create the configuration data for a Spot Launch Template.
-
-        Args:
-            template_name: unique name for this Spot Launch Template.
-            user_data_filename: full filename for script to be included in the
-                template and executed on Spot instantiation.
-            script_filename: full filename for script to be inserted into user_data file.
-            token_to_replace: string within the user_data_filename which will be replaced
-                by the text in the script filename.
-
-        Returns:
-            launch_template_data (dict): Dictionary of configuration data for the template.
-        """
-        user_data_64 = self.get_user_data(
-            user_data_filename, script_filename, token_to_replace=token_to_replace)
-        launch_template_data = {
-            "EbsOptimized": True,
-            "IamInstanceProfile":
-                {"Name": "AmazonEMR-InstanceProfile-20230404T163626"},
-                #  "Arn":
-                #      "arn:aws:iam::321942852011:instance-profile/AmazonEMR-InstanceProfile-20230404T163626",
-                # },
-            "BlockDeviceMappings": [
-                {
-                    "DeviceName": "/dev/sda1",
-                    "Ebs": {
-                        "Encrypted": False,
-                        "DeleteOnTermination": True,
-                        # "SnapshotId": "snap-0a6ff81ccbe3194d1",
-                        "VolumeSize": 50, "VolumeType": "gp2"
-                    }
-                }],
-            "NetworkInterfaces": [
-                {
-                    "AssociatePublicIpAddress": True,
-                    "DeleteOnTermination": True,
-                    "Description": "",
-                    "DeviceIndex": 0,
-                    "Groups": [SECURITY_GROUP_ID],
-                    "InterfaceType": "interface",
-                    "Ipv6Addresses": [],
-                    # "PrivateIpAddresses": [
-                    #     {"Primary": True, "PrivateIpAddress": "172.31.16.201"}
-                    # ],
-                    # "SubnetId": "subnet-0beb8b03a44442eef",
-                    # "NetworkCardIndex": 0
-                }],
-            "ImageId": "ami-0a0c8eebcdd6dcbd0",
-            "InstanceType": INSTANCE_TYPE,
-            "KeyName": KEY_NAME,
-            "Monitoring": {"Enabled": False},
-            "Placement": {
-                "AvailabilityZone": "us-east-1c", "GroupName": "", "Tenancy": "default"},
-            "DisableApiTermination": False,
-            "InstanceInitiatedShutdownBehavior": "terminate",
-            "UserData": user_data_64,
-            "TagSpecifications": [
-                {
-                    "ResourceType": "instance",
-                    "Tags": [{"Key": "TemplateName", "Value": template_name}]
-                }],
-            "InstanceMarketOptions": {
-                "MarketType": "spot",
-                "SpotOptions": {
-                    "MaxPrice": "0.033600",
-                    "SpotInstanceType": "one-time",
-                    "InstanceInterruptionBehavior": "terminate"
-                }},
-            "CreditSpecification": {"CpuCredits": "unlimited"},
-            "CpuOptions": {"CoreCount": 2, "ThreadsPerCore": 1},
-            "CapacityReservationSpecification": {"CapacityReservationPreference": "open"},
-            "HibernationOptions": {"Configured": False},
-            "MetadataOptions": {
-                "HttpTokens": "optional",
-                "HttpPutResponseHopLimit": 1,
-                "HttpEndpoint": "enabled",
-                "HttpProtocolIpv6": "disabled",
-                "InstanceMetadataTags": "disabled"},
-            "EnclaveOptions": {"Enabled": False},
-            "PrivateDnsNameOptions": {
-                "HostnameType": "ip-name",
-                "EnableResourceNameDnsARecord": True,
-                "EnableResourceNameDnsAAAARecord": False},
-            "MaintenanceOptions": {"AutoRecovery": "default"},
-            "DisableApiStop": False
-        }
-        return launch_template_data
+    # # ----------------------------------------------------
+    # def define_spot_launch_template_data(
+    #         self, template_name, user_data_filename, script_filename,
+    #         token_to_replace=USER_DATA_TOKEN):
+    #     """Create the configuration data for a Spot Launch Template.
+    #
+    #     Args:
+    #         template_name: unique name for this Spot Launch Template.
+    #         user_data_filename: full filename for script to be included in the
+    #             template and executed on Spot instantiation.
+    #         script_filename: full filename for script to be inserted into user_data file.
+    #         token_to_replace: string within the user_data_filename which will be replaced
+    #             by the text in the script filename.
+    #
+    #     Returns:
+    #         launch_template_data (dict): Dictionary of configuration data for the template.
+    #     """
+    #     user_data_64 = self.get_user_data(
+    #         user_data_filename, script_filename, token_to_replace=token_to_replace)
+    #     launch_template_data = {
+    #         "EbsOptimized": True,
+    #         "IamInstanceProfile":
+    #             {"Name": "AmazonEMR-InstanceProfile-20230404T163626"},
+    #             #  "Arn":
+    #             #      "arn:aws:iam::321942852011:instance-profile/AmazonEMR-InstanceProfile-20230404T163626",
+    #             # },
+    #         "BlockDeviceMappings": [
+    #             {
+    #                 "DeviceName": "/dev/sda1",
+    #                 "Ebs": {
+    #                     "Encrypted": False,
+    #                     "DeleteOnTermination": True,
+    #                     # "SnapshotId": "snap-0a6ff81ccbe3194d1",
+    #                     "VolumeSize": 50, "VolumeType": "gp2"
+    #                 }
+    #             }],
+    #         "NetworkInterfaces": [
+    #             {
+    #                 "AssociatePublicIpAddress": True,
+    #                 "DeleteOnTermination": True,
+    #                 "Description": "",
+    #                 "DeviceIndex": 0,
+    #                 "Groups": [SECURITY_GROUP_ID],
+    #                 "InterfaceType": "interface",
+    #                 "Ipv6Addresses": [],
+    #                 # "PrivateIpAddresses": [
+    #                 #     {"Primary": True, "PrivateIpAddress": "172.31.16.201"}
+    #                 # ],
+    #                 # "SubnetId": "subnet-0beb8b03a44442eef",
+    #                 # "NetworkCardIndex": 0
+    #             }],
+    #         "ImageId": "ami-0a0c8eebcdd6dcbd0",
+    #         "InstanceType": INSTANCE_TYPE,
+    #         "KeyName": KEY_NAME,
+    #         "Monitoring": {"Enabled": False},
+    #         "Placement": {
+    #             "AvailabilityZone": "us-east-1c", "GroupName": "", "Tenancy": "default"},
+    #         "DisableApiTermination": False,
+    #         "InstanceInitiatedShutdownBehavior": "terminate",
+    #         "UserData": user_data_64,
+    #         "TagSpecifications": [
+    #             {
+    #                 "ResourceType": "instance",
+    #                 "Tags": [{"Key": "TemplateName", "Value": template_name}]
+    #             }],
+    #         "InstanceMarketOptions": {
+    #             "MarketType": "spot",
+    #             "SpotOptions": {
+    #                 "MaxPrice": "0.033600",
+    #                 "SpotInstanceType": "one-time",
+    #                 "InstanceInterruptionBehavior": "terminate"
+    #             }},
+    #         "CreditSpecification": {"CpuCredits": "unlimited"},
+    #         "CpuOptions": {"CoreCount": 2, "ThreadsPerCore": 1},
+    #         "CapacityReservationSpecification": {"CapacityReservationPreference": "open"},
+    #         "HibernationOptions": {"Configured": False},
+    #         "MetadataOptions": {
+    #             "HttpTokens": "optional",
+    #             "HttpPutResponseHopLimit": 1,
+    #             "HttpEndpoint": "enabled",
+    #             "HttpProtocolIpv6": "disabled",
+    #             "InstanceMetadataTags": "disabled"},
+    #         "EnclaveOptions": {"Enabled": False},
+    #         "PrivateDnsNameOptions": {
+    #             "HostnameType": "ip-name",
+    #             "EnableResourceNameDnsARecord": True,
+    #             "EnableResourceNameDnsAAAARecord": False},
+    #         "MaintenanceOptions": {"AutoRecovery": "default"},
+    #         "DisableApiStop": False
+    #     }
+    #     return launch_template_data
 
     # # ----------------------------------------------------
     # @classmethod
@@ -267,7 +277,6 @@ class EC2:
             uf.write(s)
 
     # ----------------------------------------------------
-    @classmethod
     def create_token(self, type=None):
         """Create a token to name and identify an AWS resource.
 
@@ -282,56 +291,53 @@ class EC2:
         token = f"{type}_{DT.datetime.now().timestamp()}"
         return token
 
+    # # ----------------------------------------------------
+    # def create_spot_launch_template(
+    #     self, template_name, user_data_filename, description=None,
+    #         insert_script_filename=None, overwrite=False):
+    #     """Create an EC2 Spot Instance Launch template on AWS.
+    #
+    #     Args:
+    #         template_name: name for the launch template0
+    #         user_data_filename: script to be installed and run on EC2 instantiation.
+    #         description: user-supplied name defining the template.
+    #         insert_script_filename: optional script to be inserted into user_data_filename.
+    #         overwrite: flag indicating whether to use an existing template with this name,
+    #             or create a new
+    #
+    #     Returns:
+    #         success: boolean flag indicating the success of creating launch template.
+    #     """
+    #     success = False
+    #     if overwrite is True:
+    #         self.delete_launch_template(template_name)
+    #     template = self.get_launch_template(template_name)
+    #     if template is not None:
+    #         success = True
+    #     else:
+    #         spot_template_data = self.define_spot_launch_template_data(
+    #             template_name, user_data_filename, insert_script_filename)
+    #         template_token = self.create_token("template")
+    #         try:
+    #             response = self._client.create_launch_template(
+    #                 DryRun=False,
+    #                 ClientToken=template_token,
+    #                 LaunchTemplateName=template_name,
+    #                 VersionDescription=description,
+    #                 LaunchTemplateData=spot_template_data
+    #             )
+    #         except ClientError as e:
+    #             print(f"Failed to create launch template {template_name}, ({e})")
+    #         else:
+    #             success = (response["ResponseMetadata"]["HTTPStatusCode"] == 200)
+    #     return success
+
     # ----------------------------------------------------
-    @classmethod
-    def create_spot_launch_template(
-        self, template_name, user_data_filename, description=None,
-            insert_script_filename=None, overwrite=False):
-        """Create an EC2 Spot Instance Launch template on AWS.
-
-        Args:
-            template_name: name for the launch template0
-            user_data_filename: script to be installed and run on EC2 instantiation.
-            description: user-supplied name defining the template.
-            insert_script_filename: optional script to be inserted into user_data_filename.
-            overwrite: flag indicating whether to use an existing template with this name,
-                or create a new
-
-        Returns:
-            success: boolean flag indicating the success of creating launch template.
-        """
-        success = False
-        if overwrite is True:
-            self.delete_launch_template(template_name)
-        template = self.get_launch_template(template_name)
-        if template is not None:
-            success = True
-        else:
-            spot_template_data = self.define_spot_launch_template_data(
-                template_name, user_data_filename, insert_script_filename)
-            template_token = self.create_token("template")
-            try:
-                response = self._client.create_launch_template(
-                    DryRun=False,
-                    ClientToken=template_token,
-                    LaunchTemplateName=template_name,
-                    VersionDescription=description,
-                    LaunchTemplateData=spot_template_data
-                )
-            except ClientError as e:
-                print(f"Failed to create launch template {template_name}, ({e})")
-            else:
-                success = (response["ResponseMetadata"]["HTTPStatusCode"] == 200)
-        return success
-
-    # ----------------------------------------------------
-    @classmethod
-    def get_instance(self, instance_id, region=REGION):
+    def get_instance(self, instance_id):
         """Describe an EC2 instance with instance_id.
 
         Args:
             instance_id: EC2 instance identifier.
-            region: AWS region to query.
 
         Returns:
             instance: metadata for the EC2 instance
@@ -347,7 +353,6 @@ class EC2:
         return instance
 
     # ----------------------------------------------------
-    @classmethod
     def run_instance_spot(self, template_name):
         """Run an EC2 Spot Instance on AWS.
 
@@ -388,7 +393,6 @@ class EC2:
         return instance_id
 
     # ----------------------------------------------------
-    @classmethod
     def get_launch_template_from_instance(self, instance_id):
         """Get or create an EC2 launch template from an EC2 instance identifier.
 
@@ -397,26 +401,43 @@ class EC2:
 
         Returns:
             launch_template_data: metadata to be used as an EC2 launch template.
+
+        Raises:
+            Exception: on failure to get launch template for instance.
         """
-        launch_template_data = self._client.get_launch_template_data(InstanceId=instance_id)
+        try:
+            launch_template_data = self._client.get_launch_template_data(
+                InstanceId=instance_id)
+        except Exception:
+            raise
         return launch_template_data
 
     # ----------------------------------------------------
-    @classmethod
     def get_launch_template(self, template_name):
-        lnch_temp = None
+        """Get or create an EC2 launch template from an EC2 instance identifier.
+
+        Args:
+            template_name: unique template name for a launch template.
+
+        Returns:
+            launch_template_data: metadata to be used as an EC2 launch template.
+
+        Raises:
+            Exception: on failure to find launch template for name.
+            Exception: on failure to get launch template data.
+        """
+        launch_template_data = None
         try:
             response = self._client.describe_launch_templates(
                 LaunchTemplateNames=[template_name])
         except Exception:
-            pass
-        else:
-            # LaunchTemplateName is unique
-            try:
-                lnch_temp = response["LaunchTemplates"][0]
-            except Exception:
-                pass
-        return lnch_temp
+            raise
+        # LaunchTemplateName is unique
+        try:
+            launch_template_data = response["LaunchTemplates"][0]
+        except Exception:
+            raise
+        return launch_template_data
 
     # ----------------------------------------------------
     def delete_instance(self, instance_id):
@@ -427,11 +448,37 @@ class EC2:
 
         Returns:
             response: response from the server.
+
+        Raises:
+            Exception: on failure to delete EC2 instance.
         """
-        response = self._client.delete_instance(InstanceId=instance_id)
+        try:
+            response = self._client.delete_instance(InstanceId=instance_id)
+        except Exception:
+            raise
         return response
 
-    # --------------------------------------------------------------------------------------
+    # ----------------------------------------------------
+    def _print_inst_info(self, reservation):
+        resid = reservation["ReservationId"]
+        inst = reservation["Instances"][0]
+        print(f"ReservationId: {resid}")
+        name = temp_id = None
+        try:
+            tags = inst["Tags"]
+        except Exception:
+            pass
+        else:
+            for t in tags:
+                if t["Key"] == "Name":
+                    name = t["Value"]
+                if t["Key"] == "aws:ec2launchtemplate:id":
+                    temp_id = t["Value"]
+        ip = inst["PublicIpAddress"]
+        state = inst["State"]["Name"]
+        print(f"Instance name: {name}, template: {temp_id}, IP: {ip}, state: {state}")
+
+    # ----------------------------------------------------
     def find_instances(self, key_name, launch_template_name):
         """Describe all instances with given key_name and/or launch_template_id.
 
@@ -444,7 +491,8 @@ class EC2:
         """
         filters = []
         if launch_template_name is not None:
-            filters.append({"Name": "tag:TemplateName", "Values": [launch_template_name]})
+            filters.append(
+                {"Name": "tag:TemplateName", "Values": [launch_template_name]})
         if key_name is not None:
             filters.append({"Name": "key-name", "Values": [key_name]})
         response = self._client.describe_instances(
@@ -460,7 +508,7 @@ class EC2:
             pass
         else:
             for res in ress:
-                self.print_inst_info(res)
+                self._print_inst_info(res)
                 instances.extend(res["Instances"])
         return instances
 
@@ -473,6 +521,11 @@ class S3:
     """Class for interacting with S3."""
     # ----------------------------------------------------
     def __init__(self, region=REGION):
+        """Constructor for common ec2 operations.
+
+        Args:
+            region: AWS region of S3 buckets.
+        """
         self._region = region
         self._client = boto3.client("s3", region=region)
 
@@ -485,7 +538,6 @@ class S3:
             trigger_name: Name of workflow to trigger.
             s3_bucket: name of the S3 bucket destination.
             s3_bucket_path: the data destination inside the S3 bucket (without filename).
-            region: AWS region to query.
 
         Returns:
             s3_filename: the URI to the file in the S3 bucket.
@@ -504,29 +556,39 @@ class S3:
         return s3_filename
 
     # ----------------------------------------------------
-    def write_dataframe_to_parquet(self, df, bucket, parquet_path, region=REGION):
-        """Convert DataFrame to Parquet format and upload to S3.
+    def get_dataframe_from_csv(
+            self, bucket, bucket_path, filename, delimiter, encoding="utf-8",
+            quoting=QUOTE_NONE):
+        """Get or create an EC2 launch template from an EC2 instance identifier.
 
         Args:
-            df: pandas DataFrame containing data.
-            bucket: name of the S3 bucket destination.
-            parquet_path: the data destination inside the S3 bucket
-            region: AWS region to query.
-        """
-        parquet_buffer = BytesIO()
-        df.to_parquet(parquet_buffer, engine="pyarrow")
-        parquet_buffer.seek(0)
-        self._client.upload_fileobj(parquet_buffer, bucket, parquet_path)
+            bucket: name for an S3 bucket.
+            bucket_path: bucket path to data of interest.
+            filename (str): Filename of CSV data to read from S3.
+            delimiter (str): single character indicating the delimiter in the csv file.
+            encoding (str): encoding for the csv file.
+            quoting (int): one of csv enumerations: 'QUOTE_ALL', 'QUOTE_MINIMAL',
+                'QUOTE_NONE', 'QUOTE_NONNUMERIC'
 
-    # .............................................................................
-    def get_parquet_to_pandas(self, bucket, bucket_path, filename, **args):
+        Returns:
+            df: pandas dataframe containing the tabular CSV data.
+        """
+        # Read CSV file from S3 into a pandas DataFrame
+        s3_key = f"{bucket_path}/{filename}"
+        s3_obj = self._client.get_object(Bucket=bucket, Key=s3_key)
+        df = pandas.read_csv(
+            s3_obj["Body"], delimiter=delimiter, encoding=encoding, low_memory=False,
+            quoting=quoting)
+        return df
+
+    # ----------------------------------------------------
+    def get_dataframe_from_parquet(self, bucket, bucket_path, filename, **args):
         """Read a parquet file from a folder on S3 into a pd DataFrame.
 
         Args:
             bucket (str): Bucket identifier on S3.
             bucket_path (str): Folder path to the S3 parquet data.
             filename (str): Filename of parquet data to read from S3.
-            region (str): AWS region to query.
             args: Additional arguments to be sent to the pd.read_parquet function.
 
         Returns:
@@ -552,7 +614,6 @@ class S3:
         Args:
             bucket (str): Bucket identifier on S3.
             bucket_path (str): Parent folder path to the S3 parquet data.
-            s3_conn (object): Connection to the S3 resource
             args: Additional arguments to be sent to the pd.read_parquet function.
 
         Returns:
@@ -571,10 +632,34 @@ class S3:
             return None
 
         dfs = [
-            self.get_parquet_to_pandas(bucket, bucket_path, key, **args)
+            self.get_dataframe_from_parquet(bucket, bucket_path, key, **args)
             for key in s3_keys
         ]
         return pandas.concat(dfs, ignore_index=True)
+
+    # .............................................................................
+    def write_dataframe_to_parquet(self, df, bucket, parquet_path):
+        """Convert DataFrame to Parquet format and upload to S3.
+
+        Args:
+            df: pandas DataFrame containing data.
+            bucket: name of the S3 bucket destination.
+            parquet_path: the data destination inside the S3 bucket
+
+        Returns:
+            path to S3 data object
+
+        Raises:
+            Exception: on failure to upload file to S3.
+        """
+        parquet_buffer = BytesIO()
+        df.to_parquet(parquet_buffer, engine="pyarrow")
+        parquet_buffer.seek(0)
+        try:
+            self._client.upload_fileobj(parquet_buffer, bucket, parquet_path)
+        except Exception:
+            raise
+        return f"s3//{bucket}/{parquet_path}"
 
     # ----------------------------------------------------
     def upload(self, local_filename, bucket, s3_path):
@@ -584,10 +669,21 @@ class S3:
             local_filename: Full path to local file for upload.
             bucket: name of the S3 bucket destination.
             s3_path: the data destination inside the S3 bucket (without filename).
+
+        Returns:
+            uploaded_fname: the S3 path to the uploaded file.
+
+        Raises:
+            Exception: on failure to upload file to S3.
         """
         filename = os.path.split(local_filename)[1]
-        self._client.upload_file(local_filename, bucket, s3_path)
-        print(f"Successfully uploaded {filename} to s3://{bucket}/{s3_path}")
+        try:
+            self._client.upload_file(local_filename, bucket, s3_path)
+        except Exception:
+            raise
+        else:
+            uploaded_fname = f"s3://{bucket}/{s3_path}/{filename}"
+        return uploaded_fname
 
     # ----------------------------------------------------
     def download(
@@ -599,8 +695,6 @@ class S3:
             bucket_path (str): Folder path to the S3 parquet data.
             filename (str): Filename of data to read from S3.
             local_path (str): local path for download.
-            region (str): AWS region to query.
-            logger (object): logger for saving relevant processing messages
             overwrite (boolean):  flag indicating whether to overwrite an existing file.
 
         Returns:
@@ -642,37 +736,3 @@ class S3:
                     print(f"Downloaded {url} to {local_filename}")
 
         return local_filename
-    # ----------------------------------------------------
-
-    # ----------------------------------------------------
-    def get_dataframe_from_csv(
-            self, bucket, csv_path, delimiter, encoding="utf-8", quoting=QUOTE_NONE):
-        """Get or create an EC2 launch template from an EC2 instance identifier.
-
-        Args:
-            bucket: name for an S3 bucket.
-            csv_path: bucket path, including object name, of CSV data of interest.
-
-        Returns:
-            df: pandas dataframe containing the tabular CSV data.
-        """
-        # Read CSV file from S3 into a pandas DataFrame
-        s3_obj = self._client.get_object(Bucket=bucket, Key=csv_path)
-        df = pandas.read_csv(
-            s3_obj["Body"], delimiter=delimiter, encoding=encoding, low_memory=False,
-            quoting=quoting)
-        return df
-
-    # ----------------------------------------------------
-    def write_dataframe_to_parquet(self, df, bucket, parquet_path):
-        """Write DataFrame to Parquet format and upload to S3.
-
-        Args:
-            df (pandas.DataFrame): tabular data to write on S3.
-            bucket (str): Bucket identifier on S3.
-            parquet_path (str): Destination path to the S3 parquet data.
-        """
-        parquet_buffer = BytesIO()
-        df.to_parquet(parquet_buffer, engine="pyarrow")
-        parquet_buffer.seek(0)
-        self._client.upload_fileobj(parquet_buffer, bucket, parquet_path)

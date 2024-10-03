@@ -29,19 +29,19 @@ Attach to BISON namespace (Redshift)
   * TODO: change to Redshift - Scheduler when automated
 
 {
-	"Version": "2012-10-17",
-	"Statement": [
-		{
-			"Effect": "Allow",
-			"Action": [
-				"lambda:InvokeFunction"
-			],
-			"Resource": [
-				"arn:aws:lambda:us-east-1:321942852011:function:bison_s0_test_schedule:*",
-				"arn:aws:lambda:us-east-1:321942852011:function:bison_s0_test_schedule"
-			]
-		}
-	]
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "lambda:InvokeFunction"
+            ],
+            "Resource": [
+                "arn:aws:lambda:us-east-1:321942852011:function:bison_s0_test_schedule:*",
+                "arn:aws:lambda:us-east-1:321942852011:function:bison_s0_test_schedule"
+            ]
+        }
+    ]
 }
 
 bison_redshift_lambda_role

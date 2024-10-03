@@ -1,5 +1,5 @@
 """Common classes for BISON RIIS data processing."""
-from logging import INFO, DEBUG, ERROR, WARNING
+from logging import DEBUG, ERROR, WARNING
 import os
 
 from bison.common.constants import ENCODING, REPORT
@@ -237,9 +237,11 @@ class RIIS:
 
         Args:
             input_riis_filename (str): full or base filename of the original RIIS data.
+            datestr (str): date for current dataset processing in YYYY_MM_DD format.
 
         Returns:
             out_filename: full filename for the output file.
+            datestr (str): date of the current dataset, in YYYY_MM_DD format
 
         Note:
             If only the basename is provided, the filename with extension but no path
@@ -249,21 +251,6 @@ class RIIS:
         basename, _ = os.path.splitext(fname)
         out_filename = os.path.join(pth, f"{basename}_annotated_{datestr}.csv")
         return out_filename
-
-    # ...............................................
-    def logit(self, msg, refname=None, log_level=INFO):
-        """Method to log a message to a logger/file/stream or print to console.
-
-        Args:
-            msg: message to print.
-            refname: calling function name.
-            log_level: logging constant error level (logging.INFO, logging.DEBUG,
-                logging.WARNING, logging.ERROR)
-        """
-        if self._log is not None:
-            self._log.log(msg, refname=refname, log_level=log_level)
-        else:
-            print(msg)
 
     # ...............................................
     def _get_fields(self, csvfile, delimiter):
@@ -752,7 +739,7 @@ def resolve_riis_taxa(riis_filename, logger, overwrite=True):
         refname: {}
     }
     riis = RIIS(riis_filename, logger)
-    datestr =  get_current_datadate_str()
+    datestr = get_current_datadate_str()
     annotated_filename = RIIS.get_annotated_riis_filename(riis_filename, datestr)
     # Update species data
     try:

@@ -113,18 +113,16 @@ b_ass_fld = riis_data["fields"]["assess"][1]
 state_aggregate_stmt = f"""
     CREATE TABLE {pub_schema}.{state_aggregate_tbl} AS
         SELECT DISTINCT {b_st_fld}, {b_ass_fld},
-            COUNT(*) AS {out_occcount_fld}, 
+            COUNT(*) AS {out_occcount_fld},
             COUNT(DISTINCT {gbif_tx_fld}) AS {out_spcount_fld}
         FROM  {bison_tbl} WHERE {b_st_fld} IS NOT NULL
         GROUP BY {b_st_fld}, {b_ass_fld};
-"""
-state_agg_export_stmt = f"""
 """
 # Note: in county agggregate, include states bc county names are not unique
 county_aggregate_stmt = f"""
     CREATE TABLE public.{county_aggregate_tbl} AS
         SELECT DISTINCT {b_stcty_fld}, {b_cty_fld}, {b_st_fld}, {b_ass_fld},
-            COUNT(*) AS {out_occcount_fld}, 
+            COUNT(*) AS {out_occcount_fld},
             COUNT(DISTINCT {gbif_tx_fld}) AS {out_spcount_fld}
         FROM  {bison_tbl} WHERE {b_st_fld} IS NOT NULL
         GROUP BY {b_stcty_fld}, {b_cty_fld}, {b_st_fld}, {b_ass_fld};
@@ -132,7 +130,7 @@ county_aggregate_stmt = f"""
 aiannh_aggregate_stmt = f"""
     CREATE TABLE {pub_schema}.{aiannh_aggregate_tbl} AS
         SELECT DISTINCT {b_nm_fld}, {b_ass_fld},
-            COUNT(*) AS {out_occcount_fld}, 
+            COUNT(*) AS {out_occcount_fld},
             COUNT(DISTINCT {gbif_tx_fld}) AS {out_spcount_fld}
         FROM  {bison_tbl} WHERE {b_nm_fld} IS NOT NULL
         GROUP BY {b_nm_fld}, {b_ass_fld};

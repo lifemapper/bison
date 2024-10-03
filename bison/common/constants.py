@@ -82,6 +82,7 @@ class REPORT:
     RANK_FAIL_COUNT = "records_failed_rank"
     MESSAGE = "message"
 
+
 # .............................................................................
 SPECIES_DIM = {
     "name": "species",
@@ -91,6 +92,7 @@ SPECIES_DIM = {
 
 # .............................................................................
 class ANALYSIS_DIM:
+    """All dimensions (besides species) with columns used for data analyses."""
     STATE = {
         "name": "state",
         "fields"
@@ -247,19 +249,11 @@ class SUMMARY:
 
     # ...............................................
     @classmethod
-    def parse_table_type(cls, table_type):
-        tbl = cls.get_table(table_type)
-        parts = table_type.split("_")
-        if len(parts) == 2:
-            datacontents, datetype = parts
-        else:
-            raise Exception(f"Failed to parse {table_type} into datacontents, datetype.")
-        return datacontents, datetype
-
-    # ...............................................
-    @classmethod
     def tables(cls, datestr=None):
         """All tables of species and occurrence counts, summaries, and matrices.
+
+        Args:
+            datestr (str): String in the format YYYY_MM_DD.
 
         Returns:
             sums (dict): dict of dictionaries for each table defined by the project.
@@ -337,7 +331,7 @@ class SUMMARY:
         """Update the filename in a metadata dictionary for one table, and return.
 
         Args:
-            table_type: type of summary table to return.
+            table_type (str): predefined type of data indicating type and contents.
             datestr: Datestring contained in the filename indicating the current version
                 of the data.
 
@@ -363,6 +357,9 @@ class SUMMARY:
             dim1 (str): second dimension (columns/axis 1) of data in the table
             datatype (str): type of data structure: summary table, stacked records
                 (lists or counts), or matrix.
+
+        Raises:
+            Exception: on failure to parse table_type into 2 strings.
         """
         fn_parts = table_type.split(cls.sep)
         if len(fn_parts) == 2:
