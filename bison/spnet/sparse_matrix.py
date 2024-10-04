@@ -47,17 +47,17 @@ class SparseMatrix(_AggregateDataMatrix):
     # ...........................
     @classmethod
     def init_from_stacked_data(
-            cls, stacked_df, x_fld, y_fld, val_fld, table_type, data_datestr,
+            cls, stacked_df, y_fld, x_fld, val_fld, table_type, data_datestr,
             logger=None):
         """Create a sparse matrix of rows by columns containing values from a table.
 
         Args:
             stacked_df (pandas.DataFrame): DataFrame of records containing columns to be
                 used as the new rows, new columns, and values.
-            x_fld: column in the input dataframe containing values to be used as
-                columns (axis 1)
             y_fld: column in the input dataframe containing values to be used as rows
                 (axis 0)
+            x_fld: column in the input dataframe containing values to be used as
+                columns (axis 1)
             val_fld: : column in the input dataframe containing values to be used as
                 values for the intersection of x and y fields
             table_type (sppy.tools.s2n.constants.SUMMARY_TABLE_TYPES): table type of

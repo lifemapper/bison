@@ -17,20 +17,20 @@ from bison.common.constants import (
 
 
 # .............................................................................
-class AWS:
+class _AWS:
     """Class for working with AWS tools."""
 
-    # ----------------------------------------------------
-    def __init__(self, region=REGION):
-        """Constructor for common ec2 operations.
-
-        Args:
-        """
-        self._region = region
+    # # ----------------------------------------------------
+    # def __init__(self, region=REGION):
+    #     """Constructor for common ec2 operations.
+    #
+    #     Args:
+    #     """
+    #     self._region = region
 
     # ----------------------------------------------------
     @classmethod
-    def get_secret(cls, secret_name, region=REGION):
+    def _get_secret(cls, secret_name, region=REGION):
         """Get a secret from the Secrets Manager for connection authentication.
 
         Args:
@@ -66,7 +66,7 @@ class AWS:
             response = sts.assume_role(
                 RoleArn=role, RoleSessionName="authenticated-bison-session")
         except NoCredentialsError:
-            secret = cls.get_secret(WORKFLOW_SECRET_NAME, region=region)
+            secret = cls._get_secret(WORKFLOW_SECRET_NAME, region=region)
             sts = session.client(
                 "sts",
                 aws_access_key_id=secret["aws_access_key_id"],
@@ -113,13 +113,15 @@ class EC2:
     TEMPLATE_BASENAME = "launch_template"
 
     # ----------------------------------------------------
-    def __init__(self, auth_session):
+    def __init__(self, profile, role, region=REGION):
         """Constructor for common ec2 operations.
 
         Args:
-            auth_session (boto3.session.Session): an authenticated session.
+            profile: local user profile with assume_role privilege on role
+            role: role with permissions for AWS operations.
+            region: AWS region for the session.
         """
-        self._auth_session = auth_session
+        self._auth_session = _AWS.get_authenticated_session(profile, role, region)
         self._client = self._auth_session.client("ec2")
 
     # ----------------------------------------------------
@@ -553,13 +555,15 @@ class EC2:
 class S3:
     """Class for interacting with S3."""
     # ----------------------------------------------------
-    def __init__(self, auth_session):
-        """Constructor for common ec2 operations.
+    def __init__(self, profile, role, region=REGION):
+        """Constructor for common S3 operations.
 
         Args:
-            auth_session (boto3.session.Session): an authenticated session.
+            profile: local user profile with assume_role privilege on role
+            role: role with permissions for AWS operations.
+            region: AWS region for the session.
         """
-        self._auth_session = auth_session
+        self._auth_session = _AWS.get_authenticated_session(profile, role, region)
         self._client = self._auth_session.client("s3")
 
     # ----------------------------------------------------

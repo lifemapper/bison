@@ -64,11 +64,11 @@ class SummaryMatrix(_AggregateDataMatrix):
         # Axis 0 summarizes each column (down axis 0) of sparse matrix
         if axis == 0:
             index = sp_mtx.column_category.categories
-            table_type = input_table_meta["column_summary_table"]
+            table_type = input_table_meta["column_input"]
         # Axis 1 summarizes each row (across axis 1) of sparse matrix
         elif axis == 1:
             index = sp_mtx.row_category.categories
-            table_type = input_table_meta["row_summary_table"]
+            table_type = input_table_meta["row_input"]
 
         # summary fields = columns, sparse matrix axis = rows
         sdf = pd.DataFrame(data=data, index=index)

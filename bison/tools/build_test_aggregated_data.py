@@ -4,7 +4,7 @@ import os
 
 from bison.common.aws_util import S3
 from bison.common.constants import (
-    PROJ_NAME, TMP_PATH, S3_BUCKET, S3_SUMMARY_DIR, SUMMARY)
+    PROJECT, TMP_PATH, S3_BUCKET, S3_SUMMARY_DIR, SUMMARY, WORKFLOW_USER, ANALYSIS_DIM, WORKFLOW_ROLE)
 from bison.common.log import Logger
 from bison.common.util import get_current_datadate_str
 from bison.spnet.sparse_matrix import SparseMatrix
@@ -219,7 +219,7 @@ def test_stacked_to_aggregate_extremes(
 
 
 # ...............................................
-def read_stacked_data_records(table_type, data_datestr):
+def read_stacked_data_records(s3, table_type, data_datestr):
     """Read stacked records from S3, aggregate into a sparse matrix of species x dim.
 
     Args:
@@ -231,29 +231,17 @@ def read_stacked_data_records(table_type, data_datestr):
         agg_sparse_mtx (bison.spnet.sparse_matrix.SparseMatrix): sparse matrix
             containing data separated into 2 dimensions
     """
-    # Datasets in rows/x/axis 1
-    stacked_record_table = SUMMARY.get_table(table_type, datestr=data_datestr)
-    stk_col_label_for_axis1 = stacked_record_table["key_fld"]
-    stk_col_label_for_val = stacked_record_table["value_fld"]
-    # Dict of new fields constructed from existing fields, just 1 for species key/name
-    fld_mods = stacked_record_table["combine_fields"]
+    # Analysis dimension (i.e. region) in rows/x/axis 1
+    stk_tbl = SUMMARY.get_table(table_type, datestr=data_datestr)
+    axis1_label = stk_tbl["key_fld"]
+    val_label = stk_tbl["value_fld"]
     # Species (taxonKey + name) in columns/y/axis 0
-    stk_col_label_for_axis0 = list(fld_mods.keys())[0]
-    (fld1, fld2) = fld_mods[stk_col_label_for_axis0]
-    pqt_fname = f"{stacked_record_table['fname']}.parquet"
+    axis0_label = stk_tbl["species_fld"]
+    pqt_fname = f"{stk_tbl['fname']}.parquet"
     # Read stacked (record) data directly into DataFrame
-    s3 = S3()
     stk_df = s3.get_dataframe_from_parquet(S3_BUCKET, S3_SUMMARY_DIR, pqt_fname)
 
-    # .................................
-    # Combine key and species fields to ensure uniqueness
-    def _combine_columns(row):
-        return str(row[fld1]) + ' ' + str(row[fld2])
-    # Combine 2 columns to create a guaranteed unique column
-    stk_df[stk_col_label_for_axis0] = stk_df.apply(_combine_columns, axis=1)
-    return (
-        stk_col_label_for_axis0, stk_col_label_for_axis1, stk_col_label_for_val, stk_df
-    )
+    return (axis0_label, axis1_label, val_label, stk_df)
 
 
 # --------------------------------------------------------------------------------------
@@ -261,12 +249,14 @@ def read_stacked_data_records(table_type, data_datestr):
 # --------------------------------------------------------------------------------------
 if __name__ == "__main__":
     """Main script creates a species-x-county_matrix from county-x-species_list."""
-    data_datestr = get_current_datadate_str()
+    datestr = get_current_datadate_str()
     overwrite = True
-    dim0 = "species"
     dim1 = "county"
-    stacked_table_type = f"{dim1}_list"
-    mtx_table_type = f"{dim0}-x-{dim1}_matrix"
+    dim2 = "species"
+    # All lists are analysis_dim x species
+    stacked_table_type = SUMMARY.get_table_type("list", dim1, dim2)
+    # Create matrix with species as rows: species x analysis_dim
+    mtx_table_type = SUMMARY.get_table_type("matrix", dim2, dim1)
 
     local_path = "/tmp"
     # .................................
@@ -280,39 +270,37 @@ if __name__ == "__main__":
     # .................................
     # Create a dataframe from stacked records
     # .................................
-    # dim = "county"
-    stk_col_label_for_axis0, stk_col_label_for_axis1, stk_col_label_for_val, stk_df = \
-        read_stacked_data_records(stacked_table_type, data_datestr)
+    # Get authenticated S3 client
+    s3 = S3(PROJECT, WORKFLOW_ROLE)
+    axis0_label, axis1_label, val_label, stk_df = \
+        read_stacked_data_records(s3, stacked_table_type, datestr)
 
     # .................................
     # Create matrix from record data
     # .................................
     agg_sparse_mtx = SparseMatrix.init_from_stacked_data(
-        stk_df, stk_col_label_for_axis1, stk_col_label_for_axis0, stk_col_label_for_val,
-        mtx_table_type, data_datestr, logger=logger)
+        stk_df, axis0_label, axis1_label, val_label, mtx_table_type, datestr,
+        logger=logger)
 
     # .................................
     # Test consistency between stacked data and sparse matrix
     # .................................
     # Test raw counts
-    for stk_lbl, axis in ((stk_col_label_for_axis0, 0), (stk_col_label_for_axis1, 1)):
+    for stk_lbl, axis in ((axis0_label, 0), (axis1_label, 1)):
         # Test stacked column used for axis 0/1 against sparse matrix axis 0/1
         test_stacked_to_aggregate_sum(
-            stk_df, stk_lbl, stk_col_label_for_val, agg_sparse_mtx, agg_axis=axis,
-            test_count=5)
+            stk_df, stk_lbl, val_label, agg_sparse_mtx, agg_axis=axis, test_count=5)
 
     # Test min/max values for rows/columns
     for is_max in (False, True):
         for axis in (0, 1):
             test_stacked_to_aggregate_extremes(
-                stk_df, stk_col_label_for_axis0, stk_col_label_for_axis1,
-                stk_col_label_for_val, agg_sparse_mtx, agg_axis=axis, test_count=5,
-                is_max=is_max)
+                stk_df, axis0_label, axis1_label, val_label, agg_sparse_mtx,
+                agg_axis=axis, test_count=5, is_max=is_max)
 
     # .................................
     # Save sparse matrix to S3 then clear
     # .................................
-    s3 = S3()
     out_filename = agg_sparse_mtx.compress_to_file()
     s3.upload(out_filename, S3_BUCKET, S3_SUMMARY_DIR)
     # Copy logfile to S3
@@ -322,7 +310,7 @@ if __name__ == "__main__":
     # .................................
     # Download data and create sparse matrix from S3 file to ensure consistency
     # .................................
-    table = SUMMARY.get_table(mtx_table_type, data_datestr)
+    table = SUMMARY.get_table(mtx_table_type, datestr)
     zip_fname = f"{table['fname']}.zip"
     # Only download if file does not exist
     zip_filename = s3.download(
@@ -330,32 +318,30 @@ if __name__ == "__main__":
         overwrite=overwrite)
 
     # Only extract if files do not exist
-    sparse_coo, row_categ, col_categ, table_type, _data_datestr = \
+    sparse_coo, row_categ, col_categ, table_type, _datestr = \
         SparseMatrix.uncompress_zipped_data(
             zip_filename, local_path=local_path, overwrite=overwrite)
 
     # Create
     agg_sparse_mtx = SparseMatrix(
-        sparse_coo, mtx_table_type, data_datestr, row_categ, col_categ,
+        sparse_coo, mtx_table_type, datestr, row_categ, col_categ,
         logger=logger)
 
     # .................................
     # Test consistency between stacked data and sparse matrix from S3 file
     # .................................
     # Test raw counts
-    for stk_lbl, axis in ((stk_col_label_for_axis0, 0), (stk_col_label_for_axis1, 1)):
+    for stk_lbl, axis in ((axis0_label, 0), (axis1_label, 1)):
         # Test stacked column used for axis 0/1 against sparse matrix axis 0/1
         test_stacked_to_aggregate_sum(
-            stk_df, stk_lbl, stk_col_label_for_val, agg_sparse_mtx, agg_axis=axis,
-            test_count=5)
+            stk_df, stk_lbl, val_label, agg_sparse_mtx, agg_axis=axis, test_count=5)
 
     # Test min/max values for rows/columns
     for is_max in (False, True):
         for axis in (0, 1):
             test_stacked_to_aggregate_extremes(
-                stk_df, stk_col_label_for_axis0, stk_col_label_for_axis1,
-                stk_col_label_for_val, agg_sparse_mtx, agg_axis=axis, test_count=5,
-                is_max=is_max)
+                stk_df, axis0_label, axis1_label, val_label, agg_sparse_mtx,
+                agg_axis=axis, test_count=5, is_max=is_max)
 
     # .................................
     # Create a summary matrix for each dimension of sparse matrix and upload
@@ -382,24 +368,24 @@ if __name__ == "__main__":
     # Download summary matrix files and recreate 2 summary matrices to test for corruption
     # .................................
     # Species Summary
-    sp_table = SUMMARY.get_table(spsum_table_type, data_datestr)
+    sp_table = SUMMARY.get_table(spsum_table_type, datestr)
     sp_zip_fname = f"{sp_table['fname']}.zip"
     sp_zip_filename = s3.download(
         S3_BUCKET, S3_SUMMARY_DIR, sp_zip_fname, local_path=local_path,
         overwrite=overwrite)
 
-    sp_dataframe, sp_meta_dict, sp_table_type, data_datestr = \
+    sp_dataframe, sp_meta_dict, sp_table_type, datestr = \
         SummaryMatrix.uncompress_zipped_data(
             sp_zip_filename, local_path=local_path, overwrite=overwrite)
 
     # Dataset Summary
-    ds_table = SUMMARY.get_table(dssum_table_type, data_datestr)
+    ds_table = SUMMARY.get_table(dssum_table_type, datestr)
     ds_zip_fname = f"{ds_table['fname']}.zip"
     ds_zip_filename = s3.download(
         S3_BUCKET, S3_SUMMARY_DIR, ds_zip_fname, local_path=local_path,
         overwrite=overwrite)
 
-    ds_dataframe, ds_meta_dict, ds_table_type, data_datestr = \
+    ds_dataframe, ds_meta_dict, ds_table_type, datestr = \
         SummaryMatrix.uncompress_zipped_data(
             ds_zip_filename, local_path=local_path, overwrite=overwrite)
 
@@ -412,36 +398,48 @@ if __name__ == "__main__":
     # .................................
 
 """
+from logging import INFO
+import os
+
+from bison.common.aws_util import S3
+from bison.common.constants import (
+    PROJECT, TMP_PATH, S3_BUCKET, S3_SUMMARY_DIR, SUMMARY, WORKFLOW_USER)
+from bison.common.log import Logger
+from bison.common.util import get_current_datadate_str
+from bison.spnet.sparse_matrix import SparseMatrix
+from bison.spnet.summary_matrix import SummaryMatrix
+
 from bison.tools.build_test_aggregated_data import *
 from bison.common.constants import *
 import boto3
 
-profile =  "PROJ_NAME"
+profile =  PROJECT
 role = WORKFLOW_ROLE
 secret_name = WORKFLOW_SECRET_NAME
 region = REGION
 
-data_datestr = get_current_datadate_str()
+datestr = "2024_09_01"
 overwrite = True
-dim0 = "species"
 dim1 = "county"
-stacked_table_type = f"{dim1}_list"
-mtx_table_type = f"{dim0}-x-{dim1}_matrix"
+dim2 = "species"
+
+stacked_table_type = SUMMARY.get_table_type("list", dim1, dim2)
+mtx_table_type = SUMMARY.get_table_type("matrix", dim2, dim1)
 
 local_path = "/tmp"
 # .................................
 # Create a logger
 # .................................
-script_name = "test_mtx"
-# Create logger with default INFO messages
 logger = Logger(
-    script_name, log_path=TMP_PATH, log_console=True, log_level=INFO)
+    "test", log_path=TMP_PATH, log_console=True, log_level=INFO)
 
 # .................................
 # Create a dataframe from stacked records
 # .................................
-# dim = "county"
-stk_col_label_for_axis0, stk_col_label_for_axis1, stk_col_label_for_val, stk_df = \
-    read_stacked_data_records(stacked_table_type, data_datestr)
+# Get authenticated S3 client
+s3 = S3(PROJECT, WORKFLOW_ROLE)
+axis0_label, axis1_label, val_label, stk_df = \
+    read_stacked_data_records(s3, stacked_table_type, datestr)
+
 
 """

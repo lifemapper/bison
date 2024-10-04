@@ -3,7 +3,8 @@ import copy
 from enum import Enum
 import os
 
-PROJ_NAME = "bison"
+# also used for profile name
+PROJECT = "bison"
 ENCODING = "utf-8"
 
 GBIF_BUCKET = "gbif-open-data-us-east-1/occurrence"
@@ -12,7 +13,7 @@ GBIF_ODR_FNAME = "occurrence.parquet"
 
 TMP_PATH = "/tmp"
 
-S3_BUCKET = f"{PROJ_NAME}-321942852011-us-east-1"
+S3_BUCKET = f"{PROJECT}-321942852011-us-east-1"
 S3_IN_DIR = "input"
 S3_OUT_DIR = "output"
 S3_SUMMARY_DIR = "summary"
@@ -87,29 +88,70 @@ class REPORT:
 
 
 # .............................................................................
-SPECIES_DIM = {
-    "name": "species",
-    "key_fld": "taxonkey_species"
-}
-
-
-# .............................................................................
 class ANALYSIS_DIM:
     """All dimensions (besides species) with columns used for data analyses."""
     STATE = {
-        "name": "state",
-        "fields"
-        "key_fld": "census_state"
+        "code": "state",
+        # In summary records
+        "fields": [
+            "census_state", "taxonkey_species", "species", "riis_assessment",
+            "occ_count"
+        ],
+        "key_fld": "census_state",
     }
     COUNTY = {
-        "name": "county",
-        "key_fld": "census_county"
+        "code": "county",
+        "fields": [
+            "state_county", "census_state", "census_county", "taxonkey_species",
+            "species", "riis_assessment", "occ_count"
+        ],
+        "key_fld": "census_county",
     }
     AIANNH = {
-        "name": "aiannh",
-        "key_fld": "aiannh_name"
+        "code": "aiannh",
+        "fields": [
+            "aiannh_name", "taxonkey_species", "taxonkey", "species",
+            "riis_assessment", "occ_count"
+        ],
+        "key_fld": "aiannh_name",
     }
-
+    SPECIES = {
+        "code": "species",
+        "key_fld": "taxonkey_species"
+    }
+    # ...........................
+    @classmethod
+    def species(cls):
+        return  ANALYSIS_DIM.SPECIES
+    # ...........................
+    @classmethod
+    def species_code(cls):
+        return ANALYSIS_DIM.SPECIES["code"]
+    # ...........................
+    @classmethod
+    def analysis(cls, name=None):
+        if name is None:
+            return (ANALYSIS_DIM.STATE, ANALYSIS_DIM.COUNTY, ANALYSIS_DIM.AIANNH)
+        else:
+            return cls.get(name)
+    # ...........................
+    @classmethod
+    def analysis_code(cls, name=None):
+        if name is None:
+            return (
+                ANALYSIS_DIM.STATE["code"], ANALYSIS_DIM.COUNTY["code"],
+                ANALYSIS_DIM.AIANNH["code"])
+        else:
+            return cls.get(name)["code"]
+    # ...........................
+    @classmethod
+    def get(cls, code):
+        for dim in (
+                ANALYSIS_DIM.STATE, ANALYSIS_DIM.COUNTY, ANALYSIS_DIM.AIANNH,
+                ANALYSIS_DIM.SPECIES):
+            if code == dim["code"]:
+                return dim
+        raise Exception(f"No dimension `{code}` in ANALYSIS_DIM")
 
 # .............................................................................
 class SUMMARY:
@@ -117,143 +159,167 @@ class SUMMARY:
     dt_token = "YYYY_MM_DD"
     sep = "_"
     dim_sep = "-x-"
+    DATATYPES = ("list", "summary", "matrix")
+    SPECIES_DIMENSION = ANALYSIS_DIM.species_code()
+    ANALYSIS_DIMENSIONS = ANALYSIS_DIM.analysis_code()
 
+    # ...........................
     @classmethod
-    def lists(cls):
-        """Records of dimension, species, occ counts for each dimension in project.
+    def get_table_type(cls, datatype, dim1, dim2):
+        """Get the table_type string for the analysis dimension and datatype.
+
+        Args:
+            datatype (SUMMARY.DATAYPES): type of aggregated data.
+            dim1 (str): code for primary dimension (bison.common.constants.ANALYSIS_DIM)
+                of analysis
+            dim2 (str): code for secondary dimension of analysis
+
+        Note:
+            Currently, either dim1 or dim2 must be species.
 
         Returns:
-            lists (dict): dict of dictionaries for each lists table defined by the
+            table_type (str): code for data type and contents
+
+        Raises:
+            Exception: on dim1 in ANALYSIS_DIMENSIONS and dim2 != SPECIES_DIMENSION
+            Exception: on dim1 == SPECIES_DIMENSION and dim2 not in ANALYSIS_DIMENSIONS
+            Exception: on dim1 != SPECIES_DIMENSION and not in ANALYSIS_DIMENSIONS
+            Exception: on datatype not one of: "list", "summary", "matrix"
+        """
+        if dim1 in cls.ANALYSIS_DIMENSIONS and dim2 != cls.SPECIES_DIMENSION:
+            raise Exception(f"Second dimension must be {cls.SPECIES_DIMENSION}")
+        elif dim1 == cls.SPECIES_DIMENSION and dim2 not in cls.ANALYSIS_DIMENSIONS:
+            raise Exception(f"Second dimension must be in {cls.ANALYSIS_DIMENSIONS}")
+        elif dim1 not in cls.ANALYSIS_DIMENSIONS and dim1 != cls.SPECIES_DIMENSION:
+            raise Exception(
+                f"First dimension must be {cls.SPECIES_DIMENSION} or "
+                f"in {cls.ANALYSIS_DIMENSIONS}.")
+        if datatype not in cls.DATATYPES:
+            raise Exception(f"Datatype {datatype} is not in {cls.DATATYPES}.")
+
+        prefix = f"{dim1}{cls.dim_sep}{dim2}{cls.sep}"
+        if datatype == "list":
+            table_type = f"{prefix}list"
+        elif datatype == "summary":
+            table_type = f"{prefix}summary"
+        elif datatype == "matrix":
+            table_type = f"{prefix}matrix"
+        return table_type
+
+    # ...........................
+    @classmethod
+    def list(cls):
+        """Records of dimension, species count, occ count for each dimension in project.
+
+        Returns:
+            list (dict): dict of dictionaries for each list table defined by the
                 project.
 
         Note:
             The keys for the dictionary (and code in the metadata values) are table_type
         """
-        lists = {}
-        for dim in [ANALYSIS_DIM.STATE, ANALYSIS_DIM.COUNTY, ANALYSIS_DIM.AIANNH]:
+        list = {}
+        for analysis_code in cls.ANALYSIS_DIMENSIONS:
+            table_type = cls.get_table_type(
+                "list", analysis_code, cls.SPECIES_DIMENSION)
+            dim = ANALYSIS_DIM.analysis(name=analysis_code)
             # name == table_type, ex: county-x-species_list
-            name = f"{dim['name']}{cls.dim_sep}{SPECIES_DIM['name']}{cls.sep}list"
             meta = {
-                "code": name,
-                "fname": f"{name}{cls.sep}{cls.dt_token}{cls.sep}000",
+                "code": table_type,
+                "fname": f"{table_type}{cls.sep}{cls.dt_token}{cls.sep}000",
                 "format": "Parquet",
-
-                # "fields": [DATASET_GBIF_KEY, "taxonkey", "species", "occ_count"],
-                # "key_fld": DATASET_GBIF_KEY,
-                # "species_fld": "species",
-                # "combine_fields": {"taxonkey_species": ("taxonkey", "species")},
-                # "value_fld": "occ_count",
-
                 "fields": dim["fields"],
-                "key_fld": dim["key_fld"]
+                "key_fld": dim["key_fld"],
+                "species_fld": "taxonkey_species",
+                "value_fld": "occ_count"
             }
-            lists[name] = meta
-        return lists
-
-    # # ...........................
-    # @classmethod
-    # def counts(cls):
-    #     """Tables of species and occurrence counts for each dimension in project.
-    #
-    #     Returns:
-    #         counts (dict): dict of dictionaries for each counts table defined by the
-    #             project.
-    #     """
-    #     counts = {}
-    #     for dim in [ANALYSIS_DIM.STATE, ANALYSIS_DIM.COUNTY, ANALYSIS_DIM.AIANNH]:
-    #         # name == table_type
-    #         name = f"{dim['name']}{cls.sep}count"
-    #         meta = {
-    #             "code": name,
-    #             "fname": f"{name}{cls.sep}{cls.dt_token}{cls.sep}000",
-    #             "format": "Parquet",
-    #             "fields": [],
-    #             "key_fld": "???"
-    #         }
-    #         counts[name] = meta
-    #     return counts
+            list[table_type] = meta
+        return list
 
     # ...........................
     @classmethod
-    def summaries(cls):
-        """Summary tables of species and occurrence counts for each dimension in project.
+    def summary(cls):
+        """Summary tables of species count and occurrence count for each dimension in project.
 
         Returns:
             sums (dict): dict of dictionaries for each summary table defined by the
                 project.
+
+        Note:
+            table contains stacked records summarizing original data:
+                dim1, dim2, rec count of dim2 in dim1
+                ex: county, species, occ_count
         """
         sums = {}
-        for dim in [ANALYSIS_DIM.STATE, ANALYSIS_DIM.COUNTY, ANALYSIS_DIM.AIANNH]:
-            # Species in rows, ex: species-x-county_summary
-            name1 = f"{SPECIES_DIM['name']}{cls.dim_sep}{dim['name']}_summary"
-            meta1 = {
-                "code": name1,
-                "fname": f"{name1}{cls.sep}{cls.dt_token}",
-                "aggregate_type": f"{SPECIES_DIM['name']}_summary",
-                # Axis 0, matches row (axis 0) in SPECIES_<dimension>_MATRIX
-                "row": SPECIES_DIM["key_fld"],
-            }
-            # Dimension X in rows, ex: county-x-species_summary
-            name2 = f"{dim['name']}{cls.dim_sep}{SPECIES_DIM['name']}_summary"
-            meta2 = {
-                "code": name2,
-                "fname": f"{name2}{cls.sep}{cls.dt_token}",
-                "aggregate_type": f"{dim['name']}_summary",
-                # Axis 0, matches column (axis 1) in SPECIES_DATASET_MATRIX
-                "row": dim["key_fld"],
-            }
-            for m in meta1, meta2:
-                m.update({
+        for analysis_code in cls.ANALYSIS_DIMENSIONS:
+            # Analysis first
+            table_type1 = cls.get_table_type(
+                "summary", analysis_code, cls.SPECIES_DIMENSION)
+            # Species first
+            table_type2 = cls.get_table_type(
+                "summary", cls.SPECIES_DIMENSION, analysis_code)
+
+            for tt in (table_type1, table_type2):
+                meta = {
+                    "code": tt,
+                    "fname": f"{tt}{cls.sep}{cls.dt_token}",
                     "table_format": "Zip",
                     "matrix_extension": ".csv",
                     # Axis 1
                     "column": "measurement_type",
                     "fields": [COUNT_FLD, TOTAL_FLD],
                     # Matrix values
-                    "value": "measure"
-                })
-                sums[name1] = meta1
-                sums[name2] = meta2
+                    "value": "measure"}
+                sums[tt] = meta
         return sums
 
     # ...........................
     @classmethod
-    def matrices(cls):
-        """Species by <dimension> matrices defined for this project.
+    def matrix(cls):
+        """Species by <dimension> matrix defined for this project.
 
         Returns:
             mtxs (dict): dict of dictionaries for each matrix/table defined for this
                 project.
+
+        Note:
+            Rows will always have species, columns will have analysis dimension (region)
         """
         mtxs = {}
-        for dim in [ANALYSIS_DIM.STATE, ANALYSIS_DIM.COUNTY, ANALYSIS_DIM.AIANNH]:
-            # ex: species-x-county_matrix
-            name = f"{SPECIES_DIM['name']}{cls.dim_sep}{dim['name']}{cls.sep}matrix"
-            row_input = f"{SPECIES_DIM['name']}{cls.dim_sep}{dim['name']}{cls.sep}summary"
-            col_input = f"{dim['name']}{cls.dim_sep}{SPECIES_DIM['name']}{cls.sep}summary"
+        for analysis_code in cls.ANALYSIS_DIMENSIONS:
+            dim1 = cls.SPECIES_DIMENSION
+            dim1_dict = ANALYSIS_DIM.species()
+            dim2 = analysis_code
+            dim2_dict = ANALYSIS_DIM.analysis(name=analysis_code)
+            table_type = cls.get_table_type("matrix", dim1, dim2)
+            row_input = cls.get_table_type("summary", dim1, dim2)
+            col_input = cls.get_table_type("summary", dim2, dim1)
+
             # Dimension 0/row is always species
             meta = {
-                "code": name,
-                "fname": f"{name}{cls.sep}{cls.dt_token}",
+                "code": table_type,
+                "fname": f"{table_type}{cls.sep}{cls.dt_token}",
                 "table_format": "Zip",
                 "matrix_extension": ".npz",
                 "data_type": "matrix",
-                # Axis 0
-                "row": SPECIES_DIM["key_fld"],
-                "row_input": cls.summaries()[row_input],
-                # Axis 1
-                "column": dim["key_fld"],
-                "column_summary_table": cls.summaries()[col_input],
+
+                # Dimension 1 is row (aka Axis 0)
+                "row": dim1_dict["key_fld"],
+                "row_input": row_input,
+                # Dimension 2 is column (aka Axis 1)
+                "column": dim2_dict["key_fld"],
+                "column_input": col_input,
+
                 # Matrix values
                 "value": "occ_count",
             }
-            mtxs[name] = meta
+            mtxs[table_type] = meta
         return mtxs
 
     # ...............................................
     @classmethod
     def tables(cls, datestr=None):
-        """All tables of species and occurrence counts, summaries, and matrices.
+        """All tables of species count and occurrence count, summary, and matrix.
 
         Args:
             datestr (str): String in the format YYYY_MM_DD.
@@ -265,9 +331,9 @@ class SUMMARY:
         Note:
             The keys for the dictionary (and code in the metadata values) are table_type
         """
-        tables = cls.lists()
-        tables.update(cls.summaries())
-        tables.update(cls.matrices())
+        tables = cls.list()
+        tables.update(cls.summary())
+        tables.update(cls.matrix())
         if datestr is not None:
             # Update filename in summary tables
             for key, meta in tables.items():
@@ -308,7 +374,7 @@ class SUMMARY:
         Args:
             datacontents (str): first part of filename indicating data in table.
             datatype (str): second part of filename indicating form of data in table
-                (records, lists, matrix, etc).
+                (records, list, matrix, etc).
 
         Returns:
             table_type (SUMMARY_TABLE_TYPES type): type of table.
@@ -359,7 +425,7 @@ class SUMMARY:
             dim0 (str): first dimension (rows/axis 0) of data in the table
             dim1 (str): second dimension (columns/axis 1) of data in the table
             datatype (str): type of data structure: summary table, stacked records
-                (lists or counts), or matrix.
+                (list or count), or matrix.
 
         Raises:
             Exception: on failure to parse table_type into 2 strings.
@@ -530,7 +596,7 @@ class SNKeys(Enum):
                 # ------------
                 # Counts: Count of all species (from all columns/dim1)
                 cls.COLS_COUNT: f"total_{dim1}_count",
-                # Species counts for all datasets - stats
+                # Species count for all datasets - stats
                 cls.COLS_MIN_COUNT: f"min_{dim0}_count_of_all_{dim1}",
                 cls.COLS_MIN_COUNT_NUMBER: f"number_of_{dim1}_with_min_{dim0}_count_of_all",
                 cls.COLS_MEAN_COUNT: f"mean_{dim0}_count_of_all_{dim1}",
@@ -566,7 +632,7 @@ class SNKeys(Enum):
                 # ------------
                 # Counts: Count of all datasets (from all rows/species)
                 cls.ROWS_COUNT: f"total_{dim0}_count",
-                # Dataset counts for all species - stats
+                # Dataset count for all species - stats
                 cls.ROWS_MIN_COUNT: f"min_{dim1}_count_of_all_{dim0}",
                 cls.ROWS_MIN_COUNT_NUMBER: f"{dim0}_with_min_{dim1}_count_of_all",
                 cls.ROWS_MEAN_COUNT: f"mean_{dim1}_count_of_all_{dim0}",
@@ -606,7 +672,7 @@ class SNKeys(Enum):
                 # ------------
                 # Counts: Count of all species (from all columns/datasets)
                 cls.ALL_COUNT: f"total_{dim1}_count",
-                # Species counts for all datasets - stats
+                # Species count for all datasets - stats
                 cls.ALL_MIN_COUNT: f"min_{dim1}_count_of_all_{dim0}",
                 cls.ALL_MEAN_COUNT: f"mean_{dim1}_count_of_all_{dim0}",
                 cls.ALL_MEDIAN_COUNT: f"median_{dim1}_count_of_all_{dim0}",
