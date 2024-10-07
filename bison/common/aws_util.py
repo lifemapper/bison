@@ -6,7 +6,7 @@ import base64
 import boto3
 from botocore.exceptions import ClientError, NoCredentialsError, SSLError
 from csv import QUOTE_NONE
-import datetime as DT
+from datetime import datetime, timezone
 from io import BytesIO
 import os
 import pandas
@@ -91,16 +91,21 @@ class _AWS:
 
         Returns:
             auth_session (boto3.session.Session): an authenticated session.
+            expiration (datetime.datetime): expiration time
         """
         response = cls._assume_role(profile, role, region)
         creds = response["Credentials"]
+        expiration = creds["Expiration"]
 
         # Initiate new authenticated session with credentials
         auth_session = boto3.session.Session(
             aws_access_key_id=creds["AccessKeyId"],
             aws_secret_access_key=creds["SecretAccessKey"],
-            aws_session_token=creds["SessionToken"])
-        return auth_session
+            aws_session_token=creds["SessionToken"],
+            profile_name=profile,
+            region_name=region
+        )
+        return auth_session, expiration
 
 
 # --------------------------------------------------------------------------------------
@@ -120,8 +125,21 @@ class EC2:
             role: role with permissions for AWS operations.
             region: AWS region for the session.
         """
-        self._auth_session = _AWS.get_authenticated_session(profile, role, region)
+        self._profile = profile
+        self._role = role
+        self._region = region
+        self._auth_session, self._expiration = _AWS.get_authenticated_session(
+            profile, role, region)
         self._client = self._auth_session.client("ec2")
+
+    # ----------------------------------------------------
+    def _check_expiration(self):
+        n = datetime.now(timezone.utc)
+        remaining_seconds = self._expiration - n
+        if remaining_seconds < 15:
+            # Reinitialize the session and client
+            self._auth_session, self._expiration = _AWS.get_authenticated_session(
+                self._profile, self._role, self._region)
 
     # ----------------------------------------------------
     def create_spot_launch_template_name(self, proj_prefix, desc_str=None):
@@ -322,7 +340,7 @@ class EC2:
         """
         if type is None:
             type = "token"
-        token = f"{type}_{DT.datetime.now().timestamp()}"
+        token = f"{type}_{datetime.now(timezone.utc).timestamp()}"
         return token
 
     # # ----------------------------------------------------
@@ -562,8 +580,21 @@ class S3:
             role: role with permissions for AWS operations.
             region: AWS region for the session.
         """
-        self._auth_session = _AWS.get_authenticated_session(profile, role, region)
+        self._profile = profile
+        self._role = role
+        self._region = region
+        self._auth_session, self._expiration = _AWS.get_authenticated_session(
+            profile, role, region)
         self._client = self._auth_session.client("s3")
+
+    # ----------------------------------------------------
+    def _check_expiration(self):
+        n = datetime.now(timezone.utc)
+        remaining_seconds = self._expiration - n
+        if remaining_seconds < 15:
+            # Reinitialize the session and client
+            self._auth_session, self._expiration = _AWS.get_authenticated_session(
+                self._profile, self._role, self._region)
 
     # ----------------------------------------------------
     def get_dataframe_from_csv(
@@ -582,10 +613,30 @@ class S3:
 
         Returns:
             df: pandas dataframe containing the tabular CSV data.
+
+        Raises:
+            Exception: on failure with SSL error to download from S3
+            Exception: on failure with AWS error to download from S3
+            Exception: on failure to save file locally
         """
         # Read CSV file from S3 into a pandas DataFrame
         s3_key = f"{bucket_path}/{filename}"
-        s3_obj = self._client.get_object(Bucket=bucket, Key=s3_key)
+        self._check_expiration()
+        try:
+            s3_obj = self._client.get_object(Bucket=bucket, Key=s3_key)
+        except SSLError:
+            raise Exception(
+                "Failed with SSLError to download "
+                f"s3://{bucket}/{bucket_path}/{s3_key}")
+        except ClientError as e:
+            raise Exception(
+                "Failed with ClientError to download "
+                f"s3://{bucket}/{bucket_path}/{s3_key}, ({e})")
+        except Exception as e:
+            raise Exception(
+                "Failed with unknown Exception to download "
+                f"s3://{bucket}/{bucket_path}/{s3_key}, ({e})")
+
         df = pandas.read_csv(
             s3_obj["Body"], delimiter=delimiter, encoding=encoding, low_memory=False,
             quoting=quoting)
@@ -603,18 +654,31 @@ class S3:
 
         Returns:
             pd.DataFrame containing the tabular data.
+
+        Raises:
+            Exception: on failure with SSL error to download from S3
+            Exception: on failure with AWS error to download from S3
+            Exception: on failure to save file locally
         """
-        dataframe = None
         s3_key = f"{bucket_path}/{filename}"
+        self._check_expiration()
         try:
             obj = self._client.get_object(Bucket=bucket, Key=s3_key)
         except SSLError:
-            print(f"Failed with SSLError getting {bucket}/{s3_key} from S3")
+            raise Exception(
+                "Failed with SSLError to download "
+                f"s3://{bucket}/{bucket_path}/{s3_key}")
         except ClientError as e:
-            print(f"Failed to get {bucket}/{s3_key} from S3, ({e})")
-        else:
-            print(f"Read {bucket}/{s3_key} from S3")
-            dataframe = pandas.read_parquet(BytesIO(obj["Body"].read()), **args)
+            raise Exception(
+                "Failed with ClientError to download "
+                f"s3://{bucket}/{bucket_path}/{s3_key}, ({e})")
+        except Exception as e:
+            raise Exception(
+                "Failed with unknown Exception to download "
+                f"s3://{bucket}/{bucket_path}/{s3_key}, ({e})")
+
+        print(f"Read {bucket}/{s3_key} from S3")
+        dataframe = pandas.read_parquet(BytesIO(obj["Body"].read()), **args)
         return dataframe
 
     # .............................................................................
@@ -628,6 +692,9 @@ class S3:
 
         Returns:
             pd.DataFrame containing the tabular data.
+
+        Raises:
+            Exception: on failure to download any part of data from S3
         """
         if not bucket_path.endswith("/"):
             bucket_path = bucket_path + "/"
@@ -641,10 +708,14 @@ class S3:
             print(f"No parquet found in {bucket} {bucket_path}")
             return None
 
-        dfs = [
-            self.get_dataframe_from_parquet(bucket, bucket_path, key, **args)
-            for key in s3_keys
-        ]
+        try:
+            dfs = [
+                self.get_dataframe_from_parquet(bucket, bucket_path, key, **args)
+                for key in s3_keys
+            ]
+        except Exception:
+            raise
+
         return pandas.concat(dfs, ignore_index=True)
 
     # .............................................................................
@@ -665,6 +736,7 @@ class S3:
         parquet_buffer = BytesIO()
         df.to_parquet(parquet_buffer, engine="pyarrow")
         parquet_buffer.seek(0)
+        self._check_expiration()
         try:
             self._client.upload_fileobj(parquet_buffer, bucket, parquet_path)
         except Exception:
@@ -687,6 +759,7 @@ class S3:
             Exception: on failure to upload file to S3.
         """
         filename = os.path.split(local_filename)[1]
+        self._check_expiration()
         try:
             self._client.upload_file(local_filename, bucket, s3_path)
         except Exception:
@@ -694,6 +767,61 @@ class S3:
         else:
             uploaded_fname = f"s3://{bucket}/{s3_path}/{filename}"
         return uploaded_fname
+
+    # ----------------------------------------------------
+    def list(self, bucket, bucket_folder, prefix=None):
+        """List object names/keys in a bucket.
+
+        Args:
+            bucket: bucket for query
+            bucket_folder: Any subfolder to limit the query
+            prefix: Any object prefix to limit the query
+
+        Returns:
+            objnames: Keys for the objects in the S3 location.
+
+        Raises:
+            Exception: on failure with SSL error to list objects from S3
+            Exception: on failure with AWS error to list objects from S3
+            Exception: on unknown failure to list objects from S3
+        """
+        objnames = []
+        # Ensure that directory prefix ends in /
+        if bucket_folder != "" and not bucket_folder.endswith("/"):
+            bucket_folder += "/"
+        full_prefix = bucket_folder
+        # Add object prefix if present
+        if prefix is not None:
+            full_prefix += prefix
+        # Try to list
+        self._check_expiration()
+        try:
+            response = self._client.list_objects_v2(Bucket=bucket, Prefix=full_prefix)
+        except SSLError:
+            raise Exception(
+                f"Failed with SSLError to list objects in s3://{bucket}/{full_prefix}")
+        except ClientError as e:
+            raise Exception(
+                "Failed with ClientError to list objects in "
+                f"s3://{bucket}/{full_prefix}, ({e})")
+        except Exception as e:
+            raise Exception(
+                "Failed with unknown Exception to list objects in "
+                f"s3://{bucket}/{full_prefix}, ({e})")
+
+        # Any objects?
+        try:
+            contents = response["Contents"]
+        except KeyError:
+            pass
+        else:
+            for s3obj in contents:
+                name = s3obj["Key"]
+                # Do not return the folder in results
+                if name != bucket_folder:
+                    objnames.append(s3obj["Key"])
+
+        return objnames
 
     # ----------------------------------------------------
     def download(
@@ -726,6 +854,7 @@ class S3:
                 print(f"{local_filename} already exists")
         # Download current
         if not os.path.exists(local_filename):
+            self._check_expiration()
             try:
                 self._client.download_file(bucket, obj_name, local_filename)
             except SSLError:
@@ -735,14 +864,15 @@ class S3:
             except Exception as e:
                 raise Exception(
                     f"Failed with unknown Exception to download {url}, ({e})")
+
+            # Do not return until download to complete, allow max 5 min
+            count = 0
+            while not os.path.exists(local_filename) and count < 10:
+                sleep(seconds=30)
+            if not os.path.exists(local_filename):
+                raise Exception(f"Failed to download {url} to {local_filename}")
             else:
-                # Do not return until download to complete, allow max 5 min
-                count = 0
-                while not os.path.exists(local_filename) and count < 10:
-                    sleep(seconds=30)
-                if not os.path.exists(local_filename):
-                    raise Exception(f"Failed to download {url} to {local_filename}")
-                else:
-                    print(f"Downloaded {url} to {local_filename}")
+                print(f"Downloaded {url} to {local_filename}")
 
         return local_filename
+# ----------------------------------------------------
