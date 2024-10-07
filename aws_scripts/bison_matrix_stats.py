@@ -6,14 +6,9 @@ import pandas
 
 from bison.common.log import Logger
 from bison.common.aws_util import S3
-
-# Also in bison_ec2_constants, but provided here to avoid populating EC2 template with
-# multiple files for userdata.
-REGION = "us-east-1"
-BUCKET = f"bison-321942852011-{REGION}"
-BUCKET_PATH = "out_data"
-LOG_PATH = "log"
-LOCAL_OUTDIR = "/tmp"
+from bison.common.constants import (
+    PROJECT, S3_BUCKET, S3_OUT_DIR, TMP_PATH, WORKFLOW_ROLE, S3_LOG_DIR
+)
 
 n = DT.datetime.now()
 # underscores for Redshift data
@@ -22,9 +17,9 @@ datestr = f"{n.year}_{n.month:02d}_01"
 todaystr = f"{n.year}-{n.month:02d}-{n.day:02d}"
 
 species_county_list_fname = f"county_lists_{datestr}_000.parquet"
-diversity_stats_dataname = os.path.join(LOCAL_OUTDIR, f"diversity_stats_{datestr}.csv")
-species_stats_dataname = os.path.join(LOCAL_OUTDIR, f"species_stats_{datestr}.csv")
-site_stats_dataname = os.path.join(LOCAL_OUTDIR, f"site_stats_{datestr}.csv")
+diversity_stats_dataname = os.path.join(TMP_PATH, f"diversity_stats_{datestr}.csv")
+species_stats_dataname = os.path.join(TMP_PATH, f"species_stats_{datestr}.csv")
+site_stats_dataname = os.path.join(TMP_PATH, f"site_stats_{datestr}.csv")
 
 
 # .............................................................................
@@ -403,11 +398,11 @@ if __name__ == "__main__":
     script_name = os.path.splitext(os.path.basename(__file__))[0]
     logger = Logger(script_name)
 
-    s3 = S3()
+    s3 = S3(PROJECT, WORKFLOW_ROLE)
 
     # Read directly into DataFrame
     orig_df = s3.get_dataframe_from_parquet(
-        BUCKET, BUCKET_PATH, species_county_list_fname)
+        S3_BUCKET, S3_OUT_DIR, species_county_list_fname)
 
     heat_df = reframe_to_heatmatrix(orig_df, logger)
     pam_df = reframe_to_pam(heat_df, 1)
@@ -417,16 +412,16 @@ if __name__ == "__main__":
     site_stat_df = pam.calculate_site_statistics()
     species_stat_df = pam.calculate_species_statistics()
 
-    diversity_stats_dataname = os.path.join(LOCAL_OUTDIR, f"diversity_stats_{datestr}.csv")
-    species_stats_dataname = os.path.join(LOCAL_OUTDIR, f"species_stats_{datestr}.csv")
-    site_stats_dataname = os.path.join(LOCAL_OUTDIR, f"site_stats_{datestr}.csv")
+    diversity_stats_dataname = os.path.join(TMP_PATH, f"diversity_stats_{datestr}.csv")
+    species_stats_dataname = os.path.join(TMP_PATH, f"species_stats_{datestr}.csv")
+    site_stats_dataname = os.path.join(TMP_PATH, f"site_stats_{datestr}.csv")
 
     diversity_df.to_csv(diversity_stats_dataname)
     site_stat_df.to_csv(site_stats_dataname)
     species_stat_df.to_csv(species_stats_dataname)
 
     # Write CSV and Parquet versions to S3
-    s3_outpath = f"s3://{BUCKET}/{BUCKET_PATH}"
+    s3_outpath = f"s3://{S3_BUCKET}/{S3_OUT_DIR}"
     diversity_df.to_csv(f"{s3_outpath}/diversity_stats_{datestr}.csv")
     site_stat_df.to_csv(f"{s3_outpath}/site_stats_{datestr}.csv")
     species_stat_df.to_csv(f"{s3_outpath}/species_stats_{datestr}.csv")
@@ -435,4 +430,4 @@ if __name__ == "__main__":
     species_stat_df.to_parquet(f"{s3_outpath}/species_stats_{datestr}.parquet")
 
     # Upload logfile to S3
-    uploaded_s3name = s3.upload(logger.filename, BUCKET, LOG_PATH)
+    uploaded_s3name = s3.upload(logger.filename, S3_BUCKET, S3_LOG_DIR)

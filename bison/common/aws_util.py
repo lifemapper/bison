@@ -12,8 +12,7 @@ import os
 import pandas
 from time import sleep
 
-from bison.common.constants import (
-    REGION, WORKFLOW_ROLE, WORKFLOW_USER, WORKFLOW_SECRET_NAME)
+from bison.common.constants import REGION, WORKFLOW_SECRET_NAME
 
 
 # .............................................................................
@@ -565,32 +564,6 @@ class S3:
         """
         self._auth_session = _AWS.get_authenticated_session(profile, role, region)
         self._client = self._auth_session.client("s3")
-
-    # ----------------------------------------------------
-    def upload_trigger_to_s3(
-            self, trigger_name, s3_bucket, s3_bucket_path):
-        """Upload a file to S3 which will trigger a workflow.
-
-        Args:
-            trigger_name: Name of workflow to trigger.
-            s3_bucket: name of the S3 bucket destination.
-            s3_bucket_path: the data destination inside the S3 bucket (without filename).
-
-        Returns:
-            s3_filename: the URI to the file in the S3 bucket.
-        """
-        filename = f"{trigger_name}.txt"
-        with open(filename, "r") as f:
-            f.write("go!")
-        obj_name = f"{s3_bucket_path}/{filename}"
-        try:
-            self._client.upload_file(filename, s3_bucket, obj_name)
-        except ClientError as e:
-            print(f"Failed to upload {obj_name} to {s3_bucket}, ({e})")
-        else:
-            s3_filename = f"s3://{s3_bucket}/{obj_name}"
-            print(f"Successfully uploaded {filename} to {s3_filename}")
-        return s3_filename
 
     # ----------------------------------------------------
     def get_dataframe_from_csv(

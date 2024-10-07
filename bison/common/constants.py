@@ -16,6 +16,7 @@ TMP_PATH = "/tmp"
 S3_BUCKET = f"{PROJECT}-321942852011-us-east-1"
 S3_IN_DIR = "input"
 S3_OUT_DIR = "output"
+S3_LOG_DIR = "log"
 S3_SUMMARY_DIR = "summary"
 
 WORKFLOW_ROLE = "arn:aws:iam::321942852011:role/service-role/bison_redshift_lambda_role"
@@ -119,39 +120,97 @@ class ANALYSIS_DIM:
         "code": "species",
         "key_fld": "taxonkey_species"
     }
+
     # ...........................
     @classmethod
     def species(cls):
-        return  ANALYSIS_DIM.SPECIES
+        """Get the data species analyses dimension.
+
+        Returns:
+            Data dimension relating to species.
+        """
+        return ANALYSIS_DIM.SPECIES
+
     # ...........................
     @classmethod
     def species_code(cls):
+        """Get the code for the data species analyses dimension.
+
+        Returns:
+            Code for the data dimension relating to species.
+        """
         return ANALYSIS_DIM.SPECIES["code"]
+
     # ...........................
     @classmethod
-    def analysis(cls, name=None):
-        if name is None:
-            return (ANALYSIS_DIM.STATE, ANALYSIS_DIM.COUNTY, ANALYSIS_DIM.AIANNH)
+    def analysis(cls, code=None):
+        """Get one or all data analyses dimensions to be analyzed for species.
+
+        Args:
+            code (str): Code for the analysis dimension to be returned.
+
+        Returns:
+            dim_lst (list): List of data dimension(s) to be analyzed for species.
+
+        Raises:
+            Exception: on unknown code.
+        """
+        if code is None:
+            dim_lst = [ANALYSIS_DIM.STATE, ANALYSIS_DIM.COUNTY, ANALYSIS_DIM.AIANNH]
         else:
-            return cls.get(name)
+            try:
+                dim_lst = [cls.get(code)]
+            except KeyError:
+                raise Exception(f"No dimension `{code}` in ANALYSIS_DIM")
+        return dim_lst
+
     # ...........................
     @classmethod
-    def analysis_code(cls, name=None):
-        if name is None:
-            return (
+    def analysis_code(cls, code=None):
+        """Get one or all codes for data analyses dimensions to be analyzed for species.
+
+        Args:
+            code (str): Code for the analysis dimension to be returned.
+
+        Returns:
+           code_lst (list): List of data dimension code(s) to be analyzed for species.
+
+        Raises:
+            Exception: on unknown code.
+        """
+        if code is None:
+            code_lst = [
                 ANALYSIS_DIM.STATE["code"], ANALYSIS_DIM.COUNTY["code"],
-                ANALYSIS_DIM.AIANNH["code"])
+                ANALYSIS_DIM.AIANNH["code"]
+            ]
         else:
-            return cls.get(name)["code"]
+            try:
+                code_lst = [cls.get(code)["code"]]
+            except KeyError:
+                raise Exception(f"No dimension `{code}` in ANALYSIS_DIM")
+        return code_lst
+
     # ...........................
     @classmethod
     def get(cls, code):
+        """Get the data analyses dimension for the code.
+
+        Args:
+            code (str): Code for the analysis dimension to be returned.
+
+        Returns:
+            Data dimension.
+
+        Raises:
+            Exception: on unknown code.
+        """
         for dim in (
                 ANALYSIS_DIM.STATE, ANALYSIS_DIM.COUNTY, ANALYSIS_DIM.AIANNH,
                 ANALYSIS_DIM.SPECIES):
             if code == dim["code"]:
                 return dim
         raise Exception(f"No dimension `{code}` in ANALYSIS_DIM")
+
 
 # .............................................................................
 class SUMMARY:
@@ -222,7 +281,7 @@ class SUMMARY:
         for analysis_code in cls.ANALYSIS_DIMENSIONS:
             table_type = cls.get_table_type(
                 "list", analysis_code, cls.SPECIES_DIMENSION)
-            dim = ANALYSIS_DIM.analysis(name=analysis_code)
+            dim = ANALYSIS_DIM.analysis(code=analysis_code)[0]
             # name == table_type, ex: county-x-species_list
             meta = {
                 "code": table_type,
@@ -290,7 +349,7 @@ class SUMMARY:
             dim1 = cls.SPECIES_DIMENSION
             dim1_dict = ANALYSIS_DIM.species()
             dim2 = analysis_code
-            dim2_dict = ANALYSIS_DIM.analysis(name=analysis_code)
+            dim2_dict = ANALYSIS_DIM.analysis(code=analysis_code)[0]
             table_type = cls.get_table_type("matrix", dim1, dim2)
             row_input = cls.get_table_type("summary", dim1, dim2)
             col_input = cls.get_table_type("summary", dim2, dim1)

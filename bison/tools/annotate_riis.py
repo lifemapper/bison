@@ -3,7 +3,9 @@ import json
 from logging import INFO, ERROR
 import os
 
-from bison.common.constants import (S3_BUCKET, S3_IN_DIR, REPORT)
+from bison.common.constants import (
+    PROJECT, REPORT, S3_BUCKET, S3_IN_DIR, WORKFLOW_ROLE
+)
 from bison.common.log import Logger
 from bison.common.util import get_current_datadate_str
 from bison.common.aws_util import S3
@@ -54,5 +56,5 @@ def annotate_riis():
 if __name__ == '__main__':
     """Resolve and write GBIF accepted names and taxonKeys in RIIS records."""
     annotated_filename = annotate_riis()
-    s3 = S3()
+    s3 = S3(PROJECT, WORKFLOW_ROLE)
     s3.upload(annotated_filename, S3_BUCKET, S3_IN_DIR)
