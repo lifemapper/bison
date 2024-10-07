@@ -677,9 +677,10 @@ class SparseMatrix(_AggregateDataMatrix):
             all_totals (list): list of values for the axis.
         """
         mtx = self._coo_array.sum(axis=axis)
-        # 2d Matrix is a list of rows
-        # Axis 0 produces a matrix shape (1, col_count), 1 row
-        # Axis 1 produces matrix shape (row_count, 1), row_count rows
+        # Axis 0 produces a matrix shape (1, col_count),
+        #   1 row of values, total for each column
+        # Axis 1 produces matrix shape (row_count, 1),
+        #   1 column of values, total for each row
         if axis == 0:
             all_totals = mtx.tolist()[0]
         elif axis == 1:

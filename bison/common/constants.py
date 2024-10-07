@@ -106,7 +106,7 @@ class ANALYSIS_DIM:
             "state_county", "census_state", "census_county", "taxonkey_species",
             "species", "riis_assessment", "occ_count"
         ],
-        "key_fld": "census_county",
+        "key_fld": "state_county",
     }
     AIANNH = {
         "code": "aiannh",

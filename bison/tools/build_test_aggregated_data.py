@@ -4,7 +4,7 @@ import os
 
 from bison.common.aws_util import S3
 from bison.common.constants import (
-    PROJECT, TMP_PATH, S3_BUCKET, S3_SUMMARY_DIR, SUMMARY, WORKFLOW_ROLE
+    PROJECT, S3_BUCKET, S3_SUMMARY_DIR, SUMMARY, TMP_PATH, WORKFLOW_ROLE
 )
 from bison.common.log import Logger
 from bison.common.util import get_current_datadate_str
@@ -12,8 +12,8 @@ from bison.spnet.sparse_matrix import SparseMatrix
 from bison.spnet.summary_matrix import SummaryMatrix
 
 
-# ...............................................
-def get_extreme_val_and_attrs_for_column_from_stacked_data(
+# .............................................................................
+def _get_extreme_val_and_attrs_for_column_from_stacked_data(
         stacked_df, filter_label, filter_value, attr_label, val_label, is_max=True):
     """Find the minimum or maximum value for rows where 'filter_label' = 'filter_value'.
 
@@ -51,8 +51,8 @@ def get_extreme_val_and_attrs_for_column_from_stacked_data(
     return target_val, attr_vals
 
 
-# ...............................................
-def sum_stacked_data_vals_for_column(stacked_df, filter_label, filter_value, val_label):
+# .............................................................................
+def _sum_stacked_data_vals_for_column(stacked_df, filter_label, filter_value, val_label):
     """Sum the values for rows where column 'filter_label' = 'filter_value'.
 
     Args:
@@ -72,7 +72,7 @@ def sum_stacked_data_vals_for_column(stacked_df, filter_label, filter_value, val
     return count
 
 
-# ...............................................
+# .............................................................................
 def test_row_col_comparisons(agg_sparse_mtx, test_count=5):
     """Test row comparisons between 1 and all, and column comparisons between 1 and all.
 
@@ -96,8 +96,8 @@ def test_row_col_comparisons(agg_sparse_mtx, test_count=5):
         print("Column comparisons:", print_obj=col_comps)
 
 
-# ...............................................
-def test_stacked_to_aggregate_sum(
+# .............................................................................
+def _test_stacked_to_aggregate_sum(
         stk_df, stk_axis_col_label, stk_val_col_label, agg_sparse_mtx, agg_axis=0,
         test_count=5):
     """Test for equality of sums in stacked and aggregated dataframes.
@@ -123,7 +123,7 @@ def test_stacked_to_aggregate_sum(
     labels = agg_sparse_mtx.get_random_labels(test_count, axis=agg_axis)
     # Test stacked column totals against aggregate x columns
     for lbl in labels:
-        stk_sum = sum_stacked_data_vals_for_column(
+        stk_sum = _sum_stacked_data_vals_for_column(
             stk_df, stk_axis_col_label, lbl, stk_val_col_label)
         agg_sum = agg_sparse_mtx.sum_vector(lbl, axis=agg_axis)
         print(f"Test axis {agg_axis}: {lbl}")
@@ -141,8 +141,8 @@ def test_stacked_to_aggregate_sum(
     print("")
 
 
-# ...............................................
-def test_stacked_to_aggregate_extremes(
+# .............................................................................
+def _test_stacked_to_aggregate_extremes(
         stk_df, stk_col_label_for_axis0, stk_col_label_for_axis1, stk_col_label_for_val,
         agg_sparse_mtx, agg_axis=0, test_count=5, is_max=True):
     """Test min/max counts for attributes in the sparse matrix vs. the stacked data.
@@ -189,7 +189,7 @@ def test_stacked_to_aggregate_extremes(
     for lbl in labels:
         # Get stacked data results
         (stk_target_val,
-         stk_attr_vals) = get_extreme_val_and_attrs_for_column_from_stacked_data(
+         stk_attr_vals) = _get_extreme_val_and_attrs_for_column_from_stacked_data(
             stk_df, filter_label, lbl, attr_label, stk_col_label_for_val, is_max=is_max)
         # Get sparse matrix results
         try:
@@ -219,7 +219,37 @@ def test_stacked_to_aggregate_extremes(
     print("")
 
 
-# ...............................................
+# .............................................................................
+def test_stacked_data(stk_df, axis0_label, axis1_label, val_label, agg_sparse_mtx):
+    """Test consistency between stacked data and sparse matrix.
+
+    Args:
+        stk_df: dataframe of stacked data, containing records with columns of
+            categorical values and counts.
+        axis0_label: column label in stacked dataframe to be used as the
+            row (axis 0) labels of the axis in the aggregate sparse matrix.
+        axis1_label: column label in stacked dataframe to be used as the
+            column (axis 1) labels of the axis in the aggregate sparse matrix.
+        val_label: column label in stacked dataframe for data to be used as
+            value in the aggregate sparse matrix.
+        agg_sparse_mtx (SparseMatrix): object containing a scipy.sparse.coo_array
+            with 3 columns from the stacked_df arranged as rows and columns with values]
+    """
+    # Test raw counts
+    for stk_lbl, axis in ((axis0_label, 0), (axis1_label, 1)):
+        # Test stacked column used for axis 0/1 against sparse matrix axis 0/1
+        _test_stacked_to_aggregate_sum(
+            stk_df, stk_lbl, val_label, agg_sparse_mtx, agg_axis=axis, test_count=5)
+
+    # Test min/max values for rows/columns
+    for is_max in (False, True):
+        for axis in (0, 1):
+            _test_stacked_to_aggregate_extremes(
+                stk_df, axis0_label, axis1_label, val_label, agg_sparse_mtx,
+                agg_axis=axis, test_count=5, is_max=is_max)
+
+
+# .............................................................................
 def read_stacked_data_records(s3, table_type, data_datestr):
     """Read stacked records from S3, aggregate into a sparse matrix of species x dim.
 
@@ -260,7 +290,6 @@ if __name__ == "__main__":
     # Create matrix with species as rows: species x analysis_dim
     mtx_table_type = SUMMARY.get_table_type("matrix", dim2, dim1)
 
-    local_path = "/tmp"
     # .................................
     # Create a logger
     # .................................
@@ -269,127 +298,99 @@ if __name__ == "__main__":
     logger = Logger(
         script_name, log_path=TMP_PATH, log_console=True, log_level=INFO)
 
-    # .................................
-    # Create a dataframe from stacked records
-    # .................................
     # Get authenticated S3 client
     s3 = S3(PROJECT, WORKFLOW_ROLE)
+
+    # .................................
+    # Download stacked records from S3 and build sparse matrix.
+    # Test, comparing contents of the two data structures.
+    # .................................
     axis0_label, axis1_label, val_label, stk_df = \
         read_stacked_data_records(s3, stacked_table_type, datestr)
 
-    # .................................
-    # Create matrix from record data
-    # .................................
+    # Create matrix from record data, then test consistency and upload.
     agg_sparse_mtx = SparseMatrix.init_from_stacked_data(
         stk_df, axis0_label, axis1_label, val_label, mtx_table_type, datestr,
         logger=logger)
 
-    # .................................
-    # Test consistency between stacked data and sparse matrix
-    # .................................
-    # Test raw counts
-    for stk_lbl, axis in ((axis0_label, 0), (axis1_label, 1)):
-        # Test stacked column used for axis 0/1 against sparse matrix axis 0/1
-        test_stacked_to_aggregate_sum(
-            stk_df, stk_lbl, val_label, agg_sparse_mtx, agg_axis=axis, test_count=5)
+    test_stacked_data(stk_df, axis0_label, axis1_label, val_label, agg_sparse_mtx)
 
-    # Test min/max values for rows/columns
-    for is_max in (False, True):
-        for axis in (0, 1):
-            test_stacked_to_aggregate_extremes(
-                stk_df, axis0_label, axis1_label, val_label, agg_sparse_mtx,
-                agg_axis=axis, test_count=5, is_max=is_max)
-
-    # .................................
     # Save sparse matrix to S3 then clear
-    # .................................
-    out_filename = agg_sparse_mtx.compress_to_file()
-    s3.upload(out_filename, S3_BUCKET, S3_SUMMARY_DIR)
-    # Copy logfile to S3
-    s3.upload(logger.filename, S3_BUCKET, S3_SUMMARY_DIR)
+    out_filename = agg_sparse_mtx.compress_to_file(local_path=TMP_PATH)
+    s3_sparse_data_path = s3.upload(out_filename, S3_BUCKET, S3_SUMMARY_DIR)
     agg_sparse_mtx = None
 
     # .................................
-    # Download data and create sparse matrix from S3 file to ensure consistency
+    # Download sparse matrix from S3 file; test contents to ensure consistency
     # .................................
     table = SUMMARY.get_table(mtx_table_type, datestr)
     zip_fname = f"{table['fname']}.zip"
     # Only download if file does not exist
     zip_filename = s3.download(
-        S3_BUCKET, S3_SUMMARY_DIR, zip_fname, local_path=local_path,
-        overwrite=overwrite)
+        S3_BUCKET, S3_SUMMARY_DIR, zip_fname, local_path=TMP_PATH, overwrite=overwrite)
 
     # Only extract if files do not exist
     sparse_coo, row_categ, col_categ, table_type, _datestr = \
         SparseMatrix.uncompress_zipped_data(
-            zip_filename, local_path=local_path, overwrite=overwrite)
+            zip_filename, local_path=TMP_PATH, overwrite=overwrite)
 
     # Create
     agg_sparse_mtx = SparseMatrix(
         sparse_coo, mtx_table_type, datestr, row_categ, col_categ,
         logger=logger)
 
-    # .................................
-    # Test consistency between stacked data and sparse matrix from S3 file
-    # .................................
-    # Test raw counts
-    for stk_lbl, axis in ((axis0_label, 0), (axis1_label, 1)):
-        # Test stacked column used for axis 0/1 against sparse matrix axis 0/1
-        test_stacked_to_aggregate_sum(
-            stk_df, stk_lbl, val_label, agg_sparse_mtx, agg_axis=axis, test_count=5)
-
-    # Test min/max values for rows/columns
-    for is_max in (False, True):
-        for axis in (0, 1):
-            test_stacked_to_aggregate_extremes(
-                stk_df, axis0_label, axis1_label, val_label, agg_sparse_mtx,
-                agg_axis=axis, test_count=5, is_max=is_max)
+    test_stacked_data(stk_df, axis0_label, axis1_label, val_label, agg_sparse_mtx)
 
     # .................................
     # Create a summary matrix for each dimension of sparse matrix and upload
     # .................................
-    sp_sum_mtx = SummaryMatrix.init_from_sparse_matrix(agg_sparse_mtx, axis=0, logger=logger)
-    spsum_table_type = sp_sum_mtx.table_type
-    sp_sum_filename = sp_sum_mtx.compress_to_file()
+    # dim1 = "county"
+    # dim2 = "species"
+    # axis0/rows
+    # Species totals/non-zero count
+    # Other dimension total/count of species, down axis 0, one value for every column
+    otherdim_sum_mtx = SummaryMatrix.init_from_sparse_matrix(
+        agg_sparse_mtx, axis=0, logger=logger)
+    otherdim_sum_table_type = otherdim_sum_mtx.table_type
+    otherdim_sum_filename = otherdim_sum_mtx.compress_to_file()
+    s3.upload(otherdim_sum_filename, S3_BUCKET, S3_SUMMARY_DIR)
 
-    ds_sum_mtx = SummaryMatrix.init_from_sparse_matrix(agg_sparse_mtx, axis=1, logger=logger)
-    dssum_table_type = ds_sum_mtx.table_type
-    ds_sum_filename = ds_sum_mtx.compress_to_file()
+    # axis1/columns
+    # Species total/count of other dimension, across axis 1, one val for every row
+    species_sum_mtx = SummaryMatrix.init_from_sparse_matrix(
+        agg_sparse_mtx, axis=1, logger=logger)
+    species_sum_table_type = species_sum_mtx.table_type
+    species_sum_filename = species_sum_mtx.compress_to_file()
+    s3.upload(species_sum_filename, S3_BUCKET, S3_SUMMARY_DIR)
 
     # .................................
     # TODO: Test summary matrices against sparse matrix
     # .................................
 
     # .................................
-    # Upload summary matrix files
-    # .................................
-    s3.upload(sp_sum_filename, S3_BUCKET, S3_SUMMARY_DIR)
-    s3.upload(ds_sum_filename, S3_BUCKET, S3_SUMMARY_DIR)
-
-    # .................................
     # Download summary matrix files and recreate 2 summary matrices to test for corruption
     # .................................
+    # Other dimension summary
+    odim_table = SUMMARY.get_table(otherdim_sum_table_type, datestr)
+    odim_zip_fname = f"{odim_table['fname']}.zip"
+    odim_zip_filename = s3.download(
+        S3_BUCKET, S3_SUMMARY_DIR, odim_zip_fname, local_path=TMP_PATH,
+        overwrite=overwrite)
+
+    odim_dataframe, odim_meta_dict, tmp_table_type, datestr = \
+        SummaryMatrix.uncompress_zipped_data(
+            odim_zip_filename, local_path=TMP_PATH, overwrite=overwrite)
+
     # Species Summary
-    sp_table = SUMMARY.get_table(spsum_table_type, datestr)
-    sp_zip_fname = f"{sp_table['fname']}.zip"
-    sp_zip_filename = s3.download(
-        S3_BUCKET, S3_SUMMARY_DIR, sp_zip_fname, local_path=local_path,
+    spdim_table = SUMMARY.get_table(species_sum_table_type, datestr)
+    spdim_zip_fname = f"{spdim_table['fname']}.zip"
+    spdim_zip_filename = s3.download(
+        S3_BUCKET, S3_SUMMARY_DIR, spdim_zip_fname, local_path=TMP_PATH,
         overwrite=overwrite)
 
-    sp_dataframe, sp_meta_dict, sp_table_type, datestr = \
+    spdim_dataframe, spdim_meta_dict, spdim_table_type, datestr = \
         SummaryMatrix.uncompress_zipped_data(
-            sp_zip_filename, local_path=local_path, overwrite=overwrite)
-
-    # Dataset Summary
-    ds_table = SUMMARY.get_table(dssum_table_type, datestr)
-    ds_zip_fname = f"{ds_table['fname']}.zip"
-    ds_zip_filename = s3.download(
-        S3_BUCKET, S3_SUMMARY_DIR, ds_zip_fname, local_path=local_path,
-        overwrite=overwrite)
-
-    ds_dataframe, ds_meta_dict, ds_table_type, datestr = \
-        SummaryMatrix.uncompress_zipped_data(
-            ds_zip_filename, local_path=local_path, overwrite=overwrite)
+            spdim_zip_filename, local_path=TMP_PATH, overwrite=overwrite)
 
     # .................................
     # TODO: Test summary matrices
@@ -415,11 +416,6 @@ from bison.tools.build_test_aggregated_data import *
 from bison.common.constants import *
 import boto3
 
-profile =  PROJECT
-role = WORKFLOW_ROLE
-secret_name = WORKFLOW_SECRET_NAME
-region = REGION
-
 datestr = "2024_09_01"
 overwrite = True
 dim1 = "county"
@@ -428,20 +424,107 @@ dim2 = "species"
 stacked_table_type = SUMMARY.get_table_type("list", dim1, dim2)
 mtx_table_type = SUMMARY.get_table_type("matrix", dim2, dim1)
 
-local_path = "/tmp"
-# .................................
-# Create a logger
-# .................................
 logger = Logger(
     "test", log_path=TMP_PATH, log_console=True, log_level=INFO)
 
-# .................................
-# Create a dataframe from stacked records
-# .................................
-# Get authenticated S3 client
 s3 = S3(PROJECT, WORKFLOW_ROLE)
+
+# .................................
+# Download stacked records from S3 and build sparse matrix.
+# Test, comparing contents of the two data structures.
+# .................................
 axis0_label, axis1_label, val_label, stk_df = \
     read_stacked_data_records(s3, stacked_table_type, datestr)
+
+stacked_df, y_fld, x_fld, val_fld, table_type, data_datestr = (
+    stk_df, axis0_label, axis1_label, val_label, mtx_table_type, datestr
+)
+# Create matrix from record data, then test consistency and upload.
+agg_sparse_mtx = SparseMatrix.init_from_stacked_data(
+    stk_df, axis0_label, axis1_label, val_label, mtx_table_type, datestr,
+    logger=logger)
+
+test_stacked_data(stk_df, axis0_label, axis1_label, val_label, agg_sparse_mtx)
+
+# .................................
+# Must upload sparse matrix to S3 from an EC2 instance with permission to S3
+# For local testing, do:
+#      aws s3 cp local_file s3://bucket/folder
+# .................................
+
+listing = s3.list(S3_BUCKET, S3_SUMMARY_DIR)
+if out_filename in listing:
+    print("Yay")
+    agg_sparse_mtx = None
+
+
+# .................................
+# Download sparse matrix from S3 file; test contents to ensure consistency
+# .................................
+table = SUMMARY.get_table(mtx_table_type, datestr)
+zip_fname = f"{table['fname']}.zip"
+# Only download if file does not exist
+zip_filename = s3.download(
+    S3_BUCKET, S3_SUMMARY_DIR, zip_fname, local_path=TMP_PATH, overwrite=overwrite)
+
+# Only extract if files do not exist
+sparse_coo, row_categ, col_categ, table_type, _datestr = \
+    SparseMatrix.uncompress_zipped_data(
+        zip_filename, local_path=TMP_PATH, overwrite=overwrite)
+
+# Create
+agg_sparse_mtx = SparseMatrix(
+    sparse_coo, mtx_table_type, datestr, row_categ, col_categ,
+    logger=logger)
+
+test_stacked_data(stk_df, axis0_label, axis1_label, val_label, agg_sparse_mtx)
+
+otherdim_sum_mtx = SummaryMatrix.init_from_sparse_matrix(
+    agg_sparse_mtx, axis=0, logger=logger)
+otherdim_sum_table_type = otherdim_sum_mtx.table_type
+otherdim_sum_filename = otherdim_sum_mtx.compress_to_file()
+
+# axis1/columns
+# Species total/count of other dimension, across axis 1, one val for every row
+species_sum_mtx = SummaryMatrix.init_from_sparse_matrix(
+    agg_sparse_mtx, axis=1, logger=logger)
+species_sum_table_type = species_sum_mtx.table_type
+species_sum_filename = species_sum_mtx.compress_to_file()
+
+# .................................
+# Must upload sparse matrix to S3 from an EC2 instance with permission to S3
+# For local testing, do:
+#      aws s3 cp local_file s3://bucket/folder
+# .................................
+# s3://bison-321942852011-us-east-1/summary/county-x-species_summary_2024_09_01.zip
+
+# .................................
+# Download summary matrix files and recreate 2 summary matrices to test for corruption
+# .................................
+# Other dimension summary
+odim_table = SUMMARY.get_table(otherdim_sum_table_type, datestr)
+odim_zip_fname = f"{odim_table['fname']}.zip"
+odim_zip_filename = s3.download(
+    S3_BUCKET, S3_SUMMARY_DIR, odim_zip_fname, local_path=TMP_PATH,
+    overwrite=overwrite)
+
+bucket, bucket_path, filename, local_path = (
+    S3_BUCKET, S3_SUMMARY_DIR, odim_zip_fname, TMP_PATH)
+
+odim_dataframe, odim_meta_dict, tmp_table_type, datestr = \
+    SummaryMatrix.uncompress_zipped_data(
+        odim_zip_filename, local_path=TMP_PATH, overwrite=overwrite)
+
+# Species Summary
+spdim_table = SUMMARY.get_table(species_sum_table_type, datestr)
+spdim_zip_fname = f"{spdim_table['fname']}.zip"
+spdim_zip_filename = s3.download(
+    S3_BUCKET, S3_SUMMARY_DIR, spdim_zip_fname, local_path=TMP_PATH,
+    overwrite=overwrite)
+
+spdim_dataframe, spdim_meta_dict, spdim_table_type, datestr = \
+    SummaryMatrix.uncompress_zipped_data(
+        spdim_zip_filename, local_path=TMP_PATH, overwrite=overwrite)
 
 
 """

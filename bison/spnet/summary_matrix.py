@@ -54,8 +54,13 @@ class SummaryMatrix(_AggregateDataMatrix):
                 datasetkey (for the column labels/x), species (for the row labels/y),
                 and occurrence count.
         """
-        # Column counts and totals (count along axis 0, each row)
-        # Row counts and totals (count along axis 1, each column)
+        # Total/Count down axis 0/row, rows for a column
+        #             across axis 1/column, columns for a row (aka species)
+        # Axis 0 produces a matrix shape (col_count, 1),
+        #   1 row of values, total for each column
+        #
+        # Axis 1 produces matrix shape (row_count, 1),
+        #   1 column of values, total for each row
         totals = sp_mtx.get_totals(axis=axis)
         counts = sp_mtx.get_counts(axis=axis)
         data = {COUNT_FLD: counts, TOTAL_FLD: totals}
