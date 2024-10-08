@@ -1,0 +1,143 @@
+openapi: 3.1.0
+info:
+  title: BISON services
+  description: API services for analyzing BISON-annotated occurrence data.
+  version: 1.0.0
+  contact:
+    name: Aimee Stewart
+    email: aimee.stewart@ku.edu
+  license:
+    name: GPL-3.0 License
+    url: 'https://www.gnu.org/licenses/gpl-3.0.en.html'
+servers:
+#  - url: 'https://bison.spcoco.org/api/v1'
+#    description: BISON server
+  - url: 'https://bison.localhost/api/v1'
+    description: Local testing BISON server
+tags:
+  - name: describe
+    description: Get comparative counts for a region
+paths:
+  '/count/':
+    get:
+      tags:
+        - describe
+      summary: 'Get counts for a region'
+      description: Get counts for a region
+      operationId: describe_tentacles
+      parameters:
+        - $ref: '#/components/parameters/region_type'
+        - $ref: '#/components/parameters/region_name'
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/region_tentacles'
+              examples:
+                State X:
+                   $ref:
+                    '#/components/examples/state_KS'
+
+components:
+
+  parameters:
+    region_type:
+      name: summary_type
+      in: query
+      description: Summary type
+      required: true
+      schema:
+        $ref: '#/components/schemas/summary_type'
+      examples:
+        state:
+          value: state
+        county:
+          value: county
+        american_indian_alaskan_native_hawaiian_homelands:
+          value: aiannh
+
+    summary_key:
+      name: summary_key
+      in: query
+      description: Summary identifier
+      required: false
+      schema:
+        $ref: '#/components/schemas/summary_key'
+      examples:
+
+
+  schemas:
+    wrapper:
+      type: object
+      properties:
+        service:
+          type: string
+        description:
+          type: string
+        errors:
+          type: object
+          properties:
+            error:
+              type: array
+              items:
+                type: string
+            warning:
+              type: array
+              items:
+                type: string
+            info:
+              type: array
+              items:
+                type: string
+
+    describe_tentacles:
+      allOf:
+        - $ref: '#/components/schemas/wrapper'
+        - type: object
+          properties:
+            service:
+              type: string
+              enum:
+                - 'describe'
+            records:
+              type: array
+              items:
+                $ref: '#/components/schemas/describe_facet'
+              minItems: 3
+              maxItems: 3
+    describe_facet:
+      allOf:
+        - $ref: '#/components/schemas/wrapper'
+        - type: object
+          properties:
+            service:
+              type: string
+              enum:
+                - 'count'
+            records:
+              type: array
+              items:
+                $ref: '#/components/schemas/describe_record'
+    describe_record:
+      type: object
+      properties:
+        "s2n:identifier":
+          type: string
+        "s2n:count":
+          type: integer
+          description: description for a region
+          example: 1347
+
+
+  examples:
+    collection_3f55b3fa-292d-4170-bd46-66dca41d7f05:
+      description: 'collection_id: 3f55b3fa-292d-4170-bd46-66dca41d7f05'
+      value:
+        count: 3
+
+    collection_4fa7b334-ce0d-4e88-aaae-2e0c138d049e:
+      description: 'collection_id: 3f55b3fa-292d-4170-bd46-66dca41d7f05'
+      value:
+        count: 3

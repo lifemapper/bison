@@ -1,9 +1,11 @@
 """URL Routes for the Specify Network API services."""
+import os
 from flask import Blueprint, Flask, render_template, request
 
 from flask_app.bison.describe import DescribeSvc
 from flask_app.common.constants import (
-    STATIC_DIR, TEMPLATE_DIR)
+    SCHEMA_DIR, SCHEMA_FNAME, STATIC_DIR, TEMPLATE_DIR
+)
 from flask_app.common.constants import APIEndpoint
 
 bison_blueprint = Blueprint(
@@ -43,20 +45,20 @@ def bison_status():
     }
 
 
-# # ..........................
-# @app.route("/api/v1/schema")
-# def display_raw_schema():
-#     """Show the schema XML.
-#
-#     Returns:
-#         schema: the schema for the Specify Network.
-#     """
-#     fname = os.path.join(SCHEMA_DIR, SCHEMA_ANALYST_FNAME)
-#     with open(fname, "r") as f:
-#         schema = f.read()
-#     return schema
-#
-#
+# ..........................
+@app.route("/api/v1/schema")
+def display_raw_schema():
+    """Show the schema XML.
+
+    Returns:
+        schema: the schema for the Specify Network.
+    """
+    fname = os.path.join(SCHEMA_DIR, SCHEMA_FNAME)
+    with open(fname, "r") as f:
+        schema = f.read()
+    return schema
+
+
 # # ..........................
 # @app.route("/api/v1/swaggerui")
 # def swagger_ui():

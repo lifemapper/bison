@@ -20,7 +20,7 @@ flask run
 * The development port will be 5000.  Connect to
   http://127.0.0.1:5000 in browser,
 
-  * Broker
+  * Bison
     http://127.0.0.1:5000/api/v1/describe
 
 * Flask will auto-update on file save.

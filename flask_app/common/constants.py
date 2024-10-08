@@ -4,12 +4,10 @@ import typing
 URL_ESCAPES = [[" ", r"\%20"], [",", r"\%2C"]]
 ENCODING = "utf-8"
 
-# Used in broker, so relative to the flask_app/broker or analyst directories
-STATIC_DIR = "../../bison/frontend/static"
-ICON_DIR = f"{STATIC_DIR}/icon"
-SCHEMA_DIR = f"{STATIC_DIR}/schema"
-
+# Relative to the flask_app/<app> directory
 TEMPLATE_DIR = "../templates"
+STATIC_DIR = "../../bison/frontend/static"
+SCHEMA_DIR = f"{STATIC_DIR}/schema"
 SCHEMA_FNAME = "open_api.yaml"
 
 
