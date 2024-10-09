@@ -211,34 +211,3 @@ Test by getting internal IP, using ifconfig, then command to see if connects suc
 
 Then can use same IP in browser, i.e. https://x.x.x.x/api/v1/name/
 This only exposes the bison, not the analyst services.
-
-
-
-Troubleshooting
-=================================
-
-General debug messages for the flask container
-----------------------------------------------
-
-* Print logs::
-
-  sudo docker logs bison-nginx-1 --tail 100
-
-Problem: Failed programming external connectivity
---------------------------------------------------------
-
-[+] Running 6/5
- ✔ Network bison_default        Created                                                                                                                                                          0.1s
- ✔ Network bison_nginx          Created                                                                                                                                                          0.1s
- ✔ Container bison-front-end-1  Created                                                                                                                                                          0.2s
- ✔ Container bison-bison-1     Created                                                                                                                                                          0.2s 0.2s
- ✔ Container bison-nginx-1      Created                                                                                                                                                          0.1s
-Attaching to bison-1, front-end-1, nginx-1
-Error response from daemon: driver failed programming external connectivity on endpoint
-bison-nginx-1 (1feeaa264a757ddf815a34db5dd541f48d3f57aa21ef104e3d5823efbb35f9ab):
-Error starting userland proxy: listen tcp4 0.0.0.0:80: bind: address already in use
-
-Solution
-...............
-
-Stop apache2 on the host machine

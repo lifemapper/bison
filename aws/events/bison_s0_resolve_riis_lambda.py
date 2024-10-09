@@ -18,7 +18,6 @@ waittime = 1
 
 # AMI = "ami-096ea6a12ea24a797"
 # INSTANCE_TYPE = "t4g.micro"
-# KEY_NAME = "aimee-aws-key"
 
 # Initialize Botocore session
 session = boto3.session.Session()

@@ -42,6 +42,3 @@ if __name__ == "__main__":
     # -------  Run instance from template -------
     # Runs the script on instantiation
     response = run_instance_spot(ec2_client, template_name)
-
-    # # Create and upload a file triggering an event that starts BISON data processing
-    # upload_trigger_to_s3("trigger_bison_process", PROJ_BUCKET, TRIGGER_PATH)

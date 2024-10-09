@@ -7,16 +7,20 @@ IDE debugging of functions
 * Set up python virtual environment for the project
 * Connect IDE to venv python interpreter
 
-Local debugging of flask app
+Local debugging
 =============================================
+
+Of flask app
+--------------------------------------
 
 * Run flask at command prompt
 
-```zsh
-export FLASK_ENV=development
-export FLASK_APP=flask_app.bison.routes
-flask run
-```
+    ```zsh
+    export FLASK_ENV=development
+    export FLASK_APP=flask_app.bison.routes
+    flask run
+    ```
+
 * The development port will be 5000.  Connect to
   http://127.0.0.1:5000 in browser,
 
@@ -26,7 +30,7 @@ flask run
 * Flask will auto-update on file save.
 * Refresh browser after changes
 
-Local debugging of python scripts
+Of python scripts
 --------------------------------------
 
 * Step 1, annotate RIIS with GBIF accepted taxa:
@@ -46,6 +50,9 @@ Local debugging of python scripts
 
 
 * Step 7.
+
+Docker debugging
+=============================================
 
 Run Docker containers (development)
 -------------------------------------------
@@ -78,10 +85,40 @@ Then rebuild/restart::
 Examine container
 -------------------------------------------
 
-To examine flask container at a shell prompt::
+To examine flask container at a shell prompt, or print logs::
 
     sudo docker exec -it bison-nginx-1 /bin/sh
+    sudo docker logs bison-nginx-1 --tail 100
 
-Or backend container::
+Or examine backend container::
 
     sudo docker exec -it bison-bison-1 /bin/sh
+
+Troubleshooting
+=================================
+
+General debug messages for the flask container
+----------------------------------------------
+
+* Print logs::
+
+  sudo docker logs bison-nginx-1 --tail 100
+
+Problem: Failed programming external connectivity
+--------------------------------------------------------
+
+[+] Running 6/5
+ ✔ Network bison_default        Created                                                                                                                                                          0.1s
+ ✔ Network bison_nginx          Created                                                                                                                                                          0.1s
+ ✔ Container bison-front-end-1  Created                                                                                                                                                          0.2s
+ ✔ Container bison-bison-1     Created                                                                                                                                                          0.2s 0.2s
+ ✔ Container bison-nginx-1      Created                                                                                                                                                          0.1s
+Attaching to bison-1, front-end-1, nginx-1
+Error response from daemon: driver failed programming external connectivity on endpoint
+bison-nginx-1 (1feeaa264a757ddf815a34db5dd541f48d3f57aa21ef104e3d5823efbb35f9ab):
+Error starting userland proxy: listen tcp4 0.0.0.0:80: bind: address already in use
+
+Solution
+...............
+
+Stop apache2 on the host machine

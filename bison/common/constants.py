@@ -5,7 +5,8 @@ import os
 
 # also used for profile name
 PROJECT = "bison"
-ENCODING = "utf-8"
+REGION = "us-east-1"
+AWS_ACCOUNT = "321942852011"
 
 GBIF_BUCKET = "gbif-open-data-us-east-1/occurrence"
 GBIF_ARN = "arn:aws:s3:::gbif-open-data-us-east-1"
@@ -13,7 +14,7 @@ GBIF_ODR_FNAME = "occurrence.parquet"
 
 TMP_PATH = "/tmp"
 
-S3_BUCKET = f"{PROJECT}-321942852011-us-east-1"
+S3_BUCKET = f"{PROJECT}-{AWS_ACCOUNT}-{REGION}"
 S3_IN_DIR = "input"
 S3_OUT_DIR = "output"
 S3_LOG_DIR = "log"
@@ -23,22 +24,9 @@ WORKFLOW_ROLE = "arn:aws:iam::321942852011:role/service-role/bison_redshift_lamb
 WORKFLOW_USER = "project.bison"
 WORKFLOW_SECRET_NAME = "bison_workflow_user"
 
-SPOT_TEMPLATE_BASENAME = "launch_template"
-
-KEY_NAME = "aimee-aws-key"
-REGION = "us-east-1"
-# Allows KU Dyche hall
-SECURITY_GROUP_ID = "sg-0b379fdb3e37389d1"
-SECRET_NAME = "admin_bison-db-test"
-
-# S3
-TRIGGER_PATH = "trigger"
-TRIGGER_FILENAME = "go.txt"
-
 # EC2 Spot Instance
 # List of instance types at https://aws.amazon.com/ec2/spot/pricing/
 INSTANCE_TYPE = "t2.micro"
-# INSTANCE_TYPE = "a1.large"
 
 # Log processing progress
 LOGINTERVAL = 1000000
@@ -46,8 +34,9 @@ LOG_FORMAT = " ".join(["%(asctime)s", "%(levelname)-8s", "%(message)s"])
 LOG_DATE_FORMAT = "%d %b %Y %H:%M"
 LOGFILE_MAX_BYTES = 52000000
 LOGFILE_BACKUP_COUNT = 5
-ERR_SEPARATOR = "------------"
 
+ENCODING = "utf-8"
+ERR_SEPARATOR = "------------"
 USER_DATA_TOKEN = "###SCRIPT_GOES_HERE###"
 
 COUNT_FLD = "count"
@@ -173,7 +162,7 @@ class ANALYSIS_DIM:
             code (str): Code for the analysis dimension to be returned.
 
         Returns:
-           code_lst (list): List of data dimension code(s) to be analyzed for species.
+            code_lst (list): Codes of data dimension(s) to be analyzed for species.
 
         Raises:
             Exception: on unknown code.
