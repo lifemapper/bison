@@ -208,7 +208,7 @@ class RIIS:
 
         Args:
             riis_filename (str): Path to the RIIS datafile, with or without annotations.
-            logger (object): logger for writing messages to file and console
+            logger (bison.common.log.Logger): for writing messages to file and console
 
         Raises:
             FileNotFoundError: on missing datafile
