@@ -23,8 +23,10 @@ def read_stacked_data_records(s3, table_type, data_datestr):
         data_datestr (str): date of the current dataset, in YYYY_MM_DD format
 
     Returns:
-        agg_sparse_mtx (bison.spnet.sparse_matrix.SparseMatrix): sparse matrix
-            containing data separated into 2 dimensions
+        axis0_label (str): column label in this data to be used as rows in a matrix
+        axis1_label (str): column label in this data to be used as columns in a matrix
+        val_label (str): : column label in this data to be used as values in a matrix
+        stk_df (pandas.DataFrame): dataframe containing stacked data records
 
     Raises:
         Exception: on failure to download a parquet dataset into a pandas Dataframe.
@@ -53,8 +55,8 @@ def create_sparse_matrix_from_records(
 
     Args:
         s3 (bison.tools.aws_util.S3): authenticated boto3 client for S3 interactions.
-        stacked_table_type (code from bison.common.constants.SUMMARY): predefined type
-            of data to download, indicating type and contents.
+        stacked_table_type (str): code from bison.common.constants.SUMMARY with
+            predefined type of data to download, indicating type and contents.
         mtx_table_type (code from bison.common.constants.SUMMARY): predefined type
             of data to create from the stacked data.
         datestr (str): date of the current dataset, in YYYY_MM_DD format
@@ -153,7 +155,7 @@ def process_dimension(
     agg_sparse_mtx = create_sparse_matrix_from_records(
         s3, stacked_table_type, mtx_table_type, datestr, logger=logger)
     # Save sparse matrix to S3
-    _s3dest = save_matrix(s3, agg_sparse_mtx, local_path, bucket, bucket_path, logger)
+    save_matrix(s3, agg_sparse_mtx, local_path, bucket, bucket_path, logger)
 
     # .................................
     # Create a summary matrix for both dimensions of sparse matrix and save to S3
@@ -166,7 +168,7 @@ def process_dimension(
         f"Built {dimsum_mtx.table_type} from {mtx_table_type}.",
         refname=script_name
     )
-    _s3dest = save_matrix(s3, dimsum_mtx, local_path, bucket, bucket_path, logger)
+    save_matrix(s3, dimsum_mtx, local_path, bucket, bucket_path, logger)
 
     # axis1/columns
     # Species total/count of other dimension, across axis 1, one val for every row
@@ -176,7 +178,7 @@ def process_dimension(
         f"Built {speciessum_mtx.table_type} from {mtx_table_type}.",
         refname=script_name
     )
-    _s3dest = save_matrix(s3, speciessum_mtx, local_path, bucket, bucket_path, logger)
+    save_matrix(s3, speciessum_mtx, local_path, bucket, bucket_path, logger)
 
 
 # --------------------------------------------------------------------------------------
