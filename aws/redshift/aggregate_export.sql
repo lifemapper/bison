@@ -6,72 +6,79 @@
 DROP TABLE public.county_counts_2024_09_01;
 DROP TABLE public.state_counts_2024_09_01;
 DROP TABLE public.aiannh_counts_2024_09_01;
+DROP TABLE public.county_x_riis_counts_2024_09_01;
+DROP TABLE public.state_x_riis_counts_2024_09_01;
+DROP TABLE public.aiannh_x_riis_counts_2024_09_01;
 
 CREATE TABLE public.county_counts_2024_09_01 AS
     SELECT DISTINCT state_county,
            COUNT(*) AS occ_count, COUNT(DISTINCT taxonkey) AS species_count
-    FROM  bison_2024_09_01 WHERE census_state IS NOT NULL AND taxonkey_species IS NOT NULL
+    FROM  bison_2024_09_01 WHERE census_state IS NOT NULL AND species IS NOT NULL
     GROUP BY state_county;
 CREATE TABLE public.county_x_riis_counts_2024_09_01 AS
     SELECT DISTINCT state_county, riis_assessment,
            COUNT(*) AS occ_count, COUNT(DISTINCT taxonkey) AS species_count
-    FROM  bison_2024_09_01 WHERE census_state IS NOT NULL AND taxonkey_species IS NOT NULL
+    FROM  bison_2024_09_01 WHERE census_state IS NOT NULL AND species IS NOT NULL
     GROUP BY state_county, riis_assessment;
 
 CREATE TABLE public.state_counts_2024_09_01 AS
     SELECT DISTINCT census_state,
            COUNT(*) AS occ_count, COUNT(DISTINCT taxonkey) AS species_count
-    FROM  bison_2024_09_01 WHERE census_state IS NOT NULL AND taxonkey_species IS NOT NULL
+    FROM  bison_2024_09_01 WHERE census_state IS NOT NULL AND species IS NOT NULL
     GROUP BY census_state;
 CREATE TABLE public.state_x_riis_counts_2024_09_01 AS
     SELECT DISTINCT census_state, riis_assessment,
            COUNT(*) AS occ_count, COUNT(DISTINCT taxonkey) AS species_count
-    FROM  bison_2024_09_01 WHERE census_state IS NOT NULL AND taxonkey_species IS NOT NULL
+    FROM  bison_2024_09_01 WHERE census_state IS NOT NULL AND species IS NOT NULL
     GROUP BY census_state, riis_assessment;
 
 CREATE TABLE public.aiannh_counts_2024_09_01 AS
     SELECT DISTINCT aiannh_name,
            COUNT(*) AS occ_count, COUNT(DISTINCT taxonkey) AS species_count
-    FROM  bison_2024_09_01 WHERE census_state IS NOT NULL AND taxonkey_species IS NOT NULL
+    FROM  bison_2024_09_01 WHERE census_state IS NOT NULL AND species IS NOT NULL
     GROUP BY aiannh_name;
 CREATE TABLE public.aiannh_x_riis_counts_2024_09_01 AS
     SELECT DISTINCT aiannh_name, riis_assessment,
            COUNT(*) AS occ_count, COUNT(DISTINCT taxonkey) AS species_count
-    FROM  bison_2024_09_01 WHERE census_state IS NOT NULL AND taxonkey_species IS NOT NULL
+    FROM  bison_2024_09_01 WHERE census_state IS NOT NULL AND species IS NOT NULL
     GROUP BY aiannh_name, riis_assessment;
 
 -- Check counts
-SELECT * from county_counts_2024_09_01 ORDER BY census_state, census_county, riis_assessment LIMIT 10;
-SELECT * from state_counts_2024_09_01 ORDER BY census_state, riis_assessment LIMIT 10;
-SELECT * from aiannh_counts_2024_09_01 ORDER BY aiannh_name, riis_assessment LIMIT 10;
+SELECT * from county_counts_2024_09_01 ORDER BY state_county LIMIT 10;
+SELECT * from state_counts_2024_09_01 ORDER BY census_state LIMIT 10;
+SELECT * from aiannh_counts_2024_09_01 ORDER BY aiannh_name LIMIT 10;
+
+SELECT * from county_x_riis_counts_2024_09_01 ORDER BY state_county, riis_assessment LIMIT 10;
+SELECT * from state_x_riis_counts_2024_09_01 ORDER BY census_state, riis_assessment LIMIT 10;
+SELECT * from aiannh_x_riis_counts_2024_09_01 ORDER BY aiannh_name, riis_assessment LIMIT 10;
 
 -- -------------------------------------------------------------------------------------
 -- Create lists of species for each region with counts
 -- -------------------------------------------------------------------------------------
-DROP TABLE public.county_lists_2024_09_01;
-DROP TABLE public.state_lists_2024_09_01;
-DROP TABLE public.aiannh_lists_2024_09_01;
+DROP TABLE public.county_x_species_list_2024_09_01;
+DROP TABLE public.state_x_species_list_2024_09_01;
+DROP TABLE public.aiannh_x_species_list_2024_09_01;
 
 CREATE TABLE public.county_x_species_list_2024_09_01 AS
-    SELECT DISTINCT census_state, census_county, taxonkey, species, riis_assessment,
+    SELECT DISTINCT state_county, taxonkey_species, riis_assessment,
         COUNT(*) AS occ_count
-    FROM  bison_2024_09_01 WHERE census_state IS NOT NULL AND taxonkey_species IS NOT NULL
-    GROUP BY census_state, census_county, taxonkey, species, riis_assessment;
+    FROM  bison_2024_09_01 WHERE census_state IS NOT NULL AND species IS NOT NULL
+    GROUP BY state_county, taxonkey_species, riis_assessment;
 CREATE TABLE public.state_x_species_list_2024_09_01 AS
-    SELECT DISTINCT census_state, taxonkey, species, riis_assessment,
+    SELECT DISTINCT census_state, taxonkey_species, riis_assessment,
         COUNT(*) AS occ_count
-    FROM  bison_2024_09_01 WHERE census_state IS NOT NULL AND taxonkey_species IS NOT NULL
-    GROUP BY census_state, taxonkey, species, riis_assessment;
+    FROM  bison_2024_09_01 WHERE census_state IS NOT NULL AND species IS NOT NULL
+    GROUP BY census_state, taxonkey_species, riis_assessment;
 CREATE TABLE public.aiannh_x_species_list_2024_09_01 AS
-    SELECT DISTINCT aiannh_name, taxonkey, species, riis_assessment,
+    SELECT DISTINCT aiannh_name, taxonkey_species, riis_assessment,
         COUNT(*) AS occ_count
-    FROM  bison_2024_09_01 WHERE census_state IS NOT NULL AND taxonkey_species IS NOT NULL
-    GROUP BY aiannh_name, taxonkey, species, riis_assessment;
+    FROM  bison_2024_09_01 WHERE census_state IS NOT NULL AND species IS NOT NULL
+    GROUP BY aiannh_name, taxonkey_species, riis_assessment;
 
 -- Check counts
-SELECT * from county_lists_2024_09_01 ORDER BY census_state, census_county, species LIMIT 10;
-SELECT * from state_lists_2024_09_01 ORDER BY census_state, species LIMIT 10;
-SELECT * from aiannh_lists_2024_09_01 ORDER BY aiannh_name, species LIMIT 10;
+SELECT * from county_x_species_list_2024_09_01 ORDER BY state_county, taxonkey_species, riis_assessment LIMIT 10;
+SELECT * from state_x_species_list_2024_09_01 ORDER BY census_state, taxonkey_species, riis_assessment LIMIT 10;
+SELECT * from aiannh_x_species_list_2024_09_01 ORDER BY aiannh_name, taxonkey_species, riis_assessment LIMIT 10;
 
 -- -------------------------------------------------------------------------------------
 -- Write data summaries to S3 as CSV for data delivery

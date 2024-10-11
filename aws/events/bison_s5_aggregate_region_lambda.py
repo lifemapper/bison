@@ -124,7 +124,7 @@ state_counts_stmt = f"""
             COUNT(*) AS {out_occcount_fld},
             COUNT(DISTINCT {gbif_tx_fld}) AS {out_spcount_fld}
         FROM  {bison_tbl} WHERE {b_st_fld} IS NOT NULL
-                            AND {unique_sp_fld} IS NOT NULL
+                            AND {gbif_sp_fld} IS NOT NULL
         GROUP BY {b_st_fld};
 """
 state_x_riis_counts_stmt = f"""
@@ -133,17 +133,17 @@ state_x_riis_counts_stmt = f"""
             COUNT(*) AS {out_occcount_fld},
             COUNT(DISTINCT {gbif_tx_fld}) AS {out_spcount_fld}
         FROM  {bison_tbl} WHERE {b_st_fld} IS NOT NULL
-                            AND {unique_sp_fld} IS NOT NULL
+                            AND {gbif_sp_fld} IS NOT NULL
         GROUP BY {b_st_fld}, {b_ass_fld};
 """
 # Note: in county agggregate, include states bc county names are not unique
 county_counts_stmt = f"""
     CREATE TABLE public.{county_counts_tbl} AS
-        SELECT DISTINCT {unique_cty_fld}, 
+        SELECT DISTINCT {unique_cty_fld},
             COUNT(*) AS {out_occcount_fld},
             COUNT(DISTINCT {gbif_tx_fld}) AS {out_spcount_fld}
         FROM  {bison_tbl} WHERE {b_st_fld} IS NOT NULL
-                            AND {unique_sp_fld} IS NOT NULL
+                            AND {gbif_sp_fld} IS NOT NULL
         GROUP BY {unique_cty_fld};
 """
 county_x_riis_counts_stmt = f"""
@@ -152,7 +152,7 @@ county_x_riis_counts_stmt = f"""
             COUNT(*) AS {out_occcount_fld},
             COUNT(DISTINCT {gbif_tx_fld}) AS {out_spcount_fld}
         FROM  {bison_tbl} WHERE {b_st_fld} IS NOT NULL
-                            AND {unique_sp_fld} IS NOT NULL
+                            AND {gbif_sp_fld} IS NOT NULL
         GROUP BY {unique_cty_fld}, {b_ass_fld};
 """
 
@@ -162,7 +162,7 @@ aiannh_counts_stmt = f"""
             COUNT(*) AS {out_occcount_fld},
             COUNT(DISTINCT {gbif_tx_fld}) AS {out_spcount_fld}
         FROM  {bison_tbl} WHERE {b_nm_fld} IS NOT NULL
-                            AND {unique_sp_fld} IS NOT NULL
+                            AND {gbif_sp_fld} IS NOT NULL
         GROUP BY {b_nm_fld};
 """
 aiannh_x_riis_counts_stmt = f"""
@@ -171,7 +171,7 @@ aiannh_x_riis_counts_stmt = f"""
             COUNT(*) AS {out_occcount_fld},
             COUNT(DISTINCT {gbif_tx_fld}) AS {out_spcount_fld}
         FROM  {bison_tbl} WHERE {b_nm_fld} IS NOT NULL
-                            AND {unique_sp_fld} IS NOT NULL
+                            AND {gbif_sp_fld} IS NOT NULL
         GROUP BY {b_nm_fld}, {b_ass_fld};
 """
 # ...............................................
@@ -182,7 +182,7 @@ state_list_stmt = f"""
     CREATE TABLE {pub_schema}.{state_list_tbl} AS
         SELECT DISTINCT {b_st_fld}, {unique_sp_fld}, {gbif_tx_fld}, {gbif_sp_fld},
             {b_ass_fld}, COUNT(*) AS {out_occcount_fld}
-        FROM  {bison_tbl} WHERE {b_st_fld} IS NOT NULL AND {unique_sp_fld} IS NOT NULL
+        FROM  {bison_tbl} WHERE {b_st_fld} IS NOT NULL AND {gbif_sp_fld} IS NOT NULL
         GROUP BY {b_st_fld}, {unique_sp_fld}, {gbif_tx_fld}, {gbif_sp_fld}, {b_ass_fld};
 """
 state_list_export_stmt = f"""
@@ -213,7 +213,7 @@ county_list_stmt = f"""
     CREATE TABLE {pub_schema}.{county_list_tbl} AS
         SELECT DISTINCT {unique_cty_fld}, {b_st_fld}, {b_cty_fld}, {unique_sp_fld},
             {gbif_tx_fld}, {gbif_sp_fld}, {b_ass_fld}, COUNT(*) AS {out_occcount_fld}
-        FROM  {bison_tbl} WHERE {b_st_fld} IS NOT NULL AND {unique_sp_fld} IS NOT NULL
+        FROM  {bison_tbl} WHERE {b_st_fld} IS NOT NULL AND {gbif_sp_fld} IS NOT NULL
         GROUP BY {unique_cty_fld}, {b_st_fld}, {b_cty_fld}, {unique_sp_fld}, {gbif_tx_fld},
                  {gbif_sp_fld}, {b_ass_fld};
 """
@@ -229,7 +229,7 @@ aiannh_list_stmt = f"""
     CREATE TABLE {pub_schema}.{aiannh_list_tbl} AS
         SELECT DISTINCT {b_nm_fld}, {unique_sp_fld}, {gbif_tx_fld}, {gbif_sp_fld},
             {b_ass_fld}, COUNT(*) AS {out_occcount_fld}
-        FROM  {bison_tbl} WHERE {b_st_fld} IS NOT NULL AND {unique_sp_fld} IS NOT NULL
+        FROM  {bison_tbl} WHERE {b_st_fld} IS NOT NULL AND {gbif_sp_fld} IS NOT NULL
         GROUP BY {b_nm_fld}, {unique_sp_fld}, {gbif_tx_fld}, {gbif_sp_fld}, {b_ass_fld};
 """
 aiannh_list_export_stmt = f"""
