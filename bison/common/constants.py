@@ -42,6 +42,15 @@ USER_DATA_TOKEN = "###SCRIPT_GOES_HERE###"
 COUNT_FLD = "count"
 TOTAL_FLD = "total"
 
+OCCURRENCE_COUNT_FLD = "occ_count"
+SPECIES_COUNT_FLD = "species_count"
+COUNT_FIELDS = (OCCURRENCE_COUNT_FLD, SPECIES_COUNT_FLD)
+
+UNIQUE_SPECIES_FLD = "taxonkey_species"
+UNIQUE_COUNTY_FLD = "state_county"
+OCCURRENCE_STATUS = "riis"
+OCCURRENCE_STATUS_FLD = "riis_assessment"
+
 CSV_DELIMITER = ","
 
 
@@ -84,30 +93,31 @@ class ANALYSIS_DIM:
         "code": "state",
         # In summary records
         "fields": [
-            "census_state", "taxonkey_species", "species", "riis_assessment",
-            "occ_count"
+            "census_state", UNIQUE_SPECIES_FLD, OCCURRENCE_STATUS_FLD, OCCURRENCE_COUNT_FLD
         ],
         "key_fld": "census_state",
     }
     COUNTY = {
         "code": "county",
         "fields": [
-            "state_county", "census_state", "census_county", "taxonkey_species",
-            "species", "riis_assessment", "occ_count"
+            UNIQUE_COUNTY_FLD, UNIQUE_SPECIES_FLD, OCCURRENCE_STATUS_FLD,
+            OCCURRENCE_COUNT_FLD
         ],
-        "key_fld": "state_county",
+        "key_fld": UNIQUE_COUNTY_FLD,
     }
     AIANNH = {
         "code": "aiannh",
         "fields": [
-            "aiannh_name", "taxonkey_species", "taxonkey", "species",
-            "riis_assessment", "occ_count"
+            "aiannh_name", UNIQUE_SPECIES_FLD, OCCURRENCE_STATUS_FLD, OCCURRENCE_COUNT_FLD
         ],
         "key_fld": "aiannh_name",
     }
     SPECIES = {
         "code": "species",
-        "key_fld": "taxonkey_species"
+        "key_fld": UNIQUE_COUNTY_FLD,
+        # Species status for each occurrence
+        "status": OCCURRENCE_STATUS,
+        "status_fld": OCCURRENCE_STATUS_FLD
     }
 
     # ...........................
@@ -207,7 +217,7 @@ class SUMMARY:
     dt_token = "YYYY_MM_DD"
     sep = "_"
     dim_sep = "-x-"
-    DATATYPES = ("list", "summary", "matrix")
+    DATATYPES = ("list", "counts", "summary", "matrix")
     SPECIES_DIMENSION = ANALYSIS_DIM.species_code()
     ANALYSIS_DIMENSIONS = ANALYSIS_DIM.analysis_code()
 
@@ -229,35 +239,46 @@ class SUMMARY:
             table_type (str): code for data type and contents
 
         Raises:
+            Exception: on datatype not one of: "counts", "list", "summary", "matrix"
+            Exception: on datatype "counts", dim1 not in ANALYSIS_DIMENSIONS
+            Exception: on datatype "counts", dim2 not OCCURRENCE_STATUS or None
             Exception: on dim1 in ANALYSIS_DIMENSIONS and dim2 != SPECIES_DIMENSION
             Exception: on dim1 == SPECIES_DIMENSION and dim2 not in ANALYSIS_DIMENSIONS
             Exception: on dim1 != SPECIES_DIMENSION and not in ANALYSIS_DIMENSIONS
-            Exception: on datatype not one of: "list", "summary", "matrix"
         """
-        if dim1 in cls.ANALYSIS_DIMENSIONS and dim2 != cls.SPECIES_DIMENSION:
-            raise Exception(f"Second dimension must be {cls.SPECIES_DIMENSION}")
-        elif dim1 == cls.SPECIES_DIMENSION and dim2 not in cls.ANALYSIS_DIMENSIONS:
-            raise Exception(f"Second dimension must be in {cls.ANALYSIS_DIMENSIONS}")
-        elif dim1 not in cls.ANALYSIS_DIMENSIONS and dim1 != cls.SPECIES_DIMENSION:
-            raise Exception(
-                f"First dimension must be {cls.SPECIES_DIMENSION} or "
-                f"in {cls.ANALYSIS_DIMENSIONS}.")
         if datatype not in cls.DATATYPES:
             raise Exception(f"Datatype {datatype} is not in {cls.DATATYPES}.")
 
-        prefix = f"{dim1}{cls.dim_sep}{dim2}{cls.sep}"
-        if datatype == "list":
-            table_type = f"{prefix}list"
-        elif datatype == "summary":
-            table_type = f"{prefix}summary"
-        elif datatype == "matrix":
-            table_type = f"{prefix}matrix"
+        if datatype == "counts":
+            if dim1 in cls.ANALYSIS_DIMENSIONS:
+                if dim2 == OCCURRENCE_STATUS:
+                    # ex: state-x-riis_counts
+                    table_type = f"{dim1}{cls.dim_sep}{dim2}{cls.sep}{datatype}"
+                elif dim2 is None:
+                    # ex: state_counts
+                    table_type = f"{dim1}{cls.sep}{datatype}"
+                else:
+                    raise Exception(
+                        f"Second dimension must be {OCCURRENCE_STATUS} or None")
+            else:
+                raise Exception(
+                    f"First dimension for counts must be in {cls.ANALYSIS_DIMENSIONS}.")
+        else:
+            if dim1 == cls.SPECIES_DIMENSION and dim2 not in cls.ANALYSIS_DIMENSIONS:
+                raise Exception(
+                    f"Second dimension must be in {cls.ANALYSIS_DIMENSIONS}")
+            elif dim1 not in cls.ANALYSIS_DIMENSIONS and dim1 != cls.SPECIES_DIMENSION:
+                raise Exception(
+                    f"First dimension must be {cls.SPECIES_DIMENSION} or "
+                    f"in {cls.ANALYSIS_DIMENSIONS}.")
+
+            table_type = f"{dim1}{cls.dim_sep}{dim2}{cls.sep}{datatype}"
         return table_type
 
     # ...........................
     @classmethod
     def list(cls):
-        """Records of dimension, species count, occ count for each dimension in project.
+        """Records of dimension, species, occ count for each dimension in project.
 
         Returns:
             list (dict): dict of dictionaries for each list table defined by the
@@ -278,11 +299,50 @@ class SUMMARY:
                 "format": "Parquet",
                 "fields": dim["fields"],
                 "key_fld": dim["key_fld"],
-                "species_fld": "taxonkey_species",
-                "value_fld": "occ_count"
+                "species_fld": UNIQUE_SPECIES_FLD,
+                "value_fld": OCCURRENCE_COUNT_FLD
             }
             list[table_type] = meta
         return list
+
+    # ...........................
+    @classmethod
+    def counts(cls):
+        """Records of dimension, species count, occ count for each dimension in project.
+
+        Returns:
+            list (dict): dict of dictionaries for each list table defined by the
+                project.
+
+        Note:
+            The keys for the dictionary (and code in the metadata values) are table_type
+        """
+        counts = {}
+        for analysis_code in cls.ANALYSIS_DIMENSIONS:
+            dim1 = ANALYSIS_DIM.analysis(code=analysis_code)[0]
+            # Analysis (aka region) alone or with RIIS species status
+            for dim2 in (None, OCCURRENCE_STATUS):
+                table_type = cls.get_table_type(
+                    "counts", analysis_code, dim2)
+
+                fields = copy.deepcopy(dim1["fields"])
+                # add species count
+                fields.append(SPECIES_COUNT_FLD)
+                # if just dim counts, remove RIIS status
+                if dim2 is None:
+                    fields.remove(OCCURRENCE_STATUS_FLD)
+
+                meta = {
+                    "code": table_type,
+                    "fname": f"{table_type}{cls.sep}{cls.dt_token}{cls.sep}000",
+                    "format": "Parquet",
+                    "key_fld": dim1["key_fld"],
+                    "fields": fields,
+                    "occurrence_count_fld": OCCURRENCE_COUNT_FLD,
+                    "species_count_fld": SPECIES_COUNT_FLD
+                }
+                counts[table_type] = meta
+        return counts
 
     # ...........................
     @classmethod
@@ -359,7 +419,7 @@ class SUMMARY:
                 "column_input": col_input,
 
                 # Matrix values
-                "value": "occ_count",
+                "value": OCCURRENCE_COUNT_FLD,
             }
             mtxs[table_type] = meta
         return mtxs
@@ -380,6 +440,7 @@ class SUMMARY:
             The keys for the dictionary (and code in the metadata values) are table_type
         """
         tables = cls.list()
+        tables.update(cls.counts())
         tables.update(cls.summary())
         tables.update(cls.matrix())
         if datestr is not None:
@@ -485,7 +546,10 @@ class SUMMARY:
             raise Exception(f"Failed to parse {table_type} into datacontents, datetype.")
         # Some data has 2 dimensions
         dim_parts = datacontents.split(cls.dim_sep)
-        if dim_parts == 2:
+        if len(dim_parts) == 1:
+            dim0 = dim_parts[0]
+            dim1 = None
+        elif len(dim_parts) == 2:
             dim0, dim1 = dim_parts
         else:
             dim0 = dim1 = None
