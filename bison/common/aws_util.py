@@ -498,8 +498,8 @@ class S3:
     # ----------------------------------------------------
     def _check_expiration(self):
         n = datetime.now(timezone.utc)
-        remaining_seconds = self._expiration - n
-        if remaining_seconds < 15:
+        rem = n - self._expiration
+        if rem.seconds < 100:
             # Reinitialize the session and client
             self._auth_session, self._expiration = _AWS.get_authenticated_session(
                 self._profile, self._role, self._region)
