@@ -1,0 +1,13 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "RunEC2Instances",
+            "Effect": "Allow",
+            "Action": [
+                "ec2:RunInstances"
+            ],
+            "Resource": "arn:aws:ec2:us-east-1:321942852011:instance/i-0595bfd381e64d2c9"
+        }
+    ]
+}

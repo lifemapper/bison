@@ -1,0 +1,16 @@
+version: "3.9"
+services:
+
+  bison_task:
+    build:
+      context: ./.
+      target: base
+    env_file:
+      ./.env.task.conf
+    restart: unless-stopped
+    volumes:
+      # volumes
+      - "scratch-path:/scratch-path"
+
+volumes:
+  scratch-path:
