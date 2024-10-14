@@ -15,18 +15,20 @@ pub_schema = "public"
 external_schema = "redshift_spectrum"
 timeout = 900
 waittime = 1
-
-# AMI = "ami-096ea6a12ea24a797"
-# INSTANCE_TYPE = "t4g.micro"
+bison_task_instance_id = "i-0595bfd381e64d2c9"
+# bison_task_ec2 = "arn:aws:ec2:us-east-1:321942852011:instance/i-0595bfd381e64d2c9"
 
 # Initialize Botocore session
 session = boto3.session.Session()
 bc_session = bc.get_session()
 session = boto3.Session(botocore_session=bc_session, region_name=region)
-# Initialize Redshift client
+# Initialize EC2 and SSM clients
 config = Config(connect_timeout=timeout, read_timeout=timeout)
 client_ec2 = session.client("ec2", config=config)
+client_ssm = session.client("ssm", config=config)
 
+# Bison command
+bison_script = "~/bison/bison/tools/annotate_riis.py"
 
 # --------------------------------------------------------------------------------------
 def lambda_handler(event, context):
@@ -38,17 +40,35 @@ def lambda_handler(event, context):
 
     Returns:
         instance_id (number): ID of the EC2 instance started.
+
+    Raises:
+        Exception: on unexpected response.
+        Exception: on no instances started.
+        Exception: on unknown error.
     """
-    instance = client_ec2.run_instances(
-        # ImageId=AMI,
-        # InstanceType=INSTANCE_TYPE,
-        # KeyName=KEY_NAME,
-        MaxCount=1,
-        MinCount=1
+    response = client_ec2.start_instances(
+        InstanceIds=[bison_task_instance_id],
+        AdditionalInfo="Task initiated by Lambda",
+        DryRun=False
     )
+    try:
+        instance_meta = response["StartingInstances"][0]
+    except KeyError:
+        raise Exception(f"Invalid response returned {instance_meta}")
+    except ValueError:
+        raise Exception(f"No instances returned in {instance_meta}")
+    except Exception:
+        raise
 
-    print("New instance created:")
-    instance_id = instance['Instances'][0]['InstanceId']
-    print(instance_id)
+    instance_id = instance_meta['InstanceId']
+    prev_state = instance_meta['PreviousState']['Name']
+    curr_state = instance_meta['CurrentState']['Name']
+    print(f"Started instance {instance_meta['InstanceId']}. ")
+    print(f"Moved from {curr_state} to {prev_state}")
 
+    response = client_ssm.send_command(
+        DocumentName='AWS-RunShellScript',
+        Parameters={'commands': [script]},
+        InstanceIds=exec_list
+    )
     return instance_id
