@@ -48,4 +48,3 @@ used to create the schema must match the role attached to the namespace::
         DATABASE dev
         IAM_ROLE 'arn:aws:iam::321942852011:role/bison_redshift_s3_role'
         CREATE external database if NOT exists;
-
