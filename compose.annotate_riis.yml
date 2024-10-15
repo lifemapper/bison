@@ -1,0 +1,37 @@
+version: "3.9"
+services:
+
+  bison_task:
+    build:
+      context: ./.
+      target: task
+    environment:
+      - TASK_APP=bison.tools.annotate_riis
+    env_file:
+      ./.env.task.conf
+    restart: unless-stopped
+    volumes:
+      # bind mount
+      - "/home/ubuntu/aws_data:/volumes/bison_data"
+      # volumes
+      - "scratch-path:/scratch-path"
+#      - "static-files:/home/bison/bison/frontend/static"
+
+#  nginx:
+#    image: nginx:alpine
+#    restart: unless-stopped
+#    depends_on:
+#      bison:
+#        condition: service_healthy
+#
+#    ports:
+#      - "80:80"
+#    volumes:
+#      - "static-files:/volumes/static-files:ro"
+#      # bind mounts from host machine
+#      - "./nginx/nginx.task.conf:/etc/nginx/conf.d/default.conf:ro"
+#      - "./bison/frontend/static/:/var/www/:ro"
+
+volumes:
+  scratch-path:
+#  static-files:

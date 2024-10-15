@@ -38,6 +38,21 @@ RUN python3 -m venv venv \
 COPY --chown=bison:bison ./bison ./bison
 COPY --chown=bison:bison ./data ./data
 
+# ........................................................
+# Task image from base
+FROM base as task
+# Install dev dependencies for debugging
+RUN venv/bin/pip install debugpy
+
+# Keeps Python from generating .pyc files in the container
+ENV PYTHONDONTWRITEBYTECODE 1
+# Turns off buffering for easier container logging
+ENV PYTHONUNBUFFERED 1
+COPY --chown=bison:bison ./aws/ec2/aws_config ./.aws/config
+
+CMD tail -f /dev/null
+#CMD venv/bin/python -m ${TASK_APP}
+#CMD /bin/sh
 
 # ........................................................
 # Development flask image from base

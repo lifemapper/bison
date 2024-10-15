@@ -66,6 +66,7 @@ def lambda_handler(event, context):
     print(f"Started instance {instance_meta['InstanceId']}. ")
     print(f"Moved from {curr_state} to {prev_state}")
 
+    # sudo docker compose -f docker-compose.task.yml up
     response = client_ssm.send_command(
         DocumentName='AWS-RunShellScript',
         Parameters={'commands': [script]},
