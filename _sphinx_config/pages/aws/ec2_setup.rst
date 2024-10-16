@@ -12,7 +12,7 @@ Create (Console)
   * 15 Gb General Purpose SSD (gp3)
   * Modify `IAM instance profile` - to role created for s3 access (bison_ec2_s3_role)
   * Use the security group created for this region (currently launch-wizard-1)
-  * Use the bison-ec2-role for this instance
+  * (no?) Use the bison-ec2-role for this instance
   * Assign your key pair to this instance
 
     * If you do not have a keypair, create one for SSH access (tied to region) on initial
@@ -41,9 +41,10 @@ Create an SSH key for Github clone
 Install software
 ---------------------------
 
-* Update apt::
+* Update apt and install unzip::
 
     sudo apt update
+    sudo apt install unzip
 
 * AWS Client tools
 
@@ -54,7 +55,12 @@ Install software
 
         aws s3 ls s3://bison-321942852011-us-east-1/input/
 
-* BISON code
+* install docker for BISON application deployment::
+
+    sudo apt install docker.io
+    sudo apt install docker-compose-v2
+
+* BISON code (for building docker image during development/testing)
 
     * Download the BISON code repository::
 
@@ -64,21 +70,15 @@ Install software
       files with the FQDN of the server being deployed. For development/testing EC2 servers,
       use the Public IPv4 DNS for the EC2 instance.
 
-for Docker/Application/API
+for API deployment
 ----------------------------------
-
-SSL and Docker
-...................
-* install apache for getting/managing certificates
-* install certbot for Let's Encrypt certificates
-* install docker for BISON deployment::
-
-    sudo apt install apache2 certbot plocate unzip
-    sudo apt install docker.io
-    sudo apt install docker-compose-v2
-
 SSL certificates
 ...................
+
+* install apache for getting/managing certificates
+* install certbot for Let's Encrypt certificates::
+
+    sudo apt install apache2 certbot plocate
 
 * Create an SSL certificate on the EC2 instance.
 * For testing/development, use self-signed certificates because Cerbot will not create
