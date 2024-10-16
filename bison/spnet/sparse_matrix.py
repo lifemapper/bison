@@ -18,7 +18,7 @@ class SparseMatrix(_AggregateDataMatrix):
     def __init__(
             self, sparse_coo_array, table_type, data_datestr, row_category,
             column_category, logger=None):
-        """Constructor for species by dataset comparisons.
+        """Constructor for species by region/analysis_dim comparisons.
 
         Args:
             sparse_coo_array (scipy.sparse.coo_array): A 2d sparse array with count
@@ -33,6 +33,11 @@ class SparseMatrix(_AggregateDataMatrix):
                 used to identify axis 1/columns.
             logger (object): An optional local logger to use for logging output
                 with consistent options
+
+        Note: constructed from `stacked` records in table with datatype "list" in
+            bison.common.constants.SUMMARY.DATATYPES, i.e. county-x-species_list
+            where each record has county, species, riis_status, occ_count, a list of
+            species in a county.
 
         Note: in the first implementation, because species are generally far more
             numerous, rows are always species, columns are datasets.  This allows

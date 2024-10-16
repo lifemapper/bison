@@ -15,7 +15,7 @@ class SummaryMatrix(_AggregateDataMatrix):
     # ...........................
     def __init__(
             self, summary_df, table_type, data_datestr, logger=None):
-        """Constructor for species by dataset comparisons.
+        """Constructor for occurrence/species counts by region/analysis_dim comparisons.
 
         Args:
             summary_df (pandas.DataFrame): DataFrame with a row for each element in
@@ -27,6 +27,16 @@ class SummaryMatrix(_AggregateDataMatrix):
             data_datestr (str): date of the source data in YYYY_MM_DD format.
             logger (object): An optional local logger to use for logging output
                 with consistent options
+
+        Note: constructed from records in table with datatype "counts" in
+            bison.common.constants.SUMMARY.DATATYPES,
+            i.e. county-x-riis_counts where each record has
+                county, riis_status, occ_count, species_count;
+                counts of occurrences and species by riis_status for a county
+            OR
+            county_counts where each record has
+                county, occ_count, species_count;
+                counts of occurrences and species for a county
         """
         self._df = summary_df
         _AggregateDataMatrix.__init__(self, table_type, data_datestr, logger=logger)
