@@ -1,13 +1,14 @@
 """Create a matrix of occurrence or species counts by (geospatial) analysis dimension."""
-from logging import INFO
+
+# from bison.common.aws_util import S3
 import os
 
-from bison.common.aws_util import S3
 from bison.common.constants import (
-    ANALYSIS_DIM, COUNT_FIELDS, OCCURRENCE_STATUS, OCCURRENCE_STATUS_FLD, PROJECT,
+    ANALYSIS_DIM, OCCURRENCE_COUNT_FLD, PROJECT,
     S3_BUCKET, S3_SUMMARY_DIR, SUMMARY, TMP_PATH, WORKFLOW_ROLE
 )
 from bison.common.log import Logger
+from bison.common.aws_util import S3
 from bison.common.util import get_current_datadate_str
 from bison.spnet.summary_matrix import SummaryMatrix
 
@@ -18,56 +19,35 @@ Note:
         the analysis dimesion.
 """
 
+
 # from lmpy.spatial.map import (
 #     create_point_heatmap_vector, create_site_headers_from_extent,
 #     rasterize_geospatial_matrix)
 # .............................................................................
 # .............................................................................
-
-
-
-# .............................................................................
-def build_heatmap(s3, table_type, datestr, count_field):
-    """Get a pandas dataframe from an S3 parquet table with occurrence counts by region.
+def download_dataframe(table_type, datestr, bucket, bucket_dir):
+    """Download a table written by Redshift to S3 in parquet, return dataframe.
 
     Args:
-        s3 (bison.tools.aws_util.S3): authenticated boto3 client for S3 interactions.
-        table_type (str): code from bison.common.constants.SUMMARY with predefined type
-            of data to download, indicating type and contents.
-        datestr (str): date of the current dataset, in YYYY_MM_DD format
+        table_type (aws.aws_constants.SUMMARY_TABLE_TYPES): type of table data
+        datestr (str): date string in format YYYY_MM_DD
+        bucket (str): S3 bucket for project.
+        bucket_dir (str): Folder in S3 bucket for datafile.
 
     Returns:
-        axis0_label (str): axis label used for rows in the matrix
-        axis1_label (str): axis label used for columns in the matrix
-        df (pandas.DataFrame): dataframe containing occurrence counts for the dimension
-
-    Raises:
-        Exception: on request for region x occurrence status heatmap.
+        df (pandas.DataFrame): dataframe containing Redshift "counts" table data.
     """
-    _contents, _dim0, dim1, _datatype = SUMMARY.parse_table_type(table_type)
-    if dim1 is not None:
-        raise Exception(f"Occurrence status {dim1} is not yet supported for heatmaps")
-
-    if count_field not in COUNT_FIELDS:
-        raise Exception(f"Invalid count field {count_field}")
-
     tbl = SUMMARY.get_table(table_type, datestr=datestr)
     pqt_fname = f"{tbl['fname']}.parquet"
-    axis0_label = tbl["key_fld"]
-    axis1_label = count_field
+    # axis0_label = tbl["key_fld"]
+    # axis1_label = count_field
     # Read stacked (record) data directly into DataFrame
     try:
-        df = s3.get_dataframe_from_parquet(S3_BUCKET, S3_SUMMARY_DIR, pqt_fname)
+        df = s3.get_dataframe_from_parquet(bucket, bucket_dir, pqt_fname)
     except Exception as e:
         print(f"Failed to read s3 parquet {pqt_fname} to dataframe. ({e})")
         raise(e)
-
-    # Remove unused count fields
-    for fld in COUNT_FIELDS:
-        if fld != count_field:
-            df.drop(labels=[fld], axis=1)
-
-    return (axis0_label, axis1_label, df)
+    return df
 
 
 # .............................................................................
@@ -76,7 +56,29 @@ def build_heatmap(s3, table_type, datestr, count_field):
 # --------------------------------------------------------------------------------------
 # Main
 # --------------------------------------------------------------------------------------
-# if __name__ == "__main__":
+if __name__ == "__main__":
+    datestr = get_current_datadate_str()
+    script_name = os.path.splitext(os.path.basename(__file__))[0]
+    # Create logger with default INFO messages
+    logger = Logger(script_name, log_path="/tmp", log_console=True)
+    # For upload to/download from S3
+    s3 = S3(PROJECT, WORKFLOW_ROLE)
+
+    # for count_field in (COUNT_FIELDS):
+    count_field = OCCURRENCE_COUNT_FLD
+    # for dim in ANALYSIS_DIM.analysis_code():
+    dim0 = ANALYSIS_DIM.COUNTY["code"]
+    # RIIS occurrence status not yet supported
+    dim1 = None
+    table_type = ANALYSIS_DIM.get_table_type("counts", dim0, dim1)
+
+    df = download_dataframe(table_type, datestr, S3_BUCKET, S3_SUMMARY_DIR)
+    # # Remove unused count fields
+    # for fld in COUNT_FIELDS:
+    #     if fld != count_field:
+    #         df.drop(labels=[fld], axis=1)
+    sum_mtx = SummaryMatrix(df, table_type, datestr, logger=logger)
+
 """
 from bison.tools.build_heatmap import *
 from bison.common.constants import *
