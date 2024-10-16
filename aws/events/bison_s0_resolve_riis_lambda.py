@@ -15,7 +15,8 @@ pub_schema = "public"
 external_schema = "redshift_spectrum"
 timeout = 900
 waittime = 1
-bison_task_instance_id = "i-0595bfd381e64d2c9"
+EC2_TASK_INSTANCE_ID = "i-0c7e54e257d5c8574"
+EC2_KEY = bison_task_key
 # bison_task_ec2 = "arn:aws:ec2:us-east-1:321942852011:instance/i-0595bfd381e64d2c9"
 
 # Initialize Botocore session
@@ -28,7 +29,8 @@ client_ec2 = session.client("ec2", config=config)
 client_ssm = session.client("ssm", config=config)
 
 # Bison command
-bison_script = "~/bison/bison/tools/annotate_riis.py"
+bison_script = "venv/bin/python -m bison.tools.annotate_riis"
+
 
 # --------------------------------------------------------------------------------------
 def lambda_handler(event, context):
@@ -47,7 +49,7 @@ def lambda_handler(event, context):
         Exception: on unknown error.
     """
     response = client_ec2.start_instances(
-        InstanceIds=[bison_task_instance_id],
+        InstanceIds=[EC2_TASK_INSTANCE_ID],
         AdditionalInfo="Task initiated by Lambda",
         DryRun=False
     )
@@ -69,7 +71,7 @@ def lambda_handler(event, context):
     # sudo docker compose -f docker-compose.task.yml up
     response = client_ssm.send_command(
         DocumentName='AWS-RunShellScript',
-        Parameters={'commands': [script]},
-        InstanceIds=exec_list
+        Parameters={'commands': [bison_script]},
+        InstanceIds=[bison_task_instance_id]
     )
     return instance_id

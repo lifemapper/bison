@@ -13,7 +13,7 @@ GBIF_ARN = "arn:aws:s3:::gbif-open-data-us-east-1"
 GBIF_ODR_FNAME = "occurrence.parquet"
 
 TMP_PATH = "/tmp"
-
+EC2_TASK_INSTANCE_ID = "i-0c7e54e257d5c8574"
 S3_BUCKET = f"{PROJECT}-{AWS_ACCOUNT}-{REGION}"
 S3_IN_DIR = "input"
 S3_OUT_DIR = "output"
