@@ -5,10 +5,10 @@
             "Effect": "Allow",
             "Principal": {
                 "Service": [
-                    "ec2.amazonaws.com",
-                    "redshift.amazonaws.com",
                     "scheduler.amazonaws.com",
-                    "lambda.amazonaws.com"
+                    "ec2.amazonaws.com",
+                    "lambda.amazonaws.com",
+                    "redshift.amazonaws.com"
                 ]
             },
             "Action": "sts:AssumeRole"
@@ -16,7 +16,10 @@
         {
             "Effect": "Allow",
             "Principal": {
-                "AWS": "arn:aws:iam::321942852011:user/project.bison"
+                "AWS": [
+                    "arn:aws:iam::321942852011:user/project.bison",
+                    "arn:aws:iam::321942852011:role/bison_ec2_s3_role"
+                ]
             },
             "Action": "sts:AssumeRole"
         }

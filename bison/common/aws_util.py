@@ -10,22 +10,18 @@ from datetime import datetime, timezone
 from io import BytesIO
 import os
 import pandas
+import subprocess as sp
 from time import sleep
 
 from bison.common.constants import REGION, WORKFLOW_SECRET_NAME
 
+six_hours = 21600
 
 # .............................................................................
 class _AWS:
     """Class for working with AWS tools."""
 
-    # # ----------------------------------------------------
-    # def __init__(self, region=REGION):
-    #     """Constructor for common ec2 operations.
-    #
-    #     Args:
-    #     """
-    #     self._region = region
+    meta_url = "http://169.254.169.254/latest/"
 
     # ----------------------------------------------------
     @classmethod
@@ -80,6 +76,27 @@ class _AWS:
         return response
 
     # ----------------------------------------------------
+    def _get_instance_metadata_token(cls):
+        token_prefix = "api/token"
+        ttl_key = "X-aws-ec2-metadata-token-ttl-seconds"
+        token_cmd = \
+            f'curl -X PUT "{cls.meta_url}{token_prefix}" -H "{ttl_key}: {six_hours}"'
+        token, err = sp.Popen(
+            token_cmd, shell=True, stdout=sp.PIPE, stderr=sp.PIPE).communicate()
+        return token
+
+
+    # ----------------------------------------------------
+    def _get_creds(cls, token, ec2_role):
+        cred_prefix = "meta-data/iam/security-credentials/"
+        token_key = "X-aws-ec2-metadata-token"
+        cred_cmd = \
+            f'curl -H "{token_key}": {token}" {cls.meta_url}{cred_prefix}{ec2_role}'
+        creds, err = sp.Popen(
+            cred_cmd, shell=True, stdout=sp.PIPE, stderr=sp.PIPE).communicate()
+        return creds
+
+    # ----------------------------------------------------
     @classmethod
     def get_authenticated_session(cls, profile, role, region=REGION):
         """Get an authenticated session for AWS clients.
@@ -117,29 +134,34 @@ class EC2:
     TEMPLATE_BASENAME = "launch_template"
 
     # ----------------------------------------------------
-    def __init__(self, profile, role, region=REGION):
+    def __init__(self, region=REGION):
         """Constructor for common ec2 operations.
 
         Args:
-            profile: local user profile with assume_role privilege on role
-            role: role with permissions for AWS operations.
             region: AWS region for the session.
         """
-        self._profile = profile
-        self._role = role
         self._region = region
-        self._auth_session, self._expiration = _AWS.get_authenticated_session(
-            profile, role, region)
-        self._client = self._auth_session.client("ec2")
+        self._auth_session = boto3.session.Session(region_name=region)
+        self._client = self._auth_session.client("s3")
 
-    # ----------------------------------------------------
-    def _check_expiration(self):
-        n = datetime.now(timezone.utc)
-        remaining_seconds = self._expiration - n
-        if remaining_seconds < 15:
-            # Reinitialize the session and client
-            self._auth_session, self._expiration = _AWS.get_authenticated_session(
-                self._profile, self._role, self._region)
+    # # ----------------------------------------------------
+    # def _set_credentials(self):
+    #     self._token = _AWS._get_instance_metadata_token()
+    #     creds = _AWS._get_creds(self.token, self._role)
+    #     self._expiration = self._creds["Expiration"]
+    #     self._access_key_id = creds["AccessKeyId"]
+    #     self._secret_access_key = creds["SecretAccessKey"]
+    #     self._access_token = creds["Token"]
+    #
+    # # ----------------------------------------------------
+    # def _check_expiration(self):
+    #     n = datetime.now(timezone.utc)
+    #     remaining_seconds = self._expiration - n
+    #     if remaining_seconds < 300:
+    #         # Reinitialize the session and client
+    #         # self._auth_session, self._expiration = _AWS.get_authenticated_session(
+    #         #     self._profile, self._role, self._region)
+    #         self._set_credentials()
 
     # ----------------------------------------------------
     def create_spot_launch_template_name(self, proj_prefix, desc_str=None):
@@ -250,47 +272,6 @@ class EC2:
             type = "token"
         token = f"{type}_{datetime.now(timezone.utc).timestamp()}"
         return token
-
-    # # ----------------------------------------------------
-    # def create_spot_launch_template(
-    #     self, template_name, user_data_filename, description=None,
-    #         insert_script_filename=None, overwrite=False):
-    #     """Create an EC2 Spot Instance Launch template on AWS.
-    #
-    #     Args:
-    #         template_name: name for the launch template0
-    #         user_data_filename: script to be installed and run on EC2 instantiation.
-    #         description: user-supplied name defining the template.
-    #         insert_script_filename: optional script to be inserted into user_data_filename.
-    #         overwrite: flag indicating whether to use an existing template with this name,
-    #             or create a new
-    #
-    #     Returns:
-    #         success: boolean flag indicating the success of creating launch template.
-    #     """
-    #     success = False
-    #     if overwrite is True:
-    #         self.delete_launch_template(template_name)
-    #     template = self.get_launch_template(template_name)
-    #     if template is not None:
-    #         success = True
-    #     else:
-    #         spot_template_data = self.define_spot_launch_template_data(
-    #             template_name, user_data_filename, insert_script_filename)
-    #         template_token = self.create_token("template")
-    #         try:
-    #             response = self._client.create_launch_template(
-    #                 DryRun=False,
-    #                 ClientToken=template_token,
-    #                 LaunchTemplateName=template_name,
-    #                 VersionDescription=description,
-    #                 LaunchTemplateData=spot_template_data
-    #             )
-    #         except ClientError as e:
-    #             print(f"Failed to create launch template {template_name}, ({e})")
-    #         else:
-    #             success = (response["ResponseMetadata"]["HTTPStatusCode"] == 200)
-    #     return success
 
     # ----------------------------------------------------
     def get_instance(self, instance_id):
@@ -491,18 +472,19 @@ class S3:
         self._profile = profile
         self._role = role
         self._region = region
-        self._auth_session, self._expiration = _AWS.get_authenticated_session(
-            profile, role, region)
+        # self._auth_session, self._expiration = _AWS.get_authenticated_session(
+        #     profile, role, region)
+        self._auth_session = boto3.session.Session(region_name=region)
         self._client = self._auth_session.client("s3")
 
-    # ----------------------------------------------------
-    def _check_expiration(self):
-        n = datetime.now(timezone.utc)
-        rem = n - self._expiration
-        if rem.seconds < 100:
-            # Reinitialize the session and client
-            self._auth_session, self._expiration = _AWS.get_authenticated_session(
-                self._profile, self._role, self._region)
+    # # ----------------------------------------------------
+    # def _check_expiration(self):
+    #     n = datetime.now(timezone.utc)
+    #     rem = n - self._expiration
+    #     if rem.seconds < 100:
+    #         # Reinitialize the session and client
+    #         self._auth_session, self._expiration = _AWS.get_authenticated_session(
+    #             self._profile, self._role, self._region)
 
     # ----------------------------------------------------
     def get_dataframe_from_csv(

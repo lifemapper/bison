@@ -95,5 +95,40 @@ SSL certificates
       volumes:
         - "/home/ubuntu/certificates:/etc/letsencrypt:ro"
 
+Configure for AWS access
+--------------------
+
+In the home directory, create the directory and file .aws/config, with the following
+content::
+
+    [default]
+    region = us-east-1
+    output = json
+    duration_seconds = 43200
+    credential_source = Ec2InstanceMetadata
+
+
 EC2 for Workflow Tasks
 ---------------------------------
+
+EC2 must be set up with a role for temporary credentials to enable applications to
+retrieve those credentials for AWS permissions to other services (i.e. S3).
+By default, the instance allows IMDSv1 or IMDSv2, though making v2 required is recommended.
+
+TOKEN=`curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600"` \
+&& curl -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/iam/security-credentials/s3access
+
+Using IMDSv2, first get a token::
+
+    TOKEN=`curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600"`
+
+Then get top level metadata::
+
+    curl -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/
+
+To set up config to use/assume a role:
+https://docs.aws.amazon.com/sdkref/latest/guide/feature-assume-role-credentials.html
+
+More info:
+
+https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-metadata.html

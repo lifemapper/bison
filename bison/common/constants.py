@@ -13,7 +13,10 @@ GBIF_ARN = "arn:aws:s3:::gbif-open-data-us-east-1"
 GBIF_ODR_FNAME = "occurrence.parquet"
 
 TMP_PATH = "/tmp"
+
 EC2_TASK_INSTANCE_ID = "i-0c7e54e257d5c8574"
+EC2_ROLE_NAME =  f"{PROJECT}_ec2_s3_role"
+
 S3_BUCKET = f"{PROJECT}-{AWS_ACCOUNT}-{REGION}"
 S3_IN_DIR = "input"
 S3_OUT_DIR = "output"
@@ -26,7 +29,7 @@ WORKFLOW_SECRET_NAME = "bison_workflow_user"
 
 # EC2 Spot Instance
 # List of instance types at https://aws.amazon.com/ec2/spot/pricing/
-INSTANCE_TYPE = "t2.micro"
+INSTANCE_TYPE = "t4g.micro"
 
 # Log processing progress
 LOGINTERVAL = 1000000
