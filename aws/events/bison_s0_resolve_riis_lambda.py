@@ -16,8 +16,7 @@ external_schema = "redshift_spectrum"
 timeout = 900
 waittime = 1
 EC2_TASK_INSTANCE_ID = "i-0c7e54e257d5c8574"
-EC2_KEY = bison_task_key
-# bison_task_ec2 = "arn:aws:ec2:us-east-1:321942852011:instance/i-0595bfd381e64d2c9"
+# EC2_TASK_INSTANCE_ARN = "arn:aws:ec2:us-east-1:321942852011:instance/i-0595bfd381e64d2c9"
 
 # Initialize Botocore session
 session = boto3.session.Session()
@@ -29,7 +28,7 @@ client_ec2 = session.client("ec2", config=config)
 client_ssm = session.client("ssm", config=config)
 
 # Bison command
-bison_script = "venv/bin/python -m bison.tools.annotate_riis"
+bison_script = "venv/bin/python -m bison.task.annotate_riis"
 
 
 # --------------------------------------------------------------------------------------
@@ -56,9 +55,9 @@ def lambda_handler(event, context):
     try:
         instance_meta = response["StartingInstances"][0]
     except KeyError:
-        raise Exception(f"Invalid response returned {instance_meta}")
+        raise Exception(f"Invalid response returned {response}")
     except ValueError:
-        raise Exception(f"No instances returned in {instance_meta}")
+        raise Exception(f"No instances returned in {response}")
     except Exception:
         raise
 
@@ -68,10 +67,10 @@ def lambda_handler(event, context):
     print(f"Started instance {instance_meta['InstanceId']}. ")
     print(f"Moved from {curr_state} to {prev_state}")
 
-    # sudo docker compose -f docker-compose.task.yml up
+    # sudo docker compose -f compose.annotate_riis.yml up
     response = client_ssm.send_command(
         DocumentName='AWS-RunShellScript',
         Parameters={'commands': [bison_script]},
-        InstanceIds=[bison_task_instance_id]
+        InstanceIds=[EC2_TASK_INSTANCE_ID]
     )
     return instance_id

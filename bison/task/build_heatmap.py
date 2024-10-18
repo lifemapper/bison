@@ -4,8 +4,7 @@
 import os
 
 from bison.common.constants import (
-    ANALYSIS_DIM, OCCURRENCE_COUNT_FLD, PROJECT,
-    S3_BUCKET, S3_SUMMARY_DIR, SUMMARY, TMP_PATH, WORKFLOW_ROLE
+    ANALYSIS_DIM, OCCURRENCE_COUNT_FLD, REGION, S3_BUCKET, S3_SUMMARY_DIR, SUMMARY
 )
 from bison.common.log import Logger
 from bison.common.aws_util import S3
@@ -36,11 +35,12 @@ def download_dataframe(table_type, datestr, bucket, bucket_dir):
 
     Returns:
         df (pandas.DataFrame): dataframe containing Redshift "counts" table data.
+
+    Raises:
+        Exception: on failure to download data from S3.
     """
     tbl = SUMMARY.get_table(table_type, datestr=datestr)
     pqt_fname = f"{tbl['fname']}.parquet"
-    # axis0_label = tbl["key_fld"]
-    # axis1_label = count_field
     # Read stacked (record) data directly into DataFrame
     try:
         df = s3.get_dataframe_from_parquet(bucket, bucket_dir, pqt_fname)
@@ -48,9 +48,6 @@ def download_dataframe(table_type, datestr, bucket, bucket_dir):
         print(f"Failed to read s3 parquet {pqt_fname} to dataframe. ({e})")
         raise(e)
     return df
-
-
-# .............................................................................
 
 
 # --------------------------------------------------------------------------------------
@@ -62,7 +59,7 @@ if __name__ == "__main__":
     # Create logger with default INFO messages
     logger = Logger(script_name, log_path="/tmp", log_console=True)
     # For upload to/download from S3
-    s3 = S3(PROJECT, WORKFLOW_ROLE)
+    s3 = S3(region=REGION)
 
     # for count_field in (COUNT_FIELDS):
     count_field = OCCURRENCE_COUNT_FLD
@@ -94,7 +91,7 @@ species_dim = ANALYSIS_DIM.species_code
 #     script_name, log_path=TMP_PATH, log_console=True, log_level=INFO)
 
 # Get authenticated S3 client
-s3 = S3(PROJECT, WORKFLOW_ROLE)
+s3 = S3()
 
 # Loop through regions with full, non-overlapping polygons
 # for region_dim in [ANALYSIS_DIM.COUNTY["code"]]:

@@ -7,7 +7,7 @@ import pandas
 from bison.common.log import Logger
 from bison.common.aws_util import S3
 from bison.common.constants import (
-    PROJECT, S3_BUCKET, S3_OUT_DIR, TMP_PATH, WORKFLOW_ROLE, S3_LOG_DIR
+    REGION, S3_BUCKET, S3_OUT_DIR, TMP_PATH, S3_LOG_DIR
 )
 
 n = DT.datetime.now()
@@ -398,7 +398,7 @@ if __name__ == "__main__":
     script_name = os.path.splitext(os.path.basename(__file__))[0]
     logger = Logger(script_name)
 
-    s3 = S3(PROJECT, WORKFLOW_ROLE)
+    s3 = S3(region=REGION)
 
     # Read directly into DataFrame
     orig_df = s3.get_dataframe_from_parquet(

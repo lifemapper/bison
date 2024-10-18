@@ -4,7 +4,7 @@ import os
 
 from bison.common.aws_util import S3
 from bison.common.constants import (
-    ANALYSIS_DIM, PROJECT, S3_BUCKET, S3_SUMMARY_DIR, SUMMARY, TMP_PATH, WORKFLOW_ROLE
+    ANALYSIS_DIM, REGION, S3_BUCKET, S3_SUMMARY_DIR, SUMMARY, TMP_PATH
 )
 from bison.common.log import Logger
 from bison.common.util import get_current_datadate_str
@@ -254,7 +254,7 @@ def read_stacked_data_records(s3, table_type, data_datestr):
     """Read stacked records from S3, aggregate into a sparse matrix of species x dim.
 
     Args:
-        s3 (bison.tools.aws_util.S3): authenticated boto3 client for S3 interactions.
+        s3 (bison.common.aws_util.S3): authenticated boto3 client for S3 interactions.
         table_type (code from bison.common.constants.SUMMARY): predefined type of
             data indicating type and contents.
         data_datestr (str): date of the current dataset, in YYYY_MM_DD format
@@ -293,7 +293,7 @@ if __name__ == "__main__":
         script_name, log_path=TMP_PATH, log_console=True, log_level=INFO)
 
     # Get authenticated S3 client
-    s3 = S3(PROJECT, WORKFLOW_ROLE)
+    s3 = S3(region=REGION)
 
     for other_dim in ANALYSIS_DIM.analysis_code():
         # All lists are analysis_dim x species

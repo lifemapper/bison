@@ -13,116 +13,133 @@ import pandas
 import subprocess as sp
 from time import sleep
 
-from bison.common.constants import REGION, WORKFLOW_SECRET_NAME
+from bison.common.constants import AWS_METADATA_URL, REGION
 
 six_hours = 21600
+
 
 # .............................................................................
 class _AWS:
     """Class for working with AWS tools."""
 
-    meta_url = "http://169.254.169.254/latest/"
-
     # ----------------------------------------------------
     @classmethod
-    def _get_secret(cls, secret_name, region=REGION):
-        """Get a secret from the Secrets Manager for connection authentication.
-
-        Args:
-            secret_name: name of the secret to retrieve.
-            region: AWS region for the secret.
-
-        Returns:
-            a dictionary containing the secret data.
-
-        Raises:
-            ClientError:  an AWS error in communication.
-
-        Note: For a list of exceptions thrown, see
-        https://docs.aws.amazon.com/secretsmanager/latest/apireference/API_GetSecretValue.html
-        """
-        # Create a Secrets Manager client
-        tmp_session = boto3.session.Session()
-        client = tmp_session.client(service_name="secretsmanager", region_name=region)
-        try:
-            secret_value_response = client.get_secret_value(SecretId=secret_name)
-        except ClientError as e:
-            raise (e)
-        # Decrypt secret using the associated KMS key.
-        secret_str = secret_value_response["SecretString"]
-        return eval(secret_str)
-
-    # ----------------------------------------------------
-    @classmethod
-    def _assume_role(cls, profile, role, region):
-        session = boto3.session.Session(profile_name=profile)
-        sts = session.client("sts", region_name=region)
-        try:
-            response = sts.assume_role(
-                RoleArn=role, RoleSessionName="authenticated-bison-session")
-        except NoCredentialsError:
-            secret = cls._get_secret(WORKFLOW_SECRET_NAME, region=region)
-            sts = session.client(
-                "sts",
-                aws_access_key_id=secret["aws_access_key_id"],
-                aws_secret_access_key=secret["aws_secret_access_key"],
-                region_name=region
-            )
-            try:
-                response = sts.assume_role(
-                    RoleArn=role, RoleSessionName="authenticated-bison-session")
-            except Exception:
-                raise
-        return response
-
-    # ----------------------------------------------------
     def _get_instance_metadata_token(cls):
         token_prefix = "api/token"
         ttl_key = "X-aws-ec2-metadata-token-ttl-seconds"
         token_cmd = \
-            f'curl -X PUT "{cls.meta_url}{token_prefix}" -H "{ttl_key}: {six_hours}"'
+            f'curl -X PUT "{AWS_METADATA_URL}{token_prefix}" -H "{ttl_key}: {six_hours}"'
         token, err = sp.Popen(
             token_cmd, shell=True, stdout=sp.PIPE, stderr=sp.PIPE).communicate()
         return token
 
-
     # ----------------------------------------------------
+    @classmethod
     def _get_creds(cls, token, ec2_role):
         cred_prefix = "meta-data/iam/security-credentials/"
         token_key = "X-aws-ec2-metadata-token"
         cred_cmd = \
-            f'curl -H "{token_key}": {token}" {cls.meta_url}{cred_prefix}{ec2_role}'
+            f'curl -H "{token_key}": {token}" {AWS_METADATA_URL}{cred_prefix}{ec2_role}'
         creds, err = sp.Popen(
             cred_cmd, shell=True, stdout=sp.PIPE, stderr=sp.PIPE).communicate()
         return creds
 
-    # ----------------------------------------------------
-    @classmethod
-    def get_authenticated_session(cls, profile, role, region=REGION):
-        """Get an authenticated session for AWS clients.
-
-        Args:
-            profile: local user profile with assume_role privilege on role
-            role: role with permissions for AWS operations.
-            region: AWS region for the session.
-
-        Returns:
-            auth_session (boto3.session.Session): an authenticated session.
-            expiration (datetime.datetime): expiration time
-        """
-        response = cls._assume_role(profile, role, region)
-        creds = response["Credentials"]
-        expiration = creds["Expiration"]
-
-        # Initiate new authenticated session with credentials
-        auth_session = boto3.session.Session(
-            aws_access_key_id=creds["AccessKeyId"],
-            aws_secret_access_key=creds["SecretAccessKey"],
-            aws_session_token=creds["SessionToken"],
-            profile_name=profile,
-            region_name=region
-        )
-        return auth_session, expiration
+    # # ----------------------------------------------------
+    # def _set_credentials(self):
+    #     self._token = _AWS._get_instance_metadata_token()
+    #     creds = _AWS._get_creds(self.token, self._role)
+    #     self._expiration = self._creds["Expiration"]
+    #     self._access_key_id = creds["AccessKeyId"]
+    #     self._secret_access_key = creds["SecretAccessKey"]
+    #     self._access_token = creds["Token"]
+    #
+    # # ----------------------------------------------------
+    # def _check_expiration(self):
+    #     n = datetime.now(timezone.utc)
+    #     remaining_seconds = self._expiration - n
+    #     if remaining_seconds < 300:
+    #         # Reinitialize the client
+    #         self._set_credentials()
+    #
+    # # ----------------------------------------------------
+    # @classmethod
+    # def _get_secret(cls, secret_name, region=REGION):
+    #     """Get a secret from the Secrets Manager for connection authentication.
+    #
+    #     Args:
+    #         secret_name: name of the secret to retrieve.
+    #         region: AWS region for the secret.
+    #
+    #     Returns:
+    #         a dictionary containing the secret data.
+    #
+    #     Raises:
+    #         ClientError:  an AWS error in communication.
+    #
+    #     Note: For a list of exceptions thrown, see
+    #     https://docs.aws.amazon.com/secretsmanager/latest/apireference/API_GetSecretValue.html
+    #     """
+    #     # Create a Secrets Manager client
+    #     tmp_session = boto3.session.Session()
+    #     client = tmp_session.client(service_name="secretsmanager", region_name=region)
+    #     try:
+    #         secret_value_response = client.get_secret_value(SecretId=secret_name)
+    #     except ClientError:
+    #         raise
+    #     # Decrypt secret using the associated KMS key.
+    #     secret_str = secret_value_response["SecretString"]
+    #     return eval(secret_str)
+    #
+    # # ----------------------------------------------------
+    # @classmethod
+    # def _assume_role(cls, profile, role, region):
+    #     session = boto3.session.Session(profile_name=profile)
+    #     sts = session.client("sts", region_name=region)
+    #     try:
+    #         response = sts.assume_role(
+    #             RoleArn=role, RoleSessionName="authenticated-bison-session")
+    #     except NoCredentialsError:
+    #         secret = cls._get_secret(WORKFLOW_SECRET_NAME, region=region)
+    #         sts = session.client(
+    #             "sts",
+    #             aws_access_key_id=secret["aws_access_key_id"],
+    #             aws_secret_access_key=secret["aws_secret_access_key"],
+    #             region_name=region
+    #         )
+    #         try:
+    #             response = sts.assume_role(
+    #                 RoleArn=role, RoleSessionName="authenticated-bison-session")
+    #         except Exception:
+    #             raise
+    #      return response
+    #
+    # # ----------------------------------------------------
+    # @classmethod
+    # def get_authenticated_session(cls, profile, role, region=REGION):
+    #     """Get an authenticated session for AWS clients.
+    #
+    #     Args:
+    #         profile: local user profile with assume_role privilege on role
+    #         role: role with permissions for AWS operations.
+    #         region: AWS region for the session.
+    #
+    #     Returns:
+    #         auth_session (boto3.session.Session): an authenticated session.
+    #         expiration (datetime.datetime): expiration time
+    #     """
+    #     response = cls._assume_role(profile, role, region)
+    #     creds = response["Credentials"]
+    #     expiration = creds["Expiration"]
+    #
+    #     # Initiate new authenticated session with credentials
+    #     auth_session = boto3.session.Session(
+    #         aws_access_key_id=creds["AccessKeyId"],
+    #         aws_secret_access_key=creds["SecretAccessKey"],
+    #         aws_session_token=creds["SessionToken"],
+    #         profile_name=profile,
+    #         region_name=region
+    #     )
+    #     return auth_session, expiration
 
 
 # --------------------------------------------------------------------------------------
@@ -143,25 +160,6 @@ class EC2:
         self._region = region
         self._auth_session = boto3.session.Session(region_name=region)
         self._client = self._auth_session.client("s3")
-
-    # # ----------------------------------------------------
-    # def _set_credentials(self):
-    #     self._token = _AWS._get_instance_metadata_token()
-    #     creds = _AWS._get_creds(self.token, self._role)
-    #     self._expiration = self._creds["Expiration"]
-    #     self._access_key_id = creds["AccessKeyId"]
-    #     self._secret_access_key = creds["SecretAccessKey"]
-    #     self._access_token = creds["Token"]
-    #
-    # # ----------------------------------------------------
-    # def _check_expiration(self):
-    #     n = datetime.now(timezone.utc)
-    #     remaining_seconds = self._expiration - n
-    #     if remaining_seconds < 300:
-    #         # Reinitialize the session and client
-    #         # self._auth_session, self._expiration = _AWS.get_authenticated_session(
-    #         #     self._profile, self._role, self._region)
-    #         self._set_credentials()
 
     # ----------------------------------------------------
     def create_spot_launch_template_name(self, proj_prefix, desc_str=None):
@@ -294,14 +292,18 @@ class EC2:
         return instance
 
     # ----------------------------------------------------
-    def run_instance_spot(self, template_name):
-        """Run an EC2 Spot Instance on AWS.
+    def run_instance(self, template_name):
+        """Run an EC2 Instance on AWS.
 
         Args:
             template_name: name for the launch template to be used for instantiation.
 
         Returns:
-            instance_id: unique identifier of the new Spot instance.
+            instance_id: unique identifier of the new instance.
+
+        Raises:
+            NoCredentialsError: on failure to authenticate and run instance.
+            ClientError: on failure to run instance.
         """
         instance_id = None
         token = self.create_token()
@@ -322,8 +324,12 @@ class EC2:
                     }
                 ]
             )
-        except ClientError as e:
-            print(f"Failed to instantiate Spot instance {instance_name}, ({e})")
+        except NoCredentialsError:
+            print(f"Failed to authenticate for run_instances")
+            raise
+        except ClientError:
+            print(f"Failed to run instance {instance_name}")
+            raise
         else:
             try:
                 instance = response["Instances"][0]
@@ -344,11 +350,15 @@ class EC2:
             launch_template_data: metadata to be used as an EC2 launch template.
 
         Raises:
-            Exception: on failure to get launch template for instance.
+            NoCredentialsError: on failure to authenticate to get_launch_template_data.
+            Exception: on failure to get_launch_template_data for instance.
         """
         try:
             launch_template_data = self._client.get_launch_template_data(
                 InstanceId=instance_id)
+        except NoCredentialsError:
+            print(f"Failed to authenticate for get_launch_template_data")
+            raise
         except Exception:
             raise
         return launch_template_data
@@ -364,13 +374,16 @@ class EC2:
             launch_template_data: metadata to be used as an EC2 launch template.
 
         Raises:
+            NoCredentialsError: on failure to authenticate and get launch template data.
             Exception: on failure to find launch template for name.
-            Exception: on failure to get launch template data.
+            Exception: on failure to get launch template data from response.
         """
-        launch_template_data = None
         try:
             response = self._client.describe_launch_templates(
                 LaunchTemplateNames=[template_name])
+        except NoCredentialsError:
+            print(f"Failed to authenticate for describe_launch_templates")
+            raise
         except Exception:
             raise
         # LaunchTemplateName is unique
@@ -391,10 +404,14 @@ class EC2:
             response: response from the server.
 
         Raises:
+            NoCredentialsError: on failure to authenticate and delete instance.
             Exception: on failure to delete EC2 instance.
         """
         try:
             response = self._client.delete_instance(InstanceId=instance_id)
+        except NoCredentialsError:
+            print(f"Failed to authenticate for delete_instance")
+            raise
         except Exception:
             raise
         return response
@@ -461,30 +478,15 @@ class EC2:
 class S3:
     """Class for interacting with S3."""
     # ----------------------------------------------------
-    def __init__(self, profile, role, region=REGION):
+    def __init__(self, region=REGION):
         """Constructor for common S3 operations.
 
         Args:
-            profile: local user profile with assume_role privilege on role
-            role: role with permissions for AWS operations.
             region: AWS region for the session.
         """
-        self._profile = profile
-        self._role = role
         self._region = region
-        # self._auth_session, self._expiration = _AWS.get_authenticated_session(
-        #     profile, role, region)
         self._auth_session = boto3.session.Session(region_name=region)
         self._client = self._auth_session.client("s3")
-
-    # # ----------------------------------------------------
-    # def _check_expiration(self):
-    #     n = datetime.now(timezone.utc)
-    #     rem = n - self._expiration
-    #     if rem.seconds < 100:
-    #         # Reinitialize the session and client
-    #         self._auth_session, self._expiration = _AWS.get_authenticated_session(
-    #             self._profile, self._role, self._region)
 
     # ----------------------------------------------------
     def get_dataframe_from_csv(
@@ -505,27 +507,28 @@ class S3:
             df: pandas dataframe containing the tabular CSV data.
 
         Raises:
-            Exception: on failure with SSL error to download from S3
-            Exception: on failure with AWS error to download from S3
-            Exception: on failure to save file locally
+            NoCredentialsError: on failure to authenticate and run instance.
+            SSLError: on failure to download from S3.
+            ClientError: on failure with generic AWS error to download from S3.
+            Exception: on failure with unknown error to download from S3.
         """
         # Read CSV file from S3 into a pandas DataFrame
         s3_key = f"{bucket_path}/{filename}"
-        self._check_expiration()
+        s3_uri = f"s3://{bucket}/{bucket_path}/{s3_key}"
         try:
             s3_obj = self._client.get_object(Bucket=bucket, Key=s3_key)
+        except NoCredentialsError:
+            print(f"Failed with to download {s3_uri}")
+            raise
         except SSLError:
-            raise Exception(
-                "Failed with SSLError to download "
-                f"s3://{bucket}/{bucket_path}/{s3_key}")
-        except ClientError as e:
-            raise Exception(
-                "Failed with ClientError to download "
-                f"s3://{bucket}/{bucket_path}/{s3_key}, ({e})")
-        except Exception as e:
-            raise Exception(
-                "Failed with unknown Exception to download "
-                f"s3://{bucket}/{bucket_path}/{s3_key}, ({e})")
+            print(f"Failed with to download {s3_uri}")
+            raise
+        except ClientError:
+            print(f"Failed with to download {s3_uri}")
+            raise
+        except Exception:
+            print(f"Failed with unhandled exception to download {s3_uri}")
+            raise
 
         df = pandas.read_csv(
             s3_obj["Body"], delimiter=delimiter, encoding=encoding, low_memory=False,
@@ -546,33 +549,34 @@ class S3:
             pd.DataFrame containing the tabular data.
 
         Raises:
-            Exception: on failure with SSL error to download from S3
-            Exception: on failure with AWS error to download from S3
+            NoCredentialsError: on failure to authenticate and download from S3.
+            SSLError: on failure with SSL error to download from S3
+            ClientError: on failure with AWS error to download from S3
             Exception: on failure to save file locally
         """
         s3_key = f"{bucket_path}/{filename}"
-        self._check_expiration()
+        s3_uri = f"s3://{bucket}/{bucket_path}/{s3_key}"
         try:
             obj = self._client.get_object(Bucket=bucket, Key=s3_key)
+        except NoCredentialsError:
+            print(f"Failed to authenticate for get_object {s3_uri}")
+            raise
         except SSLError:
-            raise Exception(
-                "Failed with SSLError to download "
-                f"s3://{bucket}/{bucket_path}/{s3_key}")
-        except ClientError as e:
-            raise Exception(
-                "Failed with ClientError to download "
-                f"s3://{bucket}/{bucket_path}/{s3_key}, ({e})")
-        except Exception as e:
-            raise Exception(
-                "Failed with unknown Exception to download "
-                f"s3://{bucket}/{bucket_path}/{s3_key}, ({e})")
+            print(f"Failed with SSLError to download {s3_uri}")
+            raise
+        except ClientError:
+            print(f"Failed with ClientError to download {s3_uri}")
+            raise
+        except Exception:
+            print(f"Failed with unknown Exception to download {s3_uri}")
+            raise
 
         print(f"Read {bucket}/{s3_key} from S3")
         dataframe = pandas.read_parquet(BytesIO(obj["Body"].read()), **args)
         return dataframe
 
     # .............................................................................
-    def get_multiple_parquets_to_pandas(self, bucket, bucket_path, **args):
+    def get_dataframe_from_parquet_folder(self, bucket, bucket_path, **args):
         """Read multiple parquets from a folder on S3 into a pd DataFrame.
 
         Args:
@@ -621,15 +625,19 @@ class S3:
             path to S3 data object
 
         Raises:
+            NoCredentialsError: on failure to authenticate and upload to S3.
             Exception: on failure to upload file to S3.
         """
         parquet_buffer = BytesIO()
         df.to_parquet(parquet_buffer, engine="pyarrow")
         parquet_buffer.seek(0)
-        self._check_expiration()
         try:
             self._client.upload_fileobj(parquet_buffer, bucket, parquet_path)
+        except NoCredentialsError:
+            print(f"Failed to authenticate for upload_fileobj {parquet_path}.")
+            raise
         except Exception:
+            print(f"Failed with unknown error to upload_fileobj {parquet_path}.")
             raise
         return f"s3//{bucket}/{parquet_path}"
 
@@ -646,13 +654,17 @@ class S3:
             uploaded_fname: the S3 path to the uploaded file.
 
         Raises:
-            Exception: on failure to upload file to S3.
+            NoCredentialsError: on failure to autheticate for upload_file.
+            Exception: on failure to upload_file to S3.
         """
         filename = os.path.split(local_filename)[1]
-        self._check_expiration()
         try:
             self._client.upload_file(local_filename, bucket, s3_path)
+        except NoCredentialsError:
+            print(f"Failed to authenticate for upload_file {local_filename}.")
+            raise
         except Exception:
+            print(f"Failed to upload_file {local_filename}.")
             raise
         else:
             uploaded_fname = f"s3://{bucket}/{s3_path}/{filename}"
@@ -671,8 +683,9 @@ class S3:
             objnames: Keys for the objects in the S3 location.
 
         Raises:
-            Exception: on failure with SSL error to list objects from S3
-            Exception: on failure with AWS error to list objects from S3
+            NoCredentialsError: on failure to list objects from S3
+            SSLError: on failure list objects from S3
+            ClientError: on failure list objects from S3
             Exception: on unknown failure to list objects from S3
         """
         objnames = []
@@ -683,21 +696,22 @@ class S3:
         # Add object prefix if present
         if prefix is not None:
             full_prefix += prefix
+        s3uri = f"s3://{bucket}/{full_prefix}"
         # Try to list
-        self._check_expiration()
         try:
             response = self._client.list_objects_v2(Bucket=bucket, Prefix=full_prefix)
+        except NoCredentialsError:
+            print(f"Failed to authenticate for list_objects_v2 in {s3uri}")
+            raise
         except SSLError:
-            raise Exception(
-                f"Failed with SSLError to list objects in s3://{bucket}/{full_prefix}")
-        except ClientError as e:
-            raise Exception(
-                "Failed with ClientError to list objects in "
-                f"s3://{bucket}/{full_prefix}, ({e})")
-        except Exception as e:
-            raise Exception(
-                "Failed with unknown Exception to list objects in "
-                f"s3://{bucket}/{full_prefix}, ({e})")
+            print(f"Failed with SSLError to list_objects_v2 in {s3uri}")
+            raise
+        except ClientError:
+            print(f"Failed with ClientError to list_objects_v2 in {s3uri}")
+            raise
+        except Exception:
+            print(f"Failed with unknown Exception to list_objects_v2 in {s3uri}")
+            raise
 
         # Any objects?
         try:
@@ -729,8 +743,10 @@ class S3:
             local_filename (str): full path to local filename containing downloaded data.
 
         Raises:
-            Exception: on failure with SSL error to download from S3
-            Exception: on failure with AWS error to download from S3
+            NoCredentialsError: on failure to authenticate and download from S3.
+            SSLError: on failure to download from S3
+            ClientError: on failure with AWS error to download from S3
+            Exception: on failure with unexpected error to download from S3
             Exception: on failure to save file locally
         """
         local_filename = os.path.join(local_path, filename)
@@ -744,16 +760,20 @@ class S3:
                 print(f"{local_filename} already exists")
         # Download current
         if not os.path.exists(local_filename):
-            self._check_expiration()
             try:
                 self._client.download_file(bucket, obj_name, local_filename)
+            except NoCredentialsError:
+                print("Failed to authenticate and download_file.")
+                raise
             except SSLError:
-                raise Exception(f"Failed with SSLError to download {url}")
-            except ClientError as e:
-                raise Exception(f"Failed with ClientError to download {url}, ({e})")
-            except Exception as e:
-                raise Exception(
-                    f"Failed with unknown Exception to download {url}, ({e})")
+                print("Failed with SSLError to download_file.")
+                raise
+            except ClientError:
+                print("Failed with generic AWS error to download_file.")
+                raise
+            except Exception:
+                print("Failed with unexpected Exception to download_file.")
+                raise
 
             # Do not return until download to complete, allow max 5 min
             count = 0

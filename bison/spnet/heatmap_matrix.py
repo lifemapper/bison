@@ -40,4 +40,3 @@ class HeatmapMatrix(_AggregateDataMatrix):
         """
         self._df = summary_df
         _AggregateDataMatrix.__init__(self, table_type, data_datestr, logger=logger)
-

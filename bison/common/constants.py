@@ -7,6 +7,7 @@ import os
 PROJECT = "bison"
 REGION = "us-east-1"
 AWS_ACCOUNT = "321942852011"
+AWS_METADATA_URL = "http://169.254.169.254/latest/"
 
 GBIF_BUCKET = "gbif-open-data-us-east-1/occurrence"
 GBIF_ARN = "arn:aws:s3:::gbif-open-data-us-east-1"
@@ -15,7 +16,7 @@ GBIF_ODR_FNAME = "occurrence.parquet"
 TMP_PATH = "/tmp"
 
 EC2_TASK_INSTANCE_ID = "i-0c7e54e257d5c8574"
-EC2_ROLE_NAME =  f"{PROJECT}_ec2_s3_role"
+EC2_ROLE_NAME = f"{PROJECT}_ec2_s3_role"
 
 S3_BUCKET = f"{PROJECT}-{AWS_ACCOUNT}-{REGION}"
 S3_IN_DIR = "input"
