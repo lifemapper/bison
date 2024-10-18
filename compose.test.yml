@@ -6,12 +6,12 @@ services:
       context: ./.
       target: task
     environment:
-      - TASK_APP=bison.tools.test_task
+      - TASK_APP=bison.task.test_task
     env_file:
       ./.env.task.conf
     restart: unless-stopped
     volumes:
-      # bind mount
+      # bind mount from host machine
       - "/home/ubuntu/aws_data:/volumes/bison_data"
       # volumes
       - "scratch-path:/scratch-path"

@@ -48,7 +48,7 @@ RUN venv/bin/pip install debugpy
 ENV PYTHONDONTWRITEBYTECODE 1
 # Turns off buffering for easier container logging
 ENV PYTHONUNBUFFERED 1
-COPY --chown=bison:bison ./aws/ec2/aws_config ./.aws/config
+COPY --chown=bison:bison ./config/aws.conf ./.aws/config
 
 CMD tail -f /dev/null
 #CMD venv/bin/python -m ${TASK_APP}

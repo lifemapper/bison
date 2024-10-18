@@ -57,11 +57,11 @@ Docker debugging
 Run Docker containers (development)
 -------------------------------------------
 
-Note that the development compose file, docker-compose.development.yml, is referenced
+Note that the development compose file, compose.development.yml, is referenced
 first on the command line.  It has elements that override those defined in the
-general compose file, docker-compose.yml::
+general compose file, compose.yml::
 
-    sudo docker compose -f docker-compose.development.yml -f docker-compose.yml  up
+    sudo docker compose -f compose.development.yml -f compose.yml  up
 
 Flask has hot-reload enabled.
 
@@ -80,7 +80,7 @@ And run this command (which ignores running container)::
 
 Then rebuild/restart::
 
-    sudo docker compose -f docker-compose.development.yml -f docker-compose.yml  up
+    sudo docker compose -f compose.development.yml -f compose.yml  up
 
 Examine container
 -------------------------------------------

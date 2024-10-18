@@ -13,12 +13,12 @@ services:
       ./.env.conf
     restart: unless-stopped
     volumes:
+      # bind mount from host machine
+      - "/home/ubuntu/aws_data:/volumes/bison_data"
       # volumes
       - "scratch-path:/scratch-path"
       - "webpack-output:/volumes/webpack-output"
       - "static-files:/home/bison/bison/frontend/static"
-      # bind mounts from host machine
-      - "./config/aws.conf:/home/bison/.aws/config:ro"
 
   nginx:
     image: nginx:alpine

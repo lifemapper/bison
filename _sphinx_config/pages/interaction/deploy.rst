@@ -50,7 +50,7 @@ Environment status checks:
         ...
         CMD venv/bin/python -m gunicorn -w 4 --bind 0.0.0.0:5000 ${FLASK_APP}
 
-  docker-compose.yml::
+  compose.yml::
 
       services:
         bison:
@@ -66,7 +66,7 @@ Environment status checks:
         ...
         CMD venv/bin/python -m debugpy --listen 0.0.0.0:${DEBUG_PORT} -m ${FLASK_MANAGE} run --host=0.0.0.0
 
-  docker-compose.development.yml::
+  compose.development.yml::
 
       bison:
         ...
@@ -114,7 +114,7 @@ script run on instantiation.
 
       * TODO: set up an automated task to download this on creation in S3
 
-    * docker-compose.yml bind-mounts this host directory to the /volumes/aws_data
+    * compose.yml bind-mounts this host directory to the /volumes/aws_data
       directory as Read-Only on the backend (bison) container.
     * AWS_INPUT_DATA in the .env.conf file points to this volume
     * AWS_INPUT_PATH in python code references the AWS_INPUT_DATA environment variable
@@ -139,7 +139,7 @@ Run the containers (production)
 
 Start the containers with the Docker composition file::
 
-    sudo docker compose -f docker-compose.yml up -d
+    sudo docker compose -f compose.yml up -d
 
 BISON web services are now available at https://bison.spcoco.org/
 
@@ -150,11 +150,11 @@ the http/https ports and not allow the docker containers to use them.
 Run the containers (development)
 -------------------------------------------
 
-Note that the development compose file, docker-compose.development.yml, is referenced
+Note that the development compose file, compose.development.yml, is referenced
 first on the command line.  It has elements that override those defined in the
-general compose file, docker-compose.yml::
+general compose file, compose.yml::
 
-    sudo docker compose -f docker-compose.development.yml -f docker-compose.yml  up
+    sudo docker compose -f compose.development.yml -f compose.yml  up
 
 BISON web services are now available at https://localhost/ or
 https://bison-dev.spcoco.org/
@@ -179,7 +179,7 @@ Then rebuild/restart::
 
     sudo docker compose up -d
     # or
-    sudo docker compose -f docker-compose.development.yml -f docker-compose.yml  up
+    sudo docker compose -f compose.development.yml -f compose.yml  up
 
 Examine container
 -------------------------------------------

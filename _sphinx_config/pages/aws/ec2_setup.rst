@@ -84,7 +84,7 @@ SSL certificates
 * For testing/development, use self-signed certificates because Cerbot will not create
   certificates for an AWS EC2 Public IPv4 DNS, or an IP address.
 
-  * Edit the docker-compose.yml file under `nginx` service (which intercepts all web
+  * Edit the compose.yml file under `nginx` service (which intercepts all web
     requests) in `volumes` to bind-mount the directory containing self-signed
     certificates to /etc/letsencrypt::
 

@@ -13,11 +13,5 @@ services:
       - DEBUG_PORT=5001
     volumes:
       - "./flask_app/:/home/bison/flask_app/"
-
-#  front-end:
-#    build:
-#      context: ./.
-#      target: base-front-end
-#    command: ["npm", "run", "watch"]
-#    volumes:
-#      - "./bison/frontend/js_src/lib/:/home/node/lib/"
+      # bind mount from host machine
+      - "/home/ubuntu/aws_data:/volumes/bison_data"
