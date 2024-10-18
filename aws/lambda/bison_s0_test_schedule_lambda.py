@@ -57,7 +57,7 @@ bison_datestr = f"{yr}_{mo:02d}_01"
 gbif_datestr = f"{yr}-{mo:02d}-01"
 
 gbif_parquet_key = f"occurrence/{gbif_datestr}/{GBIF_ODR_FNAME}"
-annotated_riis_key = f"input/{RIIS_BASENAME}_annotated_{bison_datestr}.csv
+annotated_riis_key = f"input/{RIIS_BASENAME}_annotated_{bison_datestr}.csv"
 
 query_stmt = "riis_output_s3"
 
@@ -88,9 +88,8 @@ def lambda_handler(event, context):
         Exception: on failure to execute Redshift export command.
     """
     print("*** ---------------------------------------")
+    print("Received trigger: " + json.dumps(event))
     print("*** ---------------------------------------")
-    print("Received trigger: " + json.dumps(event, indent=2))
-    print("*** S3 list command submitted")
 
     # Look for existing S3 annotated data
     do_annotate = False
@@ -103,14 +102,14 @@ def lambda_handler(event, context):
     try:
         contents = tr_response["Contents"]
     except KeyError:
-        print(f"Object {annotated_riis_key} is not present")
+        print(f"*** Object {annotated_riis_key} is not present")
         do_annotate = True
     else:
-        print(f"Found object: {contents[0]['Key']}")
+        print(f"*** Found object: {contents[0]['Key']}")
 
     if do_annotate is True:
         print("*** ---------------------------------------")
-        print("*** Initiate EC2 annotate_riis task")
+        print("*** Initiate EC2 start_instances task")
         try:
             response = ec2_client.start_instances(
                 InstanceIds=[EC2_TASK_INSTANCE_ID],
@@ -131,10 +130,10 @@ def lambda_handler(event, context):
             raise
 
         instance_id = instance_meta['InstanceId']
-        # prev_state = instance_meta['PreviousState']['Name']
-        # curr_state = instance_meta['CurrentState']['Name']
-        # print(f"Started instance {instance_meta['InstanceId']}. ")
-        # print(f"Moved from {curr_state} to {prev_state}")
+        prev_state = instance_meta['PreviousState']['Name']
+        curr_state = instance_meta['CurrentState']['Name']
+        print(f"Started instance {instance_meta['InstanceId']}. ")
+        print(f"Moved from {prev_state} to {curr_state}")
 
         # -------------------------------------
         # Loop til complete
@@ -146,6 +145,8 @@ def lambda_handler(event, context):
                     InstanceIds=[instance_id])
             except Exception as e:
                 print(f"*** Failed to describe_instances in {elapsed_time} secs: {e}")
+                raise
+
             else:
                 try:
                     instance_meta = describe_result["Reservations"][0]["Instances"][0]

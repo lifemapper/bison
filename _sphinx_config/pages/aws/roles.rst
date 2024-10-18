@@ -17,12 +17,12 @@ Attach to BISON namespace (Redshift)
   * AmazonRedshiftAllCommandsFullAccess (AWS managed)
   * AmazonRedshiftDataFullAccess (AWS managed)
   * AmazonRedshiftFullAccess (AWS managed)
+  * bison_create_run_ec2_policy (Describe, Start, Stop EC2 instances)
   * bison_invoke_lambda_policy (invoke lambda functions starting with `bison`)
   * bison_lambda_log_policy (write CloudWatch logs to log groups starting with `bison`)
+  * bison_redshift_policy.json (for Redshift and Glue interactions)
   * bison_s3_policy (read public/GBIF S3 data and read/write S3 data in bison bucket)
-  * redshift_glue_policy.json (for Redshift interactions)
 
-  * AmazonS3FullAccess (AWS managed)
 
 * for Redshift - Customizable
 

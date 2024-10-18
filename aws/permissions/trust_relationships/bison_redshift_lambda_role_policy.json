@@ -1,0 +1,27 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Principal": {
+                "Service": [
+                    "lambda.amazonaws.com",
+                    "scheduler.amazonaws.com",
+                    "redshift.amazonaws.com",
+                    "ec2.amazonaws.com"
+                ]
+            },
+            "Action": "sts:AssumeRole"
+        },
+        {
+            "Effect": "Allow",
+            "Principal": {
+                "AWS": [
+                    "arn:aws:iam::321942852011:user/project.bison",
+                    "arn:aws:iam::321942852011:role/bison_ec2_s3_role"
+                ]
+            },
+            "Action": "sts:AssumeRole"
+        }
+    ]
+}
