@@ -214,7 +214,7 @@ class EC2:
     # ----------------------------------------------------
     @classmethod
     def fill_user_data_script(
-            self, user_data_filename, script_filename, token_to_replace):
+            cls, user_data_filename, script_filename, token_to_replace):
         """Fill the EC2 user_data script with a python script in another file.
 
         Args:
@@ -257,18 +257,18 @@ class EC2:
             uf.write(s)
 
     # ----------------------------------------------------
-    def create_token(self, type=None):
+    def create_token(self, ec2_type=None):
         """Create a token to name and identify an AWS resource.
 
         Args:
-            type (str): optional descriptor to include in the token string.
+            ec2_type (str): optional descriptor to include in the token string.
 
         Returns:
             token(str): token for AWS resource identification.
         """
-        if type is None:
-            type = "token"
-        token = f"{type}_{datetime.now(timezone.utc).timestamp()}"
+        if ec2_type is None:
+            ec2_type = "token"
+        token = f"{ec2_type}_{datetime.now(timezone.utc).timestamp()}"
         return token
 
     # ----------------------------------------------------
@@ -307,7 +307,7 @@ class EC2:
         """
         instance_id = None
         token = self.create_token()
-        instance_name = self.create_token(type="ec2")
+        instance_name = self.create_token(ec2_type="ec2")
         try:
             response = self._client.run_instances(
                 # KeyName=key_name,

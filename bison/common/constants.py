@@ -3,20 +3,28 @@ import copy
 from enum import Enum
 import os
 
-# also used for profile name
 PROJECT = "bison"
+
+# .............................................................................
+# AWS constants
+# .............................................................................
 REGION = "us-east-1"
 AWS_ACCOUNT = "321942852011"
 AWS_METADATA_URL = "http://169.254.169.254/latest/"
 
-GBIF_BUCKET = "gbif-open-data-us-east-1/occurrence"
-GBIF_ARN = "arn:aws:s3:::gbif-open-data-us-east-1"
+WORKFLOW_ROLE_NAME = f"{PROJECT}_redshift_lambda_role"
+WORKFLOW_ROLE_ARN = f"arn:aws:iam::{PROJECT}:role/service-role/{WORKFLOW_ROLE_NAME}"
+WORKFLOW_USER = f"project.{PROJECT}"
+WORKFLOW_SECRET_NAME = f"{PROJECT}_workflow_user"
+
+GBIF_BUCKET = f"gbif-open-data-{REGION}"
+GBIF_ARN = f"arn:aws:s3:::{GBIF_BUCKET}"
 GBIF_ODR_FNAME = "occurrence.parquet"
 
-TMP_PATH = "/tmp"
-
-EC2_TASK_INSTANCE_ID = "i-0c7e54e257d5c8574"
+EC2_TASK_INSTANCE_ID = "i-0bc5a64e9385902a6"
 EC2_ROLE_NAME = f"{PROJECT}_ec2_s3_role"
+# Instance types: https://aws.amazon.com/ec2/spot/pricing/
+EC2_INSTANCE_TYPE = "t4g.micro"
 
 S3_BUCKET = f"{PROJECT}-{AWS_ACCOUNT}-{REGION}"
 S3_IN_DIR = "input"
@@ -24,25 +32,9 @@ S3_OUT_DIR = "output"
 S3_LOG_DIR = "log"
 S3_SUMMARY_DIR = "summary"
 
-WORKFLOW_ROLE = "arn:aws:iam::321942852011:role/service-role/bison_redshift_lambda_role"
-WORKFLOW_USER = "project.bison"
-WORKFLOW_SECRET_NAME = "bison_workflow_user"
-
-# EC2 Spot Instance
-# List of instance types at https://aws.amazon.com/ec2/spot/pricing/
-INSTANCE_TYPE = "t4g.micro"
-
-# Log processing progress
-LOGINTERVAL = 1000000
-LOG_FORMAT = " ".join(["%(asctime)s", "%(levelname)-8s", "%(message)s"])
-LOG_DATE_FORMAT = "%d %b %Y %H:%M"
-LOGFILE_MAX_BYTES = 52000000
-LOGFILE_BACKUP_COUNT = 5
-
-ENCODING = "utf-8"
-ERR_SEPARATOR = "------------"
-USER_DATA_TOKEN = "###SCRIPT_GOES_HERE###"
-
+# .............................................................................
+# Data constants
+# .............................................................................
 COUNT_FLD = "count"
 TOTAL_FLD = "total"
 
@@ -55,6 +47,18 @@ UNIQUE_COUNTY_FLD = "state_county"
 OCCURRENCE_STATUS = "riis"
 OCCURRENCE_STATUS_FLD = "riis_assessment"
 
+# .............................................................................
+# Log processing progress
+LOGINTERVAL = 1000000
+LOG_FORMAT = " ".join(["%(asctime)s", "%(levelname)-8s", "%(message)s"])
+LOG_DATE_FORMAT = "%d %b %Y %H:%M"
+LOGFILE_MAX_BYTES = 52000000
+LOGFILE_BACKUP_COUNT = 5
+
+TMP_PATH = "/tmp"
+ENCODING = "utf-8"
+ERR_SEPARATOR = "------------"
+USER_DATA_TOKEN = "###SCRIPT_GOES_HERE###"
 CSV_DELIMITER = ","
 
 
