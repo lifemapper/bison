@@ -51,7 +51,7 @@ ENV PYTHONUNBUFFERED 1
 COPY --chown=bison:bison ./config/aws.conf ./.aws/config
 
 CMD tail -f /dev/null
-#CMD venv/bin/python -m ${TASK_APP}
+CMD venv/bin/python -m ${TASK_APP}
 #CMD /bin/sh
 
 # ........................................................
