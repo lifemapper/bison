@@ -88,8 +88,9 @@ def lambda_handler(event, context):
         Exception: on failure to execute S3 delete command.
         Exception: on failure to execute Redshift export command.
     """
+    output = "Received trigger: " + json.dumps(event)
     print("*** ---------------------------------------")
-    print("Received trigger: " + json.dumps(event))
+    print(output)
     print("*** ---------------------------------------")
 
     # -------------------------------------
@@ -169,19 +170,25 @@ def lambda_handler(event, context):
 
         # -------------------------------------
         # Start docker with compose file containing task command
-        if state == "running":
+        if state != "running":
             cmds = [
                 "cd git/bison"
                 "sudo docker compose -f compose.test.yml up"
                 ]
-            cmd_result = ssm_client.send_command(
-                # One of AWS' preconfigured documents
-                DocumentName="AWS-RunShellScript",
-                Parameters={'commands': [cmd]},
-                InstanceIds=[instance_id],
-            )
+            try:
+                cmd_result = ssm_client.send_command(
+                    # One of AWS' preconfigured documents
+                    DocumentName="AWS-RunShellScript",
+                    Parameters={'commands': cmds},
+                    InstanceIds=[instance_id],
+                )
+            except Exception:
+                print(f"*** Failed to send_command for instance {instance_id}.")
+                raise
+
+            output = json.dumps(cmd_result, indent=2)
 
     return {
         'statusCode': 200,
-        'body': json.dumps("Lambda result logged")
+        'body': output
     }
