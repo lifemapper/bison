@@ -88,9 +88,8 @@ def lambda_handler(event, context):
         Exception: on failure to execute S3 delete command.
         Exception: on failure to execute Redshift export command.
     """
-    output = "Received trigger: " + json.dumps(event)
     print("*** ---------------------------------------")
-    print(output)
+    print("*** Received trigger: " + json.dumps(event))
     print("*** ---------------------------------------")
 
     # -------------------------------------
@@ -100,7 +99,7 @@ def lambda_handler(event, context):
         tr_response = s3_client.list_objects_v2(
             Bucket=S3_BUCKET, Prefix=annotated_riis_key, MaxKeys=10)
     except Exception as e:
-        print(f"Error querying for bucket/object {annotated_riis_key} ({e})")
+        print(f"*** Error querying for bucket/object {annotated_riis_key} ({e})")
         raise e
     try:
         contents = tr_response["Contents"]
@@ -128,14 +127,14 @@ def lambda_handler(event, context):
         try:
             instance_meta = response["StartingInstances"][0]
         except KeyError:
-            raise Exception(f"Invalid response returned {response}")
+            raise Exception(f"*** Invalid response returned {response}")
         except ValueError:
-            raise Exception(f"No instances returned in {response}")
+            raise Exception(f"*** No instances returned in {response}")
         except Exception:
             raise
 
         instance_id = instance_meta['InstanceId']
-        print(f"Started instance {instance_meta['InstanceId']}. ")
+        print(f"*** Started instance {instance_meta['InstanceId']}. ")
 
         # -------------------------------------
         # Loop til running
@@ -168,27 +167,7 @@ def lambda_handler(event, context):
                 complete = True
                 print(f"*** Failed with {state} state after {elapsed_time} seconds")
 
-        # -------------------------------------
-        # Start docker with compose file containing task command
-        if state != "running":
-            cmds = [
-                "cd git/bison"
-                "sudo docker compose -f compose.test.yml up"
-                ]
-            try:
-                cmd_result = ssm_client.send_command(
-                    # One of AWS' preconfigured documents
-                    DocumentName="AWS-RunShellScript",
-                    Parameters={'commands': cmds},
-                    InstanceIds=[instance_id],
-                )
-            except Exception:
-                print(f"*** Failed to send_command for instance {instance_id}.")
-                raise
-
-            output = json.dumps(cmd_result, indent=2)
-
     return {
-        'statusCode': 200,
-        'body': output
+        "statusCode": 200,
+        "body": "Executed bison_s0_test_schedule_lambda"
     }

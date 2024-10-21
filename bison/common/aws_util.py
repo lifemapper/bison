@@ -648,7 +648,7 @@ class S3:
         Args:
             local_filename: Full path to local file for upload.
             bucket: name of the S3 bucket destination.
-            s3_path: the data destination inside the S3 bucket (without filename).
+            s3_path: the data destination inside the S3 bucket (WITH filename).
 
         Returns:
             uploaded_fname: the S3 path to the uploaded file.
@@ -667,7 +667,8 @@ class S3:
             print(f"Failed to upload_file {local_filename}.")
             raise
         else:
-            uploaded_fname = f"s3://{bucket}/{s3_path}/{filename}"
+            uploaded_fname = f"s3://{bucket}/{s3_path}"
+            print(f"Success uploading file {uploaded_fname}.")
         return uploaded_fname
 
     # ----------------------------------------------------
