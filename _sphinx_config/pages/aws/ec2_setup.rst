@@ -111,6 +111,9 @@ content::
 EC2 for Workflow Tasks
 ---------------------------------
 
+Credentials
+..............
+
 EC2 must be set up with a role for temporary credentials to enable applications to
 retrieve those credentials for AWS permissions to other services (i.e. S3).
 By default, the instance allows IMDSv1 or IMDSv2, though making v2 required is recommended.
@@ -132,3 +135,19 @@ https://docs.aws.amazon.com/sdkref/latest/guide/feature-assume-role-credentials.
 More info:
 
 https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-metadata.html
+
+Hop Limit for AWS communication
+................................
+
+* Extend the hop limit for getting metadata about permissions to 2
+  host --> dockercontainer --> metadata
+  https://specifydev.slack.com/archives/DQSAVMMHN/p1717706137817839
+
+* SSH to the ec2 instance, then run ::
+
+    aws ec2 modify-instance-metadata-options \
+        --instance-id i-082e751b94e476987 \
+        --http-put-response-hop-limit 2 \
+        --http-endpoint enabled
+
+* or in console, add metadata tag/value HttpPutResponseHopLimit/2

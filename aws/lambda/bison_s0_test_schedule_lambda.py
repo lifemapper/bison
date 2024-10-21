@@ -69,6 +69,7 @@ session = boto3.Session(botocore_session=bc_session, region_name=REGION)
 config = Config(connect_timeout=timeout, read_timeout=timeout)
 s3_client = session.client("s3", config=config, region_name=REGION)
 ec2_client = session.client("ec2", config=config)
+ssm_client = session.client("ssm", config=config, region_name=REGION)
 
 
 # --------------------------------------------------------------------------------------
@@ -91,6 +92,7 @@ def lambda_handler(event, context):
     print("Received trigger: " + json.dumps(event))
     print("*** ---------------------------------------")
 
+    # -------------------------------------
     # Look for existing S3 annotated data
     do_annotate = False
     try:
@@ -107,6 +109,8 @@ def lambda_handler(event, context):
     else:
         print(f"*** Found object: {contents[0]['Key']}")
 
+    # -------------------------------------
+    # Start instance to run task
     if do_annotate is True:
         print("*** ---------------------------------------")
         print("*** Initiate EC2 start_instances task")
@@ -130,13 +134,10 @@ def lambda_handler(event, context):
             raise
 
         instance_id = instance_meta['InstanceId']
-        prev_state = instance_meta['PreviousState']['Name']
-        curr_state = instance_meta['CurrentState']['Name']
         print(f"Started instance {instance_meta['InstanceId']}. ")
-        print(f"Moved from {prev_state} to {curr_state}")
 
         # -------------------------------------
-        # Loop til complete
+        # Loop til running
         elapsed_time = 0
         complete = False
         while not complete:
@@ -155,19 +156,30 @@ def lambda_handler(event, context):
                     raise
 
                 state = instance_meta["State"]["Name"].lower()
-                if state == "pending":
-                    print(f"*** Pending after {elapsed_time} seconds")
+                print(f"*** Instance {state} after {elapsed_time} seconds")
+                if state != "running":
                     time.sleep(waittime)
                     elapsed_time += waittime
-                elif state == "running":
-                    complete = True
-                    print(f"*** Instance running after {elapsed_time} seconds")
                 else:
                     complete = True
-                    print(f"*** Failed with {state} state after {elapsed_time} seconds")
 
-            if elapsed_time >= timeout:
+            if elapsed_time >= timeout and not complete:
                 complete = True
+                print(f"*** Failed with {state} state after {elapsed_time} seconds")
+
+        # -------------------------------------
+        # Start docker with compose file containing task command
+        if state == "running":
+            cmds = [
+                "cd git/bison"
+                "sudo docker compose -f compose.test.yml up"
+                ]
+            cmd_result = ssm_client.send_command(
+                # One of AWS' preconfigured documents
+                DocumentName="AWS-RunShellScript",
+                Parameters={'commands': [cmd]},
+                InstanceIds=[instance_id],
+            )
 
     return {
         'statusCode': 200,
