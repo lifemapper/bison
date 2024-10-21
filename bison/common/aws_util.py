@@ -325,7 +325,7 @@ class EC2:
                 ]
             )
         except NoCredentialsError:
-            print(f"Failed to authenticate for run_instances")
+            print("Failed to authenticate for run_instances")
             raise
         except ClientError:
             print(f"Failed to run instance {instance_name}")
@@ -357,7 +357,7 @@ class EC2:
             launch_template_data = self._client.get_launch_template_data(
                 InstanceId=instance_id)
         except NoCredentialsError:
-            print(f"Failed to authenticate for get_launch_template_data")
+            print("Failed to authenticate for get_launch_template_data")
             raise
         except Exception:
             raise
@@ -382,7 +382,7 @@ class EC2:
             response = self._client.describe_launch_templates(
                 LaunchTemplateNames=[template_name])
         except NoCredentialsError:
-            print(f"Failed to authenticate for describe_launch_templates")
+            print("Failed to authenticate for describe_launch_templates")
             raise
         except Exception:
             raise
@@ -410,7 +410,7 @@ class EC2:
         try:
             response = self._client.delete_instance(InstanceId=instance_id)
         except NoCredentialsError:
-            print(f"Failed to authenticate for delete_instance")
+            print("Failed to authenticate for delete_instance")
             raise
         except Exception:
             raise
@@ -657,7 +657,6 @@ class S3:
             NoCredentialsError: on failure to autheticate for upload_file.
             Exception: on failure to upload_file to S3.
         """
-        filename = os.path.split(local_filename)[1]
         try:
             self._client.upload_file(local_filename, bucket, s3_path)
         except NoCredentialsError:
