@@ -9,7 +9,6 @@ services:
       - TASK_APP=bison.task.annotate_riis
     env_file:
       ./.env.task.conf
-    restart: unless-stopped
     volumes:
       # bind mount from host machine
       - "/home/ubuntu/aws_data:/volumes/bison_data"
