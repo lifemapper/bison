@@ -1,10 +1,10 @@
 """Lambda function to delete temporary and previous month's tables."""
 # Set lambda timeout to 5 minutes.
-import json
 import boto3
 import botocore.session as bc
 from botocore.client import Config
 from datetime import datetime
+import json
 import time
 
 print('Loading function')
