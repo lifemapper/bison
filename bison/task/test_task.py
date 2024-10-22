@@ -22,7 +22,8 @@ def some_task(logger):
     datestr = get_today_str()
     some_filename = f"/tmp/some_filename_{datestr}.txt"
 
-    logger.log(f"Timestamp is {DT.datetime.now().isoformat()}")
+    n = DT.datetime.now()
+    logger.log(f"Time is {n.time().isoformat()} on {n.date().isoformat()}")
     msg = f"Executing {script_name} for {datestr} dataset"
     logger.log(msg, refname=script_name)
     with open(some_filename, "w") as outf:
@@ -54,3 +55,8 @@ if __name__ == '__main__':
         logger.filename, S3_BUCKET,
         f"{S3_LOG_DIR}/{os.path.basename(logger.filename)}")
     print(f"Uploaded {logger.filename} to {uploaded_logname}")
+
+    n = DT.datetime.now()
+    print(f"Exiting at {n.time().isoformat()} on {n.date().isoformat()}")
+    print()
+    exit(0)
