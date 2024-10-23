@@ -13,7 +13,7 @@ import pandas
 import subprocess as sp
 from time import sleep
 
-from bison.common.constants import AWS_METADATA_URL, REGION
+from bison.common.constants import AWS_METADATA_URL, EC2_CONFIG_DIR, REGION, EC2_SPOT_TEMPLATE
 
 six_hours = 21600
 
@@ -159,31 +159,79 @@ class EC2:
         """
         self._region = region
         self._auth_session = boto3.session.Session(region_name=region)
-        self._client = self._auth_session.client("s3")
+        self._client = self._auth_session.client("ec2")
 
     # ----------------------------------------------------
-    def create_spot_launch_template_name(self, proj_prefix, desc_str=None):
-        """Create a name identifier for a Spot Launch Template.
+    def get_userdata(self, userdata_filename, local_path):
+        """Return the EC2 user_data script as a Base64 encoded string.
 
         Args:
-            proj_prefix (str): prefix for template name.
-            desc_str (str): optional descriptor to include in the name.
+            userdata_filename: Filename containing the userdata script to be executed on
+                EC2 instance.
+            local_path: path to file on local system.
 
         Returns:
-            template_name (str): name for identifying this Spot Launch Template.
+            A Base64-encoded string of the user_data file to create on an EC2 instance.
+
+        Raises:
+            Exception: on userdata_filename does not exist in the local path.
         """
-        if desc_str is None:
-            template_name = f"{proj_prefix}_{self.TEMPLATE_BASENAME}"
+        local_userdata = os.path.join(local_path, userdata_filename)
+        if not os.path.exists(local_userdata):
+            raise Exception(
+                f"Userdata file {local_userdata} does not exist in {local_path}")
+        try:
+            with open(local_userdata, "r") as infile:
+                script_text = infile.read()
+        except Exception:
+            return None
         else:
-            template_name = f"{proj_prefix}_{desc_str}_{self.TEMPLATE_BASENAME}"
-        return template_name
+            text_bytes = script_text.encode("ascii")
+            text_base64_bytes = base64.b64encode(text_bytes)
+            base64_script_text = text_base64_bytes.decode("ascii")
+            return base64_script_text
+
+    # ----------------------------------------------------
+    def _create_task_template_version(
+            self, template_name, userdata_filename, local_path=EC2_CONFIG_DIR):
+        base64_script_text = self.get_userdata(userdata_filename, local_path=local_path)
+        response = self._client.create_launch_template_version(
+            DryRun=False,
+            LaunchTemplateName=template_name,
+            SourceVersion="1",
+            VersionDescription=userdata_filename,
+            LaunchTemplateData={"UserData": base64_script_text}
+        )
+        try:
+            v_meta = response["LaunchTemplateVersion"]
+        except Exception:
+            raise
+
+        desc = v_meta["VersionDescription"]
+        if desc != userdata_filename:
+            raise Exception(f"Bad description {desc} in version response {response}")
+
+        return v_meta["VersionNumber"]
+
+
+    # ----------------------------------------------------
+    def _get_template_version(self, template_name, userdata_filename):
+        version_num = None
+        response = self._client.describe_launch_template_versions(
+            LaunchTemplateName=template_name
+        )
+        versions  = response["LaunchTemplateVersions"]
+        for ver in versions:
+            if ver["VersionDescription"] == userdata_filename:
+                version_num = ver["VersionNumber"]
+                break
+        return version_num
 
     # # ----------------------------------------------------
     # @classmethod
-    # def get_user_data(
-    #         self, user_data_filename, script_filename=None,
-    #         token_to_replace=USER_DATA_TOKEN):
-    #     """Return the EC2 user_data script as a Base64 encoded string.
+    # def fill_user_data_script(
+    #         cls, user_data_filename, script_filename, token_to_replace):
+    #     """Fill an EC2 user_data script with a python script in another file.
     #
     #     Args:
     #         user_data_filename: Filename containing the user-data script to be executed on
@@ -193,68 +241,36 @@ class EC2:
     #         token_to_replace: string within the user_data_filename which will be replaced
     #             by the text in the script filename.
     #
-    #     Returns:
-    #         A Base64-encoded string of the user_data file to create on an EC2 instance.
+    #     Postcondition:
+    #         The user_data file contains the text of the script file.
     #     """
-    #     # Insert an external script if provided
-    #     if script_filename is not None:
-    #         self.fill_user_data_script(
-    #             user_data_filename, script_filename, token_to_replace)
+    #     # Safely read the input filename using 'with'
+    #     with open(user_data_filename) as f:
+    #         s = f.read()
+    #         if token_to_replace not in s:
+    #             print(f"{token_to_replace} not found in {user_data_filename}.")
+    #             return
+    #
+    #     # with open(script_filename) as sf:
+    #     #     script = sf.read()
+    #     base64_script_text = None
     #     try:
-    #         with open(user_data_filename, "r") as infile:
+    #         with open(script_filename, "r") as infile:
     #             script_text = infile.read()
     #     except Exception:
-    #         return None
+    #         pass
     #     else:
     #         text_bytes = script_text.encode("ascii")
     #         text_base64_bytes = base64.b64encode(text_bytes)
     #         base64_script_text = text_base64_bytes.decode("ascii")
-    #         return base64_script_text
-
-    # ----------------------------------------------------
-    @classmethod
-    def fill_user_data_script(
-            cls, user_data_filename, script_filename, token_to_replace):
-        """Fill the EC2 user_data script with a python script in another file.
-
-        Args:
-            user_data_filename: Filename containing the user-data script to be executed on
-                EC2 instantiation.
-            script_filename: Filename containing a python script to be written to a file on
-                the EC2 instantiation.
-            token_to_replace: string within the user_data_filename which will be replaced
-                by the text in the script filename.
-
-        Postcondition:
-            The user_data file contains the text of the script file.
-        """
-        # Safely read the input filename using 'with'
-        with open(user_data_filename) as f:
-            s = f.read()
-            if token_to_replace not in s:
-                print(f"{token_to_replace} not found in {user_data_filename}.")
-                return
-
-        # with open(script_filename) as sf:
-        #     script = sf.read()
-        base64_script_text = None
-        try:
-            with open(script_filename, "r") as infile:
-                script_text = infile.read()
-        except Exception:
-            pass
-        else:
-            text_bytes = script_text.encode("ascii")
-            text_base64_bytes = base64.b64encode(text_bytes)
-            base64_script_text = text_base64_bytes.decode("ascii")
-
-        # Safely write the changed content, if found in the file
-        with open(user_data_filename, "w") as uf:
-            print(
-                f"Changing {token_to_replace} in {user_data_filename} to contents in "
-                f"{script_filename}")
-            s = s.replace(token_to_replace, base64_script_text)
-            uf.write(s)
+    #
+    #     # Safely write the changed content, if found in the file
+    #     with open(user_data_filename, "w") as uf:
+    #         print(
+    #             f"Changing {token_to_replace} in {user_data_filename} to contents in "
+    #             f"{script_filename}")
+    #         s = s.replace(token_to_replace, base64_script_text)
+    #         uf.write(s)
 
     # ----------------------------------------------------
     def create_token(self, ec2_type=None):
@@ -292,11 +308,12 @@ class EC2:
         return instance
 
     # ----------------------------------------------------
-    def run_instance(self, template_name):
-        """Run an EC2 Instance on AWS.
+    def run_task_instance(self, template_name, userdata_filename):
+        """Run an EC2 Instance from template with version desc = userdata_filename.
 
         Args:
             template_name: name for the launch template to be used for instantiation.
+            userdata_filename: file containing startup script corresponding to a task.
 
         Returns:
             instance_id: unique identifier of the new instance.
@@ -306,19 +323,19 @@ class EC2:
             ClientError: on failure to run instance.
         """
         instance_id = None
-        token = self.create_token()
-        instance_name = self.create_token(ec2_type="ec2")
+        # token = self.create_token()
+        # instance_name = self.create_token(ec2_type="ec2")
         try:
             response = self._client.run_instances(
                 # KeyName=key_name,
-                ClientToken=token,
+                # ClientToken=token,
                 MinCount=1, MaxCount=1,
                 LaunchTemplate={"LaunchTemplateName": template_name, "Version": "1"},
                 TagSpecifications=[
                     {
                         "ResourceType": "instance",
                         "Tags": [
-                            {"Key": "Name", "Value": instance_name},
+                            {"Key": "Name", "Value": userdata_filename},
                             {"Key": "TemplateName", "Value": template_name}
                         ]
                     }
@@ -328,7 +345,9 @@ class EC2:
             print("Failed to authenticate for run_instances")
             raise
         except ClientError:
-            print(f"Failed to run instance {instance_name}")
+            print(
+                f"Failed to run instance for template {template_name}, "
+                f"version {userdata_filename}")
             raise
         else:
             try:

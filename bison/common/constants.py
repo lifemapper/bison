@@ -21,7 +21,8 @@ GBIF_BUCKET = f"gbif-open-data-{REGION}"
 GBIF_ARN = f"arn:aws:s3:::{GBIF_BUCKET}"
 GBIF_ODR_FNAME = "occurrence.parquet"
 
-EC2_TASK_INSTANCE_ID = "i-0bc5a64e9385902a6"
+# EC2_TASK_INSTANCE_ID = "i-0bc5a64e9385902a6"
+EC2_SPOT_TEMPLATE = "bison_spot_task_template"
 EC2_ROLE_NAME = f"{PROJECT}_ec2_s3_role"
 # Instance types: https://aws.amazon.com/ec2/spot/pricing/
 EC2_INSTANCE_TYPE = "t4g.micro"
@@ -31,6 +32,21 @@ S3_IN_DIR = "input"
 S3_OUT_DIR = "output"
 S3_LOG_DIR = "log"
 S3_SUMMARY_DIR = "summary"
+
+# .............................................................................
+# Docker compose files for tasks
+# .............................................................................
+# Assumes project repo directory
+EC2_CONFIG_DIR = "./aws/ec2"
+EC2_USERDATA_TEST_TASK = "test_task.userdata.sh"
+EC2_USERDATA_ANNOTATE_RIIS = "annotate_riis.userdata.sh"
+EC2_USERDATA_BUILD_SUMMARIES = "build_summaries.userdata.sh"
+EC2_USERDATA_BUILD_HEATMAP = "build_heatmap.userdata.sh"
+
+# COMPOSE_TEST_TASK_FILENAME = "compose.test_task.yml"
+# COMPOSE_ANNOTATE_RIIS_FILENAME = "compose.annotate_riis.yml"
+# COMPOSE_BUILD_SUMMARIES_FILENAME = "compose.build_summaries.yml"
+# COMPOSE_BUILD_HEATMAP_FILENAME = "compose.build_heatmap.yml"
 
 # .............................................................................
 # Data constants

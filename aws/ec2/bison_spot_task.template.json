@@ -1,0 +1,123 @@
+{
+    "LaunchTemplateData": {
+        "EbsOptimized": true,
+        "IamInstanceProfile": {
+            "Arn": "arn:aws:iam::321942852011:instance-profile/bison_ec2_s3_role"
+        },
+        "BlockDeviceMappings": [
+            {
+                "DeviceName": "/dev/sda1",
+                "Ebs": {
+                    "Encrypted": false,
+                    "DeleteOnTermination": true,
+                    "Iops": 3000,
+                    "SnapshotId": "snap-083cf295f04147970",
+                    "VolumeSize": 8,
+                    "VolumeType": "gp3",
+                    "Throughput": 125
+                }
+            }
+        ],
+        "NetworkInterfaces": [
+            {
+                "AssociatePublicIpAddress": true,
+                "DeleteOnTermination": true,
+                "Description": "",
+                "DeviceIndex": 0,
+                "Groups": [
+                    "sg-02f0f4e0c24d77b1c"
+                ],
+                "InterfaceType": "interface",
+                "Ipv6Addresses": [],
+                "PrivateIpAddresses": [
+                    {
+                        "Primary": true,
+                        "PrivateIpAddress": "172.31.21.100"
+                    }
+                ],
+                "SubnetId": "subnet-0beb8b03a44442eef",
+                "NetworkCardIndex": 0
+            }
+        ],
+        "ImageId": "ami-0325498274077fac5",
+        "InstanceType": "t4g.nano",
+        "KeyName": "bison-task-key",
+        "Monitoring": {
+            "Enabled": false
+        },
+        "Placement": {
+            "AvailabilityZone": "us-east-1c",
+            "GroupName": "",
+            "Tenancy": "default"
+        },
+        "DisableApiTermination": false,
+        "InstanceInitiatedShutdownBehavior": "terminate",
+        "UserData": "",
+        "TagSpecifications": [
+            {
+                "ResourceType": "instance",
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "bison_spot_task"
+                    }
+                ]
+            }
+        ],
+        "InstanceMarketOptions": {
+            "MarketType": "spot",
+            "SpotOptions": {
+                "MaxPrice": "0.004200",
+                "SpotInstanceType": "one-time",
+                "InstanceInterruptionBehavior": "terminate"
+            }
+        },
+        "CreditSpecification": {
+            "CpuCredits": "unlimited"
+        },
+        "CpuOptions": {
+            "CoreCount": 2,
+            "ThreadsPerCore": 1
+        },
+        "CapacityReservationSpecification": {
+            "CapacityReservationPreference": "open"
+        },
+        "HibernationOptions": {
+            "Configured": false
+        },
+        "MetadataOptions": {
+            "HttpTokens": "required",
+            "HttpPutResponseHopLimit": 2,
+            "HttpEndpoint": "enabled",
+            "HttpProtocolIpv6": "disabled",
+            "InstanceMetadataTags": "enabled"
+        },
+        "EnclaveOptions": {
+            "Enabled": false
+        },
+        "PrivateDnsNameOptions": {
+            "HostnameType": "ip-name",
+            "EnableResourceNameDnsARecord": true,
+            "EnableResourceNameDnsAAAARecord": false
+        },
+        "MaintenanceOptions": {
+            "AutoRecovery": "default"
+        },
+        "DisableApiStop": false
+    },
+    "ResponseMetadata": {
+        "RequestId": "ee971a79-1c18-4631-b561-536aabbd2afb",
+        "HTTPStatusCode": 200,
+        "HTTPHeaders": {
+            "x-amzn-requestid": "ee971a79-1c18-4631-b561-536aabbd2afb",
+            "cache-control": "no-cache, no-store",
+            "strict-transport-security": "max-age=31536000; includeSubDomains",
+            "vary": "accept-encoding",
+            "content-type": "text/xml;charset=UTF-8",
+            "transfer-encoding": "chunked",
+            "date": "Wed, 23 Oct 2024 16:53:06 GMT",
+            "server": "AmazonEC2"
+        },
+        "RetryAttempts": 0
+    }
+}
