@@ -1,0 +1,265 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Create lambda function to initiate processing &mdash; LmBISON documentation 1.0a1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=036e6a88"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            LmBISON documentation
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../about.html">About</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../workflow.html">AWS workflow</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="aws_setup.html">AWS Resource Setup</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../history/year4_planB.html">Year 4, Part 2, 2023-2024</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../history/year4_planA.html">Year 4, Part 1, 2023</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../history/year3.html">Year 3, 2021-2022</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../history/year5.html">Year 5, 2024</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../history/aws_experiments.html">AWS workflow experiments</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../history/aws_experiments.html#glue-interactive-development">Glue - Interactive Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../history/aws_experiments.html#bison-aws-data-tools">BISON AWS data/tools</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">LmBISON documentation</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Create lambda function to initiate processing</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/pages/aws/automation.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="create-lambda-function-to-initiate-processing">
+<h1>Create lambda function to initiate processing<a class="headerlink" href="#create-lambda-function-to-initiate-processing" title="Link to this heading"></a></h1>
+<ul class="simple">
+<li><p>Create a lambda function for execution when the trigger condition is activated,
+aws/events/bison_find_current_gbif_lambda.py</p>
+<ul>
+<li><p>This trigger condition is a file deposited in the BISON bucket</p>
+<ul>
+<li><p>TODO: change to the first of the month</p></li>
+</ul>
+</li>
+<li><p>The lambda function will delete the new file, and test the existence of
+GBIF data for the current month</p>
+<ul>
+<li><p>TODO: change to mount GBIF data in Redshift, subset, unmount</p></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</section>
+<section id="edit-the-execution-role-for-lambda-function">
+<h1>Edit the execution role for lambda function<a class="headerlink" href="#edit-the-execution-role-for-lambda-function" title="Link to this heading"></a></h1>
+<ul class="simple">
+<li><p>Under Configuration/Permissions see the Execution role Role name
+(bison_find_current_gbif_lambda-role-fb05ks88) automatically created for this function</p></li>
+<li><p>Open in a new window and under Permissions policies, Add permissions</p>
+<ul>
+<li><p>bison_s3_policy</p></li>
+<li><p>redshift_glue_policy</p></li>
+</ul>
+</li>
+</ul>
+</section>
+<section id="create-trigger-to-initiate-lambda-function">
+<h1>Create trigger to initiate lambda function<a class="headerlink" href="#create-trigger-to-initiate-lambda-function" title="Link to this heading"></a></h1>
+<ul>
+<li><p>Check for existence of new GBIF data</p></li>
+<li><p>Use a blueprint, python, “Get S3 Object”</p></li>
+<li><p>Function name: bison_find_current_gbif_lambda</p></li>
+<li><p>S3 trigger:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Bucket: arn:aws:s3:::gbif-open-data-us-east-1</p></li>
+</ul>
+</div></blockquote>
+</li>
+<li><p>Create a rule in EventBridge to use as the trigger</p>
+<ul class="simple">
+<li><p>Event source : AWS events or EventBridge partner events</p></li>
+<li><p>Sample event, “S3 Object Created”, aws/events/test_trigger_event.json</p></li>
+<li><p>Creation method: Use pattern form</p></li>
+<li><p>Event pattern</p>
+<ul>
+<li><p>Event Source: AWS services</p></li>
+<li><p>AWS service: S3</p></li>
+<li><p>Event type: Object-Level API Call via CloudTrail</p></li>
+<li><p>Event Type Specifications</p>
+<ul>
+<li><p>Specific operation(s): GetObject</p></li>
+<li><p>Specific bucket(s) by name: arn:aws:s3:::bison-321942852011-us-east-1</p></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p>Select target(s)</p>
+<ul>
+<li><p>AWS service</p></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</section>
+<section id="lambda-to-query-redshift">
+<h1>Lambda to query Redshift<a class="headerlink" href="#lambda-to-query-redshift" title="Link to this heading"></a></h1>
+<p><a class="reference external" href="https://repost.aws/knowledge-center/redshift-lambda-function-queries">https://repost.aws/knowledge-center/redshift-lambda-function-queries</a></p>
+<p><a class="reference external" href="https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/redshift-data/client/execute_statement.html">https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/redshift-data/client/execute_statement.html</a></p>
+<ul class="simple">
+<li><p>Connect to a serverless workgroup (bison), namespace (bison), database name (dev)</p></li>
+<li><p>When connecting to a serverless workgroup, specify the workgroup name and database
+name. The database user name is derived from the IAM identity. For example,
+arn:iam::123456789012:user:foo has the database user name IAM:foo. Also, permission
+to call the redshift-serverless:GetCredentials operation is required.</p></li>
+<li><p>need redshift:GetClusterCredentialsWithIAM permission for temporary authentication
+with a role</p></li>
+</ul>
+</section>
+<section id="lambda-to-start-ec2-for-task">
+<h1>Lambda to start EC2 for task<a class="headerlink" href="#lambda-to-start-ec2-for-task" title="Link to this heading"></a></h1>
+<p>Lambda functions must be single-function tasks that run in less than 15 minutes.
+For complex or long-running tasks we start an EC2 instance containing bison code
+and execute it in a docker container.</p>
+<p>For each task, the lambda function should create a Spot EC2 instance with a template
+containing userdata that will either 1) pull the Github repo, then build the docker
+image, or 2) pull a docker image directly.</p>
+<p>Annotating the RIIS records with GBIF accepted taxa takes about 1 hour and uses
+multiple bison modules.</p>
+<section id="ec2-docker-setup">
+<h2>EC2/Docker setup<a class="headerlink" href="#ec2-docker-setup" title="Link to this heading"></a></h2>
+<ul>
+<li><p>The EC2 Spot instance should have the following settings:</p>
+<p>Name: bison_spot_task
+Application and OS Images: Ubuntu
+AMI: Ubuntu Server 24.04 LTS
+Architecture: 64-bit ARM
+Instance type: t4g.nano (maybe)
+Key pair: bison-task-key
+Network settings/Select existing security group: launch-wizard-1
+Configure storage: 8 Gb gp3 (default)
+Advanced Details:</p>
+<blockquote>
+<div><p>IAM instance profile: bison_ec2_s3_role
+Purchasing option: Spot instances</p>
+</div></blockquote>
+</li>
+<li><p>Pull the template from the first instance and use it to create each new instance.</p></li>
+<li><p>The EC2 instance should have the following in the userdata:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="ch">#!/bin/bash</span>
+<span class="n">sudo</span> <span class="n">apt</span> <span class="n">update</span>
+<span class="n">sudo</span> <span class="n">apt</span> <span class="n">install</span> <span class="n">docker</span><span class="o">.</span><span class="n">io</span>
+<span class="n">sudo</span> <span class="n">apt</span> <span class="n">install</span> <span class="n">docker</span><span class="o">-</span><span class="n">compose</span><span class="o">-</span><span class="n">v2</span>
+<span class="n">git</span> <span class="n">clone</span> <span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">github</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">lifemapper</span><span class="o">/</span><span class="n">bison</span><span class="o">.</span><span class="n">git</span>
+<span class="n">cd</span> <span class="n">bison</span>
+<span class="n">sudo</span> <span class="n">docker</span> <span class="n">compose</span> <span class="o">-</span><span class="n">f</span> <span class="o">&lt;</span><span class="n">compose</span><span class="o">.</span><span class="n">test_task</span><span class="o">.</span><span class="n">yml</span><span class="o">&gt;</span> <span class="n">up</span>
+</pre></div>
+</div>
+</li>
+<li><p>For each task compose.test_task.yml must be replaced with the appropriate compose file.</p></li>
+<li><p>On EC2 instance startup, the userdata script will execute</p></li>
+<li><p>The compose file sets an environment variable (TASK_APP) containing a python module
+to be executed from the Dockerfile.</p></li>
+<li><p>Tasks should deposit outputs and logfiles into S3.</p></li>
+<li><p>After completion, the docker container will stop.</p></li>
+<li><p>A final command should prune the system and volumes, to ensure the next execution
+runs the most current code.</p></li>
+<li><p><strong>TODO</strong>: once the workflow is stable, create an image and download it in userdata script.
+That will also eliminate the build time, and allow a new EC2 spot instance for every
+task.</p></li>
+</ul>
+</section>
+<section id="lambda-setup">
+<h2>Lambda setup<a class="headerlink" href="#lambda-setup" title="Link to this heading"></a></h2>
+</section>
+</section>
+<section id="triggering-execution">
+<h1>Triggering execution<a class="headerlink" href="#triggering-execution" title="Link to this heading"></a></h1>
+<p>The first step may be executed on a schedule, such as the second day of the month (since
+GBIF data is deposited on the first day of the month).</p>
+<p>Upon successful completion, the deposition of successful output into S3 can trigger
+following steps.</p>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, LmBISON Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

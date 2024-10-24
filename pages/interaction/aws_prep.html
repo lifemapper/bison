@@ -1,0 +1,184 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AWS Setup &mdash; LmBISON documentation 1.0a1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=036e6a88"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            LmBISON documentation
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../about.html">About</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../workflow.html">AWS workflow</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../aws/aws_setup.html">AWS Resource Setup</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../history/year4_planB.html">Year 4, Part 2, 2023-2024</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../history/year4_planA.html">Year 4, Part 1, 2023</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../history/year3.html">Year 3, 2021-2022</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../history/year5.html">Year 5, 2024</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../history/aws_experiments.html">AWS workflow experiments</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../history/aws_experiments.html#glue-interactive-development">Glue - Interactive Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../history/aws_experiments.html#bison-aws-data-tools">BISON AWS data/tools</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">LmBISON documentation</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">AWS Setup</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/pages/interaction/aws_prep.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="aws-setup">
+<h1>AWS Setup<a class="headerlink" href="#aws-setup" title="Link to this heading"></a></h1>
+<section id="security">
+<h2>Security<a class="headerlink" href="#security" title="Link to this heading"></a></h2>
+<section id="create-a-security-group-for-the-region">
+<h3>Create a Security Group for the region<a class="headerlink" href="#create-a-security-group-for-the-region" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Test this group!</p></li>
+<li><p>Create a security group for the project/region</p>
+<ul>
+<li><p>inbound rules allow:</p>
+<ul>
+<li><p>Custom TCP, port 8000</p></li>
+<li><p>Custom TCP, port 8080</p></li>
+<li><p>HTTPS, port 80</p></li>
+<li><p>HTTPS, port 443</p></li>
+<li><p>SSH, port 22</p></li>
+</ul>
+</li>
+<li><p>Consider restricting SSH to campus</p></li>
+</ul>
+</li>
+<li><p>or use launch-wizard-1 security group (created by some EC2 instance creation in 2023)</p>
+<ul>
+<li><p>inbound rules IPv4:</p>
+<ul>
+<li><p>Custom TCP 8000</p></li>
+<li><p>Custom TCP 8080</p></li>
+<li><p>SSH 22</p></li>
+<li><p>HTTP 80</p></li>
+<li><p>HTTPS 443</p></li>
+</ul>
+</li>
+<li><p>outbound rules IPv4, IPv6:</p>
+<ul>
+<li><p>All traffic all ports</p></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</section>
+<section id="create-an-policies-for-the-ec2-s3-interaction">
+<h3>Create an Policies for the EC2/S3 interaction<a class="headerlink" href="#create-an-policies-for-the-ec2-s3-interaction" title="Link to this heading"></a></h3>
+<ul>
+<li><p>Create a Policy for EC2 instance access to S3</p>
+<ul class="simple">
+<li><p>bison_s3_policy</p></li>
+<li><p>allowing s3:ListBucket, s3:GetBucket, s3:GetObject, and s3:object-lambda</p></li>
+<li><p>to the Bison bucket and input, output, log, and summary subfolders.</p></li>
+<li><p>Make sure to add each subfolder - permissions are not recursive.</p></li>
+</ul>
+</li>
+<li><p>Create a Policy for Redshift / S3 access interaction</p>
+<ol class="arabic simple" start="2">
+<li><p>Trusted entity type = AWS service, Use Case = S3.</p></li>
+<li><p>Add permissions</p></li>
+</ol>
+<blockquote>
+<div><ul class="simple">
+<li><p>specnet_S3bucket_FullAccess</p></li>
+</ul>
+</div></blockquote>
+<ol class="arabic simple" start="4">
+<li><p>Save and name role (specnet_ec2_role)</p></li>
+</ol>
+</li>
+</ul>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, LmBISON Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
