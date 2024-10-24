@@ -192,8 +192,18 @@ class EC2:
             return base64_script_text
 
     # ----------------------------------------------------
-    def _create_task_template_version(
+    def create_task_template_version(
             self, template_name, userdata_filename, local_path=EC2_CONFIG_DIR):
+        """Create a launch template version from the original, replacing the userdata.
+
+        Args:
+            template_name: name of the template to version.
+            userdata_filename: filename containing the userdata for the new version.
+            local_path: full path to the local copy of the userdata file.
+
+        Returns:
+            ver_num: version number of the newly created template version.
+        """
         base64_script_text = self.get_userdata(userdata_filename, local_path=local_path)
         response = self._client.create_launch_template_version(
             DryRun=False,
@@ -208,11 +218,11 @@ class EC2:
             raise
 
         desc = v_meta["VersionDescription"]
+        ver_num = v_meta["VersionNumber"]
         if desc != userdata_filename:
             raise Exception(f"Bad description {desc} in version response {response}")
 
-        return v_meta["VersionNumber"]
-
+        return ver_num
 
     # ----------------------------------------------------
     def _get_template_version(self, template_name, userdata_filename):
@@ -349,13 +359,13 @@ class EC2:
                 f"Failed to run instance for template {template_name}, "
                 f"version {userdata_filename}")
             raise
-        else:
-            try:
-                instance = response["Instances"][0]
-            except KeyError:
-                print("No instance returned")
-            else:
-                instance_id = instance["InstanceId"]
+
+        try:
+            instance = response["Instances"][0]
+        except KeyError:
+            print("No instance returned")
+        instance_id = instance["InstanceId"]
+
         return instance_id
 
     # ----------------------------------------------------
@@ -804,4 +814,3 @@ class S3:
                 print(f"Downloaded {url} to {local_filename}")
 
         return local_filename
-# ----------------------------------------------------

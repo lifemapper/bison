@@ -1,6 +1,7 @@
 """Lambda function to delete temporary and previous month's tables."""
 # Set lambda timeout to 5 minutes.
 import boto3
+from botocore.exceptions import ClientError, NoCredentialsError
 import botocore.session as bc
 from botocore.client import Config
 from datetime import datetime
@@ -27,10 +28,11 @@ GBIF_BUCKET = "gbif-open-data-us-east-1/occurrence"
 GBIF_ARN = "arn:aws:s3:::gbif-open-data-us-east-1"
 GBIF_ODR_FNAME = "occurrence.parquet"
 
-EC2_TASK_INSTANCE_ID = "i-0bc5a64e9385902a6"
-EC2_ROLE_NAME = f"{PROJECT}_ec2_s3_role"
-# Instance types: https://aws.amazon.com/ec2/spot/pricing/
-EC2_INSTANCE_TYPE = "t4g.micro"
+EC2_SPOT_TEMPLATE = "bison_spot_task_template"
+EC2_USERDATA_TEST_TASK = "test_task.userdata.sh"
+EC2_USERDATA_ANNOTATE_RIIS = "annotate_riis.userdata.sh"
+EC2_USERDATA_BUILD_SUMMARIES = "build_summaries.userdata.sh"
+EC2_USERDATA_BUILD_HEATMAP = "build_heatmap.userdata.sh"
 
 S3_BUCKET = f"{PROJECT}-{AWS_ACCOUNT}-{REGION}"
 S3_IN_DIR = "input"
@@ -71,6 +73,9 @@ s3_client = session.client("s3", config=config, region_name=REGION)
 ec2_client = session.client("ec2", config=config)
 ssm_client = session.client("ssm", config=config, region_name=REGION)
 
+template = EC2_SPOT_TEMPLATE
+task = EC2_USERDATA_TEST_TASK
+
 
 # --------------------------------------------------------------------------------------
 def lambda_handler(event, context):
@@ -107,67 +112,64 @@ def lambda_handler(event, context):
         print(f"*** Object {annotated_riis_key} is not present")
         do_annotate = True
     else:
-        print(f"*** Found object: {contents[0]['Key']}")
+        raise Exception(
+            f"*** Annotated RIIS data is already present: {annotated_riis_key}")
 
     # -------------------------------------
     # Start instance to run task
-    if do_annotate is True:
-        print("*** ---------------------------------------")
-        print("*** Initiate EC2 start_instances task")
-        try:
-            response = ec2_client.start_instances(
-                InstanceIds=[EC2_TASK_INSTANCE_ID],
-                AdditionalInfo="Task initiated by Lambda",
-                DryRun=False
-            )
-        except Exception:
-            print("*** Failed to start EC2 instance")
-            raise
+    version_num = None
+    print("*** ---------------------------------------")
+    print("*** Find template version")
+    response = ec2_client.describe_launch_template_versions(
+        LaunchTemplateName=template
+    )
+    versions = response["LaunchTemplateVersions"]
+    for ver in versions:
+        if ver["VersionDescription"] == task:
+            version_num = ver["VersionNumber"]
+            break
+    if version_num is None:
+        raise Exception(
+            f"Template {template} version {task} "
+            "does not exist")
 
-        try:
-            instance_meta = response["StartingInstances"][0]
-        except KeyError:
-            raise Exception(f"*** Invalid response returned {response}")
-        except ValueError:
-            raise Exception(f"*** No instances returned in {response}")
-        except Exception:
-            raise
+    print("*** ---------------------------------------")
+    print("*** Launch EC2 instance with task template version")
+    try:
+        response = ec2_client.run_instances(
+            MinCount=1, MaxCount=1,
+            LaunchTemplate={
+                "LaunchTemplateName": template,
+                "Version": f"{version_num}"
+            },
+            TagSpecifications=[
+                {
+                    "ResourceType": "instance",
+                    "Tags": [
+                        {"Key": "Name", "Value": f"{template}_{task}"},
+                        {"Key": "TemplateName", "Value": template}
+                    ]
+                }
+            ]
+        )
+    except NoCredentialsError:
+        print("Failed to authenticate for run_instances")
+        raise
+    except ClientError:
+        print(
+            f"Failed to run instance for template {template}, "
+            f"version {version_num}/{task}")
+        raise
 
-        instance_id = instance_meta['InstanceId']
-        print(f"*** Started instance {instance_meta['InstanceId']}. ")
+    try:
+        instance = response["Instances"][0]
+    except KeyError:
+        raise Exception(f"*** No instances returned in {response}")
 
-        # -------------------------------------
-        # Loop til running
-        elapsed_time = 0
-        complete = False
-        while not complete:
-            try:
-                describe_result = ec2_client.describe_instances(
-                    InstanceIds=[instance_id])
-            except Exception as e:
-                print(f"*** Failed to describe_instances in {elapsed_time} secs: {e}")
-                raise
-
-            else:
-                try:
-                    instance_meta = describe_result["Reservations"][0]["Instances"][0]
-                except Exception:
-                    print(f"*** Failed to return metadata for instance {instance_id}.")
-                    raise
-
-                state = instance_meta["State"]["Name"].lower()
-                print(f"*** Instance {state} after {elapsed_time} seconds")
-                if state != "running":
-                    time.sleep(waittime)
-                    elapsed_time += waittime
-                else:
-                    complete = True
-
-            if elapsed_time >= timeout and not complete:
-                complete = True
-                print(f"*** Failed with {state} state after {elapsed_time} seconds")
+    instance_id = instance["InstanceId"]
+    print(f"*** Started instance {instance_id}. ")
 
     return {
         "statusCode": 200,
-        "body": "Executed bison_s0_test_schedule_lambda"
+        "body": f"Executed bison_s0_test_schedule_lambda starting EC2 {instance_id}"
     }
