@@ -814,3 +814,20 @@ class S3:
                 print(f"Downloaded {url} to {local_filename}")
 
         return local_filename
+
+
+# ----------------------------------------------------
+
+"""
+from bison.common.constants import *
+from bison.common.aws_util import EC2
+
+ec2 = EC2()
+test_version = ec2.create_task_template_version(
+    EC2_SPOT_TEMPLATE, EC2_USERDATA_TEST_TASK, local_path=EC2_CONFIG_DIR)
+
+annotate_riis_version = ec2.create_task_template_version(
+    EC2_SPOT_TEMPLATE, EC2_USERDATA_ANNOTATE_RIIS, local_path=EC2_CONFIG_DIR)
+
+
+"""

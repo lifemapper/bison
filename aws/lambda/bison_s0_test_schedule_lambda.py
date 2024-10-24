@@ -74,8 +74,8 @@ ec2_client = session.client("ec2", config=config)
 ssm_client = session.client("ssm", config=config, region_name=REGION)
 
 template = EC2_SPOT_TEMPLATE
-task = EC2_USERDATA_TEST_TASK
-
+task_userdata_fname = EC2_USERDATA_TEST_TASK
+task = task_userdata_fname.rstrip('.userdata.sh')
 
 # --------------------------------------------------------------------------------------
 def lambda_handler(event, context):
@@ -99,7 +99,6 @@ def lambda_handler(event, context):
 
     # -------------------------------------
     # Look for existing S3 annotated data
-    do_annotate = False
     try:
         tr_response = s3_client.list_objects_v2(
             Bucket=S3_BUCKET, Prefix=annotated_riis_key, MaxKeys=10)
@@ -110,7 +109,6 @@ def lambda_handler(event, context):
         contents = tr_response["Contents"]
     except KeyError:
         print(f"*** Object {annotated_riis_key} is not present")
-        do_annotate = True
     else:
         raise Exception(
             f"*** Annotated RIIS data is already present: {annotated_riis_key}")
@@ -125,7 +123,7 @@ def lambda_handler(event, context):
     )
     versions = response["LaunchTemplateVersions"]
     for ver in versions:
-        if ver["VersionDescription"] == task:
+        if ver["VersionDescription"] == task_userdata_fname:
             version_num = ver["VersionNumber"]
             break
     if version_num is None:
@@ -135,6 +133,8 @@ def lambda_handler(event, context):
 
     print("*** ---------------------------------------")
     print("*** Launch EC2 instance with task template version")
+    instance_name = f"bison_{task}"
+
     try:
         response = ec2_client.run_instances(
             MinCount=1, MaxCount=1,
@@ -146,7 +146,7 @@ def lambda_handler(event, context):
                 {
                     "ResourceType": "instance",
                     "Tags": [
-                        {"Key": "Name", "Value": f"{template}_{task}"},
+                        {"Key": "Name", "Value": instance_name},
                         {"Key": "TemplateName", "Value": template}
                     ]
                 }
