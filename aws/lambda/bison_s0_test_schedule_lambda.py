@@ -53,6 +53,7 @@ config = Config(connect_timeout=timeout, read_timeout=timeout)
 s3_client = session.client("s3", config=config, region_name=REGION)
 ec2_client = session.client("ec2", config=config)
 
+
 # --------------------------------------------------------------------------------------
 def lambda_handler(event, context):
     """Check for an S3 object, delete if exists, export from Redshift to S3.
@@ -65,9 +66,13 @@ def lambda_handler(event, context):
         JSON object
 
     Raises:
-        Exception: on failure to execute S3 query command.
-        Exception: on failure to execute S3 delete command.
-        Exception: on failure to execute Redshift export command.
+        Exception: on unexpected response from query for S3 data.
+        Exception: on S3 data already present, no need for task.
+        Exception: on requested template does not exist.
+        NoCredentialsError: on failure to get credentials to run EC2 task.
+        ClientError: on failure to run EC2 task.
+        Exception: on no instances started.
+        Exception: on unknown error.
     """
     print("*** ---------------------------------------")
     print("*** Received trigger: " + json.dumps(event))
@@ -82,7 +87,7 @@ def lambda_handler(event, context):
         print(f"*** Error querying for bucket/object {annotated_riis_key} ({e})")
         raise e
     try:
-        contents = tr_response["Contents"]
+        _contents = tr_response["Contents"]
     except KeyError:
         print(f"*** Object {annotated_riis_key} is not present")
     else:

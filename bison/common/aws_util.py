@@ -6,16 +6,13 @@ import base64
 import boto3
 from botocore.exceptions import ClientError, NoCredentialsError, SSLError
 from csv import QUOTE_NONE
-from datetime import datetime, timezone
 from io import BytesIO
 import os
 import pandas
 import subprocess as sp
 from time import sleep
 
-from bison.common.constants import (
-    AWS_METADATA_URL, EC2_SPOT_TEMPLATE, REGION, TASK, USERDATA_DIR
-)
+from bison.common.constants import (AWS_METADATA_URL, REGION, TASK, USERDATA_DIR)
 
 six_hours = 21600
 
@@ -240,7 +237,7 @@ class EC2:
         response = self._client.describe_launch_template_versions(
             LaunchTemplateName=template_name
         )
-        versions  = response["LaunchTemplateVersions"]
+        versions = response["LaunchTemplateVersions"]
         for ver in versions:
             if ver["VersionDescription"] == task:
                 version_num = ver["VersionNumber"]

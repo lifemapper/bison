@@ -1,8 +1,5 @@
 """Lambda function to create bison records by subsetting public GBIF data."""
-"""Lambda function to delete temporary and previous month's tables."""
-# Set lambda timeout to 5 minutes.
 import boto3
-from botocore.exceptions import ClientError, NoCredentialsError
 import botocore.session as bc
 from botocore.client import Config
 from datetime import datetime

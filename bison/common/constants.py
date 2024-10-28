@@ -38,12 +38,6 @@ S3_SUMMARY_DIR = "summary"
 # Assumes project repo directory
 USERDATA_DIR = "./aws/userdata"
 
-
-# COMPOSE_TEST_TASK_FILENAME = "compose.test_task.yml"
-# COMPOSE_ANNOTATE_RIIS_FILENAME = "compose.annotate_riis.yml"
-# COMPOSE_BUILD_SUMMARIES_FILENAME = "compose.build_summaries.yml"
-# COMPOSE_BUILD_HEATMAP_FILENAME = "compose.build_heatmap.yml"
-
 # .............................................................................
 # Data constants
 # .............................................................................
@@ -84,6 +78,11 @@ class TASK:
     # ...........................
     @classmethod
     def tasks(cls):
+        """Get all valid tasks.
+
+        Returns:
+            (list of str): all valid tasks
+        """
         return (cls.TEST, cls.ANNOTATE_RIIS, cls.SUMMARIZE, cls.BUILD_HEATMAP)
 
     # ...........................
@@ -92,7 +91,11 @@ class TASK:
         """Get the filename containing userdata to execute this task.
 
         Args:
-            task: task
+            task (str): task
+            pth (str): local path for file.
+
+        Returns:
+            fname (str): filename for EC2 userdata to execute task.
         """
         if task not in cls.tasks():
             raise Exception(f"Unknown task {task}")
@@ -104,10 +107,22 @@ class TASK:
     # ...........................
     @classmethod
     def get_task_from_userdata_filename(cls, fname):
+        """Get the task for the userdata file.
+
+        Args:
+            fname (str): filename for EC2 userdata to execute task.
+
+        Returns:
+            task (str): task
+
+        Raises:
+            Exception: on no task for this filename.
+        """
         task = fname.rstrip(cls.userdata_extension)
-        if task not in cls.TASKS:
+        if task not in cls.tasks():
             raise Exception(f"Unknown task {task} from userdata file {fname}")
         return task
+
 
 # .............................................................................
 class REPORT:
