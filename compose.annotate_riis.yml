@@ -9,6 +9,11 @@ services:
       - TASK_APP=bison.task.annotate_riis
     env_file:
       ./.env.task.conf
+    logging:
+      driver: awslogs
+      options:
+        awslogs-group: bison_task
+        awslogs-stream: annotate_riis
     volumes:
       # bind mount from host machine
       - "/home/ubuntu/aws_data:/volumes/bison_data"
