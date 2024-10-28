@@ -90,31 +90,35 @@ EC2/Docker setup
 
   Name: bison_spot_task
   Application and OS Images: Ubuntu
-  AMI: Ubuntu 22.04.2 LTS (or latest Ubuntu supporting hibernation)
+  AMI: Ubuntu 24.04 LTS
   Architecture: 64-bit ARM
-  Instance type: t4g.micro (only some instance families support hibernation)
+  Instance type: t4g.micro
   Key pair: bison-task-key
   Network settings/Select existing security group: launch-wizard-1
   Configure storage: 8 Gb gp3 (default)
     Details - encrypted
   Advanced Details:
     IAM instance profile: bison_ec2_s3_role
+    Shutdown behavior: Terminate
+    Cloudwatch monitoring: Enable
     Purchasing option: Spot instances
+    Request type: One-time
 
 * Use the launch template to create a version for each task.
 * The launch template task versions must have the task name in the description, and
   have the following script in the userdata::
 
     #!/bin/bash
-    sudo apt update
-    sudo apt install docker.io
-    sudo apt install docker-compose-v2
+    sudo apt-get -y update
+    sudo apt-get -y install docker.io
+    sudo apt-get -y install docker-compose-v2
     git clone https://github.com/lifemapper/bison.git
     cd bison
-    sudo docker compose -f <compose.task_name.yml> up
+    sudo docker compose -f compose.test_task.yml up
     sudo shutdown -h now
 
-* For each task compose.task_name.yml must be replaced with the appropriate compose file.
+
+* For each task **compose.test_task.yml** must be replaced with the appropriate compose file.
 * On EC2 instance startup, the userdata script will execute
 * The compose file sets an environment variable (TASK_APP) containing a python module
   to be executed from the Dockerfile.

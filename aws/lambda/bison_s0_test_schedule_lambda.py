@@ -1,16 +1,22 @@
-"""Lambda function to delete temporary and previous month's tables."""
-# Set lambda timeout to 5 minutes.
+"""Lambda function to test EC2 task execution."""
 import boto3
 from botocore.exceptions import ClientError, NoCredentialsError
 import botocore.session as bc
 from botocore.client import Config
 from datetime import datetime
 import json
-import time
 
 print('Loading function')
-
 PROJECT = "bison"
+
+# .............................................................................
+# Dataload filename postfixes
+# .............................................................................
+dt = datetime.now()
+yr = dt.year
+mo = dt.month
+bison_datestr = f"{yr}_{mo:02d}_01"
+gbif_datestr = f"{yr}-{mo:02d}-01"
 
 # .............................................................................
 # AWS constants
@@ -18,46 +24,27 @@ PROJECT = "bison"
 REGION = "us-east-1"
 AWS_ACCOUNT = "321942852011"
 AWS_METADATA_URL = "http://169.254.169.254/latest/"
-
 WORKFLOW_ROLE_NAME = f"{PROJECT}_redshift_lambda_role"
 WORKFLOW_ROLE_ARN = f"arn:aws:iam::{PROJECT}:role/service-role/{WORKFLOW_ROLE_NAME}"
 WORKFLOW_USER = f"project.{PROJECT}"
-WORKFLOW_SECRET_NAME = f"{PROJECT}_workflow_user"
 
-GBIF_BUCKET = "gbif-open-data-us-east-1/occurrence"
-GBIF_ARN = "arn:aws:s3:::gbif-open-data-us-east-1"
-GBIF_ODR_FNAME = "occurrence.parquet"
-
+# EC2 launch template/version
+EC2_SPOT_TEMPLATE = "bison_spot_task_template"
 TASK = "test_task"
-TASK_FNAME = f"{TEST_TASK}.userdata.sh"
 
+# S3 locations
 S3_BUCKET = f"{PROJECT}-{AWS_ACCOUNT}-{REGION}"
 S3_IN_DIR = "input"
 S3_OUT_DIR = "output"
 S3_LOG_DIR = "log"
 S3_SUMMARY_DIR = "summary"
-
 RIIS_BASENAME = "USRIISv2_MasterList"
-db_user = f"IAMR:{WORKFLOW_ROLE_NAME}"
-database = "dev"
-pub_schema = "public"
-external_schema = "redshift_spectrum"
+annotated_riis_key = f"{S3_IN_DIR}/{RIIS_BASENAME}_annotated_{bison_datestr}.csv"
 
-# Timeout for ec2 startup
+# .............................................................................
+# Initialize Botocore session and clients
+# .............................................................................
 timeout = 300
-# Wait time between result checks
-waittime = 30
-
-# Dataload filename postfixes
-dt = datetime.now()
-yr = dt.year
-mo = dt.month
-bison_datestr = f"{yr}_{mo:02d}_01"
-gbif_datestr = f"{yr}-{mo:02d}-01"
-
-annotated_riis_key = f"input/{RIIS_BASENAME}_annotated_{bison_datestr}.csv"
-
-# Initialize Botocore session
 session = boto3.session.Session()
 bc_session = bc.get_session()
 session = boto3.Session(botocore_session=bc_session, region_name=REGION)
@@ -104,7 +91,7 @@ def lambda_handler(event, context):
 
     # -------------------------------------
     # Start instance to run task
-    version_num = None
+    ver_num = None
     print("*** ---------------------------------------")
     print("*** Find template version")
     response = ec2_client.describe_launch_template_versions(
@@ -112,23 +99,24 @@ def lambda_handler(event, context):
     )
     versions = response["LaunchTemplateVersions"]
     for ver in versions:
-        if ver["VersionDescription"] == task:
-            version_num = ver["VersionNumber"]
+        if ver["VersionDescription"] == TASK:
+            ver_num = ver["VersionNumber"]
             break
-    if version_num is None:
+    if ver_num is None:
         raise Exception(
-            f"Template {EC2_SPOT_TEMPLATE} version {task} "
+            f"Template {EC2_SPOT_TEMPLATE} version {TASK} "
             "does not exist")
+    print(f"*** Found template {EC2_SPOT_TEMPLATE} version {ver_num} for {TASK}.")
 
     print("*** ---------------------------------------")
     print("*** Launch EC2 instance with task template version")
-    instance_name = f"bison_{task}"
+    instance_name = f"bison_{TASK}"
 
     try:
         response = ec2_client.run_instances(
             MinCount=1, MaxCount=1,
             LaunchTemplate={
-                "LaunchTemplateName": EC2_SPOT_TEMPLATE, "Version": f"{version_num}"
+                "LaunchTemplateName": EC2_SPOT_TEMPLATE, "Version": f"{ver_num}"
             },
             TagSpecifications=[
                 {
@@ -146,7 +134,7 @@ def lambda_handler(event, context):
     except ClientError:
         print(
             f"Failed to run instance for template {EC2_SPOT_TEMPLATE}, "
-            f"version {version_num}/{task}")
+            f"version {ver_num}/{TASK}")
         raise
 
     try:

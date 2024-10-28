@@ -1,35 +1,59 @@
-"""Lambda function to aggregate counts and lists by region."""
-# Set lambda timeout to 3 minutes.
+"""Lambda function to initiate an EC2 instance to annotate RIIS data with GBIF taxa."""
 import boto3
+from botocore.exceptions import ClientError, NoCredentialsError
 import botocore.session as bc
 from botocore.client import Config
+from datetime import datetime
+import json
+import time
 
-print("*** Loading lambda function")
+print('Loading function')
+PROJECT = "bison"
 
-region = "us-east-1"
-workgroup = "bison"
-database = "dev"
-iam_role = "arn:aws:iam::321942852011:role/service-role/bison_redshift_lambda_role"
-db_user = "IAMR:bison_redshift_lambda_role"
-pub_schema = "public"
-external_schema = "redshift_spectrum"
-timeout = 900
-waittime = 1
-EC2_TASK_INSTANCE_ID = "i-0bc5a64e9385902a6"
-# EC2_TASK_INSTANCE_ARN = "arn:aws:ec2:us-east-1:321942852011:instance/{EC2_TASK_INSTANCE_ID}"
+# .............................................................................
+# Dataload filename postfixes
+# .............................................................................
+dt = datetime.now()
+yr = dt.year
+mo = dt.month
+bison_datestr = f"{yr}_{mo:02d}_01"
+gbif_datestr = f"{yr}-{mo:02d}-01"
 
+# .............................................................................
+# AWS constants
+# .............................................................................
+REGION = "us-east-1"
+AWS_ACCOUNT = "321942852011"
+AWS_METADATA_URL = "http://169.254.169.254/latest/"
+WORKFLOW_ROLE_NAME = f"{PROJECT}_redshift_lambda_role"
+WORKFLOW_ROLE_ARN = f"arn:aws:iam::{PROJECT}:role/service-role/{WORKFLOW_ROLE_NAME}"
+WORKFLOW_USER = f"project.{PROJECT}"
+
+# S3 locations
+S3_BUCKET = f"{PROJECT}-{AWS_ACCOUNT}-{REGION}"
+S3_IN_DIR = "input"
+S3_OUT_DIR = "output"
+S3_LOG_DIR = "log"
+S3_SUMMARY_DIR = "summary"
+RIIS_BASENAME = "USRIISv2_MasterList"
+annotated_riis_key = f"{S3_IN_DIR}/{RIIS_BASENAME}_annotated_{bison_datestr}.csv"
+
+# EC2 launch template/version
+EC2_SPOT_TEMPLATE = "bison_spot_task_template"
+TASK = "annotate_riis"
+
+# .............................................................................
 # Initialize Botocore session
+# .............................................................................
+timeout = 300
+
 session = boto3.session.Session()
 bc_session = bc.get_session()
-session = boto3.Session(botocore_session=bc_session, region_name=region)
-# Initialize EC2 and SSM clients
+session = boto3.Session(botocore_session=bc_session, region_name=REGION)
+# Initialize Redshift client
 config = Config(connect_timeout=timeout, read_timeout=timeout)
-client_ec2 = session.client("ec2", config=config)
-client_ssm = session.client("ssm", config=config)
-
-# Bison command
-bison_script = "venv/bin/python -m bison.task.test_task"
-
+s3_client = session.client("s3", config=config, region_name=REGION)
+ec2_client = session.client("ec2", config=config)
 
 # --------------------------------------------------------------------------------------
 def lambda_handler(event, context):
@@ -47,30 +71,83 @@ def lambda_handler(event, context):
         Exception: on no instances started.
         Exception: on unknown error.
     """
-    response = client_ec2.start_instances(
-        InstanceIds=[EC2_TASK_INSTANCE_ID],
-        AdditionalInfo="Task initiated by Lambda",
-        DryRun=False
-    )
+    print("*** ---------------------------------------")
+    print("*** Received trigger: " + json.dumps(event))
+    print("*** ---------------------------------------")
+
+    # -------------------------------------
+    # Look for existing S3 annotated data
     try:
-        instance_meta = response["StartingInstances"][0]
+        tr_response = s3_client.list_objects_v2(
+            Bucket=S3_BUCKET, Prefix=annotated_riis_key, MaxKeys=10)
+    except Exception as e:
+        print(f"*** Error querying for bucket/object {annotated_riis_key} ({e})")
+        raise e
+    try:
+        contents = tr_response["Contents"]
     except KeyError:
-        raise Exception(f"Invalid response returned {response}")
-    except ValueError:
-        raise Exception(f"No instances returned in {response}")
-    except Exception:
+        print(f"*** Object {annotated_riis_key} is not present")
+    else:
+        raise Exception(
+            f"*** Annotated RIIS data is already present: {annotated_riis_key}")
+
+    # -------------------------------------
+    # Start instance to run task
+    ver_num = None
+    print("*** ---------------------------------------")
+    print("*** Find template version")
+    response = ec2_client.describe_launch_template_versions(
+        LaunchTemplateName=EC2_SPOT_TEMPLATE
+    )
+    versions = response["LaunchTemplateVersions"]
+    for ver in versions:
+        if ver["VersionDescription"] == TASK:
+            ver_num = ver["VersionNumber"]
+            break
+    if ver_num is None:
+        raise Exception(
+            f"Template {EC2_SPOT_TEMPLATE} version {TASK} "
+            "does not exist")
+    print(f"*** Found template {EC2_SPOT_TEMPLATE} version {ver_num} for {TASK}.")
+
+    print("*** ---------------------------------------")
+    print("*** Launch EC2 instance with task template version")
+    instance_name = f"bison_{TASK}"
+
+    try:
+        response = ec2_client.run_instances(
+            MinCount=1, MaxCount=1,
+            LaunchTemplate={
+                "LaunchTemplateName": EC2_SPOT_TEMPLATE, "Version": f"{ver_num}"
+            },
+            TagSpecifications=[
+                {
+                    "ResourceType": "instance",
+                    "Tags": [
+                        {"Key": "Name", "Value": instance_name},
+                        {"Key": "TemplateName", "Value": EC2_SPOT_TEMPLATE}
+                    ]
+                }
+            ]
+        )
+    except NoCredentialsError:
+        print("Failed to authenticate for run_instances")
+        raise
+    except ClientError:
+        print(
+            f"Failed to run instance for template {EC2_SPOT_TEMPLATE}, "
+            f"version {ver_num}/{TASK}")
         raise
 
-    instance_id = instance_meta['InstanceId']
-    prev_state = instance_meta['PreviousState']['Name']
-    curr_state = instance_meta['CurrentState']['Name']
-    print(f"Started instance {instance_meta['InstanceId']}. ")
-    print(f"Moved from {prev_state} to {curr_state}")
+    try:
+        instance = response["Instances"][0]
+    except KeyError:
+        raise Exception(f"*** No instances returned in {response}")
 
-    # sudo docker compose -f compose.annotate_riis.yml up
-    response = client_ssm.send_command(
-        DocumentName='AWS-RunShellScript',
-        Parameters={'commands': [bison_script]},
-        InstanceIds=[EC2_TASK_INSTANCE_ID]
-    )
-    return instance_id
+    instance_id = instance["InstanceId"]
+    print(f"*** Started instance {instance_id}. ")
+
+    return {
+        "statusCode": 200,
+        "body": f"Executed bison_s0_annotate_riis_lambda starting EC2 {instance_id}"
+    }

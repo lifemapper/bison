@@ -1,42 +1,74 @@
-"""Lambda function to load ancillary data - geospatial regions and RIIS."""
-# Set lambda timeout to 1 minute.
-import json
+"""Lambda function to load ancillary data (geospatial and RIIS) into Redshift."""
 import boto3
 import botocore.session as bc
 from botocore.client import Config
 from datetime import datetime
+import json
 import time
 
 print('Loading function')
+PROJECT = "bison"
 
-# AWS region for all services
-region = "us-east-1"
-# Redshift settings
-workgroup = "bison"
+# .............................................................................
+# Dataload filename postfixes
+# .............................................................................
+dt = datetime.now()
+yr = dt.year
+mo = dt.month
+bison_datestr = f"{yr}_{mo:02d}_01"
+gbif_datestr = f"{yr}-{mo:02d}-01"
+
+# .............................................................................
+# AWS constants
+# .............................................................................
+REGION = "us-east-1"
+AWS_ACCOUNT = "321942852011"
+AWS_METADATA_URL = "http://169.254.169.254/latest/"
+WORKFLOW_ROLE_NAME = f"{PROJECT}_redshift_lambda_role"
+WORKFLOW_ROLE_ARN = f"arn:aws:iam::{PROJECT}:role/service-role/{WORKFLOW_ROLE_NAME}"
+WORKFLOW_USER = f"project.{PROJECT}"
+
+# EC2 launch template/version
+EC2_SPOT_TEMPLATE = "bison_spot_task_template"
+TASK = "test_task"
+
+# S3 locations
+S3_BUCKET = f"{PROJECT}-{AWS_ACCOUNT}-{REGION}"
+S3_IN_DIR = "input"
+S3_OUT_DIR = "output"
+S3_LOG_DIR = "log"
+S3_SUMMARY_DIR = "summary"
+RIIS_BASENAME = "USRIISv2_MasterList"
+annotated_riis_key = f"{S3_IN_DIR}/{RIIS_BASENAME}_annotated_{bison_datestr}.csv"
+
+# Redshift
+# namespace, workgroup both = 'bison'
+db_user = f"IAMR:{WORKFLOW_ROLE_NAME}"
 database = "dev"
-iam_role = "arn:aws:iam::321942852011:role/service-role/bison_redshift_lambda_role"
-db_user = "IAMR:bison_redshift_lambda_role"
 pub_schema = "public"
 external_schema = "redshift_spectrum"
-# S3 settings
-bison_bucket = "bison-321942852011-us-east-1"
-input_folder = "input"
-# Timeout/check results times
-timeout = 900
-waittime = 1
+# Wait time for completion of Redshift command
+waittime = 5
+# Name the Redshift mounted gbif data and bison table to create from it
+bison_tbl = f"{pub_schema}.bison_{bison_datestr}"
+mounted_gbif_name = f"{external_schema}.occurrence_{bison_datestr}_parquet"
 
-# Dataload filename postfixes
-yr = datetime.now().year
-mo = datetime.now().month
-prev_yr = yr
-prev_mo = mo - 1
-if mo == 1:
-    prev_mo = 12
-    prev_yr = yr - 1
-bison_datestr = f"{yr}_{mo:02d}_01"
-old_bison_datestr = f"{prev_yr}_{prev_mo:02d}_01"
+# .............................................................................
+# Initialize Botocore session and clients
+# .............................................................................
+timeout = 300
+session = boto3.session.Session()
+bc_session = bc.get_session()
+session = boto3.Session(botocore_session=bc_session, region_name=REGION)
+# Initialize Redshift client
+config = Config(connect_timeout=timeout, read_timeout=timeout)
+s3_client = session.client("s3", config=config, region_name=REGION)
+rs_client = session.client("redshift", config=config)
 
-# Each fields tuple contains original fieldname, corresponding bison fieldname and type
+# .............................................................................
+# Ancillary data parameters
+# .............................................................................
+# Each fields tuple contains original fieldname, bison fieldname and bison fieldtype
 ancillary_data = {
     "aiannh": {
         "table": "aiannh2023",
@@ -52,6 +84,7 @@ ancillary_data = {
         "fields": {
             "state": ("stusps", "census_state", "VARCHAR(2)"),
             "county": ("namelsad", "census_county", "VARCHAR(100)"),
+            # Field constructed to ensure uniqueness
             "state_county": (None, "state_county", "VARCHAR(102)")
         }
     },
@@ -67,6 +100,7 @@ ancillary_data = {
 }
 
 query_tables_stmt = f"SHOW TABLES FROM SCHEMA {database}.{pub_schema};"
+
 aiannh_tbl = ancillary_data["aiannh"]["table"]
 aiannh_fname = ancillary_data["aiannh"]["filename"]
 create_aiannh_stmt = f"""
@@ -86,7 +120,7 @@ create_aiannh_stmt = f"""
 """
 fill_aiannh_stmt = f""""
     COPY {aiannh_tbl}
-        FROM 's3://{bison_bucket}/{input_folder}/{aiannh_fname}'
+        FROM 's3://{S3_BUCKET}/{S3_IN_DIR}/{aiannh_fname}'
         FORMAT SHAPEFILE
         IAM_role DEFAULT;
 """
@@ -112,7 +146,7 @@ create_county_stmt = f"""
 """
 fill_county_stmt = f"""
     COPY {county_tbl}
-        FROM 's3://{bison_bucket}/{input_folder}/{county_fname}'
+        FROM 's3://{S3_BUCKET}/{S3_IN_DIR}/{county_fname}'
         FORMAT SHAPEFILE
         IAM_role DEFAULT;
 """
@@ -160,18 +194,10 @@ create_riis_stmt = f"""
 """
 fill_riis_stmt = f"""
     COPY riisv2_{bison_datestr}
-        FROM 's3://{bison_bucket}/{input_folder}/{riis_fname}'
+        FROM 's3://{S3_BUCKET}/{S3_IN_DIR}/{riis_fname}'
         FORMAT CSV
         IAM_role DEFAULT;
 """
-
-# Initialize Botocore session
-session = boto3.session.Session()
-bc_session = bc.get_session()
-session = boto3.Session(botocore_session=bc_session, region_name=region)
-# Initialize Redshift client
-config = Config(connect_timeout=timeout, read_timeout=timeout)
-client_redshift = session.client("redshift-data", config=config)
 
 COMMANDS = [
     ("query_tables", query_tables_stmt, None),
@@ -203,8 +229,8 @@ def lambda_handler(event, context):
         if tblname is None or tblname not in tables_present:
             # -------------------------------------
             try:
-                submit_result = client_redshift.execute_statement(
-                    WorkgroupName=workgroup, Database=database, Sql=stmt)
+                submit_result = rs_client.execute_statement(
+                    WorkgroupName=PROJECT, Database=database, Sql=stmt)
             except Exception as e:
                 raise Exception(e)
 
@@ -218,7 +244,7 @@ def lambda_handler(event, context):
             complete = False
             while not complete:
                 try:
-                    describe_result = client_redshift.describe_statement(Id=submit_id)
+                    describe_result = rs_client.describe_statement(Id=submit_id)
                 except Exception as e:
                     complete = True
                     print(f"*** Failed to describe_statement in {elapsed_time} secs: {e}")
@@ -242,7 +268,7 @@ def lambda_handler(event, context):
             # IFF query tables, create list of tables that are present
             if cmd == "query_tables":
                 try:
-                    stmt_result = client_redshift.get_statement_result(Id=submit_id)
+                    stmt_result = rs_client.get_statement_result(Id=submit_id)
                 except Exception as e:
                     print(f"*** No get_statement_result {e}")
                 else:

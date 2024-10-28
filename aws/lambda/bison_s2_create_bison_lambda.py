@@ -1,33 +1,23 @@
 """Lambda function to create bison records by subsetting public GBIF data."""
-# Set lambda timeout to 3 minutes.
-import json
+"""Lambda function to delete temporary and previous month's tables."""
+# Set lambda timeout to 5 minutes.
 import boto3
+from botocore.exceptions import ClientError, NoCredentialsError
 import botocore.session as bc
 from botocore.client import Config
 from datetime import datetime
+import json
 import time
 
 print('Loading function')
+PROJECT = "bison"
 
-# AWS region for all services
-region = "us-east-1"
-# Redshift settings
-workgroup = "bison"
-database = "dev"
-iam_role = "arn:aws:iam::321942852011:role/service-role/bison_redshift_lambda_role"
-db_user = "IAMR:bison_redshift_lambda_role"
-pub_schema = "public"
-external_schema = "redshift_spectrum"
-# S3 settings
-bison_bucket = "bison-321942852011-us-east-1"
-input_folder = "input"
-# Timeout/check results times
-timeout = 900
-waittime = 1
-
+# .............................................................................
 # Dataload filename postfixes
-yr = datetime.now().year
-mo = datetime.now().month
+# .............................................................................
+dt = datetime.now()
+yr = dt.year
+mo = dt.month
 prev_yr = yr
 prev_mo = mo - 1
 if mo == 1:
@@ -35,16 +25,52 @@ if mo == 1:
     prev_yr = yr - 1
 bison_datestr = f"{yr}_{mo:02d}_01"
 old_bison_datestr = f"{prev_yr}_{prev_mo:02d}_01"
-
-# S3 GBIF bucket and file to query
-gbif_bucket = f"gbif-open-data-{region}"
 gbif_datestr = f"{yr}-{mo:02d}-01"
-parquet_key = f"occurrence/{gbif_datestr}/occurrence.parquet"
-# Define the bison bucket and table to create
-bison_tbl = f"{pub_schema}.bison_{bison_datestr}"
 
+# .............................................................................
+# AWS constants
+# .............................................................................
+REGION = "us-east-1"
+AWS_ACCOUNT = "321942852011"
+AWS_METADATA_URL = "http://169.254.169.254/latest/"
+WORKFLOW_ROLE_NAME = f"{PROJECT}_redshift_lambda_role"
+WORKFLOW_ROLE_ARN = f"arn:aws:iam::{PROJECT}:role/service-role/{WORKFLOW_ROLE_NAME}"
+WORKFLOW_USER = f"project.{PROJECT}"
+
+# S3 locations
+S3_BUCKET = f"{PROJECT}-{AWS_ACCOUNT}-{REGION}"
+S3_IN_DIR = "input"
+S3_OUT_DIR = "output"
+S3_LOG_DIR = "log"
+S3_SUMMARY_DIR = "summary"
+# S3 GBIF bucket and file to query
+gbif_bucket = f"gbif-open-data-{REGION}"
+parquet_key = f"occurrence/{gbif_datestr}/occurrence.parquet"
 gbif_odr_data = f"s3://{gbif_bucket}/{parquet_key}/"
+
+# Redshift
+# namespace, workgroup both = 'bison'
+db_user = f"IAMR:{WORKFLOW_ROLE_NAME}"
+database = "dev"
+pub_schema = "public"
+external_schema = "redshift_spectrum"
+# Wait time for completion of Redshift command
+waittime = 5
+# Name the Redshift mounted gbif data and bison table to create from it
+bison_tbl = f"{pub_schema}.bison_{bison_datestr}"
 mounted_gbif_name = f"{external_schema}.occurrence_{bison_datestr}_parquet"
+
+# .............................................................................
+# Initialize Botocore session and clients
+# .............................................................................
+timeout = 300
+session = boto3.session.Session()
+bc_session = bc.get_session()
+session = boto3.Session(botocore_session=bc_session, region_name=REGION)
+# Initialize Redshift client
+config = Config(connect_timeout=timeout, read_timeout=timeout)
+s3_client = session.client("s3", config=config, region_name=REGION)
+rs_client = session.client("redshift", config=config)
 
 COMMANDS = []
 
@@ -178,27 +204,13 @@ ancillary_data = {
         }
     }
 }
-# Add fields for annotations to BISON table
+# Add commands to
+#    add fields for annotations from ancillary tables to BISON table
 for _ttyp, tbl in ancillary_data.items():
     for (_orig_fld, bison_fld, bison_typ) in tbl["fields"].values():
         # 1-2 secs
         stmt = f"ALTER TABLE {bison_tbl} ADD COLUMN {bison_fld} {bison_typ} DEFAULT NULL;"
         COMMANDS.append((f"add_{bison_fld}", stmt))
-
-# alter_stcty_stmt = \
-#     f"ALTER TABLE {bison_tbl} ADD COLUMN census_state_county VARCHAR(102) DEFAULT NULL;"
-# alter_spkey_stmt = \
-#     f"ALTER TABLE {bison_tbl} ADD COLUMN taxonkey_species VARCHAR(max) DEFAULT NULL;"
-# update_spkey_stmt = \
-#     f"UPDATE {bison_tbl} SET taxonkey_species = (taxonkey || ' ' ||  species);"
-
-# Initialize Botocore session
-session = boto3.session.Session()
-bc_session = bc.get_session()
-session = boto3.Session(botocore_session=bc_session, region_name=region)
-# Initialize Redshift client
-config = Config(connect_timeout=timeout, read_timeout=timeout)
-client_redshift = session.client("redshift-data", config=config)
 
 
 # --------------------------------------------------------------------------------------
@@ -218,8 +230,8 @@ def lambda_handler(event, context):
     for (cmd, stmt) in COMMANDS:
         # -------------------------------------
         try:
-            submit_result = client_redshift.execute_statement(
-                WorkgroupName=workgroup, Database=database, Sql=stmt)
+            submit_result = rs_client.execute_statement(
+                WorkgroupName=PROJECT, Database=database, Sql=stmt)
         except Exception as e:
             raise Exception(e)
 
@@ -234,7 +246,7 @@ def lambda_handler(event, context):
         complete = False
         while not complete:
             try:
-                describe_result = client_redshift.describe_statement(Id=submit_id)
+                describe_result = rs_client.describe_statement(Id=submit_id)
             except Exception as e:
                 complete = True
                 print(f"Failed to describe_statement {e}")
@@ -257,7 +269,7 @@ def lambda_handler(event, context):
         # IF query for count, get statement output
         if cmd.startswith("query"):
             try:
-                stmt_result = client_redshift.get_statement_result(Id=submit_id)
+                stmt_result = rs_client.get_statement_result(Id=submit_id)
             except Exception as e:
                 print(f"*** No get_statement_result {e}")
             else:

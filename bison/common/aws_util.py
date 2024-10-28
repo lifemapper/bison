@@ -247,66 +247,6 @@ class EC2:
                 break
         return version_num
 
-    # # ----------------------------------------------------
-    # @classmethod
-    # def fill_user_data_script(
-    #         cls, user_data_filename, script_filename, token_to_replace):
-    #     """Fill an EC2 user_data script with a python script in another file.
-    #
-    #     Args:
-    #         user_data_filename: Filename containing the user-data script to be executed on
-    #             EC2 instantiation.
-    #         script_filename: Filename containing a python script to be written to a file on
-    #             the EC2 instantiation.
-    #         token_to_replace: string within the user_data_filename which will be replaced
-    #             by the text in the script filename.
-    #
-    #     Postcondition:
-    #         The user_data file contains the text of the script file.
-    #     """
-    #     # Safely read the input filename using 'with'
-    #     with open(user_data_filename) as f:
-    #         s = f.read()
-    #         if token_to_replace not in s:
-    #             print(f"{token_to_replace} not found in {user_data_filename}.")
-    #             return
-    #
-    #     # with open(script_filename) as sf:
-    #     #     script = sf.read()
-    #     base64_script_text = None
-    #     try:
-    #         with open(script_filename, "r") as infile:
-    #             script_text = infile.read()
-    #     except Exception:
-    #         pass
-    #     else:
-    #         text_bytes = script_text.encode("ascii")
-    #         text_base64_bytes = base64.b64encode(text_bytes)
-    #         base64_script_text = text_base64_bytes.decode("ascii")
-    #
-    #     # Safely write the changed content, if found in the file
-    #     with open(user_data_filename, "w") as uf:
-    #         print(
-    #             f"Changing {token_to_replace} in {user_data_filename} to contents in "
-    #             f"{script_filename}")
-    #         s = s.replace(token_to_replace, base64_script_text)
-    #         uf.write(s)
-
-    # ----------------------------------------------------
-    def create_token(self, ec2_type=None):
-        """Create a token to name and identify an AWS resource.
-
-        Args:
-            ec2_type (str): optional descriptor to include in the token string.
-
-        Returns:
-            token(str): token for AWS resource identification.
-        """
-        if ec2_type is None:
-            ec2_type = "token"
-        token = f"{ec2_type}_{datetime.now(timezone.utc).timestamp()}"
-        return token
-
     # ----------------------------------------------------
     def get_instance(self, instance_id):
         """Describe an EC2 instance with instance_id.
@@ -353,7 +293,7 @@ class EC2:
                     {
                         "ResourceType": "instance",
                         "Tags": [
-                            {"Key": "Name", "Value": userdata_filename},
+                            {"Key": "Name", "Value": task},
                             {"Key": "TemplateName", "Value": template_name}
                         ]
                     }
@@ -365,7 +305,7 @@ class EC2:
         except ClientError:
             print(
                 f"Failed to run instance for template {template_name}, "
-                f"version {userdata_filename}")
+                f"version {ver_num}, {task}")
             raise
 
         try:
@@ -832,11 +772,11 @@ from bison.common.aws_util import EC2
 
 ec2 = EC2()
 
-# task = TASK.TEST
-# test_version = ec2.create_task_template_version(
-#     EC2_SPOT_TEMPLATE, task, local_path=USERDATA_DIR)
-    
-    
+task = TASK.TEST
+test_version = ec2.create_task_template_version(
+    EC2_SPOT_TEMPLATE, task, local_path=USERDATA_DIR)
+
+
 task = TASK.ANNOTATE_RIIS
 annotate_riis_version = ec2.create_task_template_version(
     EC2_SPOT_TEMPLATE, task, local_path=USERDATA_DIR)

@@ -3,7 +3,7 @@ Roles, Policies, Trust Relationships
 
 .. _bison_redshift_s3_role:
 
-bison_redshift_s3_role
+bison_ec2_s3_role
 ------------------------------
 
 Attach to BISON namespace (Redshift)
