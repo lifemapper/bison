@@ -28,11 +28,8 @@ GBIF_BUCKET = "gbif-open-data-us-east-1/occurrence"
 GBIF_ARN = "arn:aws:s3:::gbif-open-data-us-east-1"
 GBIF_ODR_FNAME = "occurrence.parquet"
 
-EC2_SPOT_TEMPLATE = "bison_spot_task_template"
-EC2_USERDATA_TEST_TASK = "test_task.userdata.sh"
-EC2_USERDATA_ANNOTATE_RIIS = "annotate_riis.userdata.sh"
-EC2_USERDATA_BUILD_SUMMARIES = "build_summaries.userdata.sh"
-EC2_USERDATA_BUILD_HEATMAP = "build_heatmap.userdata.sh"
+TASK = "test_task"
+TASK_FNAME = f"{TEST_TASK}.userdata.sh"
 
 S3_BUCKET = f"{PROJECT}-{AWS_ACCOUNT}-{REGION}"
 S3_IN_DIR = "input"
@@ -58,10 +55,7 @@ mo = dt.month
 bison_datestr = f"{yr}_{mo:02d}_01"
 gbif_datestr = f"{yr}-{mo:02d}-01"
 
-gbif_parquet_key = f"occurrence/{gbif_datestr}/{GBIF_ODR_FNAME}"
 annotated_riis_key = f"input/{RIIS_BASENAME}_annotated_{bison_datestr}.csv"
-
-query_stmt = "riis_output_s3"
 
 # Initialize Botocore session
 session = boto3.session.Session()
@@ -71,11 +65,6 @@ session = boto3.Session(botocore_session=bc_session, region_name=REGION)
 config = Config(connect_timeout=timeout, read_timeout=timeout)
 s3_client = session.client("s3", config=config, region_name=REGION)
 ec2_client = session.client("ec2", config=config)
-ssm_client = session.client("ssm", config=config, region_name=REGION)
-
-template = EC2_SPOT_TEMPLATE
-task_userdata_fname = EC2_USERDATA_TEST_TASK
-task = task_userdata_fname.rstrip('.userdata.sh')
 
 # --------------------------------------------------------------------------------------
 def lambda_handler(event, context):
@@ -119,16 +108,16 @@ def lambda_handler(event, context):
     print("*** ---------------------------------------")
     print("*** Find template version")
     response = ec2_client.describe_launch_template_versions(
-        LaunchTemplateName=template
+        LaunchTemplateName=EC2_SPOT_TEMPLATE
     )
     versions = response["LaunchTemplateVersions"]
     for ver in versions:
-        if ver["VersionDescription"] == task_userdata_fname:
+        if ver["VersionDescription"] == task:
             version_num = ver["VersionNumber"]
             break
     if version_num is None:
         raise Exception(
-            f"Template {template} version {task} "
+            f"Template {EC2_SPOT_TEMPLATE} version {task} "
             "does not exist")
 
     print("*** ---------------------------------------")
@@ -139,15 +128,14 @@ def lambda_handler(event, context):
         response = ec2_client.run_instances(
             MinCount=1, MaxCount=1,
             LaunchTemplate={
-                "LaunchTemplateName": template,
-                "Version": f"{version_num}"
+                "LaunchTemplateName": EC2_SPOT_TEMPLATE, "Version": f"{version_num}"
             },
             TagSpecifications=[
                 {
                     "ResourceType": "instance",
                     "Tags": [
                         {"Key": "Name", "Value": instance_name},
-                        {"Key": "TemplateName", "Value": template}
+                        {"Key": "TemplateName", "Value": EC2_SPOT_TEMPLATE}
                     ]
                 }
             ]
@@ -157,7 +145,7 @@ def lambda_handler(event, context):
         raise
     except ClientError:
         print(
-            f"Failed to run instance for template {template}, "
+            f"Failed to run instance for template {EC2_SPOT_TEMPLATE}, "
             f"version {version_num}/{task}")
         raise
 
