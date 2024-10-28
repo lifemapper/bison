@@ -84,22 +84,26 @@ multiple bison modules.
 EC2/Docker setup
 ....................
 
-* The EC2 Spot instance should have the following settings::
+* Create the first EC2 Launch Template as a "one-time" Spot instance, no hibernation
+
+* The Launch template should have the following settings::
 
   Name: bison_spot_task
   Application and OS Images: Ubuntu
-  AMI: Ubuntu Server 24.04 LTS
+  AMI: Ubuntu 22.04.2 LTS (or latest Ubuntu supporting hibernation)
   Architecture: 64-bit ARM
-  Instance type: t4g.nano (maybe)
+  Instance type: t4g.micro (only some instance families support hibernation)
   Key pair: bison-task-key
   Network settings/Select existing security group: launch-wizard-1
   Configure storage: 8 Gb gp3 (default)
+    Details - encrypted
   Advanced Details:
     IAM instance profile: bison_ec2_s3_role
     Purchasing option: Spot instances
 
-* Pull the template from the first instance and use it to create each new instance.
-* The EC2 instance should have the following in the userdata::
+* Use the launch template to create a version for each task.
+* The launch template task versions must have the task name in the description, and
+  have the following script in the userdata::
 
     #!/bin/bash
     sudo apt update
@@ -107,19 +111,18 @@ EC2/Docker setup
     sudo apt install docker-compose-v2
     git clone https://github.com/lifemapper/bison.git
     cd bison
-    sudo docker compose -f <compose.test_task.yml> up
+    sudo docker compose -f <compose.task_name.yml> up
+    sudo shutdown -h now
 
-* For each task compose.test_task.yml must be replaced with the appropriate compose file.
+* For each task compose.task_name.yml must be replaced with the appropriate compose file.
 * On EC2 instance startup, the userdata script will execute
 * The compose file sets an environment variable (TASK_APP) containing a python module
   to be executed from the Dockerfile.
 * Tasks should deposit outputs and logfiles into S3.
-* After completion, the docker container will stop.
-* A final command should prune the system and volumes, to ensure the next execution
-  runs the most current code.
-* **TODO**: once the workflow is stable, create an image and download it in userdata script.
-  That will also eliminate the build time, and allow a new EC2 spot instance for every
-  task.
+* After completion, the docker container will stop automatically and the EC2 instance
+  will stop because of the shutdown command in the final line of the userdata script.
+* **TODO**: once the workflow is stable, to eliminate Docker build time, create a Docker
+  image and download it in userdata script.
 
 Lambda setup
 ....................
