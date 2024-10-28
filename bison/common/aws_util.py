@@ -13,7 +13,9 @@ import pandas
 import subprocess as sp
 from time import sleep
 
-from bison.common.constants import AWS_METADATA_URL, EC2_CONFIG_DIR, REGION, EC2_SPOT_TEMPLATE
+from bison.common.constants import (
+    AWS_METADATA_URL, EC2_SPOT_TEMPLATE, REGION, TASK, USERDATA_DIR
+)
 
 six_hours = 21600
 
@@ -148,8 +150,6 @@ class _AWS:
 # .............................................................................
 class EC2:
     """Class for creating and manipulating ec2 instances."""
-    TEMPLATE_BASENAME = "launch_template"
-
     # ----------------------------------------------------
     def __init__(self, region=REGION):
         """Constructor for common ec2 operations.
@@ -193,23 +193,24 @@ class EC2:
 
     # ----------------------------------------------------
     def create_task_template_version(
-            self, template_name, userdata_filename, local_path=EC2_CONFIG_DIR):
+            self, template_name, task, local_path=USERDATA_DIR):
         """Create a launch template version from the original, replacing the userdata.
 
         Args:
             template_name: name of the template to version.
-            userdata_filename: filename containing the userdata for the new version.
+            task (str): one of aws.common.constants.TASK.tasks
             local_path: full path to the local copy of the userdata file.
 
         Returns:
             ver_num: version number of the newly created template version.
         """
+        userdata_filename = TASK.get_userdata_filename(task)
         base64_script_text = self.get_userdata(userdata_filename, local_path=local_path)
         response = self._client.create_launch_template_version(
             DryRun=False,
             LaunchTemplateName=template_name,
             SourceVersion="1",
-            VersionDescription=userdata_filename,
+            VersionDescription=task,
             LaunchTemplateData={"UserData": base64_script_text}
         )
         try:
@@ -219,20 +220,29 @@ class EC2:
 
         desc = v_meta["VersionDescription"]
         ver_num = v_meta["VersionNumber"]
-        if desc != userdata_filename:
+        if desc != task:
             raise Exception(f"Bad description {desc} in version response {response}")
 
         return ver_num
 
     # ----------------------------------------------------
-    def _get_template_version(self, template_name, userdata_filename):
+    def get_template_version_number(self, template_name, task):
+        """Get a launch template version number for the task.
+
+        Args:
+            template_name: name of the task template.
+            task (str): one of aws.common.constants.TASK.tasks
+
+        Returns:
+            version_num (int): Version number of the launch template for this task.
+        """
         version_num = None
         response = self._client.describe_launch_template_versions(
             LaunchTemplateName=template_name
         )
         versions  = response["LaunchTemplateVersions"]
         for ver in versions:
-            if ver["VersionDescription"] == userdata_filename:
+            if ver["VersionDescription"] == task:
                 version_num = ver["VersionNumber"]
                 break
         return version_num
@@ -318,12 +328,12 @@ class EC2:
         return instance
 
     # ----------------------------------------------------
-    def run_task_instance(self, template_name, userdata_filename):
+    def run_task_instance(self, template_name, task):
         """Run an EC2 Instance from template with version desc = userdata_filename.
 
         Args:
             template_name: name for the launch template to be used for instantiation.
-            userdata_filename: file containing startup script corresponding to a task.
+            task (str): one of aws.common.constants.TASK.tasks
 
         Returns:
             instance_id: unique identifier of the new instance.
@@ -332,15 +342,13 @@ class EC2:
             NoCredentialsError: on failure to authenticate and run instance.
             ClientError: on failure to run instance.
         """
-        instance_id = None
-        # token = self.create_token()
-        # instance_name = self.create_token(ec2_type="ec2")
+        ver_num = self.get_template_version_number(template_name, task)
         try:
             response = self._client.run_instances(
-                # KeyName=key_name,
-                # ClientToken=token,
                 MinCount=1, MaxCount=1,
-                LaunchTemplate={"LaunchTemplateName": template_name, "Version": "1"},
+                LaunchTemplate={
+                    "LaunchTemplateName": template_name, "Version": f"{ver_num}"
+                },
                 TagSpecifications=[
                     {
                         "ResourceType": "instance",
@@ -823,11 +831,15 @@ from bison.common.constants import *
 from bison.common.aws_util import EC2
 
 ec2 = EC2()
-test_version = ec2.create_task_template_version(
-    EC2_SPOT_TEMPLATE, EC2_USERDATA_TEST_TASK, local_path=EC2_CONFIG_DIR)
 
+# task = TASK.TEST
+# test_version = ec2.create_task_template_version(
+#     EC2_SPOT_TEMPLATE, task, local_path=USERDATA_DIR)
+    
+    
+task = TASK.ANNOTATE_RIIS
 annotate_riis_version = ec2.create_task_template_version(
-    EC2_SPOT_TEMPLATE, EC2_USERDATA_ANNOTATE_RIIS, local_path=EC2_CONFIG_DIR)
+    EC2_SPOT_TEMPLATE, task, local_path=USERDATA_DIR)
 
 
 """

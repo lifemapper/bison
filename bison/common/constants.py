@@ -21,7 +21,6 @@ GBIF_BUCKET = f"gbif-open-data-{REGION}"
 GBIF_ARN = f"arn:aws:s3:::{GBIF_BUCKET}"
 GBIF_ODR_FNAME = "occurrence.parquet"
 
-# EC2_TASK_INSTANCE_ID = "i-0bc5a64e9385902a6"
 EC2_SPOT_TEMPLATE = "bison_spot_task_template"
 EC2_ROLE_NAME = f"{PROJECT}_ec2_s3_role"
 # Instance types: https://aws.amazon.com/ec2/spot/pricing/
@@ -37,11 +36,8 @@ S3_SUMMARY_DIR = "summary"
 # Docker compose files for tasks
 # .............................................................................
 # Assumes project repo directory
-EC2_CONFIG_DIR = "./aws/ec2"
-EC2_USERDATA_TEST_TASK = "test_task.userdata.sh"
-EC2_USERDATA_ANNOTATE_RIIS = "annotate_riis.userdata.sh"
-EC2_USERDATA_BUILD_SUMMARIES = "build_summaries.userdata.sh"
-EC2_USERDATA_BUILD_HEATMAP = "build_heatmap.userdata.sh"
+USERDATA_DIR = "./aws/userdata"
+
 
 # COMPOSE_TEST_TASK_FILENAME = "compose.test_task.yml"
 # COMPOSE_ANNOTATE_RIIS_FILENAME = "compose.annotate_riis.yml"
@@ -77,6 +73,41 @@ ERR_SEPARATOR = "------------"
 USER_DATA_TOKEN = "###SCRIPT_GOES_HERE###"
 CSV_DELIMITER = ","
 
+class TASK:
+    """Workflow tasks to be executed on EC2 instances."""
+    TEST = "test_task"
+    ANNOTATE_RIIS = "annotate_riis"
+    SUMMARIZE = "summarize"
+    BUILD_HEATMAP = "build_heatmap"
+    userdata_extension = ".userdata.sh"
+
+    # ...........................
+    @classmethod
+    def tasks(cls):
+        return (cls.TEST, cls.ANNOTATE_RIIS, cls.SUMMARIZE, cls.BUILD_HEATMAP)
+
+    # ...........................
+    @classmethod
+    def get_userdata_filename(cls, task, pth=None):
+        """Get the filename containing userdata to execute this task.
+
+        Args:
+            task: task
+        """
+        if task not in cls.tasks():
+            raise Exception(f"Unknown task {task}")
+        fname = f"{task}{cls.userdata_extension}"
+        if pth is not None:
+            fname = os.path.join(pth, fname)
+        return fname
+
+    # ...........................
+    @classmethod
+    def get_task_from_userdata_filename(cls, fname):
+        task = fname.rstrip(cls.userdata_extension)
+        if task not in cls.TASKS:
+            raise Exception(f"Unknown task {task} from userdata file {fname}")
+        return task
 
 # .............................................................................
 class REPORT:
