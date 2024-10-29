@@ -160,6 +160,7 @@ fill_aiannh_stmt = f"""
         FROM {tmp_aiannh_tbl} AS tmp
         WHERE bison.{join_fld} = tmp.{join_fld};
     """
+
 # Add field commands, < 30 sec total
 COMMANDS.extend([
     #
@@ -192,7 +193,18 @@ def lambda_handler(event, context):
     Raises:
         Exception: on failure to execute Redshift command.
     """
-    # Execute the commmands in order
+    # -------------------------------------
+    # FIRST: Check that current BISON data is in Redshift
+    # -------------------------------------
+    query_bison_stmt = f"SHOW TABLES FROM SCHEMA {database}.{pub_schema} WHERE name = {bison_tbl};"
+    try:
+        submit_result = rs_client.execute_statement(
+            WorkgroupName=PROJECT, Database=database, Sql=query_bison_stmt)
+    except Exception:
+        raise
+    # -------------------------------------
+    # NEXT: Intersect BISON data with ancillary tables, annotate BISON, in Redshift
+    # -------------------------------------
     for (cmd, stmt) in COMMANDS:
         # -------------------------------------
         try:

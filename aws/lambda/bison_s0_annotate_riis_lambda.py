@@ -110,8 +110,7 @@ def lambda_handler(event, context):
             break
     if ver_num is None:
         raise Exception(
-            f"Template {EC2_SPOT_TEMPLATE} version {TASK} "
-            "does not exist")
+            f"!!! Template {EC2_SPOT_TEMPLATE} version {TASK} does not exist")
     print(f"*** Found template {EC2_SPOT_TEMPLATE} version {ver_num} for {TASK}.")
 
     print("*** ---------------------------------------")
@@ -135,18 +134,18 @@ def lambda_handler(event, context):
             ]
         )
     except NoCredentialsError:
-        print("Failed to authenticate for run_instances")
+        print("!!! Failed to authenticate for run_instances")
         raise
     except ClientError:
         print(
-            f"Failed to run instance for template {EC2_SPOT_TEMPLATE}, "
+            f"!!! Failed to run instance for template {EC2_SPOT_TEMPLATE}, "
             f"version {ver_num}/{TASK}")
         raise
 
     try:
         instance = response["Instances"][0]
     except KeyError:
-        raise Exception(f"*** No instances returned in {response}")
+        raise Exception(f"!!! No instances returned in {response}")
 
     instance_id = instance["InstanceId"]
     print(f"*** Started instance {instance_id}. ")

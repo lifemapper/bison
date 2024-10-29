@@ -1,0 +1,30 @@
+{
+  "id": "bison_s1_load_ancillary",
+  "detail-type": "RIIS Annotated Object Created",
+  "source": "aws.s3",
+  "account": "321942852011",
+  "time": "2024-10-29T13:45:00Z",
+  "region": "us-region-1",
+  "resources": ["arn:aws:s3:::bison-321942852011-us-east-1"],
+  "detail": {
+    "version": "0",
+    "bucket": {
+      "name": "bison-321942852011-us-east-1"
+    },
+    "object": {
+      "key": "input/USRIISv2_MasterList_annotated*csv"
+    },
+    "requester": "321942852011",
+    "reason": "PutObject"
+  }
+}
+
+{
+  "source": ["aws.s3"],
+  "detail-type": ["Object Created"],
+  "detail": {
+    "bucket": {
+      "name": ["bison-321942852011-us-east-1"]
+    }
+  }
+}

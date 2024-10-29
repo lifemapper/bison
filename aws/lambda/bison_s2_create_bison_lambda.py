@@ -158,8 +158,10 @@ subset_stmt = f"""
 count_gbif_stmt = f"SELECT COUNT(*) from {mounted_gbif_name};"
 count_bison_stmt = f"SELECT COUNT(*) FROM {bison_tbl};"
 unmount_stmt = f"DROP TABLE {mounted_gbif_name};"
+query_tables_stmt = f"SHOW TABLES FROM SCHEMA {database}.{pub_schema};"
 
 COMMANDS = [
+    ("query_tables", query_tables_stmt),
     ("schema", create_schema_stmt),
     # 2 secs
     ("mount", mount_stmt),
@@ -224,6 +226,10 @@ def lambda_handler(event, context):
     Raises:
         Exception: on failure to execute Redshift command.
     """
+    # -------------------------------------
+    # No checks required
+    # Mount GBIF, subset to BISON table, add fields, all in Redshift
+    # -------------------------------------
     for (cmd, stmt) in COMMANDS:
         # -------------------------------------
         try:
@@ -263,19 +269,26 @@ def lambda_handler(event, context):
                     elapsed_time += waittime
 
         # -------------------------------------
-        # IF query for count, get statement output
+        # IF query, get statement output
         if cmd.startswith("query"):
             try:
                 stmt_result = rs_client.get_statement_result(Id=submit_id)
             except Exception as e:
-                print(f"*** No get_statement_result {e}")
+                print(f"!!! No get_statement_result {e}")
             else:
                 try:
                     records = stmt_result["Records"]
                 except Exception as e:
-                    print(f"Failed to return records ({e})")
+                    print(f"!!! Failed to return records ({e})")
                 else:
-                    print(f"***     COUNT = {records[0][0]['longValue']}")
+                    if cmd == "query_tables":
+                        tables_present = []
+                        # tablename is 2nd item in record
+                        for rec in records:
+                            tables_present.append(rec[2]['stringValue'])
+                        print(f"***     Tables: {tables_present}")
+                    else:
+                        print(f"***     COUNT = {records[0][0]['longValue']}")
 
     return {
         'statusCode': 200,

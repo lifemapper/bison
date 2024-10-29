@@ -39,7 +39,9 @@ S3_OUT_DIR = "output"
 S3_LOG_DIR = "log"
 S3_SUMMARY_DIR = "summary"
 RIIS_BASENAME = "USRIISv2_MasterList"
-annotated_riis_key = f"{S3_IN_DIR}/{RIIS_BASENAME}_annotated_{bison_datestr}.csv"
+riis_fname = f"{RIIS_BASENAME}_annotated_{bison_datestr}.csv"
+# ancillary_data["riis"]["filename"]
+annotated_riis_key = f"{S3_IN_DIR}/{riis_fname}"
 
 # Redshift
 # namespace, workgroup both = 'bison'
@@ -90,7 +92,7 @@ ancillary_data = {
     },
     "riis": {
         "table": f"riisv2_{bison_datestr}",
-        "filename": f"USRIISv2_MasterList_annotated_{bison_datestr}.csv",
+        "filename": riis_fname,
         "fields": {
             "locality": ("locality", "riis_region", "VARCHAR(3)"),
             "occid": ("occurrenceid", "riis_occurrence_id", "VARCHAR(50)"),
@@ -99,9 +101,12 @@ ancillary_data = {
     }
 }
 
+riis_tbl = ancillary_data["riis"]["table"]
+aiannh_tbl = ancillary_data["aiannh"]["table"]
+county_tbl = ancillary_data["county"]["table"]
+tables_required = []
 query_tables_stmt = f"SHOW TABLES FROM SCHEMA {database}.{pub_schema};"
 
-aiannh_tbl = ancillary_data["aiannh"]["table"]
 aiannh_fname = ancillary_data["aiannh"]["filename"]
 create_aiannh_stmt = f"""
     CREATE TABLE {aiannh_tbl} (
@@ -125,7 +130,6 @@ fill_aiannh_stmt = f""""
         IAM_role DEFAULT;
 """
 
-county_tbl = ancillary_data["county"]["table"]
 county_fname = ancillary_data["county"]["filename"]
 create_county_stmt = f"""
     CREATE TABLE {county_tbl} (
@@ -151,8 +155,6 @@ fill_county_stmt = f"""
         IAM_role DEFAULT;
 """
 
-riis_tbl = ancillary_data["riis"]["table"]
-riis_fname = ancillary_data["riis"]["filename"]
 create_riis_stmt = f"""
     CREATE TABLE IF NOT EXISTS {riis_tbl} (
     locality                  VARCHAR(max),
@@ -193,8 +195,8 @@ create_riis_stmt = f"""
 );
 """
 fill_riis_stmt = f"""
-    COPY riisv2_{bison_datestr}
-        FROM 's3://{S3_BUCKET}/{S3_IN_DIR}/{riis_fname}'
+    COPY {riis_tbl}
+        FROM 's3://{S3_BUCKET}/{annotated_riis_key}'
         FORMAT CSV
         IAM_role DEFAULT;
 """
@@ -224,6 +226,26 @@ def lambda_handler(event, context):
     Raises:
         Exception: on failure to execute Redshift command.
     """
+    # -------------------------------------
+    # FIRST: Check that current RIIS annotated data is on S3
+    # -------------------------------------
+    try:
+        tr_response = s3_client.list_objects_v2(
+            Bucket=S3_BUCKET, Prefix=annotated_riis_key, MaxKeys=10)
+    except Exception as e:
+        print(f"!!! Error querying for bucket/object {annotated_riis_key} ({e})")
+        raise e
+    try:
+        _contents = tr_response["Contents"]
+    except KeyError:
+        raise Exception(
+            f"!!! Missing annotated RIIS data: {annotated_riis_key}")
+    else:
+        print(f"*** Found annotated RIIS data: {annotated_riis_key}")
+
+    # -------------------------------------
+    # NEXT: Load tables from S3 to Redshift
+    # -------------------------------------
     tables_present = []
     for (cmd, stmt, tblname) in COMMANDS:
         if tblname is None or tblname not in tables_present:
@@ -259,7 +281,7 @@ def lambda_handler(event, context):
                                 err = describe_result["Error"]
                             except Exception:
                                 err = "Unknown Error"
-                            print(f"***    FAILED: {err}")
+                            print(f"!!!  FAILED: {err}")
                     else:
                         time.sleep(waittime)
                         elapsed_time += waittime
@@ -275,7 +297,7 @@ def lambda_handler(event, context):
                     try:
                         records = stmt_result["Records"]
                     except Exception as e:
-                        print(f"*** Failed to return records ({e})")
+                        print(f"!!! Failed to return records ({e})")
                     else:
                         # tablename is 2nd item in record
                         for rec in records:
