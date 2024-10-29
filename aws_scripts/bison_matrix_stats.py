@@ -430,4 +430,6 @@ if __name__ == "__main__":
     species_stat_df.to_parquet(f"{s3_outpath}/species_stats_{datestr}.parquet")
 
     # Upload logfile to S3
-    uploaded_s3name = s3.upload(logger.filename, S3_BUCKET, S3_LOG_DIR)
+    basename = os.path.basename(logger.filename)
+    uploaded_s3name = s3.upload(
+        logger.filename, S3_BUCKET, f"{S3_LOG_DIR}/{basename}")

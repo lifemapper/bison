@@ -52,8 +52,9 @@ def annotate_riis():
 if __name__ == '__main__':
     """Resolve and write GBIF accepted names and taxonKeys in RIIS records."""
     annotated_filename = annotate_riis()
+    annotated_basename = os.path.basename(annotated_filename)
     s3 = S3(region=REGION)
-    s3.upload(annotated_filename, S3_BUCKET, S3_IN_DIR)
+    s3.upload(annotated_filename, S3_BUCKET, f"{S3_IN_DIR}/{annotated_basename}")
 
 
 """

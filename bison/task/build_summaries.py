@@ -114,10 +114,11 @@ def save_matrix(s3, mtx, local_path, bucket, bucket_path, logger):
     """
     # Compress and save matrix to S3
     out_filename = mtx.compress_to_file(local_path=local_path)
+    out_basename = os.path.basename(out_filename)
     logger.log(
         f"Compressed {mtx.table_type} to {out_filename}", refname=script_name)
     try:
-        s3_datapath = s3.upload(out_filename, bucket, bucket_path)
+        s3_datapath = s3.upload(out_filename, bucket, f"{bucket_path}/{out_basename}")
     except Exception as e:
         logger.log(f"Failed to upload {out_filename} to S3. ({e})")
         raise (e)
