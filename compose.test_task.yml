@@ -12,6 +12,7 @@ services:
     logging:
       driver: awslogs
       options:
+        awslogs-region: us-east-1
         awslogs-group: bison_task
         awslogs-stream: test_task
     volumes:
