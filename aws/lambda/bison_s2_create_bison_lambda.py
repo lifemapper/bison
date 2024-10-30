@@ -20,9 +20,9 @@ prev_mo = mo - 1
 if mo == 1:
     prev_mo = 12
     prev_yr = yr - 1
+gbif_datestr = f"{yr}-{mo:02d}-01"
 bison_datestr = f"{yr}_{mo:02d}_01"
 old_bison_datestr = f"{prev_yr}_{prev_mo:02d}_01"
-gbif_datestr = f"{yr}-{mo:02d}-01"
 
 # .............................................................................
 # AWS constants
@@ -53,8 +53,10 @@ pub_schema = "public"
 external_schema = "redshift_spectrum"
 # Wait time for completion of Redshift command
 waittime = 5
+
 # Name the Redshift mounted gbif data and bison table to create from it
 bison_tbl = f"{pub_schema}.bison_{bison_datestr}"
+old_bison_tbl = f"{pub_schema}.bison_{old_bison_datestr}"
 mounted_gbif_name = f"{external_schema}.occurrence_{bison_datestr}_parquet"
 
 # .............................................................................
@@ -66,10 +68,12 @@ bc_session = bc.get_session()
 session = boto3.Session(botocore_session=bc_session, region_name=REGION)
 # Initialize Redshift client
 config = Config(connect_timeout=timeout, read_timeout=timeout)
-s3_client = session.client("s3", config=config, region_name=REGION)
-rs_client = session.client("redshift", config=config)
+rs_client = session.client("redshift-data", config=config)
 
-COMMANDS = []
+# .............................................................................
+# Commands
+# .............................................................................
+query_tables_stmt = f"SHOW TABLES FROM SCHEMA {database}.{pub_schema};"
 
 create_schema_stmt = f"""
     CREATE EXTERNAL SCHEMA IF NOT EXISTS {external_schema}
@@ -158,9 +162,8 @@ subset_stmt = f"""
 count_gbif_stmt = f"SELECT COUNT(*) from {mounted_gbif_name};"
 count_bison_stmt = f"SELECT COUNT(*) FROM {bison_tbl};"
 unmount_stmt = f"DROP TABLE {mounted_gbif_name};"
-query_tables_stmt = f"SHOW TABLES FROM SCHEMA {database}.{pub_schema};"
 
-COMMANDS = [
+REDSHIFT_COMMANDS = [
     ("query_tables", query_tables_stmt),
     ("schema", create_schema_stmt),
     # 2 secs
@@ -174,6 +177,13 @@ COMMANDS = [
     # 1 secs
     ("unmount", unmount_stmt)
 ]
+# .............................................................................
+# Ancillary data parameters
+# .............................................................................
+RIIS_BASENAME = "USRIISv2_MasterList"
+riis_fname = f"{RIIS_BASENAME}_annotated_{bison_datestr}.csv"
+riis_tbl = f"riisv2_{bison_datestr}"
+
 # Each fields tuple contains original fieldname, corresponding bison fieldname and type
 ancillary_data = {
     "aiannh": {
@@ -194,8 +204,8 @@ ancillary_data = {
         }
     },
     "riis": {
-        "table": f"riisv2_{bison_datestr}",
-        "filename": f"USRIISv2_MasterList_annotated_{bison_datestr}.csv",
+        "table": riis_tbl,
+        "filename": riis_fname,
         "fields": {
             "locality": ("locality", "riis_region", "VARCHAR(3)"),
             "occid": ("occurrenceid", "riis_occurrence_id", "VARCHAR(50)"),
@@ -209,7 +219,7 @@ for _ttyp, tbl in ancillary_data.items():
     for (_orig_fld, bison_fld, bison_typ) in tbl["fields"].values():
         # 1-2 secs
         stmt = f"ALTER TABLE {bison_tbl} ADD COLUMN {bison_fld} {bison_typ} DEFAULT NULL;"
-        COMMANDS.append((f"add_{bison_fld}", stmt))
+        REDSHIFT_COMMANDS.append((f"add_{bison_fld}", stmt))
 
 
 # --------------------------------------------------------------------------------------
@@ -226,11 +236,12 @@ def lambda_handler(event, context):
     Raises:
         Exception: on failure to execute Redshift command.
     """
+    output = []
     # -------------------------------------
     # No checks required
     # Mount GBIF, subset to BISON table, add fields, all in Redshift
     # -------------------------------------
-    for (cmd, stmt) in COMMANDS:
+    for (cmd, stmt) in REDSHIFT_COMMANDS:
         # -------------------------------------
         try:
             submit_result = rs_client.execute_statement(
@@ -239,8 +250,9 @@ def lambda_handler(event, context):
             raise Exception(e)
 
         print("*** ......................")
-        print(f"*** {cmd.upper()} command submitted")
-        print(f"***    {stmt}")
+        msg = f"*** {cmd.upper()} command submitted"
+        output.append(msg)
+        print(msg)
         submit_id = submit_result['Id']
 
         # -------------------------------------
@@ -252,7 +264,7 @@ def lambda_handler(event, context):
                 describe_result = rs_client.describe_statement(Id=submit_id)
             except Exception as e:
                 complete = True
-                print(f"Failed to describe_statement {e}")
+                print(f"!!! Failed to describe_statement {e}")
             else:
                 status = describe_result["Status"]
                 if status in ("ABORTED", "FAILED", "FINISHED"):
@@ -263,7 +275,7 @@ def lambda_handler(event, context):
                             err = describe_result["Error"]
                         except Exception:
                             err = "Unknown Error"
-                        print(f"***    FAILED: {err}")
+                        print(f"!!!    FAILED: {err}")
                 else:
                     time.sleep(waittime)
                     elapsed_time += waittime
@@ -286,11 +298,12 @@ def lambda_handler(event, context):
                         # tablename is 2nd item in record
                         for rec in records:
                             tables_present.append(rec[2]['stringValue'])
-                        print(f"***     Tables: {tables_present}")
+                        msg = f"***     Tables: {tables_present}"
                     else:
-                        print(f"***     COUNT = {records[0][0]['longValue']}")
-
+                        msg = f"***     COUNT = {records[0][0]['longValue']}"
+                    print(msg)
+                    output.append(msg)
     return {
         'statusCode': 200,
-        'body': json.dumps("Lambda result logged")
+        'body': json.dumps(output)
     }
