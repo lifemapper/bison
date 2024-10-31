@@ -151,3 +151,50 @@ Hop Limit for AWS communication
         --http-endpoint enabled
 
 * or in console, add metadata tag/value HttpPutResponseHopLimit/2
+
+EC2/Docker setup
+....................
+
+* Create the first EC2 Launch Template as a "one-time" Spot instance, no hibernation
+
+* The Launch template should have the following settings::
+
+  Name: bison_spot_task
+  Application and OS Images: Ubuntu
+  AMI: Ubuntu 24.04 LTS
+  Architecture: 64-bit ARM
+  Instance type: t4g.micro
+  Key pair: bison-task-key
+  Network settings/Select existing security group: launch-wizard-1
+  Configure storage: 8 Gb gp3 (default)
+    Details - encrypted
+  Advanced Details:
+    IAM instance profile: bison_ec2_s3_role
+    Shutdown behavior: Terminate
+    Cloudwatch monitoring: Enable
+    Purchasing option: Spot instances
+    Request type: One-time
+
+* Use the launch template to create a version for each task.
+* The launch template task versions must have the task name in the description, and
+  have the following script in the userdata::
+
+    #!/bin/bash
+    sudo apt-get -y update
+    sudo apt-get -y install docker.io
+    sudo apt-get -y install docker-compose-v2
+    git clone https://github.com/lifemapper/bison.git
+    cd bison
+    sudo docker compose -f compose.test_task.yml up
+    sudo shutdown -h now
+
+
+* For each task **compose.test_task.yml** must be replaced with the appropriate compose file.
+* On EC2 instance startup, the userdata script will execute
+* The compose file sets an environment variable (TASK_APP) containing a python module
+  to be executed from the Dockerfile.
+* Tasks should deposit outputs and logfiles into S3.
+* After completion, the docker container will stop automatically and the EC2 instance
+  will stop because of the shutdown command in the final line of the userdata script.
+* **TODO**: once the workflow is stable, to eliminate Docker build time, create a Docker
+  image and download it in userdata script.

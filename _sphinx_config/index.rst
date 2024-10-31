@@ -9,7 +9,7 @@ Current
 ------------
 
 .. toctree::
-    :maxdepth: 2
+    :maxdepth: 1
 
     pages/about
     pages/workflow
@@ -18,23 +18,28 @@ Setup AWS
 ------------
 
 .. toctree::
-    :maxdepth: 2
+    :maxdepth: 1
 
     pages/aws/aws_setup
+    pages/aws/ec2_setup
+    pages/aws/lambda
+    pages/aws/roles
+    pages/aws/automation
 
 Using BISON
 ------------
 
 .. toctree::
-    :maxdepth: 2
+    :maxdepth: 1
 
-    pages/interaction/about
+    pages/interaction/debug
+    pages/interaction/deploy
 
-History
+Old Stuff
 ------------
 
 .. toctree::
-    :maxdepth: 2
+    :maxdepth: 1
 
     pages/history/year4_planB
     pages/history/year4_planA

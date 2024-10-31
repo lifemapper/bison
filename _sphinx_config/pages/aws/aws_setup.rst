@@ -1,8 +1,12 @@
 AWS Resource Setup
+###################
+
+Security
 ********************
 
 Create policies and roles
 ===========================================================
+
 
 The :ref:`_bison_redshift_lambda_role` allows access to the bison Redshift
 namespace/workgroup, lambda functions, EventBridge Scheduler, and S3 data.
@@ -24,6 +28,36 @@ schema and lambda functions.  When mounting external data as a redshift table to
 external schema, you may encounter an error indicating that the "dev" database does not
 exist.  This refers to the external database, and may indicate that the role used by the
 command and/or namespace differs from the role granted to the schema upon creation.
+
+Create a Security Group for the region
+===========================================================
+
+* Test this group!
+* Create a security group for the project/region
+
+  * inbound rules allow:
+
+    * Custom TCP, port 8000
+    * Custom TCP, port 8080
+    * HTTPS, port 80
+    * HTTPS, port 443
+    * SSH, port 22
+
+  * Consider restricting SSH to campus
+
+* or use launch-wizard-1 security group (created by some EC2 instance creation in 2023)
+
+  * inbound rules IPv4:
+
+    * Custom TCP 8000
+    * Custom TCP 8080
+    * SSH 22
+    * HTTP 80
+    * HTTPS 443
+
+  * outbound rules IPv4, IPv6:
+
+    * All traffic all ports
 
 Redshift Namespace and Workgroup
 ===========================================================
