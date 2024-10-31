@@ -3,10 +3,9 @@ import boto3
 import botocore.session as bc
 from botocore.client import Config
 from datetime import datetime
-import json
 import time
 
-print('Loading function')
+print("*** Loading function bison_s2_create_bison")
 PROJECT = "bison"
 
 # .............................................................................
@@ -31,8 +30,6 @@ REGION = "us-east-1"
 AWS_ACCOUNT = "321942852011"
 AWS_METADATA_URL = "http://169.254.169.254/latest/"
 WORKFLOW_ROLE_NAME = f"{PROJECT}_redshift_lambda_role"
-WORKFLOW_ROLE_ARN = f"arn:aws:iam::{PROJECT}:role/service-role/{WORKFLOW_ROLE_NAME}"
-WORKFLOW_USER = f"project.{PROJECT}"
 
 # S3 locations
 S3_BUCKET = f"{PROJECT}-{AWS_ACCOUNT}-{REGION}"
@@ -146,7 +143,7 @@ subset_stmt = f"""
             gbifid, datasetkey, species, taxonrank, scientificname, countrycode, stateprovince,
             occurrencestatus, publishingorgkey, day, month, year, taxonkey, specieskey,
             basisofrecord, decimallongitude, decimallatitude,
-            (taxonkey || ' ' || species) as taxonkey_species
+            (taxonkey || ' ' || species) as taxonkey_species,
             ST_Makepoint(decimallongitude, decimallatitude) as geom
         FROM redshift_spectrum.occurrence_{bison_datestr}_parquet
         WHERE decimallatitude IS NOT NULL
@@ -236,12 +233,15 @@ def lambda_handler(event, context):
     Raises:
         Exception: on failure to execute Redshift command.
     """
-    output = []
+    success = True
     # -------------------------------------
     # No checks required
     # Mount GBIF, subset to BISON table, add fields, all in Redshift
     # -------------------------------------
     for (cmd, stmt) in REDSHIFT_COMMANDS:
+        # Stop after a failure
+        if success is False:
+            break
         # -------------------------------------
         try:
             submit_result = rs_client.execute_statement(
@@ -250,9 +250,7 @@ def lambda_handler(event, context):
             raise Exception(e)
 
         print("*** ......................")
-        msg = f"*** {cmd.upper()} command submitted"
-        output.append(msg)
-        print(msg)
+        print(f"*** {cmd.upper()} command submitted")
         submit_id = submit_result['Id']
 
         # -------------------------------------
@@ -270,7 +268,8 @@ def lambda_handler(event, context):
                 if status in ("ABORTED", "FAILED", "FINISHED"):
                     complete = True
                     print(f"*** Status - {status} after {elapsed_time} seconds")
-                    if status == "FAILED":
+                    if status in ("ABORTED", "FAILED"):
+                        success = False
                         try:
                             err = describe_result["Error"]
                         except Exception:
@@ -282,7 +281,7 @@ def lambda_handler(event, context):
 
         # -------------------------------------
         # IF query, get statement output
-        if cmd.startswith("query"):
+        if cmd.startswith("query") and success is True:
             try:
                 stmt_result = rs_client.get_statement_result(Id=submit_id)
             except Exception as e:
@@ -300,10 +299,12 @@ def lambda_handler(event, context):
                             tables_present.append(rec[2]['stringValue'])
                         msg = f"***     Tables: {tables_present}"
                     else:
-                        msg = f"***     COUNT = {records[0][0]['longValue']}"
+                        if cmd == "query_mount":
+                            msg = f"***     GBIF COUNT = {records[0][0]['longValue']}"
+                        else:
+                            msg = f"***     BISON COUNT = {records[0][0]['longValue']}"
                     print(msg)
-                    output.append(msg)
     return {
-        'statusCode': 200,
-        'body': json.dumps(output)
+        "statusCode": 200,
+        "body": "Executed bison_s2_create_bison lambda"
     }

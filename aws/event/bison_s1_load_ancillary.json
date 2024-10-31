@@ -18,13 +18,3 @@
     "reason": "PutObject"
   }
 }
-
-{
-  "source": ["aws.s3"],
-  "detail-type": ["Object Created"],
-  "detail": {
-    "bucket": {
-      "name": ["bison-321942852011-us-east-1"]
-    }
-  }
-}

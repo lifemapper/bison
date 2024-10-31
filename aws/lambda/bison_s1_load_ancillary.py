@@ -3,10 +3,9 @@ import boto3
 import botocore.session as bc
 from botocore.client import Config
 from datetime import datetime
-import json
 import time
 
-print('Loading function')
+print("*** Loading function bison_s1_load_ancillary")
 PROJECT = "bison"
 
 # .............................................................................
@@ -29,10 +28,7 @@ old_bison_datestr = f"{prev_yr}_{prev_mo:02d}_01"
 # .............................................................................
 REGION = "us-east-1"
 AWS_ACCOUNT = "321942852011"
-AWS_METADATA_URL = "http://169.254.169.254/latest/"
 WORKFLOW_ROLE_NAME = f"{PROJECT}_redshift_lambda_role"
-WORKFLOW_ROLE_ARN = f"arn:aws:iam::{PROJECT}:role/service-role/{WORKFLOW_ROLE_NAME}"
-WORKFLOW_USER = f"project.{PROJECT}"
 
 # S3 locations
 S3_BUCKET = f"{PROJECT}-{AWS_ACCOUNT}-{REGION}"
@@ -234,7 +230,6 @@ def lambda_handler(event, context):
     Raises:
         Exception: on failure to execute Redshift command.
     """
-    output = []
     # -------------------------------------
     # FIRST: Check that current RIIS annotated data exists on S3
     # -------------------------------------
@@ -250,9 +245,7 @@ def lambda_handler(event, context):
         raise Exception(
             f"!!! Missing annotated RIIS data: {annotated_riis_key}")
     else:
-        msg = f"*** Found annotated RIIS data: {annotated_riis_key}"
-        output.append(msg)
-        print(msg)
+        print(f"*** Found annotated RIIS data: {annotated_riis_key}")
 
     # -------------------------------------
     # NEXT: Delete obsolete table,
@@ -270,10 +263,7 @@ def lambda_handler(event, context):
                 raise Exception(e)
 
             submit_id = submit_result['Id']
-            msg = f"*** {cmd.upper()} command submitted with Id {submit_id}"
-            print(msg)
-            output.append(msg)
-            # print(f"***    {stmt}")
+            print(f"*** {cmd.upper()} command submitted with Id {submit_id}")
 
             # -------------------------------------
             # Loop til complete, then get result status
@@ -317,26 +307,9 @@ def lambda_handler(event, context):
                         # tablename is 2nd item in record
                         for rec in records:
                             tables_present.append(rec[2]['stringValue'])
-                        msg = f"***     Tables in Redshift: {tables_present}"
-                        output.append(msg)
-                        print(msg)
-
-    # -------------------------------------
-    # Last: Remove obsolete RIIS annotated data from S3
-    # -------------------------------------
-    try:
-        rm_response = s3_client.delete_object(
-            Bucket=S3_BUCKET, Key=old_annotated_riis_key)
-
-    except Exception as e:
-        print(f"!!! Error deleting bucket/object {old_annotated_riis_key} ({e})")
-        raise e
-
-    msg = f"*** Deleted {old_annotated_riis_key} (if exists) with delete command."
-    output.append(msg)
-    print(msg)
+                        print(f"***     Tables in Redshift: {tables_present}")
 
     return {
-        'statusCode': 200,
-        'body': json.dumps(output)
+        "statusCode": 200,
+        "body": "Executed bison_s1_load_ancillary lambda"
     }

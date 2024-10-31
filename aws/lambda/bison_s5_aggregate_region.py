@@ -1,43 +1,72 @@
 """Lambda function to aggregate counts and lists by region."""
-# Set lambda timeout to 5 minutes.
-import json
 import boto3
 import botocore.session as bc
 from botocore.client import Config
 from datetime import datetime
 import time
 
-print("*** Loading lambda function")
+print("*** Loading function bison_s3_intersect_bison")
+PROJECT = "bison"
 
-region = "us-east-1"
-workgroup = "bison"
+# .............................................................................
+# Dataload filename postfixes
+# .............................................................................
+dt = datetime.now()
+yr = dt.year
+mo = dt.month
+bison_datestr = f"{yr}_{mo:02d}_01"
+gbif_datestr = f"{yr}-{mo:02d}-01"
+
+# .............................................................................
+# AWS constants
+# .............................................................................
+REGION = "us-east-1"
+AWS_ACCOUNT = "321942852011"
+WORKFLOW_ROLE_NAME = f"{PROJECT}_redshift_lambda_role"
+
+# EC2 launch template/version
+EC2_SPOT_TEMPLATE = "bison_spot_task_template"
+TASK = "test_task"
+
+# S3 locations
+S3_BUCKET = f"{PROJECT}-{AWS_ACCOUNT}-{REGION}"
+S3_IN_DIR = "input"
+S3_OUT_DIR = "output"
+S3_LOG_DIR = "log"
+S3_SUMMARY_DIR = "summary"
+s3_out = f"s3://{S3_BUCKET}/summary"
+
+# Redshift
+# namespace, workgroup both = 'bison'
+db_user = f"IAMR:{WORKFLOW_ROLE_NAME}"
 database = "dev"
 pub_schema = "public"
-iam_role = "arn:aws:iam::321942852011:role/service-role/bison_redshift_lambda_role"
-db_user = "IAMR:bison_redshift_lambda_role"
 external_schema = "redshift_spectrum"
-timeout = 900
-waittime = 1
-
-# Get previous data date
-yr = datetime.now().year
-mo = datetime.now().month
-prev_yr = yr
-prev_mo = mo - 1
-if mo == 1:
-    prev_mo = 12
-    prev_yr = yr - 1
-bison_datestr = f"{yr}_{mo:02d}_01"
-old_bison_datestr = f"{prev_yr}_{prev_mo:02d}_01"
+# Wait time for completion of Redshift command
+waittime = 5
+# Name the Redshift mounted gbif data and bison table to create from it
 bison_tbl = f"bison_{bison_datestr}"
+mounted_gbif_name = f"{external_schema}.occurrence_{bison_datestr}_parquet"
 
-# Define the bison bucket and table to create
-bison_bucket = "bison-321942852011-us-east-1"
-s3_out = f"s3://{bison_bucket}/summary"
+# .............................................................................
+# Initialize Botocore session and clients
+# .............................................................................
+timeout = 300
+session = boto3.session.Session()
+bc_session = bc.get_session()
+session = boto3.Session(botocore_session=bc_session, region_name=REGION)
+# Initialize Redshift client
+config = Config(connect_timeout=timeout, read_timeout=timeout)
+rs_client = session.client("redshift-data", config=config)
 
-COMMANDS = []
+# .............................................................................
+# Ancillary data parameters
+# .............................................................................
+RIIS_BASENAME = "USRIISv2_MasterList"
+riis_fname = f"{RIIS_BASENAME}_annotated_{bison_datestr}.csv"
+riis_tbl = f"riisv2_{bison_datestr}"
 
-# Each fields tuple contains original fieldname, corresponding bison fieldname and type
+# Each fields tuple contains original fieldname, bison fieldname and bison fieldtype
 ancillary_data = {
     "aiannh": {
         "table": "aiannh2023",
@@ -57,10 +86,8 @@ ancillary_data = {
         }
     },
     "riis": {
-        "table": f"riisv2_{bison_datestr}",
-        # in S3; filename constructed with
-        #   BisonNameOp.get_annotated_riis_filename(RIIS_BASENAME)
-        "filename": f"USRIISv2_MasterList_annotated_{bison_datestr}.csv",
+        "table": riis_tbl,
+        "filename": riis_fname,
         "fields": {
             "locality": ("locality", "riis_region", "VARCHAR(3)"),
             "occid": ("occurrenceid", "riis_occurrence_id", "VARCHAR(50)"),
@@ -138,7 +165,7 @@ state_x_riis_counts_stmt = f"""
 """
 # Note: in county agggregate, include states bc county names are not unique
 county_counts_stmt = f"""
-    CREATE TABLE public.{county_counts_tbl} AS
+    CREATE TABLE {pub_schema}.{county_counts_tbl} AS
         SELECT DISTINCT {unique_cty_fld},
             COUNT(*) AS {out_occcount_fld},
             COUNT(DISTINCT {gbif_tx_fld}) AS {out_spcount_fld}
@@ -147,7 +174,7 @@ county_counts_stmt = f"""
         GROUP BY {unique_cty_fld};
 """
 county_x_riis_counts_stmt = f"""
-    CREATE TABLE public.{county_x_riis_counts_tbl} AS
+    CREATE TABLE {pub_schema}.{county_x_riis_counts_tbl} AS
         SELECT DISTINCT {unique_cty_fld}, {b_ass_fld},
             COUNT(*) AS {out_occcount_fld},
             COUNT(DISTINCT {gbif_tx_fld}) AS {out_spcount_fld}
@@ -240,29 +267,19 @@ aiannh_list_export_stmt = f"""
         FORMAT AS PARQUET
         PARALLEL OFF;
 """
-COMMANDS.extend([
+REDSHIFT_COMMANDS = [
     # Create tables of region with species counts, occurrence counts
-    ("counts_by_state", state_counts_stmt),
-    ("counts_by_county", county_counts_stmt),
-    ("counts_by_aiannh", aiannh_counts_stmt),
-    # Create lists of region with species, riis status, occurrence counts
+    ("counts_by_state", state_counts_stmt, None),
+    ("counts_by_county", county_counts_stmt, None),
+    ("counts_by_aiannh", aiannh_counts_stmt, None),
+    # Create lists of region with species, riis status, occurrence counts, then export
     ("list_state_species", state_list_stmt),
-    ("list_county_species", county_list_stmt),
-    ("list_aiannh_species", aiannh_list_stmt),
-    # Export lists of region with species, riis status, occurrence counts to S3
     ("export_state_species", state_list_export_stmt),
+    ("list_county_species", county_list_stmt),
     ("export_county_species", county_list_export_stmt),
+    ("list_aiannh_species", aiannh_list_stmt),
     ("export_aiannh_species", aiannh_list_export_stmt),
     ]
-)
-
-# Initialize Botocore session
-session = boto3.session.Session()
-bc_session = bc.get_session()
-session = boto3.Session(botocore_session=bc_session, region_name=region)
-# Initialize Redshift client
-config = Config(connect_timeout=timeout, read_timeout=timeout)
-client_redshift = session.client("redshift-data", config=config)
 
 
 # --------------------------------------------------------------------------------------
@@ -279,18 +296,21 @@ def lambda_handler(event, context):
     Raises:
         Exception: on failure to execute Redshift command.
     """
-    # Execute the commmands in order
-    for (cmd, stmt) in COMMANDS:
+    # -------------------------------------
+    # Execute the annotation commmands in order
+    # -------------------------------------
+    for (cmd, stmt) in REDSHIFT_COMMANDS:
+        # Do not stop after a failure
         # -------------------------------------
         try:
-            submit_result = client_redshift.execute_statement(
-                WorkgroupName=workgroup, Database=database, Sql=stmt)
+            submit_result = rs_client.execute_statement(
+                WorkgroupName=PROJECT, Database=database, Sql=stmt)
         except Exception:
             raise
 
         print("*** ---------------------------------------")
         print(f"*** {cmd.upper()} command submitted")
-        print(f"***    {stmt}")
+        print(stmt)
         submit_id = submit_result['Id']
 
         # -------------------------------------
@@ -299,25 +319,26 @@ def lambda_handler(event, context):
         complete = False
         while not complete:
             try:
-                describe_result = client_redshift.describe_statement(Id=submit_id)
+                describe_result = rs_client.describe_statement(Id=submit_id)
             except Exception as e:
-                print(f"*** Failed to describe_statement in {elapsed_time} secs: {e}")
+                complete = True
+                print(f"!!! Failed to describe_statement {e}")
             else:
                 status = describe_result["Status"]
                 if status in ("ABORTED", "FAILED", "FINISHED"):
-                    print(f"*** Status - {status} after {elapsed_time} seconds")
                     complete = True
-                    if status == "FAILED":
+                    print(f"*** Status - {status} after {elapsed_time} seconds")
+                    if status in ("ABORTED", "FAILED"):
                         try:
                             err = describe_result["Error"]
                         except Exception:
                             err = "Unknown Error"
-                        print(f"***    FAILED: {err}")
+                        print(f"!!!    FAILED: {err}")
                 else:
                     time.sleep(waittime)
                     elapsed_time += waittime
 
     return {
-        'statusCode': 200,
-        'body': json.dumps("Lambda result logged")
+        "statusCode": 200,
+        "body": "Executed bison_s5_aggregate_region lambda"
     }

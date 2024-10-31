@@ -4,9 +4,8 @@ from botocore.exceptions import ClientError, NoCredentialsError
 import botocore.session as bc
 from botocore.client import Config
 from datetime import datetime
-import json
 
-print('Loading function')
+print("*** Loading function bison_s0_annotate_riis")
 PROJECT = "bison"
 
 # .............................................................................
@@ -75,10 +74,6 @@ def lambda_handler(event, context):
         Exception: on no instances started.
         Exception: on unknown error.
     """
-    print("*** ---------------------------------------")
-    print("*** Received trigger: " + json.dumps(event))
-    print("*** ---------------------------------------")
-
     # -------------------------------------
     # Look for existing S3 annotated data
     try:
@@ -152,5 +147,5 @@ def lambda_handler(event, context):
 
     return {
         "statusCode": 200,
-        "body": f"Executed bison_s0_annotate_riis_lambda starting EC2 {instance_id}"
+        "body": f"Executed bison_s0_annotate_riis lambda starting EC2 {instance_id}"
     }

@@ -3,10 +3,9 @@ import boto3
 import botocore.session as bc
 from botocore.client import Config
 from datetime import datetime
-import json
 import time
 
-print('Loading function')
+print("*** Loading function bison_s3_intersect_bison")
 PROJECT = "bison"
 
 # .............................................................................
@@ -23,10 +22,7 @@ gbif_datestr = f"{yr}-{mo:02d}-01"
 # .............................................................................
 REGION = "us-east-1"
 AWS_ACCOUNT = "321942852011"
-AWS_METADATA_URL = "http://169.254.169.254/latest/"
 WORKFLOW_ROLE_NAME = f"{PROJECT}_redshift_lambda_role"
-WORKFLOW_ROLE_ARN = f"arn:aws:iam::{PROJECT}:role/service-role/{WORKFLOW_ROLE_NAME}"
-WORKFLOW_USER = f"project.{PROJECT}"
 
 # EC2 launch template/version
 EC2_SPOT_TEMPLATE = "bison_spot_task_template"
@@ -50,7 +46,7 @@ external_schema = "redshift_spectrum"
 # Wait time for completion of Redshift command
 waittime = 5
 # Name the Redshift mounted gbif data and bison table to create from it
-bison_tbl = f"{pub_schema}.bison_{bison_datestr}"
+bison_tbl = f"bison_{bison_datestr}"
 mounted_gbif_name = f"{external_schema}.occurrence_{bison_datestr}_parquet"
 
 # .............................................................................
@@ -62,12 +58,15 @@ bc_session = bc.get_session()
 session = boto3.Session(botocore_session=bc_session, region_name=REGION)
 # Initialize Redshift client
 config = Config(connect_timeout=timeout, read_timeout=timeout)
-s3_client = session.client("s3", config=config, region_name=REGION)
-rs_client = session.client("redshift", config=config)
+rs_client = session.client("redshift-data", config=config)
 
 # .............................................................................
 # Ancillary data parameters
 # .............................................................................
+RIIS_BASENAME = "USRIISv2_MasterList"
+riis_fname = f"{RIIS_BASENAME}_annotated_{bison_datestr}.csv"
+riis_tbl = f"riisv2_{bison_datestr}"
+
 # Each fields tuple contains original fieldname, bison fieldname and bison fieldtype
 ancillary_data = {
     "aiannh": {
@@ -88,8 +87,8 @@ ancillary_data = {
         }
     },
     "riis": {
-        "table": f"riisv2_{bison_datestr}",
-        "filename": "{riis_prefix}{bison_datestr}.csv",
+        "table": riis_tbl,
+        "filename": riis_fname,
         "fields": {
             "locality": ("locality", "riis_region", "VARCHAR(3)"),
             "occid": ("occurrenceid", "riis_occurrence_id", "VARCHAR(50)"),
@@ -97,8 +96,6 @@ ancillary_data = {
         }
     }
 }
-
-COMMANDS = []
 
 join_fld = "gbifid"
 
@@ -112,8 +109,8 @@ b_cty_fld = cty_data["fields"]["county"][1]
 b_stcty_fld = cty_data["fields"]["state_county"][1]
 
 # Temporary intersection tables
-tmp_county_tbl = f"{pub_schema}.tmp_bison_x_county_{bison_datestr}"
-tmp_aiannh_tbl = f"{pub_schema}.tmp_bison_x_aiannh_{bison_datestr}"
+tmp_county_tbl = f"tmp_bison_x_county_{bison_datestr}"
+tmp_aiannh_tbl = f"tmp_bison_x_aiannh_{bison_datestr}"
 
 # Drop temp tables if exist
 drop_county_tmp_stmt = f"DROP TABLE IF EXISTS {pub_schema}.{tmp_county_tbl};"
@@ -161,14 +158,19 @@ fill_aiannh_stmt = f"""
         WHERE bison.{join_fld} = tmp.{join_fld};
     """
 
+query_bison_stmt = f"SHOW TABLES FROM SCHEMA {database}.{pub_schema} LIKE '{bison_tbl}';"
+count_null_state_stmt = f"SELECT count(*) from {bison_tbl} WHERE {b_st_fld} IS NULL;"
+
 # Add field commands, < 30 sec total
-COMMANDS.extend([
+REDSHIFT_COMMANDS = [
+    ("query_bison", query_bison_stmt),
     #
     ("drop_tmp_county", drop_county_tmp_stmt),
     # 3 min
     ("intersect_county", intersect_county_tmp_stmt),
     # 7 min
     ("fill_county", fill_county_stmt),
+    ("query_count", count_null_state_stmt),
     #
     ("drop_tmp_aiannh", drop_aiannh_tmp_stmt),
     # 1 min
@@ -176,7 +178,6 @@ COMMANDS.extend([
     # 1 min
     ("fill_aiannh", fill_aiannh_stmt),
     ]
-)
 
 
 # --------------------------------------------------------------------------------------
@@ -193,19 +194,15 @@ def lambda_handler(event, context):
     Raises:
         Exception: on failure to execute Redshift command.
     """
+    success = True
     # -------------------------------------
     # FIRST: Check that current BISON data is in Redshift
-    # -------------------------------------
-    query_bison_stmt = f"SHOW TABLES FROM SCHEMA {database}.{pub_schema} WHERE name = {bison_tbl};"
-    try:
-        submit_result = rs_client.execute_statement(
-            WorkgroupName=PROJECT, Database=database, Sql=query_bison_stmt)
-    except Exception:
-        raise
-    # -------------------------------------
     # NEXT: Intersect BISON data with ancillary tables, annotate BISON, in Redshift
     # -------------------------------------
-    for (cmd, stmt) in COMMANDS:
+    for (cmd, stmt) in REDSHIFT_COMMANDS:
+        # Stop after a failure
+        if success is False:
+            break
         # -------------------------------------
         try:
             submit_result = rs_client.execute_statement(
@@ -213,9 +210,9 @@ def lambda_handler(event, context):
         except Exception:
             raise
 
-        print("*** ---------------------------------------")
+        print("*** ......................")
         print(f"*** {cmd.upper()} command submitted")
-        print(f"***    {stmt}")
+        print(stmt)
         submit_id = submit_result['Id']
 
         # -------------------------------------
@@ -226,24 +223,57 @@ def lambda_handler(event, context):
             try:
                 describe_result = rs_client.describe_statement(Id=submit_id)
             except Exception as e:
-                print(f"*** Failed to describe_statement in {elapsed_time} secs: {e}")
+                complete = True
+                print(f"!!! Failed to describe_statement {e}")
             else:
                 status = describe_result["Status"]
                 if status in ("ABORTED", "FAILED", "FINISHED"):
-                    if status in ("ABORTED", "FAILED", "FINISHED"):
-                        print(f"*** Status - {status} after {elapsed_time} seconds")
-                        complete = True
-                        if status == "FAILED":
-                            try:
-                                err = describe_result["Error"]
-                            except Exception:
-                                err = "Unknown Error"
-                            print(f"***    FAILED: {err}")
+                    complete = True
+                    print(f"*** Status - {status} after {elapsed_time} seconds")
+                    if status in ("ABORTED", "FAILED"):
+                        success = False
+                        try:
+                            err = describe_result["Error"]
+                        except Exception:
+                            err = "Unknown Error"
+                        print(f"!!!    FAILED: {err}")
                 else:
                     time.sleep(waittime)
                     elapsed_time += waittime
 
+        # -------------------------------------
+        # Successful response to query required
+        if cmd.startswith("query") and success is True:
+            try:
+                stmt_result = rs_client.get_statement_result(Id=submit_id)
+            except Exception as e:
+                print(f"!!! No get_statement_result {e}")
+                raise
+            else:
+                try:
+                    records = stmt_result["Records"]
+                except Exception as e:
+                    print(f"!!! Failed to return records ({e})")
+                    raise
+                else:
+                    if cmd == "query_bison":
+                        if len(records) == 0:
+                            success = False
+                            msg = f"!!! Missing Bison table {bison_tbl}"
+                        else:
+                            try:
+                                name = records[0][2]["stringValue"]
+                            except:
+                                success = False
+                                msg = f"!!! Unexpected query result {records}"
+                            else:
+                                msg = f"*** Bison table {name} found"
+                    else:
+                        count = records[0][0]['longValue']
+                        msg = (f"***     Found {count} records where state could not "
+                               f"be determined.")
+                    print(msg)
     return {
-        'statusCode': 200,
-        'body': json.dumps("Lambda result logged")
+        "statusCode": 200,
+        "body": "Executed bison_s3_intersect_bison lambda"
     }
