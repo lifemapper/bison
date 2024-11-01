@@ -5,7 +5,7 @@ import botocore.session as bc
 from botocore.client import Config
 from datetime import datetime
 
-print("*** Loading function bison_s0_annotate_riis")
+print("*** Loading function bison_s1_annotate_riis")
 PROJECT = "bison"
 
 # .............................................................................
@@ -147,5 +147,5 @@ def lambda_handler(event, context):
 
     return {
         "statusCode": 200,
-        "body": f"Executed bison_s0_annotate_riis lambda starting EC2 {instance_id}"
+        "body": f"Executed bison_s1_annotate_riis lambda starting EC2 {instance_id}"
     }

@@ -237,7 +237,7 @@ def lambda_handler(event, context):
         tr_response = s3_client.list_objects_v2(
             Bucket=S3_BUCKET, Prefix=annotated_riis_key, MaxKeys=10)
     except Exception as e:
-        print(f"!!! Error querying for bucket/object {annotated_riis_key} ({e})")
+        print(f"!!! Error querying for object {annotated_riis_key} ({e})")
         raise e
     try:
         _contents = tr_response["Contents"]
@@ -292,7 +292,7 @@ def lambda_handler(event, context):
                         elapsed_time += waittime
 
             # -------------------------------------
-            # First command queries tables and creates list of tables that are present
+            # Return list of tables now present
             if cmd == "query_tables":
                 try:
                     stmt_result = rs_client.get_statement_result(Id=submit_id)

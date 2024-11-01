@@ -5,7 +5,7 @@ from botocore.client import Config
 from datetime import datetime
 import time
 
-print("*** Loading function bison_s3_intersect_bison")
+print("*** Loading function bison_s5_assign_riis")
 PROJECT = "bison"
 
 # .............................................................................
@@ -240,5 +240,5 @@ def lambda_handler(event, context):
 
     return {
         "statusCode": 200,
-        "body": "Executed bison_s4_assign_riis lambda"
+        "body": "Executed bison_s5_assign_riis lambda"
     }

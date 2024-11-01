@@ -3,9 +3,11 @@ import boto3
 import botocore.session as bc
 from botocore.client import Config
 from datetime import datetime
+from pprint import pp
+
 import time
 
-print("*** Loading function bison_s1_load_ancillary")
+print("*** Loading function bison_s6_delete_obsolete")
 PROJECT = "bison"
 
 # .............................................................................
@@ -19,9 +21,12 @@ prev_mo = mo - 1
 if mo == 1:
     prev_mo = 12
     prev_yr = yr - 1
-gbif_datestr = f"{yr}-{mo:02d}-01"
+# Redshift date format
 bison_datestr = f"{yr}_{mo:02d}_01"
 old_bison_datestr = f"{prev_yr}_{prev_mo:02d}_01"
+# S3 date format
+gbif_datestr = f"{yr}-{mo:02d}-01"
+old_bison_s3_datestr = old_bison_datestr.replace('_', '-')
 
 # .............................................................................
 # AWS constants
@@ -37,7 +42,7 @@ S3_OUT_DIR = "output"
 S3_LOG_DIR = "log"
 S3_SUMMARY_DIR = "summary"
 s3_obsolete_prefix = f"{S3_SUMMARY_DIR}/"
-
+s3_obsolete_pattern = ""
 # Redshift
 # namespace, workgroup both = 'bison'
 db_user = f"IAMR:{WORKFLOW_ROLE_NAME}"
@@ -148,10 +153,10 @@ def lambda_handler(event, context):
         except Exception as e:
             raise Exception(e)
 
-        print("*** ......................")
-        print(f"*** {cmd.upper()} command submitted")
-        print(f"***    {stmt}")
         submit_id = submit_result['Id']
+        print("*** ......................")
+        print(f"*** {cmd.upper()} command submitted with Id {submit_id}")
+        print(f"***    {stmt}")
 
         # -------------------------------------
         # Loop til complete, then get result status
@@ -180,18 +185,19 @@ def lambda_handler(event, context):
 
         # -------------------------------------
         # Get list of tables
+        time.sleep(waittime * 2)
         try:
             stmt_result = rs_client.get_statement_result(Id=submit_id)
         except Exception as e:
             print(f"*** No get_statement_result {e}")
         else:
-            print("*** get_statement_result records")
+            print("*** Tables to remove:")
             try:
                 records = stmt_result["Records"]
                 for rec in records:
                     tbl = rec[2]["stringValue"]
+                    print(f"***    {tbl}")
                     tables_to_remove.append(tbl)
-                print(f"*** Found tables to be deleted: {tables_to_remove}")
             except Exception as e:
                 print(f"Failed to return records ({e})")
 
@@ -205,10 +211,10 @@ def lambda_handler(event, context):
         except Exception as e:
             raise Exception(e)
 
-        print("*** ......................")
-        print(f"*** Drop table {tbl} submitted")
-        print(f"***    {drop_stmt}")
         submit_id = submit_result['Id']
+        print("*** ......................")
+        print(f"*** Drop table {tbl} submitted with Id: {submit_id}")
+        print(f"***    {drop_stmt}")
 
         # -------------------------------------
         # Loop til complete, then get result status
@@ -274,15 +280,17 @@ def lambda_handler(event, context):
         else:
             for rec in contents:
                 key = rec["Key"]
-                if key.find(old_bison_datestr) > len(s3_obsolete_prefix):
+                print("*** Keys to delete:")
+                if key.find(old_bison_s3_datestr) > len(s3_obsolete_prefix):
                     keys_to_delete.append(key)
+                    print(f"***      {key}")
 
     for old_key in keys_to_delete:
         try:
             _ = s3_client.delete_object(
                 Bucket=S3_BUCKET, Key=old_key)
         except Exception as e:
-            print(f"!!! Error deleting bucket/object {old_key} ({e})")
+            print(f"!!! Error deleting object {old_key} ({e})")
         else:
             print(f"*** Deleted {old_key} with delete_object.")
 
@@ -290,14 +298,3 @@ def lambda_handler(event, context):
         "statusCode": 200,
         "body": "Executed bison_s6_delete_obsolete lambda"
     }
-"""
-*** get_statement_result 
-{'ColumnMetadata': [
-{'isCaseSensitive': True, 'isCurrency': False, 'isSigned': False, 'label': 'database_name', 'length': 0, 'name': 'database_name', 'nullable': 1, 'precision': 65535, 'scale': 0, 'schemaName': '', 'tableName': '', 'typeName': 'varchar'
-}, 
-{'isCaseSensitive': True, 'isCurrency': False, 'isSigned': False, 'label': 'schema_name', 'length': 0, 'name': 'schema_name', 'nullable': 1, 'precision': 65535, 'scale': 0, 'schemaName': '', 'tableName': '', 'typeName': 'varchar'}, {'isCaseSensitive': True, 'isCurrency': False, 'isSigned': False, 'label': 'table_name', 'length': 0, 'name': 'table_name', 'nullable': 1, 'precision': 65535, 'scale': 0, 'schemaName': '', 'tableName': '', 'typeName': 'varchar'}, {'isCaseSensitive': True, 'isCurrency': False, 'isSigned': False, 'label': 'table_type', 'length': 0, 'name': 'table_type', 'nullable': 1, 'precision': 65535, 'scale': 0, 'schemaName': '', 'tableName': '', 'typeName': 'varchar'}, {'isCaseSensitive': True, 'isCurrency': False, 'isSigned': False, 'label': 'table_acl', 'length': 0, 'name': 'table_acl', 'nullable': 1, 'precision': 65535, 'scale': 0, 'schemaName': '', 'tableName': '', 'typeName': 'varchar'}, {'isCaseSensitive': True, 'isCurrency': False, 'isSigned': False, 'label': 'remarks', 'length': 0, 'name': 'remarks', 'nullable': 1, 'precision': 65535, 'scale': 0, 'schemaName': '', 'tableName': '', 'typeName': 'varchar'}], 
-'Records': [], 'TotalNumRows': 0, 
-'ResponseMetadata': {'RequestId': '5874061f-c17a-4248-a5ea-728f67e3bde3', 'HTTPStatusCode': 200, 
-'HTTPHeaders': {'x-amzn-requestid': '5874061f-c17a-4248-a5ea-728f67e3bde3', 'content-type': 'application/x-amz-json-1.1', 'content-length': '1286', 'date': 'Thu, 31 Oct 2024 21:02:29 GMT'}, 'RetryAttempts': 0}}
-
-"""
