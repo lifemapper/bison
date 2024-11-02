@@ -7,7 +7,7 @@ from pprint import pp
 
 import time
 
-print("*** Loading function bison_s6_delete_obsolete")
+print("*** Loading function bison_s7_delete_obsolete")
 PROJECT = "bison"
 
 # .............................................................................
@@ -296,5 +296,5 @@ def lambda_handler(event, context):
 
     return {
         "statusCode": 200,
-        "body": "Executed bison_s6_delete_obsolete lambda"
+        "body": "Executed bison_s7_delete_obsolete lambda"
     }

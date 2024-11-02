@@ -5,7 +5,7 @@ from botocore.client import Config
 from datetime import datetime
 import time
 
-print("*** Loading function bison_s1_load_ancillary")
+print("*** Loading function bison_s2_load_ancillary")
 PROJECT = "bison"
 
 # .............................................................................
@@ -204,14 +204,14 @@ rm_old_riis_stmt = f"DROP TABLE IF EXISTS {pub_schema}.{old_riis_tbl};"
 
 # Before Redshift commands, check that current RIIS data exists on S3
 REDSHIFT_COMMANDS = [
-    ("remove_obsolete_riis", rm_old_riis_stmt, None),
     ("query_tables", query_tables_stmt, None),
     ("create_aiannh", create_aiannh_stmt, aiannh_tbl),
     ("fill_aiannh", fill_aiannh_stmt, aiannh_tbl),
     ("create_county", create_county_stmt, county_tbl),
     ("fill_county", fill_county_stmt, county_tbl),
     ("create_riis", create_riis_stmt, riis_tbl),
-    ("fill_riis", fill_riis_stmt, riis_tbl)
+    ("fill_riis", fill_riis_stmt, riis_tbl),
+    ("query_tables", query_tables_stmt, None),
 ]
 # After successful load, remove old RIIS data from S3
 
@@ -311,5 +311,5 @@ def lambda_handler(event, context):
 
     return {
         "statusCode": 200,
-        "body": "Executed bison_s1_load_ancillary lambda"
+        "body": "Executed bison_s2 _load_ancillary lambda"
     }
