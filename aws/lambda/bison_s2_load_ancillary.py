@@ -64,7 +64,6 @@ rs_client = session.client("redshift-data", config=config)
 RIIS_BASENAME = "USRIISv2_MasterList"
 riis_fname = f"{RIIS_BASENAME}_annotated_{bison_datestr}.csv"
 annotated_riis_key = f"{S3_IN_DIR}/{riis_fname}"
-old_annotated_riis_key = f"{S3_IN_DIR}/{RIIS_BASENAME}_annotated_{old_bison_datestr}.csv"
 riis_tbl = f"riisv2_{bison_datestr}"
 old_riis_tbl = f"riisv2_{old_bison_datestr}"
 
@@ -200,7 +199,6 @@ fill_riis_stmt = f"""
         FORMAT CSV
         IAM_role DEFAULT;
 """
-rm_old_riis_stmt = f"DROP TABLE IF EXISTS {pub_schema}.{old_riis_tbl};"
 
 # Before Redshift commands, check that current RIIS data exists on S3
 REDSHIFT_COMMANDS = [
@@ -292,7 +290,7 @@ def lambda_handler(event, context):
                         elapsed_time += waittime
 
             # -------------------------------------
-            # Return list of tables now present
+            # First and last command queries tables and creates list of tables that are present
             if cmd == "query_tables":
                 try:
                     stmt_result = rs_client.get_statement_result(Id=submit_id)
@@ -307,6 +305,7 @@ def lambda_handler(event, context):
                         # tablename is 2nd item in record
                         for rec in records:
                             tables_present.append(rec[2]['stringValue'])
+                            print(f"***     Tables in Redshift: {tables_present}")
                         print(f"***     Tables in Redshift: {tables_present}")
 
     return {
