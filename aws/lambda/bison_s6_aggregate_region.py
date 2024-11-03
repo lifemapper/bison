@@ -269,9 +269,9 @@ aiannh_list_export_stmt = f"""
 """
 REDSHIFT_COMMANDS = [
     # Create tables of region with species counts, occurrence counts
-    ("counts_by_state", state_counts_stmt, None),
-    ("counts_by_county", county_counts_stmt, None),
-    ("counts_by_aiannh", aiannh_counts_stmt, None),
+    ("counts_by_state", state_counts_stmt),
+    ("counts_by_county", county_counts_stmt),
+    ("counts_by_aiannh", aiannh_counts_stmt),
     # Create lists of region with species, riis status, occurrence counts, then export
     ("list_state_species", state_list_stmt),
     ("export_state_species", state_list_export_stmt),
