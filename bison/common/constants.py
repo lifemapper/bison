@@ -46,7 +46,6 @@ TOTAL_FLD = "total"
 
 OCCURRENCE_COUNT_FLD = "occ_count"
 SPECIES_COUNT_FLD = "species_count"
-COUNT_FIELDS = (OCCURRENCE_COUNT_FLD, SPECIES_COUNT_FLD)
 
 UNIQUE_SPECIES_FLD = "taxonkey_species"
 UNIQUE_COUNTY_FLD = "state_county"
@@ -303,7 +302,15 @@ class SUMMARY:
             dim2 (str): code for secondary dimension of analysis
 
         Note:
-            Currently, either dim1 or dim2 must be species.
+            BISON Table types include:
+                list: region_x_species_list
+                counts: region_counts
+                summary: region_x_species_summary
+                         species_x_region_summary
+                matrix:  species_x_region_matrix
+
+        Note: for matrix, dimension1 corresponds to Axis 0 (rows) and dimension2
+            corresponds to Axis 1 (columns).
 
         Returns:
             table_type (str): code for data type and contents

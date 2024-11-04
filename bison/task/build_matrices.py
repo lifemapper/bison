@@ -1,27 +1,265 @@
 """Create a matrix of occurrence or species counts by (geospatial) analysis dimension."""
-
-# from bison.common.aws_util import S3
 import os
 
-from bison.common.constants import (
-    ANALYSIS_DIM, OCCURRENCE_COUNT_FLD, REGION, S3_BUCKET, S3_SUMMARY_DIR, SUMMARY
-)
-from bison.common.log import Logger
 from bison.common.aws_util import S3
-from bison.common.util import get_current_datadate_str
+from bison.common.constants import (
+    ANALYSIS_DIM, OCCURRENCE_COUNT_FLD, REGION, S3_BUCKET, S3_SUMMARY_DIR,
+    SPECIES_COUNT_FLD, SUMMARY, TMP_PATH
+)
+from bison.common.log import logit, Logger
+from bison.common.util import get_current_datadate_str, get_today_str
+from bison.spnet.sparse_matrix import SparseMatrix
 from bison.spnet.summary_matrix import SummaryMatrix
 
 """
 Note:
     The analysis dimension should be geospatial, and fully cover the landscape with no
         overlaps.  Each species/occurrence count applies to one and only one record in
-        the analysis dimesion.
+        the analysis dimension.
 """
 
+# ...............................................
+def get_extreme_val_and_attrs_for_column_from_stacked_data(
+        stacked_df, filter_label, filter_value, attr_label, val_label, is_max=True):
+    """Find the minimum or maximum value for rows where 'filter_label' = 'filter_value'.
 
-# from lmpy.spatial.map import (
-#     create_point_heatmap_vector, create_site_headers_from_extent,
-#     rasterize_geospatial_matrix)
+    Args:
+        stacked_df: dataframe containing stacked data records
+        filter_label: column name for filtering.
+        filter_value: column value for filtering.
+        attr_label: column name of attribute to return.
+        val_label: column name for attribute with min/max value.
+        is_max (bool): flag indicating whether to get maximum (T) or minimum (F)
+
+    Returns:
+        target_val:  Minimum or maximum value for rows where
+            'filter_label' = 'filter_value'.
+        attr_vals: values for attr_label for rows with the minimum or maximum value.
+
+    Raises:
+        Exception: on min/max = 0.  Zeros should never be returned for min or max value.
+    """
+    # Create a dataframe of rows where column 'filter_label' = 'filter_value'.
+    tmp_df = stacked_df.loc[stacked_df[filter_label] == filter_value]
+    # Find the min or max value for those rows
+    if is_max is True:
+        target_val = tmp_df[val_label].max()
+    else:
+        target_val = tmp_df[val_label].min()
+        # There should be NO zeros in these aggregated records
+    if target_val == 0:
+        raise Exception(
+            f"Found value 0 in column {val_label} for rows where "
+            f"{filter_label} == {filter_value}")
+    # Get the attribute(s) in the row(s) with the max value
+    attrs_containing_max_df = tmp_df.loc[tmp_df[val_label] == target_val]
+    attr_vals = [rec for rec in attrs_containing_max_df[attr_label]]
+    return target_val, attr_vals
+
+
+# ...............................................
+def sum_stacked_data_vals_for_column(stacked_df, filter_label, filter_value, val_label):
+    """Sum the values for rows where column 'filter_label' = 'filter_value'.
+
+    Args:
+        stacked_df: dataframe containing stacked data records
+        filter_label: column name for filtering.
+        filter_value: column value for filtering.
+        val_label: column name for summation.
+
+    Returns:
+        tmp_df: dataframe containing only rows with a value of filter_value in column
+            filter_label.
+    """
+    # Create a dataframe of rows where column 'filter_label' = 'filter_value'.
+    tmp_df = stacked_df.loc[stacked_df[filter_label] == filter_value]
+    # Sum the values for those rows
+    count = tmp_df[val_label].sum()
+    return count
+
+
+# ...............................................
+def test_row_col_comparisons(agg_sparse_mtx, test_count, logger):
+    """Test row comparisons between 1 and all, and column comparisons between 1 and all.
+
+    Args:
+        agg_sparse_mtx (SparseMatrix): object containing a scipy.sparse.coo_array
+            with 3 columns from the stacked_df arranged as rows and columns with values
+        test_count (int): number of rows and columns to test.
+        logger (object): logger for saving relevant processing messages
+
+    Postcondition:
+        Printed information for successful or failed tests.
+
+    Note: The aggregate_df must have been created from the stacked_df.
+    """
+    y_vals = agg_sparse_mtx.get_random_labels(test_count, axis=0)
+    x_vals = agg_sparse_mtx.get_random_labels(test_count, axis=1)
+    for y in y_vals:
+        row_comps = agg_sparse_mtx.compare_row_to_others(y)
+        logit(logger, "Row comparisons:", print_obj=row_comps)
+    for x in x_vals:
+        col_comps = agg_sparse_mtx.compare_column_to_others(x)
+        logit(logger, "Column comparisons:", print_obj=col_comps)
+
+
+# ...............................................
+def test_stacked_to_aggregate_sum(
+        stk_df, stk_axis_col_label, stk_val_col_label, agg_sparse_mtx, agg_axis=0,
+        test_count=5, logger=None):
+    """Test for equality of sums in stacked and aggregated dataframes.
+
+    Args:
+        stk_df: dataframe of stacked data, containing records with columns of
+            categorical values and counts.
+        stk_axis_col_label: column label in stacked dataframe to be used as the column
+            labels of the axis in the aggregate sparse matrix.
+        stk_val_col_label: column label in stacked dataframe for data to be used as
+            value in the aggregate sparse matrix.
+        agg_sparse_mtx (SparseMatrix): object containing a scipy.sparse.coo_array
+            with 3 columns from the stacked_df arranged as rows and columns with values]
+        agg_axis (int): Axis 0 (row) or 1 (column) that corresponds with the column
+            label (stk_axis_col_label) in the original stacked data.
+        test_count (int): number of rows and columns to test.
+        logger (object): logger for saving relevant processing messages
+
+    Postcondition:
+        Printed information for successful or failed tests.
+
+    Note: The aggregate_df must have been created from the stacked_df.
+    """
+    labels = agg_sparse_mtx.get_random_labels(test_count, axis=agg_axis)
+    # Test stacked column totals against aggregate x columns
+    for lbl in labels:
+        stk_sum = sum_stacked_data_vals_for_column(
+            stk_df, stk_axis_col_label, lbl, stk_val_col_label)
+        agg_sum = agg_sparse_mtx.sum_vector(lbl, axis=agg_axis)
+        logit(logger, f"Test axis {agg_axis}: {lbl}")
+        if stk_sum == agg_sum:
+            logit(
+                logger, f"  Total {stk_sum}: Stacked data for "
+                f"{stk_axis_col_label} == aggregate data in axis {agg_axis}: {lbl}"
+            )
+        else:
+            logit(
+                logger, f"  !!! {stk_sum} != {agg_sum}: Stacked data for "
+                f"{stk_axis_col_label} != aggregate data in axis {agg_axis}: {lbl}"
+            )
+        logit(logger, "")
+    logit(logger, "")
+
+
+# ...............................................
+def test_stacked_to_aggregate_extremes(
+        stk_df, stk_col_label_for_axis0, stk_col_label_for_axis1, stk_col_label_for_val,
+        agg_sparse_mtx, agg_axis=0, test_count=5, logger=None, is_max=True):
+    """Test min/max counts for attributes in the sparse matrix vs. the stacked data.
+
+    Args:
+        stk_df: dataframe of stacked data, containing records with columns of
+            categorical values and counts.
+        stk_col_label_for_axis0: column label in stacked dataframe to be used as the
+            row (axis 0) labels of the axis in the aggregate sparse matrix.
+        stk_col_label_for_axis1: column label in stacked dataframe to be used as the
+            column (axis 1) labels of the axis in the aggregate sparse matrix.
+        stk_col_label_for_val: column label in stacked dataframe for data to be used as
+            value in the aggregate sparse matrix.
+        agg_sparse_mtx (SparseMatrix): object containing a scipy.sparse.coo_array
+            with 3 columns from the stacked_df arranged as rows and columns with values]
+        agg_axis (int): Axis 0 (row) or 1 (column) that corresponds with the column
+            label (stk_axis_col_label) in the original stacked data.
+        test_count (int): number of rows and columns to test.
+        logger (object): logger for saving relevant processing messages
+        is_max (bool): flag indicating whether to test maximum (T) or minimum (F)
+
+    Postcondition:
+        Printed information for successful or failed tests.
+
+    Note: The aggregate_df must have been created from the stacked_df.
+    """
+    labels = agg_sparse_mtx.get_random_labels(test_count, axis=agg_axis)
+    # for logging
+    if is_max is True:
+        extm = "Max"
+    else:
+        extm = "Min"
+
+    # Get min/max of row (identified by filter_label, attr_label in axis 0)
+    if agg_axis == 0:
+        filter_label, attr_label = stk_col_label_for_axis0, stk_col_label_for_axis1
+    # Get min/max of column (identified by label in axis 1)
+    elif agg_axis == 1:
+        filter_label, attr_label = stk_col_label_for_axis1, stk_col_label_for_axis0
+
+    # Test dataset - get species with largest count and compare
+    for lbl in labels:
+        # Get stacked data results
+        (stk_target_val,
+         stk_attr_vals) = get_extreme_val_and_attrs_for_column_from_stacked_data(
+            stk_df, filter_label, lbl, attr_label, stk_col_label_for_val, is_max=is_max)
+        # Get sparse matrix results
+        try:
+            # Get row/column (sparse array), and its index
+            vector, vct_idx = agg_sparse_mtx.get_vector_from_label(lbl, axis=agg_axis)
+        except IndexError:
+            raise
+        agg_target_val, agg_labels = agg_sparse_mtx.get_extreme_val_labels_for_vector(
+            vector, axis=agg_axis, is_max=is_max)
+        logit(f"Test vector {lbl} on axis {agg_axis}", logger=logger)
+        if stk_target_val == agg_target_val:
+            logit(logger, f"  {extm} values equal {stk_target_val}")
+            if set(stk_attr_vals) == set(agg_labels):
+                logit(
+                    logger, f"  {extm} value labels equal; "
+                    f"len={len(stk_attr_vals)}")
+            else:
+                logit(
+                    logger, f"  !!! {extm} value labels NOT equal; "
+                    f"stacked labels {stk_attr_vals} != agg labels {agg_labels}"
+                )
+        else:
+            logit(
+                logger, f"!!! {extm} stacked value {stk_target_val} != "
+                f"{agg_target_val} agg value")
+        logit(logger, "")
+    logit(logger, "")
+
+
+# ...............................................
+def read_stacked_data_records(s3_client, stacked_data_table_type, datestr, logger):
+    """Read stacked records from S3, aggregate into a sparse matrix of species x dataset.
+
+    Args:
+        s3_client (bison.aws_util.S3): connection for reading/writing data to AWS S3.
+        stacked_data_table_type (str): table type for parquet data containing records of
+            species lists for another dimension (i.e. region) with occurrence and
+            species counts.
+        datestr (str): date of the current dataset, in YYYY_MM_DD format
+        logger (object): logger for saving relevant processing messages
+
+    Returns:
+        agg_sparse_mtx (sppy.tools.s2n.sparse_matrix.SparseMatrix): sparse matrix
+            containing data separated into 2 dimensions
+    """
+    # Datasets in rows/x/axis 1
+    stacked_record_table = SUMMARY.get_table(stacked_data_table_type, datestr)
+    stk_col_label_for_axis1 = stacked_record_table["key_fld"]
+    stk_col_label_for_val = stacked_record_table["value_fld"]
+    # Dict of new fields constructed from existing fields, just 1 for species key/name
+    fld_mods = stacked_record_table["combine_fields"]
+    # Species (taxonKey + name) in columns/y/axis 0
+    stk_col_label_for_axis0 = list(fld_mods.keys())[0]
+    (fld1, fld2) = fld_mods[stk_col_label_for_axis0]
+    pqt_fname = f"{stacked_record_table['fname']}.parquet"
+    # Read stacked (record) data directly into DataFrame
+    stk_df = s3_client.get_dataframe_from_parquet(
+        S3_BUCKET, S3_SUMMARY_DIR, pqt_fname, logger, s3_client=None
+    )
+    return (
+        stk_col_label_for_axis0, stk_col_label_for_axis1, stk_col_label_for_val, stk_df
+    )
+
+
 # .............................................................................
 # .............................................................................
 def download_dataframe(table_type, datestr, bucket, bucket_dir):
@@ -54,14 +292,22 @@ def download_dataframe(table_type, datestr, bucket, bucket_dir):
 # Main
 # --------------------------------------------------------------------------------------
 if __name__ == "__main__":
+    """Main script creates a SPECIES_DATASET_MATRIX from county/species list."""
     datestr = get_current_datadate_str()
-    script_name = os.path.splitext(os.path.basename(__file__))[0]
-    # Create logger with default INFO messages
-    logger = Logger(script_name, log_path="/tmp", log_console=True)
-    # For upload to/download from S3
+    datatype = "list"
+    dimension1 = ANALYSIS_DIM.COUNTY["code"]
+    dimension2 = None
+    # _script_name = os.path.splitext(os.path.basename(__file__))[0]
+    # todaystr = get_today_str()
+    # log_name = f"{_script_name}_{todaystr}"
+    # logger = Logger(_script_name, log_path=TMP_PATH, log_console=True)
     s3 = S3(region=REGION)
+    stacked_data_table_type = SUMMARY.get_table_type(datatype, dimension1, dimension2)
 
-    # for count_field in (COUNT_FIELDS):
+    stk_col_label_for_axis0, stk_col_label_for_axis1, stk_col_label_for_val, stk_df = \
+        read_stacked_data_records(s3, stacked_data_table_type, datestr, logger)
+
+    # for count_field in (OCCURRENCE_COUNT_FLD, SPECIES_COUNT_FLD):
     count_field = OCCURRENCE_COUNT_FLD
     # for dim in ANALYSIS_DIM.analysis_code():
     dim0 = ANALYSIS_DIM.COUNTY["code"]
@@ -83,45 +329,5 @@ from bison.common.constants import *
 datestr = get_current_datadate_str()
 datestr = "2024_09_01"
 species_dim = ANALYSIS_DIM.species_code
-
-# # Initialize logger and S3 client
-# script_name = os.path.splitext(os.path.basename(__file__))[0]
-# # Create logger that also prints to console (for AWS CloudWatch)
-# logger = Logger(
-#     script_name, log_path=TMP_PATH, log_console=True, log_level=INFO)
-
-# Get authenticated S3 client
-s3 = S3()
-
-# Loop through regions with full, non-overlapping polygons
-# for region_dim in [ANALYSIS_DIM.COUNTY["code"]]:
-region_dim = ANALYSIS_DIM.COUNTY["code"]
-datatype = "counts"
-
-    # Occurrence status is 'riis', ex: county_counts and county-x-riis_counts
-    # for dim2 in (None, OCCURRENCE_STATUS):
-    # for dim2 in [None]:
-
-# Ignore RIIS status for now, will need 2 row headers, region + riis
-dim2 = None
-counts_table_type = SUMMARY.get_table_type(datatype, region_dim, dim2)
-
-# Build occurrence count heatmap
-axis0_label, axis1_label, df = build_heatmap(
-    counts_table_type, datestr, OCCURRENCE_COUNT_FLD)
-
-
-
-# ##########################################################################
-# Debug
-# ##########################################################################
-# ##########################################################################
-
-
-
-
-
-    # Get the vector file from S3 for mapping features with values
-    # Create a 2d matrix for regions, any order mtx[y][x] = region/value
 
 """

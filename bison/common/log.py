@@ -1,6 +1,8 @@
 """Module containing standardized logging class for lmpy."""
+from io import StringIO
 import logging
 import os
+from pprint import pp
 import sys
 
 from bison.common.util import get_today_str
@@ -15,8 +17,24 @@ FILE_MAX_BYTES = 52000000
 FILE_BACKUP_COUNT = 5
 
 
+# ......................................................
+def prettify_object(print_obj):
+    """Format an object for output.
+
+    Args:
+        print_obj (obj): Object to pretty print in output
+
+    Returns:
+        formatted string representation of object
+    """
+    strm = StringIO()
+    pp(print_obj, stream=strm)
+    obj_str = strm.getvalue()
+    return obj_str
+
+
 # ...............................................
-def logit(msg, logger=None, refname=None, log_level=None):
+def logit(msg, logger=None, refname=None, print_obj=None, log_level=logging.INFO):
     """Method to log a message to a logger/file/stream or print to console.
 
     Args:
@@ -26,10 +44,13 @@ def logit(msg, logger=None, refname=None, log_level=None):
         log_level: logging constant error level (logging.INFO, logging.DEBUG,
             logging.WARNING, logging.ERROR)
     """
+    if print_obj is not None:
+        obj_str = prettify_object(print_obj)
+        msg = f"{msg}\n{obj_str}"
     if logger is not None:
         logger.log(msg, refname=refname, log_level=log_level)
     else:
-        print(msg)
+        print(f"{refname}:log_level {log_level}: {msg}")
 
 
 # .....................................................................................
