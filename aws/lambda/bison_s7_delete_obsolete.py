@@ -3,7 +3,6 @@ import boto3
 import botocore.session as bc
 from botocore.client import Config
 from datetime import datetime
-from pprint import pp
 
 import time
 
@@ -251,7 +250,7 @@ def lambda_handler(event, context):
         print(f"*** Error querying for bucket/object {old_annotated_riis_key} ({e})")
     else:
         try:
-            _contents = tr_response["Contents"]
+            _ = tr_response["Contents"]
         except KeyError:
             print(f"*** Object {old_annotated_riis_key} is not present")
         else:

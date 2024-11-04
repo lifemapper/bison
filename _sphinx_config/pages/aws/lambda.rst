@@ -1,16 +1,24 @@
 Create lambda function to initiate processing
 --------------------------------------------
-* Create a lambda function for execution when the trigger condition is activated,
-  i.e.  aws/lambda/bison_s0_test_task_lambda.py
-* This trigger condition can be either a schedule (i.e. midnight on the second day of
-  every month) or a rule (i.e. file matching xxx* deposited in an S3 bucket)
 
-Edit the execution role for lambda function
+Lambda functions can execute tasks in a workflow.  They can be initiated when a trigger
+condition occurs, set (separately) in the Amazon EventBridge as either Rules or
+Schedules.
+
+Lambda functions can only execute for up to 15 minutes at a time, but can launch longer
+running processes in another service, such as launch an EC2 instance to run a
+BISON workflow tasks.
+
+Lambda functions log directly to AWS Cloudwatch - make sure the role executing
+the lambda function has Create/Write permissions to AWS Cloudwatch.
+
+Edit the Configuration for lambda function
 --------------------------------------------
-* Under Configuration/Permissions set the Execution role to the Workflow role
-  (bison_redshift_lambda_role)
 
-
+* General: Timeout to an appropriate value for this task.
+* Permissions: Execution role to the Workflow role (bison_redshift_lambda_role)
+* Asynchronous Invokation: Set Maximum age of event and Retry attempts.
+* By default, Lambda functions produce a Cloudwatch Logs stream.
 
 Lambda to query Redshift
 --------------------------------------------
