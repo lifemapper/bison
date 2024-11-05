@@ -25,6 +25,7 @@ bison_datestr = f"{yr}_{mo:02d}_01"
 old_bison_datestr = f"{prev_yr}_{prev_mo:02d}_01"
 # S3 date format
 gbif_datestr = f"{yr}-{mo:02d}-01"
+bison_s3_datestr = bison_datestr.replace('_', '-')
 old_bison_s3_datestr = old_bison_datestr.replace('_', '-')
 
 # .............................................................................
@@ -40,8 +41,8 @@ S3_IN_DIR = "input"
 S3_OUT_DIR = "output"
 S3_LOG_DIR = "log"
 S3_SUMMARY_DIR = "summary"
-s3_obsolete_prefix = f"{S3_SUMMARY_DIR}/"
-s3_obsolete_pattern = ""
+s3_summary_prefix = f"{S3_SUMMARY_DIR}/"
+
 # Redshift
 # namespace, workgroup both = 'bison'
 db_user = f"IAMR:{WORKFLOW_ROLE_NAME}"
@@ -67,6 +68,7 @@ rs_client = session.client("redshift-data", config=config)
 # Ancillary data parameters
 # .............................................................................
 RIIS_BASENAME = "USRIISv2_MasterList"
+s3_riis_prefix = f"{S3_IN_DIR}/{RIIS_BASENAME}"
 riis_fname = f"{RIIS_BASENAME}_annotated_{bison_datestr}.csv"
 annotated_riis_key = f"{S3_IN_DIR}/{riis_fname}"
 old_annotated_riis_key = f"{S3_IN_DIR}/{RIIS_BASENAME}_annotated_{old_bison_datestr}.csv"
@@ -112,18 +114,18 @@ county_tbl = ancillary_data["county"]["table"]
 
 # Current temp tables to be deleted
 tmp_prefix = "tmp_bison"
+query_new_stmt = \
+    f"SHOW TABLES FROM SCHEMA {database}.{pub_schema} LIKE '%{bison_datestr}';"
+query_old_stmt = \
+    f"SHOW TABLES FROM SCHEMA {database}.{pub_schema} LIKE '%{old_bison_datestr}';"
+query_tmp_stmt = \
+    f"SHOW TABLES FROM SCHEMA {database}.{pub_schema} LIKE '{tmp_prefix}%';"
 
 # Queries for obsolete tables to be deleted
 QUERY_COMMANDS = (
-    (
-        "query_old",
-        f"SHOW TABLES FROM SCHEMA {database}.{pub_schema} LIKE '%{old_bison_datestr}';"
-    ),
-    (
-        "query_tmp",
-        f"SHOW TABLES FROM SCHEMA {database}.{pub_schema} "
-        f"LIKE '{tmp_prefix}%{bison_datestr}';"
-    )
+    ("query_tmp", query_tmp_stmt),
+    ("query_old", query_old_stmt),
+    ("query_new", query_new_stmt),
 )
 
 
@@ -142,8 +144,18 @@ def lambda_handler(event, context):
         Exception: on failure to execute Redshift query command.
         Exception: on failure to execute Redshift drop command.
     """
-    tables_to_remove = []
+    tmp_tables = []
+    old_tables = []
+    new_tables = []
     for cmd, stmt in QUERY_COMMANDS:
+        if cmd == "query_tmp":
+            tbl_lst = tmp_tables
+        elif cmd == "query_old":
+            tbl_lst = old_tables
+        else:
+            tbl_lst = new_tables
+
+
         # -------------------------------------
         # Submit query request
         try:
@@ -188,17 +200,36 @@ def lambda_handler(event, context):
         try:
             stmt_result = rs_client.get_statement_result(Id=submit_id)
         except Exception as e:
-            print(f"*** No get_statement_result {e}")
+            print(f"!!! No get_statement_result {e}")
+            raise
+
+        try:
+            records = stmt_result["Records"]
+        except Exception as e:
+            print(f"!!! Failed to return any records ({e})")
         else:
-            print("*** Tables to remove:")
+            print(f"*** Tables from {cmd}:")
             try:
-                records = stmt_result["Records"]
                 for rec in records:
                     tbl = rec[2]["stringValue"]
+                    tbl_lst.append(tbl)
                     print(f"***    {tbl}")
-                    tables_to_remove.append(tbl)
             except Exception as e:
                 print(f"Failed to return records ({e})")
+
+    # -------------------------------------
+    # Determine which tables to remove
+    print("*** ---------------------------------------")
+    tables_to_remove = set(tmp_tables)
+    print("*** Tables to remove:" )
+    print(f"***      {tmp_tables}")
+    # Make sure new table exists before removing old table
+    for old_tbl in old_tables:
+        prefix = old_tbl[:-len(old_bison_datestr)]
+        new_tbl = f"{prefix}{bison_datestr}"
+        if new_tbl in new_tables:
+            tables_to_remove.add(old_tbl)
+            print(f"***      {old_tbl}")
 
     # -------------------------------------
     # Drop each table in list
@@ -241,48 +272,68 @@ def lambda_handler(event, context):
                     elapsed_time += waittime
 
     # -------------------------------------
-    # Find then remove annotated RIIS input data from S3
-    # -------------------------------------
-    try:
-        tr_response = s3_client.list_objects_v2(
-            Bucket=S3_BUCKET, Prefix=old_annotated_riis_key, MaxKeys=10)
-    except Exception as e:
-        print(f"*** Error querying for bucket/object {old_annotated_riis_key} ({e})")
-    else:
-        try:
-            _ = tr_response["Contents"]
-        except KeyError:
-            print(f"*** Object {old_annotated_riis_key} is not present")
-        else:
-            try:
-                _ = s3_client.delete_object(
-                    Bucket=S3_BUCKET, Key=old_annotated_riis_key)
-            except Exception as e:
-                print(f"!!! Error deleting bucket/object {old_annotated_riis_key} ({e})")
-            else:
-                print(f"*** Deleted {old_annotated_riis_key} with delete_object.")
-
-    # -------------------------------------
-    # Last: List then remove obsolete summary data from S3
+    # Find obsolete annotated RIIS input data from S3
     # -------------------------------------
     keys_to_delete = []
+    riis_keys = []
     try:
         tr_response = s3_client.list_objects_v2(
-            Bucket=S3_BUCKET, Prefix=s3_obsolete_prefix, MaxKeys=10)
+            Bucket=S3_BUCKET, Prefix=s3_riis_prefix, MaxKeys=10)
     except Exception as e:
-        print(f"*** Error querying for objects in {s3_obsolete_prefix} ({e})")
+        print(f"*** Error querying for bucket/object {s3_riis_prefix} ({e})")
     else:
         try:
             contents = tr_response["Contents"]
         except KeyError:
-            print(f"!!! No values in {S3_BUCKET}/{s3_obsolete_prefix}")
+            print(f"*** Objects like {s3_riis_prefix} not present")
         else:
+            print("*** RIIS inputs found:")
             for rec in contents:
                 key = rec["Key"]
-                print("*** Keys to delete:")
-                if key.find(old_bison_s3_datestr) > len(s3_obsolete_prefix):
-                    keys_to_delete.append(key)
+                riis_keys.append(key)
+                print(f"***      {key}")
+
+    if annotated_riis_key in riis_keys and old_annotated_riis_key in riis_keys:
+        keys_to_delete.append(old_annotated_riis_key)
+
+    # -------------------------------------
+    # Last: List then remove obsolete summary data from S3
+    # -------------------------------------
+    # Find old and new versions of data
+    old_keys = []
+    new_keys = []
+    try:
+        tr_response = s3_client.list_objects_v2(
+            Bucket=S3_BUCKET, Prefix=s3_summary_prefix, MaxKeys=10)
+    except Exception as e:
+        print(f"*** Error querying for objects in {s3_summary_prefix} ({e})")
+    else:
+        try:
+            contents = tr_response["Contents"]
+        except KeyError:
+            print(f"!!! No values in {S3_BUCKET}/{s3_summary_prefix}")
+        else:
+            print("*** Keys found:")
+            for rec in contents:
+                key = rec["Key"]
+                if key.find(old_bison_s3_datestr) > len(s3_summary_prefix):
+                    old_keys.append(key)
                     print(f"***      {key}")
+                elif key.find(bison_s3_datestr) > len(s3_summary_prefix):
+                    new_keys.append(key)
+                    print(f"***      {key}")
+
+    # -------------------------------------
+    # Determine which objects to remove from S3
+    print("*** ---------------------------------------")
+    print("*** Keys to remove:" )
+    # Make sure new table exists before removing old table
+    for old_key in old_keys:
+        prefix = old_key[:-len(old_bison_datestr)]
+        new_key = f"{prefix}{bison_datestr}"
+        if new_key in new_keys:
+            keys_to_delete.add(old_key)
+            print(f"***      {old_key}")
 
     for old_key in keys_to_delete:
         try:
