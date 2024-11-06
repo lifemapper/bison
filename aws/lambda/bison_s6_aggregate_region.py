@@ -117,18 +117,18 @@ b_cty_fld = cty_data["fields"]["county"][1]
 county_counts_tbl = f"county_counts_{bison_datestr}"
 county_x_riis_counts_tbl = f"county_x_riis_counts{bison_datestr}"
 county_list_tbl = f"county_x_species_list_{bison_datestr}"
-# Redshift does not accept '-', but use that for parsing S3 filenames
-county_list_s3key = county_list_tbl.replace("_", "-")
-county_x_riis_counts_s3key = county_x_riis_counts_tbl.replace("_", "-")
-county_counts_s3key = county_counts_tbl.replace("_", "-")
+# # Redshift does not accept '-', but use that for parsing S3 filenames
+# county_list_s3key = county_list_tbl.replace("_", "-")
+# county_x_riis_counts_s3key = county_x_riis_counts_tbl.replace("_", "-")
+# county_counts_s3key = county_counts_tbl.replace("_", "-")
 
 state_counts_tbl = f"state_counts_{bison_datestr}"
 state_x_riis_counts_tbl = f"state_x_riis_counts{bison_datestr}"
 state_list_tbl = f"state_x_species_list_{bison_datestr}"
 # Redshift does not accept '-', but use that for parsing S3 filenames
-state_x_riis_counts_s3key = state_x_riis_counts_tbl.replace("_", "-")
-state_list_s3key = state_list_tbl.replace("_", "-")
-state_counts_s3key = state_counts_tbl.replace("_", "-")
+# state_x_riis_counts_s3key = state_x_riis_counts_tbl.replace("_", "-")
+# state_list_s3key = state_list_tbl.replace("_", "-")
+# state_counts_s3key = state_counts_tbl.replace("_", "-")
 
 aiannh_data = ancillary_data["aiannh"]
 b_nm_fld = aiannh_data["fields"]["name"][1]
@@ -137,10 +137,10 @@ b_gid_fld = aiannh_data["fields"]["geoid"][1]
 aiannh_counts_tbl = f"aiannh_counts_{bison_datestr}"
 aiannh_x_riis_counts_tbl = f"aiannh_x_riis_counts{bison_datestr}"
 aiannh_list_tbl = f"aiannh_x_species_list_{bison_datestr}"
-# Redshift does not accept '-', but use that for parsing S3 filenames
-aiannh_list_s3key = aiannh_list_tbl.replace("_", "-")
-aiannh_x_riis_counts_s3key = aiannh_x_riis_counts_tbl.replace("_", "-")
-aiannh_counts_s3key = aiannh_counts_tbl.replace("_", "-")
+# # Redshift does not accept '-', but use that for parsing S3 filenames
+# aiannh_list_s3key = aiannh_list_tbl.replace("_", "-")
+# aiannh_x_riis_counts_s3key = aiannh_x_riis_counts_tbl.replace("_", "-")
+# aiannh_counts_s3key = aiannh_counts_tbl.replace("_", "-")
 
 # RIIS data
 riis_data = ancillary_data["riis"]
@@ -164,7 +164,7 @@ state_counts_stmt = f"""
 state_counts_export_stmt = f"""
     UNLOAD (
         'SELECT * FROM {pub_schema}.{state_counts_tbl} ORDER BY {b_st_fld}')
-        TO '{s3_out}/{state_counts_s3key}_'
+        TO '{s3_out}/{state_counts_tbl}_'
         IAM_role DEFAULT
         FORMAT AS PARQUET
         PARALLEL OFF;
@@ -191,7 +191,7 @@ county_counts_stmt = f"""
 county_counts_export_stmt = f"""
     UNLOAD (
         'SELECT * FROM {pub_schema}.{county_counts_tbl} ORDER BY {unique_cty_fld}')
-        TO '{s3_out}/{county_counts_s3key}_'
+        TO '{s3_out}/{county_counts_tbl}_'
         IAM_role DEFAULT
         FORMAT AS PARQUET
         PARALLEL OFF;
@@ -218,7 +218,7 @@ aiannh_counts_stmt = f"""
 aiannh_counts_export_stmt = f"""
     UNLOAD (
         'SELECT * FROM {pub_schema}.{aiannh_counts_tbl} ORDER BY {b_nm_fld}')
-        TO '{s3_out}/{aiannh_counts_s3key}_'
+        TO '{s3_out}/{aiannh_counts_tbl}_'
         IAM_role DEFAULT
         FORMAT AS PARQUET
         PARALLEL OFF;
@@ -246,7 +246,7 @@ state_list_stmt = f"""
 state_list_export_stmt = f"""
     UNLOAD (
         'SELECT * FROM {pub_schema}.{state_list_tbl} ORDER BY {b_st_fld}, {gbif_sp_fld}')
-        TO '{s3_out}/{state_list_s3key}_'
+        TO '{s3_out}/{state_list_tbl}_'
         IAM_role DEFAULT
         FORMAT AS PARQUET
         PARALLEL OFF;
@@ -254,7 +254,7 @@ state_list_export_stmt = f"""
 state_x_riis_counts_export_stmt = f"""
     UNLOAD (
         'SELECT * FROM {pub_schema}.{state_list_tbl} ORDER BY {b_st_fld}, {gbif_sp_fld}')
-        TO '{s3_out}/{state_list_s3key}_'
+        TO '{s3_out}/{state_list_tbl}_'
         IAM_role DEFAULT
         FORMAT AS PARQUET
         PARALLEL OFF;
@@ -270,7 +270,7 @@ county_list_stmt = f"""
 county_list_export_stmt = f"""
     UNLOAD (
         'SELECT * FROM {pub_schema}.{county_list_tbl} ORDER BY {unique_cty_fld}, {gbif_sp_fld}')
-        TO '{s3_out}/{county_list_s3key}_'
+        TO '{s3_out}/{county_list_tbl}_'
         IAM_role DEFAULT
         FORMAT AS PARQUET
         PARALLEL OFF;
@@ -285,7 +285,7 @@ aiannh_list_stmt = f"""
 aiannh_list_export_stmt = f"""
     UNLOAD (
         'SELECT * FROM {pub_schema}.{aiannh_list_tbl} ORDER BY {b_nm_fld}, {gbif_sp_fld}')
-        TO '{s3_out}/{aiannh_list_s3key}_'
+        TO '{s3_out}/{aiannh_list_tbl}_'
         IAM_role DEFAULT
         FORMAT AS PARQUET
         PARALLEL OFF;
@@ -296,18 +296,18 @@ REDSHIFT_COMMANDS = [
     ("query_tables", query_tables_stmt, None),
     # Create tables of region with species counts, occurrence counts
     ("create_counts_by_state", state_counts_stmt, state_counts_tbl),
-    ("export_state_counts", state_counts_export_stmt, state_counts_s3key),
+    ("export_state_counts", state_counts_export_stmt, state_counts_tbl),
     ("create_counts_by_county", county_counts_stmt, county_counts_tbl),
-    ("export_county_counts", county_counts_export_stmt, county_counts_s3key),
+    ("export_county_counts", county_counts_export_stmt, county_counts_tbl),
     ("create_counts_by_aiannh", aiannh_counts_stmt, aiannh_counts_tbl),
-    ("export_aiannh_counts", aiannh_counts_export_stmt, aiannh_counts_s3key),
+    ("export_aiannh_counts", aiannh_counts_export_stmt, aiannh_counts_tbl),
     # Create lists of region with species, riis status, occurrence counts, then export
     ("create_list_state_species", state_list_stmt, state_list_tbl),
-    ("export_state_species", state_list_export_stmt, state_list_s3key),
+    ("export_state_species", state_list_export_stmt, state_list_tbl),
     ("create_list_county_species", county_list_stmt, county_list_tbl),
-    ("export_county_species", county_list_export_stmt, county_list_s3key),
+    ("export_county_species", county_list_export_stmt, county_list_tbl),
     ("create_list_aiannh_species", aiannh_list_stmt, aiannh_list_tbl),
-    ("export_aiannh_species", aiannh_list_export_stmt, aiannh_list_s3key),
+    ("export_aiannh_species", aiannh_list_export_stmt, aiannh_list_tbl),
     ]
 
 
@@ -361,7 +361,7 @@ def lambda_handler(event, context):
                 (cmd.startswith("export") and out_obj in s3objs_present)
         ):
             print("*** ---------------------------------------")
-            print(f"*** Skipped command {cmd.upper()} - {out_obj} is present.")
+            print(f"*** Skipped command {cmd.upper()}, {out_obj} is present.")
         else:
             # Do not stop after a failure
             # -------------------------------------
