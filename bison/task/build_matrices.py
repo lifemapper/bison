@@ -226,7 +226,7 @@ def test_stacked_to_aggregate_extremes(
 
 
 # ...............................................
-def read_stacked_data_records(s3_client, stacked_data_table_type, datestr, logger):
+def read_stacked_data_records(s3_client, stacked_data_table_type, datestr):
     """Read stacked records from S3, aggregate into a sparse matrix of species x dataset.
 
     Args:
@@ -235,7 +235,6 @@ def read_stacked_data_records(s3_client, stacked_data_table_type, datestr, logge
             species lists for another dimension (i.e. region) with occurrence and
             species counts.
         datestr (str): date of the current dataset, in YYYY_MM_DD format
-        logger (object): logger for saving relevant processing messages
 
     Returns:
         agg_sparse_mtx (sppy.tools.s2n.sparse_matrix.SparseMatrix): sparse matrix
@@ -243,18 +242,15 @@ def read_stacked_data_records(s3_client, stacked_data_table_type, datestr, logge
     """
     # Datasets in rows/x/axis 1
     stacked_record_table = SUMMARY.get_table(stacked_data_table_type, datestr)
+
+    stk_col_label_for_axis0 = stacked_record_table["species_fld"]
     stk_col_label_for_axis1 = stacked_record_table["key_fld"]
     stk_col_label_for_val = stacked_record_table["value_fld"]
-    # Dict of new fields constructed from existing fields, just 1 for species key/name
-    fld_mods = stacked_record_table["combine_fields"]
-    # Species (taxonKey + name) in columns/y/axis 0
-    stk_col_label_for_axis0 = list(fld_mods.keys())[0]
-    (fld1, fld2) = fld_mods[stk_col_label_for_axis0]
+
     pqt_fname = f"{stacked_record_table['fname']}.parquet"
     # Read stacked (record) data directly into DataFrame
     stk_df = s3_client.get_dataframe_from_parquet(
-        S3_BUCKET, S3_SUMMARY_DIR, pqt_fname, logger, s3_client=None
-    )
+        S3_BUCKET, S3_SUMMARY_DIR, pqt_fname)
     return (
         stk_col_label_for_axis0, stk_col_label_for_axis1, stk_col_label_for_val, stk_df
     )
@@ -294,40 +290,40 @@ def download_dataframe(table_type, datestr, bucket, bucket_dir):
 if __name__ == "__main__":
     """Main script creates a SPECIES_DATASET_MATRIX from county/species list."""
     datestr = get_current_datadate_str()
-    datatype = "list"
-    dimension1 = ANALYSIS_DIM.COUNTY["code"]
-    dimension2 = None
-    # _script_name = os.path.splitext(os.path.basename(__file__))[0]
-    # todaystr = get_today_str()
-    # log_name = f"{_script_name}_{todaystr}"
-    # logger = Logger(_script_name, log_path=TMP_PATH, log_console=True)
     s3 = S3(region=REGION)
-    stacked_data_table_type = SUMMARY.get_table_type(datatype, dimension1, dimension2)
+
+    dim0 = ANALYSIS_DIM.COUNTY["code"]
+    dim1 = ANALYSIS_DIM.species_code()
+    stacked_data_table_type = SUMMARY.get_table_type("list", dim0, dim1)
 
     stk_col_label_for_axis0, stk_col_label_for_axis1, stk_col_label_for_val, stk_df = \
-        read_stacked_data_records(s3, stacked_data_table_type, datestr, logger)
+        read_stacked_data_records(s3, stacked_data_table_type, datestr)
 
     # for count_field in (OCCURRENCE_COUNT_FLD, SPECIES_COUNT_FLD):
+    count_table_type = SUMMARY.get_table_type("counts", dim0, None)
     count_field = OCCURRENCE_COUNT_FLD
-    # for dim in ANALYSIS_DIM.analysis_code():
-    dim0 = ANALYSIS_DIM.COUNTY["code"]
-    # RIIS occurrence status not yet supported
-    dim1 = None
-    table_type = ANALYSIS_DIM.get_table_type("counts", dim0, dim1)
 
-    df = download_dataframe(table_type, datestr, S3_BUCKET, S3_SUMMARY_DIR)
+    summary_df = download_dataframe(count_table_type, datestr, S3_BUCKET, S3_SUMMARY_DIR)
     # # Remove unused count fields
     # for fld in COUNT_FIELDS:
     #     if fld != count_field:
     #         df.drop(labels=[fld], axis=1)
-    sum_mtx = SummaryMatrix(df, table_type, datestr, logger=logger)
+    sum_mtx = SummaryMatrix(df, count_table_type, datestr, logger=logger)
 
 """
-from bison.tools.build_heatmap import *
+from bison.task.build_matrices import *
 from bison.common.constants import *
 
 datestr = get_current_datadate_str()
-datestr = "2024_09_01"
-species_dim = ANALYSIS_DIM.species_code
+datatype = "list"
+dim0 = ANALYSIS_DIM.COUNTY["code"]
+dim1 = ANALYSIS_DIM.species_code()
+stacked_data_table_type = SUMMARY.get_table_type(datatype, dim0, dim1)
+
+logger = None
+s3 = S3(region=REGION)
+
+stk_col_label_for_axis0, stk_col_label_for_axis1, stk_col_label_for_val, stk_df = \
+    read_stacked_data_records(s3, stacked_data_table_type, datestr)
 
 """
