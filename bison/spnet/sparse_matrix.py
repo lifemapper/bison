@@ -17,7 +17,7 @@ class SparseMatrix(_AggregateDataMatrix):
     # ...........................
     def __init__(
             self, sparse_coo_array, table_type, data_datestr, row_category,
-            column_category, logger=None):
+            column_category, y_fld=None, x_fld=None, val_fld=None, logger=None):
         """Constructor for species by region/analysis_dim comparisons.
 
         Args:
@@ -31,6 +31,12 @@ class SparseMatrix(_AggregateDataMatrix):
                 to identify axis 0/rows.
             column_category (pandas.api.types.CategoricalDtype): ordered column labels
                 used to identify axis 1/columns.
+            y_fld (str): column header from stacked input records containing values for
+                sparse matrix row headers
+            x_fld (str): column header from stacked input records containing values for
+                sparse matrix column headers
+            val_fld (str): column header from stacked input records containing values
+                for sparse matrix cells
             logger (object): An optional local logger to use for logging output
                 with consistent options
 
@@ -47,6 +53,9 @@ class SparseMatrix(_AggregateDataMatrix):
         self._coo_array = sparse_coo_array
         self._row_categ = row_category
         self._col_categ = column_category
+        self._y_fld = y_fld
+        self._x_fld = x_fld
+        self._val_fld = val_fld
         _AggregateDataMatrix.__init__(self, table_type, data_datestr, logger=logger)
 
     # ...........................
@@ -102,6 +111,36 @@ class SparseMatrix(_AggregateDataMatrix):
         sparse_matrix = SparseMatrix(
             sparse_coo, table_type, data_datestr, y_categ, x_categ, logger=logger)
         return sparse_matrix
+
+    # ...........................
+    @property
+    def input_y_fld(self):
+        """Return column header from input data records (stacked data) for axis 0.
+
+        Returns:
+            self._y_fld (str): Input field name for axis 0 (rows).
+        """
+        return self._y_fld
+
+    # ...........................
+    @property
+    def input_x_fld(self):
+        """Return column header from input data records (stacked data) for axis 1.
+
+        Returns:
+            self._x_fld (str): Input field name for axis 1 (columns).
+        """
+        return self._x_fld
+
+    # ...........................
+    @property
+    def input_val_fld(self):
+        """Return column header from input data records (stacked data) for matrix value.
+
+        Returns:
+            self._val_fld (str): Input field name for values (matrix cells).
+        """
+        return self._val_fld
 
     # ...........................
     @property
@@ -682,14 +721,14 @@ class SparseMatrix(_AggregateDataMatrix):
             all_totals (list): list of values for the axis.
         """
         mtx = self._coo_array.sum(axis=axis)
-        # Axis 0 produces a matrix shape (1, col_count),
+        # Axis 0 produces a matrix shape (col_count,),
         #   1 row of values, total for each column
-        # Axis 1 produces matrix shape (row_count, 1),
+        # Axis 1 produces matrix shape (row_count,),
         #   1 column of values, total for each row
         if axis == 0:
-            all_totals = mtx.tolist()[0]
+            all_totals = mtx.tolist()
         elif axis == 1:
-            all_totals = mtx.T.tolist()[0]
+            all_totals = mtx.T.tolist()
         return all_totals
 
     # ...............................................
@@ -702,7 +741,7 @@ class SparseMatrix(_AggregateDataMatrix):
         Returns:
             all_counts (list): list of values for the axis.
         """
-        all_counts = self._coo_array.getnnz(axis=axis)
+        all_counts = self._coo_array.getnnz(axis=axis).tolist()
         return all_counts
 
     # ...............................................

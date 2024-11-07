@@ -164,7 +164,8 @@ class _AggregateDataMatrix:
             for fname in files_present:
                 os.remove(fname)
                 deleted_files.append(fname)
-            print(f"Removed files {', '.join(deleted_files)}.")
+            if deleted_files:
+                print(f"Removed files {', '.join(deleted_files)}.")
         # Who remains?
         files_present = [fname for fname in expected_files if os.path.exists(fname)]
         all_exist = len(files_present) == len(expected_files)

@@ -48,8 +48,8 @@ class SummaryMatrix(_AggregateDataMatrix):
 
         Args:
             sp_mtx (sppy.aws.SparseMatrix): A sparse matrix with count
-                values for one aggregator0 (i.e. species) rows (axis 0) by another
-                aggregator1 (i.e. dataset) columns (axis 1) to use for computations.
+                values for one dimension, (i.e. region) rows (axis 0), by the species
+                dimension, columns (axis 1), to use for computations.
             axis (int): Summarize rows (0) or columns (1).
             logger (object): logger for saving relevant processing messages
 
@@ -59,10 +59,8 @@ class SummaryMatrix(_AggregateDataMatrix):
 
         Note:
             The input dataframe must contain only one input record for any x and y value
-                combination, and each record must contain another value for the dataframe
-                contents.  The function was written for a table of records with
-                datasetkey (for the column labels/x), species (for the row labels/y),
-                and occurrence count.
+                combination, and each record must contain another value for the
+                dataframe contents.
         """
         # Total/Count down axis 0/row, rows for a column
         #             across axis 1/column, columns for a row (aka species)
@@ -75,15 +73,17 @@ class SummaryMatrix(_AggregateDataMatrix):
         counts = sp_mtx.get_counts(axis=axis)
         data = {COUNT_FLD: counts, TOTAL_FLD: totals}
         input_table_meta = SUMMARY.get_table(sp_mtx.table_type)
+        dim0 =  input_table_meta["dimension0"]
+        dim1 =  input_table_meta["dimension1"]
 
-        # Axis 0 summarizes each column (down axis 0) of sparse matrix
+        # Axis 0 summarizes each column/species (down axis 0) of sparse matrix
         if axis == 0:
             index = sp_mtx.column_category.categories
-            table_type = input_table_meta["column_input"]
+            table_type = SUMMARY.get_table_type("summary", dim0, dim1)
         # Axis 1 summarizes each row (across axis 1) of sparse matrix
         elif axis == 1:
             index = sp_mtx.row_category.categories
-            table_type = input_table_meta["row_input"]
+            table_type = SUMMARY.get_table_type("summary", dim1, dim0)
 
         # summary fields = columns, sparse matrix axis = rows
         sdf = pd.DataFrame(data=data, index=index)
@@ -126,7 +126,7 @@ class SummaryMatrix(_AggregateDataMatrix):
         size = len(self._df.index)
         # Get a random sample of category indexes (0-based)
         idxs = random.sample(range(size), count)
-        labels = [self._df.index(i) for i in idxs]
+        labels = [self._df.index[i] for i in idxs]
         return labels
 
     # .............................................................................

@@ -183,7 +183,7 @@ class ANALYSIS_DIM:
     }
     SPECIES = {
         "code": "species",
-        "key_fld": UNIQUE_COUNTY_FLD,
+        "key_fld": UNIQUE_SPECIES_FLD,
         # Species status for each occurrence
         "status": OCCURRENCE_STATUS,
         "status_fld": OCCURRENCE_STATUS_FLD
@@ -281,13 +281,28 @@ class ANALYSIS_DIM:
 
 
 # .............................................................................
+class AGGREGATION_TYPE:
+    """Types of tables created for aggregate species data analyses."""
+    LIST = "list"
+    COUNT = "counts"
+    SUMMARY = "summary"
+    MATRIX = "matrix"
+
+    # ...........................
+    @classmethod
+    def all(cls):
+        return (cls.LIST, cls.COUNT, cls.SUMMARY, cls.MATRIX)
+
+
+# .............................................................................
 class SUMMARY:
     """Types of tables stored in S3 for aggregate species data analyses."""
     dt_token = "YYYY_MM_DD"
     sep = "_"
     dim_sep = f"{sep}x{sep}"
-    DATATYPES = ("list", "counts", "summary", "matrix")
+    DATATYPES = AGGREGATION_TYPE.all()
     SPECIES_DIMENSION = ANALYSIS_DIM.species_code()
+    SPECIES_FIELD = ANALYSIS_DIM.SPECIES["key_fld"]
     ANALYSIS_DIMENSIONS = ANALYSIS_DIM.analysis_code()
 
     # ...........................
@@ -326,7 +341,7 @@ class SUMMARY:
         if datatype not in cls.DATATYPES:
             raise Exception(f"Datatype {datatype} is not in {cls.DATATYPES}.")
 
-        if datatype == "counts":
+        if datatype == AGGREGATION_TYPE.COUNT:
             if dim0 in cls.ANALYSIS_DIMENSIONS:
                 if dim1 == OCCURRENCE_STATUS:
                     # ex: state-x-riis_counts
@@ -367,9 +382,9 @@ class SUMMARY:
         list = {}
         for analysis_code in cls.ANALYSIS_DIMENSIONS:
             table_type = cls.get_table_type(
-                "list", analysis_code, cls.SPECIES_DIMENSION)
-            dim = ANALYSIS_DIM.analysis(code=analysis_code)[0]
-            # name == table_type, ex: county-x-species_list
+                AGGREGATION_TYPE.LIST, analysis_code, cls.SPECIES_DIMENSION)
+            dim = ANALYSIS_DIM.get(analysis_code)
+            # name == table_type, ex: county_x_species_list
             meta = {
                 "code": table_type,
                 "fname": f"{table_type}{cls.sep}{cls.dt_token}{cls.sep}000",
@@ -400,7 +415,7 @@ class SUMMARY:
             # Analysis (aka region) alone or with RIIS species status
             for dim1 in (None, OCCURRENCE_STATUS):
                 table_type = cls.get_table_type(
-                    "counts", analysis_code, dim1)
+                    AGGREGATION_TYPE.COUNT, analysis_code, dim1)
 
                 fields = copy.deepcopy(dim0["fields"])
                 # add species count
@@ -424,7 +439,7 @@ class SUMMARY:
     # ...........................
     @classmethod
     def summary(cls):
-        """Summary tables of species count and occurrence count for each dimension in project.
+        """Summary tables of species count and occurrence count for each dimension.
 
         Returns:
             sums (dict): dict of dictionaries for each summary table defined by the
@@ -439,10 +454,10 @@ class SUMMARY:
         for analysis_code in cls.ANALYSIS_DIMENSIONS:
             # Analysis first
             table_type1 = cls.get_table_type(
-                "summary", analysis_code, cls.SPECIES_DIMENSION)
+                AGGREGATION_TYPE.SUMMARY, analysis_code, cls.SPECIES_DIMENSION)
             # Species first
             table_type2 = cls.get_table_type(
-                "summary", cls.SPECIES_DIMENSION, analysis_code)
+                AGGREGATION_TYPE.SUMMARY, cls.SPECIES_DIMENSION, analysis_code)
 
             for tt in (table_type1, table_type2):
                 meta = {
@@ -468,19 +483,24 @@ class SUMMARY:
                 project.
 
         Note:
-            Rows will always have species, columns will have analysis dimension (region)
+            Similar to a Presence/Absence Matrix (PAM),
+                Rows will always have analysis dimension (i.e. region or other category)
+                Columns will have species
         """
         mtxs = {}
         for analysis_code in cls.ANALYSIS_DIMENSIONS:
-            dim0 = cls.SPECIES_DIMENSION
-            dim0_dict = ANALYSIS_DIM.species()
+            dim0 = ANALYSIS_DIM.species_code()
+            dim0_dict = ANALYSIS_DIM.SPECIES
             dim1 = analysis_code
-            dim1_dict = ANALYSIS_DIM.analysis(code=analysis_code)[0]
-            table_type = cls.get_table_type("matrix", dim0, dim1)
-            row_input = cls.get_table_type("summary", dim0, dim1)
-            col_input = cls.get_table_type("summary", dim1, dim0)
+            dim1_dict = ANALYSIS_DIM.get(analysis_code)
+            table_type = cls.get_table_type(AGGREGATION_TYPE.MATRIX, dim0, dim1)
+            # # Create from summary tables?
+            # row_input = cls.get_table_type("summary", dim0, dim1)
+            # col_input = cls.get_table_type("summary", dim1, dim0)
+            # Create from stacked records (list) table
+            data_input = cls.get_table_type(AGGREGATION_TYPE.LIST, dim0, dim1)
 
-            # Dimension 0/row is always species
+            # Dimension/Axis 0/row is always region or other analysis dimension
             meta = {
                 "code": table_type,
                 "fname": f"{table_type}{cls.sep}{cls.dt_token}",
@@ -488,12 +508,12 @@ class SUMMARY:
                 "matrix_extension": ".npz",
                 "data_type": "matrix",
 
-                # Dimension 1 is row (aka Axis 0)
+                # Dimension 0 is row (aka Axis 0)
                 "row": dim0_dict["key_fld"],
-                "row_input": row_input,
-                # Dimension 2 is column (aka Axis 1)
+                "dimension0": dim0,
+                # Dimension 1 is column (aka Axis 1)
                 "column": dim1_dict["key_fld"],
-                "column_input": col_input,
+                "dimension1": dim1,
 
                 # Matrix values
                 "value": OCCURRENCE_COUNT_FLD,
@@ -616,20 +636,21 @@ class SUMMARY:
         Raises:
             Exception: on failure to parse table_type into 2 strings.
         """
+        dim0 = dim1 = None
         fn_parts = table_type.split(cls.sep)
-        if len(fn_parts) == 2:
-            datacontents, datatype = fn_parts
+        if len(fn_parts) >= 2:
+            datatype = fn_parts.pop()
+            idx = len(datatype) + 1
+            datacontents = table_type[:-idx]
         else:
-            raise Exception(f"Failed to parse {table_type} into datacontents, datetype.")
+            raise Exception(f"Failed to parse {table_type}.")
         # Some data has 2 dimensions
         dim_parts = datacontents.split(cls.dim_sep)
-        if len(dim_parts) == 1:
-            dim0 = dim_parts[0]
-            dim1 = None
-        elif len(dim_parts) == 2:
-            dim0, dim1 = dim_parts
-        else:
-            dim0 = dim1 = None
+        dim0 = dim_parts[0]
+        try:
+            dim1 = dim_parts[1]
+        except:
+            pass
         return datacontents, dim0, dim1, datatype
 
     # ...............................................
