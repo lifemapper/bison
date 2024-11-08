@@ -326,7 +326,7 @@ if __name__ == "__main__":
         # Create
         agg_sparse_mtx = SparseMatrix(
             sparse_coo, mtx_table_type, datestr, row_categ, col_categ,
-            logger=logger)
+            y_fld=None, x_fld=None, val_fld=None, logger=logger)
 
         test_stacked_data(stk_df, axis0_label, axis1_label, val_label, agg_sparse_mtx)
 

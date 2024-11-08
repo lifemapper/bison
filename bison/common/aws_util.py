@@ -616,13 +616,13 @@ class S3:
         return f"s3//{bucket}/{parquet_path}"
 
     # ----------------------------------------------------
-    def upload(self, local_filename, bucket, s3_path):
+    def upload(self, local_filename, bucket, s3_key, overwrite=False):
         """Upload a file to S3.
 
         Args:
             local_filename: Full path to local file for upload.
             bucket: name of the S3 bucket destination.
-            s3_path: the data destination inside the S3 bucket (WITH filename).
+            s3_key: the data destination inside the S3 bucket (WITH filename).
 
         Returns:
             uploaded_fname: the S3 path to the uploaded file.
@@ -631,8 +631,16 @@ class S3:
             NoCredentialsError: on failure to autheticate for upload_file.
             Exception: on failure to upload_file to S3.
         """
+        # Is it present?
+        objs = self.list(bucket, prefix=s3_key)
+        if s3_key in objs:
+            if overwrite is False:
+                raise Exception(f"Object {s3_key} is already present in S3.")
+            else:
+                self.delete(bucket, s3_key)
+        # Upload
         try:
-            self._client.upload_file(local_filename, bucket, s3_path)
+            self._client.upload_file(local_filename, bucket, s3_key)
         except NoCredentialsError:
             print(f"Failed to authenticate for upload_file {local_filename}.")
             raise
@@ -640,18 +648,47 @@ class S3:
             print(f"Failed to upload_file {local_filename}.")
             raise
         else:
-            uploaded_fname = f"s3://{bucket}/{s3_path}"
+            uploaded_fname = f"s3://{bucket}/{s3_key}"
             print(f"Success uploading file {uploaded_fname}.")
         return uploaded_fname
 
     # ----------------------------------------------------
-    def list(self, bucket, bucket_folder, prefix=None):
+    def delete(self, bucket, s3_key):
+        """Upload a file to S3.
+
+        Args:
+            local_filename: Full path to local file for upload.
+            bucket: name of the S3 bucket destination.
+            axis: the data destination inside the S3 bucket (WITH filename).
+
+        Returns:
+            uploaded_fname: the S3 path to the uploaded file.
+
+        Raises:
+            NoCredentialsError: on failure to autheticate for upload_file.
+            Exception: on failure to upload_file to S3.
+        """
+        s3_uri = f"s3://{bucket}/{s3_key}"
+        try:
+            response = self._client.delete_object(Bucket=bucket, Key=s3_key)
+            print(f"Response to delete_object: {response}")
+        except NoCredentialsError:
+            print(f"Failed to authenticate for delete_object {s3_uri}.")
+            raise
+        except Exception:
+            print(f"Failed to upload_file {s3_uri}.")
+            raise
+        else:
+            print(f"Success uploading file {s3_uri}.")
+        return s3_uri
+
+    # ----------------------------------------------------
+    def list(self, bucket, prefix=None):
         """List object names/keys in a bucket.
 
         Args:
             bucket: bucket for query
-            bucket_folder: Any subfolder to limit the query
-            prefix: Any object prefix to limit the query
+            prefix: Any object prefix (including bucket folder) to limit the query
 
         Returns:
             objnames: Keys for the objects in the S3 location.
@@ -663,28 +700,21 @@ class S3:
             Exception: on unknown failure to list objects from S3
         """
         objnames = []
-        # Ensure that directory prefix ends in /
-        if bucket_folder != "" and not bucket_folder.endswith("/"):
-            bucket_folder += "/"
-        full_prefix = bucket_folder
-        # Add object prefix if present
-        if prefix is not None:
-            full_prefix += prefix
-        s3uri = f"s3://{bucket}/{full_prefix}"
+        s3_uri = f"s3://{bucket}/{prefix}"
         # Try to list
         try:
-            response = self._client.list_objects_v2(Bucket=bucket, Prefix=full_prefix)
+            response = self._client.list_objects_v2(Bucket=bucket, Prefix=prefix)
         except NoCredentialsError:
-            print(f"Failed to authenticate for list_objects_v2 in {s3uri}")
+            print(f"Failed to authenticate for list_objects_v2 in {s3_uri}")
             raise
         except SSLError:
-            print(f"Failed with SSLError to list_objects_v2 in {s3uri}")
+            print(f"Failed with SSLError to list_objects_v2 in {s3_uri}")
             raise
         except ClientError:
-            print(f"Failed with ClientError to list_objects_v2 in {s3uri}")
+            print(f"Failed with ClientError to list_objects_v2 in {s3_uri}")
             raise
         except Exception:
-            print(f"Failed with unknown Exception to list_objects_v2 in {s3uri}")
+            print(f"Failed with unknown Exception to list_objects_v2 in {s3_uri}")
             raise
 
         # Any objects?
@@ -694,10 +724,8 @@ class S3:
             pass
         else:
             for s3obj in contents:
-                name = s3obj["Key"]
                 # Do not return the folder in results
-                if name != bucket_folder:
-                    objnames.append(s3obj["Key"])
+                objnames.append(s3obj["Key"])
 
         return objnames
 

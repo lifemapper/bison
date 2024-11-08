@@ -5,7 +5,7 @@ from numpy import integer as np_int, floating as np_float, ndarray
 import os
 from zipfile import ZipFile
 
-from bison.common.constants import SNKeys, SUMMARY
+from bison.common.constants import SNKeys, SUMMARY, TMP_PATH
 from bison.common.log import logit
 
 
@@ -37,6 +37,8 @@ class _AggregateDataMatrix:
         self._table_type = table_type
         self._data_datestr = data_datestr
         self._table = SUMMARY.get_table(table_type, datestr=data_datestr)
+        if self._table is None:
+            raise Exception(f"Table type {table_type} is invalid.")
         self._keys = SNKeys.get_keys_for_table(table_type)
         self._logger = logger
         self._report = {}
@@ -56,10 +58,12 @@ class _AggregateDataMatrix:
         logit(msg, logger=self._logger, refname=refname, log_level=log_level)
 
     # ...............................................
-    def _get_input_files(self, local_path="/tmp"):
+    @classmethod
+    def _get_matrix_meta_zip_filenames(cls, table, local_path=TMP_PATH):
         """Return the files that comprise local input data, optionally delete.
 
         Args:
+            table (dict): dictionary of metadata for a matrix
             local_path (str): Absolute path of local destination path
 
         Returns:
@@ -67,8 +71,8 @@ class _AggregateDataMatrix:
             meta_fname (str): absolute path for local metadata file.
             zip_fname (str): absolute path for local compressed file.
         """
-        basename = self._table["fname"]
-        mtx_ext = self._table["matrix_extension"]
+        basename = table["fname"]
+        mtx_ext = table["matrix_extension"]
         mtx_fname = f"{local_path}/{basename}{mtx_ext}"
         meta_fname = f"{local_path}/{basename}.json"
         zip_fname = f"{local_path}/{basename}.zip"
@@ -155,21 +159,11 @@ class _AggregateDataMatrix:
 
     # ...............................................
     @classmethod
-    def _check_for_existing_files(cls, expected_files, overwrite):
-        deleted_files = []
+    def _find_local_files(cls, expected_files):
         # Are local files already present?
         files_present = [fname for fname in expected_files if os.path.exists(fname)]
-        # Delete if overwrite is true or if not all expected files are present
-        if overwrite is True or len(files_present) < len(expected_files):
-            for fname in files_present:
-                os.remove(fname)
-                deleted_files.append(fname)
-            if deleted_files:
-                print(f"Removed files {', '.join(deleted_files)}.")
-        # Who remains?
-        files_present = [fname for fname in expected_files if os.path.exists(fname)]
         all_exist = len(files_present) == len(expected_files)
-        return all_exist, deleted_files
+        return files_present, all_exist
 
     # ...............................................
     def _compress_files(self, input_fnames, zip_fname):
@@ -187,15 +181,14 @@ class _AggregateDataMatrix:
             raise Exception(msg)
 
     # .............................................................................
-    def _remove_expected_files(self, local_path="/tmp"):
+    def _remove_expected_files(self, local_path=TMP_PATH):
         # Always delete local files before compressing this data.
-        overwrite = True
-        [mtx_fname, meta_fname, zip_fname] = self._get_input_files(local_path=local_path)
-        all_exist, deleted_files = self._check_for_existing_files(
-            [mtx_fname, meta_fname, zip_fname], overwrite)
-        if deleted_files:
-            self._logme(f"Deleted existing files {','.join(deleted_files)}.")
-        return [mtx_fname, meta_fname, zip_fname]
+        expected_files = self._get_matrix_meta_zip_filenames(
+            self._table, local_path=local_path)
+        for fn in expected_files:
+            if os.path.exists(fn):
+                os.remove(fn)
+        return expected_files
 
     # .............................................................................
     @classmethod
@@ -222,24 +215,29 @@ class _AggregateDataMatrix:
         """
         if not os.path.exists(zip_filename):
             raise Exception(f"Missing file {zip_filename}")
-        basename = os.path.basename(zip_filename)
-        fname, _ext = os.path.splitext(basename)
         try:
-            table_type, data_datestr = SUMMARY.get_tabletype_datestring_from_filename(
+            table_type, datestr = SUMMARY.get_tabletype_datestring_from_filename(
                 zip_filename)
         except Exception:
             raise
 
-        table = SUMMARY.get_table(table_type)
-        mtx_ext = table["matrix_extension"]
-        # Expected files from archive
-        mtx_fname = f"{local_path}/{fname}{mtx_ext}"
-        meta_fname = f"{local_path}/{fname}.json"
+        table = SUMMARY.get_table(table_type, datestr=datestr)
+        mtx_fname, meta_fname, _ = cls._get_matrix_meta_zip_filenames(
+            table, local_path=local_path)
 
         # Are local files already present?
         expected_files = [mtx_fname, meta_fname]
-        all_exist, _deleted_files = cls._check_for_existing_files(
-            expected_files, overwrite)
+        files_present, all_exist = cls._find_local_files(expected_files)
+
+        # If overwrite or only some are present, remove
+        if (
+                len(files_present) > 0 and
+                (overwrite is True or
+                 (overwrite is False and all_exist is False))
+        ):
+                for fn in files_present:
+                    if os.path.exists(fn):
+                        os.remove(fn)
 
         if all_exist and overwrite is False:
             print(f"Expected files {', '.join(expected_files)} already exist.")
@@ -251,4 +249,4 @@ class _AggregateDataMatrix:
                 if not os.path.exists(fn):
                     raise Exception(f"Missing expected file {fn}")
 
-        return mtx_fname, meta_fname, table_type, data_datestr
+        return mtx_fname, meta_fname, table_type, datestr

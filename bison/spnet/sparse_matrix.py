@@ -17,7 +17,7 @@ class SparseMatrix(_AggregateDataMatrix):
     # ...........................
     def __init__(
             self, sparse_coo_array, table_type, data_datestr, row_category,
-            column_category, y_fld=None, x_fld=None, val_fld=None, logger=None):
+            column_category, y_fld=None, x_fld=None, val_fld=None):
         """Constructor for species by region/analysis_dim comparisons.
 
         Args:
@@ -37,8 +37,10 @@ class SparseMatrix(_AggregateDataMatrix):
                 sparse matrix column headers
             val_fld (str): column header from stacked input records containing values
                 for sparse matrix cells
-            logger (object): An optional local logger to use for logging output
-                with consistent options
+
+        Note: y_fld, x_fld, val_fld refer to column headers from the original data
+            used to construct the sparse matrix.  They are included to aid in testing
+            the original data against the sparse matrix.
 
         Note: constructed from `stacked` records in table with datatype "list" in
             bison.common.constants.SUMMARY.DATATYPES, i.e. county-x-species_list
@@ -56,13 +58,12 @@ class SparseMatrix(_AggregateDataMatrix):
         self._y_fld = y_fld
         self._x_fld = x_fld
         self._val_fld = val_fld
-        _AggregateDataMatrix.__init__(self, table_type, data_datestr, logger=logger)
+        _AggregateDataMatrix.__init__(self, table_type, data_datestr)
 
     # ...........................
     @classmethod
     def init_from_stacked_data(
-            cls, stacked_df, y_fld, x_fld, val_fld, table_type, data_datestr,
-            logger=None):
+            cls, stacked_df, y_fld, x_fld, val_fld, table_type, data_datestr):
         """Create a sparse matrix of rows by columns containing values from a table.
 
         Args:
@@ -77,11 +78,11 @@ class SparseMatrix(_AggregateDataMatrix):
             table_type (sppy.tools.s2n.constants.SUMMARY_TABLE_TYPES): table type of
                 sparse matrix aggregated data
             data_datestr (str): date of the source data in YYYY_MM_DD format.
-            logger (object): logger for saving relevant processing messages
 
         Returns:
-            sparse_coo (scipy.coo_array): matrix of y values (rows, y axis=0) by
-                x values (columnns, x axis=1), with values from another column.
+            sparse_matrix (bison.spnet.sparse_matrix.SparseMatrix): matrix of y values
+                (rows, y axis=0) by x values (columnns, x axis=1), with values from
+                another column.
 
         Note:
             The input dataframe must contain only one input record for any x and y value
@@ -95,22 +96,73 @@ class SparseMatrix(_AggregateDataMatrix):
         unique_x_vals = list(stacked_df[x_fld].dropna().unique())
         unique_y_vals = list(stacked_df[y_fld].dropna().unique())
         # Categories allow using codes as the integer index for scipy matrix
-        y_categ = CategoricalDtype(unique_y_vals, ordered=True)
-        x_categ = CategoricalDtype(unique_x_vals, ordered=True)
+        row_categ = CategoricalDtype(unique_y_vals, ordered=True)
+        col_categ = CategoricalDtype(unique_x_vals, ordered=True)
         # Create a list of category codes matching original stacked data to replace
         #   column names from stacked data dataframe with integer codes for row and
         #   column indexes in the new scipy matrix
-        col_idx = stacked_df[x_fld].astype(x_categ).cat.codes
-        row_idx = stacked_df[y_fld].astype(y_categ).cat.codes
+        col_idx = stacked_df[x_fld].astype(col_categ).cat.codes
+        row_idx = stacked_df[y_fld].astype(row_categ).cat.codes
         # This creates a new matrix in Coordinate list (COO) format.  COO stores a list
         # of (row, column, value) tuples.  Convert to CSR or CSC for efficient Row or
         # Column slicing, respectively
         sparse_coo = scipy.sparse.coo_array(
             (stacked_df[val_fld], (row_idx, col_idx)),
-            shape=(y_categ.categories.size, x_categ.categories.size))
+            shape=(row_categ.categories.size, col_categ.categories.size))
         sparse_matrix = SparseMatrix(
-            sparse_coo, table_type, data_datestr, y_categ, x_categ, logger=logger)
+            sparse_coo, table_type, data_datestr, row_categ, col_categ,
+            y_fld=y_fld, x_fld=x_fld, val_fld=val_fld)
         return sparse_matrix
+
+    # ...........................
+    @classmethod
+    def init_from_compressed_file(
+            cls, zip_filename, local_path="/tmp", overwrite=False):
+        """Construct a SparseMatrix from a compressed file.
+
+        Args:
+            zip_filename (str): Filename of zipped sparse matrix data to uncompress.
+            local_path (str): Absolute path of local destination path
+            overwrite (bool): Flag indicating whether to use existing files unzipped
+                from the zip_filename.
+
+        Returns:
+            sparse_coo (scipy.sparse.coo_array): Sparse Matrix containing data.
+            row_categ (pandas.api.types.CategoricalDtype): row categories
+            col_categ (pandas.api.types.CategoricalDtype): column categories
+            table_type (sppy.tools.s2n.constants.SUMMARY_TABLE_TYPES): type of table
+                data
+            data_datestr (str): date string in format YYYY_MM_DD
+
+        Raises:
+            Exception: on failure to uncompress files.
+            Exception: on failure to load data from uncompressed files.
+
+        Note:
+            All filenames have the same basename with extensions indicating which data
+                they contain. The filename contains a string like YYYY-MM-DD which
+                indicates which GBIF data dump the statistics were built upon.
+        """
+        try:
+            mtx_fname, meta_fname, table_type, data_datestr = cls._uncompress_files(
+                zip_filename, local_path=local_path, overwrite=overwrite)
+        except Exception:
+            raise
+
+        try:
+            sparse_coo, meta_dict, row_categ, col_categ = cls.read_data(
+                mtx_fname, meta_fname)
+        except Exception:
+            raise
+
+        # Create
+        sparse_mtx = SparseMatrix(
+            sparse_coo, meta_dict["code"], data_datestr, row_categ, col_categ,
+            y_fld=meta_dict["axis0_fld"], x_fld=meta_dict["axis1_fld"],
+            val_fld=meta_dict["val_fld"])
+
+        return sparse_mtx
+
 
     # ...........................
     @property
@@ -861,9 +913,24 @@ class SparseMatrix(_AggregateDataMatrix):
             raise Exception(msg)
 
         # Save table data and categories to json locally
+        # table_type, data_datestr, row_category,
+        #             column_category, y_fld=None, x_fld=None, val_fld=None
         metadata = SUMMARY.get_table(self._table_type)
-        metadata["row"] = self._row_categ.categories.tolist()
-        metadata["column"] = self._col_categ.categories.tolist()
+        metadata["row_categories"] = self._row_categ.categories.tolist()
+        metadata["column_categories"] = self._col_categ.categories.tolist()
+        metadata["datestr"] = self.data_datestr
+        metadata["val_fld"] = self.input_val_fld
+        # Should be filled already, make sure they are consistent!
+        if metadata["axis0_fld"] != self.input_y_fld:
+            raise Exception(
+                f"metadata/axis0_fld {metadata['axis0_fld']} != "
+                f"y_fld {self.input_y_fld}"
+            )
+        if metadata["axis1_fld"] != self.input_x_fld:
+            raise Exception(
+                f"metadata/axis1_fld {metadata['axis1_fld']} != "
+                f"x_fld {self.input_x_fld}"
+            )
         try:
             self._dump_metadata(metadata, meta_fname)
         except Exception:
@@ -913,11 +980,12 @@ class SparseMatrix(_AggregateDataMatrix):
             raise
 
         try:
-            sparse_coo, row_categ, col_categ = cls.read_data(mtx_fname, meta_fname)
+            sparse_coo, meta_dict, row_categ, col_categ = cls.read_data(
+                mtx_fname, meta_fname)
         except Exception:
             raise
 
-        return sparse_coo, row_categ, col_categ, table_type, data_datestr
+        return sparse_coo, meta_dict, row_categ, col_categ, table_type, data_datestr
 
     # .............................................................................
     @classmethod
@@ -961,16 +1029,16 @@ class SparseMatrix(_AggregateDataMatrix):
 
         # Parse metadata into objects for matrix construction
         try:
-            row_catlst = meta_dict.pop("row")
+            row_catlst = meta_dict.pop("row_categories")
         except KeyError:
             raise Exception(f"Missing row categories in {meta_filename}")
         else:
             row_categ = CategoricalDtype(row_catlst, ordered=True)
         try:
-            col_catlst = meta_dict.pop("column")
+            col_catlst = meta_dict.pop("column_categories")
         except KeyError:
             raise Exception(f"Missing column categories in {meta_filename}")
         else:
             col_categ = CategoricalDtype(col_catlst, ordered=True)
 
-        return sparse_coo, row_categ, col_categ
+        return sparse_coo, meta_dict, row_categ, col_categ

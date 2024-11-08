@@ -47,10 +47,12 @@ def logit(msg, logger=None, refname=None, print_obj=None, log_level=logging.INFO
     if print_obj is not None:
         obj_str = prettify_object(print_obj)
         msg = f"{msg}\n{obj_str}"
+    if refname is not None:
+        msg = f"{refname}: {msg}"
     if logger is not None:
-        logger.log(msg, refname=refname, log_level=log_level)
+        logger.log(msg, log_level=log_level)
     else:
-        print(f"{refname}:log_level {log_level}: {msg}")
+        print(msg)
 
 
 # .....................................................................................
@@ -95,7 +97,7 @@ class Logger:
         self.logger.propagate = False
 
     # ........................
-    def log(self, msg, refname="", log_level=logging.INFO):
+    def log(self, msg, refname=None, log_level=logging.INFO):
         """Log a message.
 
         Args:
@@ -104,7 +106,9 @@ class Logger:
             log_level (int): A level to use when logging the message.
         """
         if self.logger is not None:
-            self.logger.log(log_level, refname + ': ' + msg)
+            if refname is not None:
+                msg = f"{refname}: {msg}"
+            self.logger.log(log_level, msg)
 
 
 # .....................................................................................

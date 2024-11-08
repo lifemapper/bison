@@ -31,6 +31,8 @@ S3_IN_DIR = "input"
 S3_OUT_DIR = "output"
 S3_LOG_DIR = "log"
 S3_SUMMARY_DIR = "summary"
+PARQUET_EXT = ".parquet"
+S3_RS_TABLE_SUFFIX = f"_000{PARQUET_EXT}"
 
 # .............................................................................
 # Docker compose files for tasks
@@ -355,14 +357,26 @@ class SUMMARY:
             else:
                 raise Exception(
                     f"First dimension for counts must be in {cls.ANALYSIS_DIMENSIONS}.")
+        elif datatype == AGGREGATION_TYPE.MATRIX:
+            if dim0 not in cls.ANALYSIS_DIMENSIONS:
+                raise Exception(
+                    f"First dimension (rows) must be in {cls.ANALYSIS_DIMENSIONS}"
+                )
+            if dim1 != cls.SPECIES_DIMENSION:
+                raise Exception(
+                    f"Second dimension (columns) must be {cls.SPECIES_DIMENSION}"
+                )
+            table_type = f"{dim0}{cls.dim_sep}{dim1}{cls.sep}{datatype}"
         else:
             if dim0 == cls.SPECIES_DIMENSION and dim1 not in cls.ANALYSIS_DIMENSIONS:
                 raise Exception(
-                    f"Second dimension must be in {cls.ANALYSIS_DIMENSIONS}")
+                    f"Second dimension must be in {cls.ANALYSIS_DIMENSIONS}"
+                )
             elif dim0 not in cls.ANALYSIS_DIMENSIONS and dim0 != cls.SPECIES_DIMENSION:
                 raise Exception(
                     f"First dimension must be {cls.SPECIES_DIMENSION} or "
-                    f"in {cls.ANALYSIS_DIMENSIONS}.")
+                    f"in {cls.ANALYSIS_DIMENSIONS}."
+                )
 
             table_type = f"{dim0}{cls.dim_sep}{dim1}{cls.sep}{datatype}"
         return table_type
@@ -489,16 +503,16 @@ class SUMMARY:
         """
         mtxs = {}
         for analysis_code in cls.ANALYSIS_DIMENSIONS:
-            dim0 = ANALYSIS_DIM.species_code()
-            dim0_dict = ANALYSIS_DIM.SPECIES
-            dim1 = analysis_code
-            dim1_dict = ANALYSIS_DIM.get(analysis_code)
+            dim0 = analysis_code
+            dim0_dict = ANALYSIS_DIM.get(analysis_code)
+            dim1 = ANALYSIS_DIM.species_code()
+            dim1_dict = ANALYSIS_DIM.SPECIES
             table_type = cls.get_table_type(AGGREGATION_TYPE.MATRIX, dim0, dim1)
             # # Create from summary tables?
             # row_input = cls.get_table_type("summary", dim0, dim1)
             # col_input = cls.get_table_type("summary", dim1, dim0)
-            # Create from stacked records (list) table
-            data_input = cls.get_table_type(AGGREGATION_TYPE.LIST, dim0, dim1)
+            # # Create from stacked records (list) table
+            # data_input = cls.get_table_type(AGGREGATION_TYPE.LIST, dim0, dim1)
 
             # Dimension/Axis 0/row is always region or other analysis dimension
             meta = {
@@ -508,12 +522,17 @@ class SUMMARY:
                 "matrix_extension": ".npz",
                 "data_type": "matrix",
 
-                # Dimension 0 is row (aka Axis 0)
-                "row": dim0_dict["key_fld"],
+                # Dimension 0 is row (aka Axis 0), 1 is column (aka Axis 1)
+                "axis0_fld": dim0_dict["key_fld"],
                 "dimension0": dim0,
-                # Dimension 1 is column (aka Axis 1)
-                "column": dim1_dict["key_fld"],
+                "axis1_fld": dim1_dict["key_fld"],
                 "dimension1": dim1,
+
+                # These are all filled in for compressing data, reading data
+                "row_categories": [],
+                "column_categories": [],
+                "value_fld": "",
+                "datestr": cls.dt_token,
 
                 # Matrix values
                 "value": OCCURRENCE_COUNT_FLD,
@@ -658,28 +677,38 @@ class SUMMARY:
     def _parse_filename(cls, filename):
         # <datacontents>_<datatype>_<YYYY_MM_DD><_optional parquet extension>
         fname = os.path.basename(filename)
-        fname_noext, _ext = os.path.splitext(fname)
-        fn_parts = fname_noext.split("_")
-        if len(fn_parts) >= 5:
-            datacontents = fn_parts[0]
-            try:
-                dim0, dim1 = datacontents.split(cls.dim_sep)
-            except ValueError:
-                dim0 = dim1 = None
-            datatype = fn_parts[1]
-            yr = fn_parts[2]
-            mo = fn_parts[3]
-            day = fn_parts[4]
-            rest = fn_parts[5:]
-            if len(yr) == 4 and len(mo) == 2 and len(day) == 2:
-                data_datestr = f"{yr}_{mo}_{day}"
-            else:
-                raise Exception(
-                    f"Length of elements year, month, day ({yr}, {mo}. {day}) should "
-                    "be 4, 2, and 2")
+        if fname.endswith(S3_RS_TABLE_SUFFIX):
+            stripped_fn = fname[:-len(S3_RS_TABLE_SUFFIX)]
+            rest = S3_RS_TABLE_SUFFIX
         else:
-            raise Exception(f"{fname_noext} does not follow the expected pattern")
-        return datacontents, dim0, dim1, datatype, data_datestr, rest
+            stripped_fn, ext = os.path.splitext(fname)
+            rest = ext
+        idx = len(stripped_fn) - len(cls.dt_token)
+        datestr = stripped_fn[idx:]
+        table_type = stripped_fn[:idx-1]
+        datacontents, dim0, dim1, datatype = cls.parse_table_type(table_type)
+
+        # fn_parts = stripped_fn.split("_")
+        # if len(fn_parts) >= 5:
+        #     datacontents = fn_parts[0]
+        #     try:
+        #         dim0, dim1 = datacontents.split(cls.dim_sep)
+        #     except ValueError:
+        #         dim0 = dim1 = None
+        #     datatype = fn_parts[1]
+        #     yr = fn_parts[2]
+        #     mo = fn_parts[3]
+        #     day = fn_parts[4]
+        #     rest = fn_parts[5:]
+        #     if len(yr) == 4 and len(mo) == 2 and len(day) == 2:
+        #         datestr = f"{yr}_{mo}_{day}"
+        #     else:
+        #         raise Exception(
+        #             f"Length of elements year, month, day ({yr}, {mo}. {day}) should "
+        #             "be 4, 2, and 2")
+        # else:
+        #     raise Exception(f"{stripped_fn} does not follow the expected pattern")
+        return datacontents, dim0, dim1, datatype, datestr, rest
 
     # ...............................................
     @classmethod

@@ -6,8 +6,8 @@ from bison.common.constants import (
     ANALYSIS_DIM, OCCURRENCE_COUNT_FLD, REGION, S3_BUCKET, S3_SUMMARY_DIR,
     SPECIES_COUNT_FLD, SUMMARY, TMP_PATH
 )
-from bison.common.log import logit, Logger
-from bison.common.util import get_current_datadate_str, get_today_str
+from bison.common.log import logit
+from bison.common.util import get_current_datadate_str
 from bison.spnet.sparse_matrix import SparseMatrix
 from bison.spnet.summary_matrix import SummaryMatrix
 
@@ -33,7 +33,7 @@ def create_sparse_matrix_from_records(
         logger (bison.common.log.Logger): for writing messages to file and console
 
     Returns:
-        agg_sparse_mtx (bison.spnet.sparse_matrix.SparseMatrix): sparse matrix
+        sparse_mtx (bison.spnet.sparse_matrix.SparseMatrix): sparse matrix
             containing data separated into 2 dimensions
         y_fld (str): column header from stacked input records containing values for
             sparse matrix row headers
@@ -51,44 +51,44 @@ def create_sparse_matrix_from_records(
         y_fld, x_fld, val_fld, stk_df = \
             _read_stacked_data_records(s3, stacked_table_type, datestr)
     except Exception as e:
-        logit(f"Failed to read {stacked_table_type} to dataframe. ({e})", logger=logger)
+        logit(
+            f"Failed to read {stacked_table_type} to dataframe. ({e})",
+            logger=logger
+        )
         raise
     logit(f"Read stacked data {stacked_table_type}.", logger=logger)
 
     # Create matrix from record data, then test consistency and upload.
     try:
-        agg_sparse_mtx = SparseMatrix.init_from_stacked_data(
-            stk_df, y_fld, x_fld, val_fld, mtx_table_type, datestr,
-            logger=logger)
+        sparse_mtx = SparseMatrix.init_from_stacked_data(
+            stk_df, y_fld, x_fld, val_fld, mtx_table_type, datestr)
     except Exception as e:
         logger.log(f"Failed to read {stacked_table_type} to sparse matrix. ({e})")
         raise(e)
     logit(f"Built {mtx_table_type} from stacked data.", logger=logger)
 
-    return stk_df, agg_sparse_mtx
+    return stk_df, sparse_mtx
 
 
 # ...............................................
-def test_stacked_vs_matrix(stack_df, sparse_matrix):
-    y_fld = sparse_matrix.input_y_fld
-    x_fld = sparse_matrix.input_x_fld
-    val_fld = sparse_matrix.input_val_fld
-    # .................................
-    # Test consistency between stacked data and sparse matrix
-    # .................................
+def test_stacked_vs_matrix(stack_df, sparse_mtx):
+    success = True
+
     # Test raw counts
-    for stk_lbl, axis in ((y_fld, 0), (x_fld, 1)):
+    for axis in (0, 1):
         # Test stacked column used for axis 0/1 against sparse matrix axis 0/1
-        _test_stacked_to_aggregate_sum(
-            stack_df, stk_lbl, y_fld, sparse_matrix, agg_axis=axis, test_count=5)
+        this_success = _test_stacked_to_aggregate_sum(
+            stack_df, sparse_mtx, axis=axis, test_count=5)
+        success = success and this_success
 
     # Test min/max values for rows/columns
     for is_max in (False, True):
         for axis in (0, 1):
-            _test_stacked_to_aggregate_extremes(
-                stack_df, y_fld, x_fld, val_fld, sparse_matrix, agg_axis=axis,
-                test_count=5, is_max=is_max)
+            this_success = _test_stacked_to_aggregate_extremes(
+                stack_df, sparse_mtx, axis=axis, test_count=5, is_max=is_max)
+            success = success and this_success
 
+    return success
 
 # ...............................................
 def _get_extreme_val_and_attrs_for_column_from_stacked_data(
@@ -151,11 +151,11 @@ def sum_stacked_data_vals_for_column(stacked_df, filter_fld, filter_value, val_f
 
 
 # ...............................................
-def _test_row_col_comparisons(agg_sparse_mtx, test_count, logger):
+def _test_row_col_comparisons(sparse_mtx, test_count, logger):
     """Test row comparisons between 1 and all, and column comparisons between 1 and all.
 
     Args:
-        agg_sparse_mtx (SparseMatrix): object containing a scipy.sparse.coo_array
+        sparse_mtx (SparseMatrix): object containing a scipy.sparse.coo_array
             with 3 columns from the stacked_df arranged as rows and columns with values
         test_count (int): number of rows and columns to test.
         logger (object): logger for saving relevant processing messages
@@ -165,91 +165,96 @@ def _test_row_col_comparisons(agg_sparse_mtx, test_count, logger):
 
     Note: The aggregate_df must have been created from the stacked_df.
     """
-    y_vals = agg_sparse_mtx.get_random_labels(test_count, axis=0)
-    x_vals = agg_sparse_mtx.get_random_labels(test_count, axis=1)
+    y_vals = sparse_mtx.get_random_labels(test_count, axis=0)
+    x_vals = sparse_mtx.get_random_labels(test_count, axis=1)
     for y in y_vals:
-        row_comps = agg_sparse_mtx.compare_row_to_others(y)
+        row_comps = sparse_mtx.compare_row_to_others(y)
         logit("Row comparisons:", logger=logger, print_obj=row_comps)
     for x in x_vals:
-        col_comps = agg_sparse_mtx.compare_column_to_others(x)
+        col_comps = sparse_mtx.compare_column_to_others(x)
         logit("Column comparisons:", logger=logger, print_obj=col_comps)
 
 
 # ...............................................
 def _test_stacked_to_aggregate_sum(
-        stk_df, stk_axis_col_label, stk_val_col_label, agg_sparse_mtx, agg_axis=0,
-        test_count=5, logger=None):
+        stk_df, sparse_mtx, axis=0, test_count=5, logger=None):
     """Test for equality of sums in stacked and aggregated dataframes.
 
     Args:
         stk_df: dataframe of stacked data, containing records with columns of
             categorical values and counts.
-        stk_axis_col_label: column label in stacked dataframe to be used as the column
-            labels of the axis in the aggregate sparse matrix.
-        stk_val_col_label: column label in stacked dataframe for data to be used as
-            value in the aggregate sparse matrix.
-        agg_sparse_mtx (SparseMatrix): object containing a scipy.sparse.coo_array
+        sparse_mtx (SparseMatrix): object containing a scipy.sparse.coo_array
             with 3 columns from the stacked_df arranged as rows and columns with values]
-        agg_axis (int): Axis 0 (row) or 1 (column) that corresponds with the column
+        axis (int): Axis 0 (row) or 1 (column) that corresponds with the column
             label (stk_axis_col_label) in the original stacked data.
         test_count (int): number of rows and columns to test.
         logger (object): logger for saving relevant processing messages
+
+    Returns:
+        success (bool): Flag indicating success of all or failure of any tests.
 
     Postcondition:
         Printed information for successful or failed tests.
 
     Note: The aggregate_df must have been created from the stacked_df.
     """
-    labels = agg_sparse_mtx.get_random_labels(test_count, axis=agg_axis)
+    success = True
+    val_fld = sparse_mtx.input_val_fld
+    if axis == 0:
+        col_fld = sparse_mtx.input_y_fld
+    else:
+        col_fld = sparse_mtx.input_x_fld
+    sparse_labels = sparse_mtx.get_random_labels(test_count, axis=axis)
     # Test stacked column totals against aggregate x columns
-    for lbl in labels:
-        stk_sum = sum_stacked_data_vals_for_column(
-            stk_df, stk_axis_col_label, lbl, stk_val_col_label)
-        agg_sum = agg_sparse_mtx.sum_vector(lbl, axis=agg_axis)
-        logit(f"Test axis {agg_axis}: {lbl}", logger=logger)
+    for sp_lbl in sparse_labels:
+        stk_sum = sum_stacked_data_vals_for_column(stk_df, col_fld, sp_lbl, val_fld)
+        agg_sum = sparse_mtx.sum_vector(sp_lbl, axis=axis)
+        logit(f"Test axis {axis}: {sp_lbl}", logger=logger)
         if stk_sum == agg_sum:
             logit(
-                f"  Total {stk_sum}: Stacked data for {stk_axis_col_label} "
-                f"== aggregate data in axis {agg_axis}: {lbl}", logger=logger
+                f"  Total {stk_sum}: Stacked data for {col_fld} "
+                f"== aggregate data in axis {axis}: {sp_lbl}", logger=logger
             )
         else:
+            success = False
             logit(
-                f"  !!! {stk_sum} != {agg_sum}: Stacked data for {stk_axis_col_label} "
-                f"!= aggregate data in axis {agg_axis}: {lbl}", logger=logger
+                f"  !!! {stk_sum} != {agg_sum}: Stacked data for {col_fld} "
+                f"!= aggregate data in axis {axis}: {sp_lbl}", logger=logger
             )
         logit("", logger=logger)
     logit("", logger=logger)
+    return success
 
 
 # ...............................................
 def _test_stacked_to_aggregate_extremes(
-        stk_df, stk_col_label_for_axis0, stk_col_label_for_axis1, stk_col_label_for_val,
-        agg_sparse_mtx, agg_axis=0, test_count=5, logger=None, is_max=True):
+        stk_df, sparse_mtx, axis=0, test_count=5, logger=None, is_max=True):
     """Test min/max counts for attributes in the sparse matrix vs. the stacked data.
 
     Args:
         stk_df: dataframe of stacked data, containing records with columns of
             categorical values and counts.
-        stk_col_label_for_axis0: column label in stacked dataframe to be used as the
-            row (axis 0) labels of the axis in the aggregate sparse matrix.
-        stk_col_label_for_axis1: column label in stacked dataframe to be used as the
-            column (axis 1) labels of the axis in the aggregate sparse matrix.
-        stk_col_label_for_val: column label in stacked dataframe for data to be used as
-            value in the aggregate sparse matrix.
-        agg_sparse_mtx (SparseMatrix): object containing a scipy.sparse.coo_array
+        sparse_mtx (SparseMatrix): object containing a scipy.sparse.coo_array
             with 3 columns from the stacked_df arranged as rows and columns with values]
-        agg_axis (int): Axis 0 (row) or 1 (column) that corresponds with the column
+        axis (int): Axis 0 (row) or 1 (column) that corresponds with the column
             label (stk_axis_col_label) in the original stacked data.
         test_count (int): number of rows and columns to test.
         logger (object): logger for saving relevant processing messages
         is_max (bool): flag indicating whether to test maximum (T) or minimum (F)
+
+    Returns:
+        success (bool): Flag indicating success of all or failure of any tests.
 
     Postcondition:
         Printed information for successful or failed tests.
 
     Note: The aggregate_df must have been created from the stacked_df.
     """
-    labels = agg_sparse_mtx.get_random_labels(test_count, axis=agg_axis)
+    success = True
+    sparse_labels = sparse_mtx.get_random_labels(test_count, axis=axis)
+    val_fld = sparse_mtx.input_val_fld
+    y_fld = sparse_mtx.input_y_fld
+    x_fld = sparse_mtx.input_x_fld
     # for logging
     if is_max is True:
         extm = "Max"
@@ -257,27 +262,27 @@ def _test_stacked_to_aggregate_extremes(
         extm = "Min"
 
     # Get min/max of row (identified by filter_fld, attr_fld in axis 0)
-    if agg_axis == 0:
-        filter_fld, attr_fld = stk_col_label_for_axis0, stk_col_label_for_axis1
+    if axis == 0:
+        filter_fld, attr_fld = y_fld, x_fld
     # Get min/max of column (identified by label in axis 1)
-    elif agg_axis == 1:
-        filter_fld, attr_fld = stk_col_label_for_axis1, stk_col_label_for_axis0
+    elif axis == 1:
+        filter_fld, attr_fld = x_fld, y_fld
 
     # Test dataset - get species with largest count and compare
-    for lbl in labels:
+    for sp_lbl in sparse_labels:
         # Get stacked data results
         (stk_target_val,
          stk_attr_vals) = _get_extreme_val_and_attrs_for_column_from_stacked_data(
-            stk_df, filter_fld, lbl, attr_fld, stk_col_label_for_val, is_max=is_max)
+            stk_df, filter_fld, sp_lbl, attr_fld, val_fld, is_max=is_max)
         # Get sparse matrix results
         try:
             # Get row/column (sparse array), and its index
-            vector, vct_idx = agg_sparse_mtx.get_vector_from_label(lbl, axis=agg_axis)
+            vector, vct_idx = sparse_mtx.get_vector_from_label(sp_lbl, axis=axis)
         except IndexError:
             raise
-        agg_target_val, agg_labels = agg_sparse_mtx.get_extreme_val_labels_for_vector(
-            vector, axis=agg_axis, is_max=is_max)
-        logit(f"Test vector {lbl} on axis {agg_axis}", logger=logger)
+        agg_target_val, agg_labels = sparse_mtx.get_extreme_val_labels_for_vector(
+            vector, axis=axis, is_max=is_max)
+        logit(f"Test vector {sp_lbl} on axis {axis}", logger=logger)
         if stk_target_val == agg_target_val:
             logit(f"  {extm} values equal {stk_target_val}", logger=logger)
             if set(stk_attr_vals) == set(agg_labels):
@@ -285,6 +290,7 @@ def _test_stacked_to_aggregate_extremes(
                     f"  {extm} value labels equal; len={len(stk_attr_vals)}",
                     logger=logger)
             else:
+                success = False
                 logit(
                     f"  !!! {extm} value labels NOT equal; stacked labels "
                     f"{stk_attr_vals} != agg labels {agg_labels}", logger=logger
@@ -295,6 +301,7 @@ def _test_stacked_to_aggregate_extremes(
                 f"agg value", logger=logger)
         logit("", logger=logger)
     logit("", logger=logger)
+    return success
 
 
 # ...............................................
@@ -309,23 +316,21 @@ def _read_stacked_data_records(s3, stacked_data_table_type, datestr):
         datestr (str): date of the current dataset, in YYYY_MM_DD format
 
     Returns:
-        agg_sparse_mtx (sppy.tools.s2n.sparse_matrix.SparseMatrix): sparse matrix
+        sparse_mtx (sppy.tools.s2n.sparse_matrix.SparseMatrix): sparse matrix
             containing data separated into 2 dimensions
     """
     # Species in columns/x/axis1
     stacked_record_table = SUMMARY.get_table(stacked_data_table_type, datestr)
 
-    stk_col_label_for_axis0 = stacked_record_table["key_fld"]
-    stk_col_label_for_axis1 = stacked_record_table["species_fld"]
-    stk_col_label_for_val = stacked_record_table["value_fld"]
+    axis0_fld = stacked_record_table["key_fld"]
+    axis1_fld = stacked_record_table["species_fld"]
+    val_fld = stacked_record_table["value_fld"]
 
     pqt_fname = f"{stacked_record_table['fname']}.parquet"
     # Read stacked (record) data directly into DataFrame
     stk_df = s3.get_dataframe_from_parquet(
         S3_BUCKET, S3_SUMMARY_DIR, pqt_fname)
-    return (
-        stk_col_label_for_axis0, stk_col_label_for_axis1, stk_col_label_for_val, stk_df
-    )
+    return (axis0_fld, axis1_fld, val_fld, stk_df)
 
 
 # .............................................................................
@@ -369,47 +374,53 @@ if __name__ == "__main__":
     dim_region = ANALYSIS_DIM.COUNTY["code"]
     dim_species = ANALYSIS_DIM.species_code()
     stacked_data_table_type = SUMMARY.get_table_type("list", dim_region, dim_species)
-    # region/axis0/row x species/axis1/column
+    # Species are always columns (for PAM)
     mtx_table_type = SUMMARY.get_table_type("matrix", dim_region, dim_species)
 
-    stack_df, agg_sparse_mtx = create_sparse_matrix_from_records(s3, stacked_data_table_type, mtx_table_type, datestr)
-    test_stacked_vs_matrix(stack_df, agg_sparse_mtx)
-    # # .................................
-    # # Create SparseMatrix from stacked data records
-    # # .................................
-    # stk_col_label_for_axis0, stk_col_label_for_axis1, stk_col_label_for_val, stk_df = \
-    #     _read_stacked_data_records(s3, stacked_data_table_type, datestr)
-    #
-    # agg_sparse_mtx = SparseMatrix.init_from_stacked_data(
-    #     stk_df, stk_col_label_for_axis0, stk_col_label_for_axis1, stk_col_label_for_val,
-    #     mtx_table_type, datestr)
-    #
-    # # .................................
-    # # Test consistency between stacked data and sparse matrix
-    # # .................................
-    # # Test raw counts
-    # for stk_lbl, axis in ((stk_col_label_for_axis0, 0), (stk_col_label_for_axis1, 1)):
-    #     # Test stacked column used for axis 0/1 against sparse matrix axis 0/1
-    #     test_stacked_to_aggregate_sum(
-    #         stk_df, stk_lbl, stk_col_label_for_val, agg_sparse_mtx, agg_axis=axis,
-    #         test_count=5, logger=logger)
-    #
-    # # Test min/max values for rows/columns
-    # for is_max in (False, True):
-    #     for axis in (0, 1):
-    #         test_stacked_to_aggregate_extremes(
-    #             stk_df, stk_col_label_for_axis0, stk_col_label_for_axis1,
-    #             stk_col_label_for_val, agg_sparse_mtx, agg_axis=axis, test_count=5,
-    #             logger=logger, is_max=is_max)
+    # .................................
+    # Create, test, save a sparse matrix from stacked data
+    # .................................
+    stack_df, sparse_mtx = create_sparse_matrix_from_records(
+        s3, stacked_data_table_type, mtx_table_type, datestr)
+
+    success = test_stacked_vs_matrix(stack_df, sparse_mtx)
+    if success is False:
+        raise Exception(
+            "Failed tests comparing matrix created from stacked data to stacked data"
+        )
+
+    out_filename = sparse_mtx.compress_to_file(local_path=TMP_PATH)
+    s3_mtx_key = f"{S3_SUMMARY_DIR}/{os.path.basename(out_filename)}"
+    s3.upload(out_filename, S3_BUCKET, s3_mtx_key, overwrite=True)
+    sparse_mtx = None
+
+    # .................................
+    # Create, test a sparse matrix from saved file
+    # .................................
+    table = SUMMARY.get_table(mtx_table_type, datestr)
+    zip_fname = f"{table['fname']}.zip"
+    zip_filename = s3.download(
+        S3_BUCKET, S3_SUMMARY_DIR, zip_fname, TMP_PATH, overwrite=True)
+
+    # Only extract if files do not exist
+    sparse_mtx2 = SparseMatrix.init_from_compressed_file(
+        zip_filename, local_path=TMP_PATH, overwrite=True)
+
+    success = test_stacked_vs_matrix(stack_df, sparse_mtx2)
+    if success is False:
+        raise Exception(
+            "Failed tests comparing matrix created from compressed file to stacked data"
+        )
+
 
     # .................................
     # Create a summary matrix for each dimension of sparse matrix and upload
     # .................................
-    sp_sum_mtx = SummaryMatrix.init_from_sparse_matrix(agg_sparse_mtx, axis=0, logger=logger)
+    sp_sum_mtx = SummaryMatrix.init_from_sparse_matrix(sparse_mtx, axis=0, logger=logger)
     spsum_table_type = sp_sum_mtx.table_type
     sp_sum_filename = sp_sum_mtx.compress_to_file()
 
-    ds_sum_mtx = SummaryMatrix.init_from_sparse_matrix(agg_sparse_mtx, axis=1, logger=logger)
+    ds_sum_mtx = SummaryMatrix.init_from_sparse_matrix(sparse_mtx, axis=1, logger=logger)
     dssum_table_type = ds_sum_mtx.table_type
     ds_sum_filename = ds_sum_mtx.compress_to_file()
 
@@ -417,11 +428,11 @@ if __name__ == "__main__":
     # # .................................
     # # Save sparse matrix to S3 then clear
     # # .................................
-    # out_filename = agg_sparse_mtx.compress_to_file()
+    # out_filename = sparse_mtx.compress_to_file()
     # upload_to_s3(out_filename, PROJ_BUCKET, SUMMARY_FOLDER, REGION)
     # # Copy logfile to S3
     # upload_to_s3(logger.filename, PROJ_BUCKET, SUMMARY_FOLDER, REGION)
-    # agg_sparse_mtx = None
+    # sparse_mtx = None
 
 
 
@@ -437,24 +448,27 @@ from bison.task.build_matrices import *
 from bison.common.constants import *
 
 datestr = get_current_datadate_str()
-datatype = "list"
+s3 = S3(region=REGION)
+logger = None
+
 dim_region = ANALYSIS_DIM.COUNTY["code"]
 dim_species = ANALYSIS_DIM.species_code()
 stacked_data_table_type = SUMMARY.get_table_type("list", dim_region, dim_species)
-# species/axis0/row x region/axis1/column
-mtx_table_type = SUMMARY.get_table_type("matrix", dim_species, dim_region) 
+mtx_table_type = SUMMARY.get_table_type("matrix", dim_region, dim_species)
 
-logger = None
-s3 = S3(region=REGION)
-
+stack_df, sparse_mtx = create_sparse_matrix_from_records(
+    s3, stacked_data_table_type, mtx_table_type, datestr)
 # .................................
-# Create a summary matrix for each dimension of sparse matrix and upload
+# Create, test a sparse matrix from saved file
 # .................................
-sp_sum_mtx = SummaryMatrix.init_from_sparse_matrix(agg_sparse_mtx, axis=0, logger=logger)
-spsum_table_type = sp_sum_mtx.table_type
-sp_sum_filename = sp_sum_mtx.com    
+table = SUMMARY.get_table(mtx_table_type, datestr)
+zip_fname = f"{table['fname']}.zip"
+zip_filename = s3.download(
+    S3_BUCKET, S3_SUMMARY_DIR, zip_fname, TMP_PATH, overwrite=True)
 
-ds_sum_mtx = SummaryMatrix.init_from_sparse_matrix(agg_sparse_mtx, axis=1, logger=logger)
-dssum_table_type = ds_sum_mtx.table_type
-ds_sum_filename = ds_sum_mtx.compress_to_file()
+# Only extract if files do not exist
+sparse_mtx2 = SparseMatrix.init_from_compressed_file(
+    zip_filename, local_path=TMP_PATH, overwrite=True)
+
+success = test_stacked_vs_matrix(stack_df, sparse_mtx2)
 """
