@@ -87,7 +87,7 @@ def lambda_handler(event, context):
         print(f"*** Error querying for bucket/object {annotated_riis_key} ({e})")
         raise e
     try:
-        _contents = tr_response["Contents"]
+        tr_response["Contents"]
     except KeyError:
         print(f"*** Object {annotated_riis_key} is not present")
     else:

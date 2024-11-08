@@ -263,7 +263,7 @@ def lambda_handler(event, context):
                         else:
                             try:
                                 name = records[0][2]["stringValue"]
-                            except:
+                            except Exception:
                                 success = False
                                 msg = f"!!! Unexpected query result {records}"
                             else:

@@ -155,7 +155,6 @@ def lambda_handler(event, context):
         else:
             tbl_lst = new_tables
 
-
         # -------------------------------------
         # Submit query request
         try:
@@ -221,7 +220,7 @@ def lambda_handler(event, context):
     # Determine which tables to remove
     print("*** ---------------------------------------")
     tables_to_remove = set(tmp_tables)
-    print("*** Tables to remove:" )
+    print("*** Tables to remove:")
     print(f"***      {tmp_tables}")
     # Make sure new table exists before removing old table
     for old_tbl in old_tables:
@@ -326,7 +325,7 @@ def lambda_handler(event, context):
     # -------------------------------------
     # Determine which objects to remove from S3
     print("*** ---------------------------------------")
-    print("*** Keys to remove:" )
+    print("*** Keys to remove:")
     # Make sure new table exists before removing old table
     for old_key in old_keys:
         prefix = old_key[:-len(old_bison_datestr)]

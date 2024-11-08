@@ -229,12 +229,12 @@ def lambda_handler(event, context):
                     raise
                 else:
                     if cmd == "query_riis":
-                        print(f"*** Assessment totals")
+                        print("*** Assessment totals")
                         # Query returns assesment, count as 1st and 2nd items in record
                         for rec in records:
                             try:
                                 print(f"***    {rec[0]['stringValue']}: {rec[1]['longValue']}")
-                            except:
+                            except Exception:
                                 print(f"!!! Unexpected record format {rec}")
                                 break
 

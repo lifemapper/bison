@@ -350,7 +350,7 @@ def lambda_handler(event, context):
                     key = fullkey[prefix_len:-suffix_len]
                     s3objs_present.append(key)
                     print(f"***      {key}")
-                    
+
     # -------------------------------------
     # SECOND: Check that current BISON data is in Redshift
     # NEXT: Execute remaining aggregation and export commmands in order
@@ -422,8 +422,8 @@ def lambda_handler(event, context):
                             tbl_name = rec[2]["stringValue"]
                             tables_present.append(tbl_name)
                             print(f"***      {tbl_name}")
-                    except:
-                        raise Exception(f"!!! Unexpected record result {rec}")
+                    except Exception as e:
+                        raise Exception(f"!!! Unexpected record result {rec}, {e}")
 
     return {
         "statusCode": 200,

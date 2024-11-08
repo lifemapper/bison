@@ -238,7 +238,7 @@ def lambda_handler(event, context):
         print(f"!!! Error querying for object {annotated_riis_key} ({e})")
         raise e
     try:
-        _contents = tr_response["Contents"]
+        tr_response["Contents"]
     except KeyError:
         raise Exception(
             f"!!! Missing annotated RIIS data: {annotated_riis_key}")
