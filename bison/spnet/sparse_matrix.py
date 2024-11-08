@@ -127,12 +127,7 @@ class SparseMatrix(_AggregateDataMatrix):
                 from the zip_filename.
 
         Returns:
-            sparse_coo (scipy.sparse.coo_array): Sparse Matrix containing data.
-            row_categ (pandas.api.types.CategoricalDtype): row categories
-            col_categ (pandas.api.types.CategoricalDtype): column categories
-            table_type (sppy.tools.s2n.constants.SUMMARY_TABLE_TYPES): type of table
-                data
-            data_datestr (str): date string in format YYYY_MM_DD
+            sparse_mtx (bison.spnet.sparse_matrix.SparseMatrix): matrix for the data.
 
         Raises:
             Exception: on failure to uncompress files.
@@ -162,7 +157,6 @@ class SparseMatrix(_AggregateDataMatrix):
             val_fld=meta_dict["val_fld"])
 
         return sparse_mtx
-
 
     # ...........................
     @property

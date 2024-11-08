@@ -59,7 +59,7 @@ class _AggregateDataMatrix:
 
     # ...............................................
     @classmethod
-    def _get_matrix_meta_zip_filenames(cls, table, local_path=TMP_PATH):
+    def get_matrix_meta_zip_filenames(cls, table, local_path=None):
         """Return the files that comprise local input data, optionally delete.
 
         Args:
@@ -70,12 +70,19 @@ class _AggregateDataMatrix:
             mtx_fname (str): absolute path for local matrix data file.
             meta_fname (str): absolute path for local metadata file.
             zip_fname (str): absolute path for local compressed file.
+
+        Note:
+            Leave local_path as None to return S3 object names.
         """
         basename = table["fname"]
         mtx_ext = table["matrix_extension"]
-        mtx_fname = f"{local_path}/{basename}{mtx_ext}"
-        meta_fname = f"{local_path}/{basename}.json"
-        zip_fname = f"{local_path}/{basename}.zip"
+        mtx_fname = f"{basename}{mtx_ext}"
+        meta_fname = f"{basename}.json"
+        zip_fname = f"{basename}.zip"
+        if local_path is not None:
+            mtx_fname = os.path.join(local_path, mtx_fname)
+            meta_fname = os.path.join(local_path, meta_fname)
+            zip_fname = os.path.join(local_path, zip_fname)
         return mtx_fname, meta_fname, zip_fname
 
     # ......................................................
@@ -183,7 +190,7 @@ class _AggregateDataMatrix:
     # .............................................................................
     def _remove_expected_files(self, local_path=TMP_PATH):
         # Always delete local files before compressing this data.
-        expected_files = self._get_matrix_meta_zip_filenames(
+        expected_files = self.get_matrix_meta_zip_filenames(
             self._table, local_path=local_path)
         for fn in expected_files:
             if os.path.exists(fn):
@@ -222,7 +229,7 @@ class _AggregateDataMatrix:
             raise
 
         table = SUMMARY.get_table(table_type, datestr=datestr)
-        mtx_fname, meta_fname, _ = cls._get_matrix_meta_zip_filenames(
+        mtx_fname, meta_fname, _ = cls.get_matrix_meta_zip_filenames(
             table, local_path=local_path)
 
         # Are local files already present?
@@ -235,9 +242,9 @@ class _AggregateDataMatrix:
                 (overwrite is True or
                  (overwrite is False and all_exist is False))
         ):
-                for fn in files_present:
-                    if os.path.exists(fn):
-                        os.remove(fn)
+            for fn in files_present:
+                if os.path.exists(fn):
+                    os.remove(fn)
 
         if all_exist and overwrite is False:
             print(f"Expected files {', '.join(expected_files)} already exist.")

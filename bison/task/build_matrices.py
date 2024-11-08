@@ -3,13 +3,13 @@ import os
 
 from bison.common.aws_util import S3
 from bison.common.constants import (
-    ANALYSIS_DIM, OCCURRENCE_COUNT_FLD, REGION, S3_BUCKET, S3_SUMMARY_DIR,
-    SPECIES_COUNT_FLD, SUMMARY, TMP_PATH
+    ANALYSIS_DIM, REGION, S3_BUCKET, S3_SUMMARY_DIR, SUMMARY, TMP_PATH
 )
 from bison.common.log import logit
 from bison.common.util import get_current_datadate_str
 from bison.spnet.sparse_matrix import SparseMatrix
 from bison.spnet.summary_matrix import SummaryMatrix
+from obsolete.src.aws_scripts.ec2_tools import local_path
 
 """
 Note:
@@ -17,6 +17,7 @@ Note:
         overlaps.  Each species/occurrence count applies to one and only one record in
         the analysis dimension.
 """
+
 
 # .............................................................................
 def create_sparse_matrix_from_records(
@@ -89,6 +90,7 @@ def test_stacked_vs_matrix(stack_df, sparse_mtx):
             success = success and this_success
 
     return success
+
 
 # ...............................................
 def _get_extreme_val_and_attrs_for_column_from_stacked_data(
@@ -402,7 +404,6 @@ if __name__ == "__main__":
     zip_filename = s3.download(
         S3_BUCKET, S3_SUMMARY_DIR, zip_fname, TMP_PATH, overwrite=True)
 
-    # Only extract if files do not exist
     sparse_mtx2 = SparseMatrix.init_from_compressed_file(
         zip_filename, local_path=TMP_PATH, overwrite=True)
 
@@ -411,7 +412,6 @@ if __name__ == "__main__":
         raise Exception(
             "Failed tests comparing matrix created from compressed file to stacked data"
         )
-
 
     # .................................
     # Create a summary matrix for each dimension of sparse matrix and upload
@@ -424,17 +424,33 @@ if __name__ == "__main__":
     dssum_table_type = ds_sum_mtx.table_type
     ds_sum_filename = ds_sum_mtx.compress_to_file()
 
+    # Upload summary matrix files
+    s3_spsum_key = f"{S3_SUMMARY_DIR}/{os.path.basename(sp_sum_filename)}"
+    s3.upload(sp_sum_filename, S3_BUCKET, s3_spsum_key, overwrite=True)
 
-    # # .................................
-    # # Save sparse matrix to S3 then clear
-    # # .................................
-    # out_filename = sparse_mtx.compress_to_file()
-    # upload_to_s3(out_filename, PROJ_BUCKET, SUMMARY_FOLDER, REGION)
-    # # Copy logfile to S3
-    # upload_to_s3(logger.filename, PROJ_BUCKET, SUMMARY_FOLDER, REGION)
-    # sparse_mtx = None
+    s3_dssum_key = f"{S3_SUMMARY_DIR}/{os.path.basename(ds_sum_filename)}"
+    s3.upload(ds_sum_filename, S3_BUCKET, s3_dssum_key, overwrite=True)
 
+    # .................................
+    # Download summary matrix files and recreate 2 summary matrices to test for corruption
+    # .................................
+    # Species Summary
+    sp_table = SUMMARY.get_table(spsum_table_type, datestr=datestr)
+    _, _, sp_zip_fname = SummaryMatrix.get_matrix_meta_zip_filenames(table)
+    sp_zip_filename = s3.download(
+        S3_BUCKET, S3_SUMMARY_DIR, sp_zip_fname, local_path=TMP_PATH, overwrite=True)
+    sp_sum_mtx2 = \
+        SummaryMatrix.init_from_compressed_file(
+            sp_zip_filename, local_path=TMP_PATH, overwrite=True)
 
+    # Dataset Summary
+    ds_table = SUMMARY.get_table(dssum_table_type, datestr=datestr)
+    _, _, ds_zip_fname = SummaryMatrix.get_matrix_meta_zip_filenames(ds_table)
+    ds_zip_filename = s3.download(
+        S3_BUCKET, S3_SUMMARY_DIR, ds_zip_fname, local_path=TMP_PATH, overwrite=True)
+    ds_sum_mtx2 = \
+        SummaryMatrix.init_from_compressed_file(
+            ds_zip_filename, local_path=TMP_PATH, overwrite=True)
 
     # # for count_field in (OCCURRENCE_COUNT_FLD, SPECIES_COUNT_FLD):
     # count_field = OCCURRENCE_COUNT_FLD
@@ -442,7 +458,6 @@ if __name__ == "__main__":
     #
     # count_df = download_dataframe(count_table_type, datestr, S3_BUCKET, S3_SUMMARY_DIR)
     # sum_mtx = SummaryMatrix(count_df, count_table_type, datestr)
-
 """
 from bison.task.build_matrices import *
 from bison.common.constants import *
@@ -458,17 +473,6 @@ mtx_table_type = SUMMARY.get_table_type("matrix", dim_region, dim_species)
 
 stack_df, sparse_mtx = create_sparse_matrix_from_records(
     s3, stacked_data_table_type, mtx_table_type, datestr)
-# .................................
-# Create, test a sparse matrix from saved file
-# .................................
-table = SUMMARY.get_table(mtx_table_type, datestr)
-zip_fname = f"{table['fname']}.zip"
-zip_filename = s3.download(
-    S3_BUCKET, S3_SUMMARY_DIR, zip_fname, TMP_PATH, overwrite=True)
 
-# Only extract if files do not exist
-sparse_mtx2 = SparseMatrix.init_from_compressed_file(
-    zip_filename, local_path=TMP_PATH, overwrite=True)
 
-success = test_stacked_vs_matrix(stack_df, sparse_mtx2)
 """

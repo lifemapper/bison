@@ -68,6 +68,7 @@ ERR_SEPARATOR = "------------"
 USER_DATA_TOKEN = "###SCRIPT_GOES_HERE###"
 CSV_DELIMITER = ","
 
+
 class TASK:
     """Workflow tasks to be executed on EC2 instances."""
     TEST = "test_task"
@@ -668,7 +669,7 @@ class SUMMARY:
         dim0 = dim_parts[0]
         try:
             dim1 = dim_parts[1]
-        except:
+        except IndexError:
             pass
         return datacontents, dim0, dim1, datatype
 

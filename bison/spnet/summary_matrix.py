@@ -3,7 +3,7 @@ from collections import OrderedDict
 import pandas as pd
 
 from bison.common.constants import (
-    COUNT_FLD, CSV_DELIMITER, SNKeys, TOTAL_FLD, SUMMARY
+    COUNT_FLD, CSV_DELIMITER, SNKeys, TMP_PATH, TOTAL_FLD, SUMMARY
 )
 from bison.spnet.aggregate_data_matrix import _AggregateDataMatrix
 
@@ -14,7 +14,7 @@ class SummaryMatrix(_AggregateDataMatrix):
 
     # ...........................
     def __init__(
-            self, summary_df, table_type, data_datestr, logger=None):
+            self, summary_df, table_type, datestr, logger=None):
         """Constructor for occurrence/species counts by region/analysis_dim comparisons.
 
         Args:
@@ -24,7 +24,7 @@ class SummaryMatrix(_AggregateDataMatrix):
                 * Column 1 contains the count of the number of columns in  that row
                 * Column 2 contains the total of values in that row.
             table_type (aws_constants.SUMMARY_TABLE_TYPES): type of aggregated data
-            data_datestr (str): date of the source data in YYYY_MM_DD format.
+            datestr (str): date of the source data in YYYY_MM_DD format.
             logger (object): An optional local logger to use for logging output
                 with consistent options
 
@@ -39,7 +39,7 @@ class SummaryMatrix(_AggregateDataMatrix):
                 counts of occurrences and species for a county
         """
         self._df = summary_df
-        _AggregateDataMatrix.__init__(self, table_type, data_datestr, logger=logger)
+        _AggregateDataMatrix.__init__(self, table_type, datestr, logger=logger)
 
     # ...........................
     @classmethod
@@ -73,8 +73,8 @@ class SummaryMatrix(_AggregateDataMatrix):
         counts = sp_mtx.get_counts(axis=axis)
         data = {COUNT_FLD: counts, TOTAL_FLD: totals}
         input_table_meta = SUMMARY.get_table(sp_mtx.table_type)
-        dim0 =  input_table_meta["dimension0"]
-        dim1 =  input_table_meta["dimension1"]
+        dim0 = input_table_meta["dimension0"]
+        dim1 = input_table_meta["dimension1"]
 
         # Axis 0 summarizes each column/species (down axis 0) of sparse matrix
         if axis == 0:
@@ -89,8 +89,43 @@ class SummaryMatrix(_AggregateDataMatrix):
         sdf = pd.DataFrame(data=data, index=index)
 
         summary_matrix = SummaryMatrix(
-            sdf, table_type, sp_mtx.data_datestr, logger=logger)
+            sdf, table_type, sp_mtx.datestr, logger=logger)
         return summary_matrix
+
+    # ...........................
+    @classmethod
+    def init_from_compressed_file(
+            cls, zip_filename, local_path=TMP_PATH, overwrite=False):
+        """Construct a SparseMatrix from a compressed file.
+
+        Args:
+            zip_filename (str): Filename of zipped sparse matrix data to uncompress.
+            local_path (str): Absolute path of local destination path
+            overwrite (bool): Flag indicating whether to use existing files unzipped
+                from the zip_filename.
+
+        Returns:
+            sparse_mtx (bison.spnet.sparse_matrix.SparseMatrix): matrix for the data.
+
+        Raises:
+            Exception: on failure to uncompress files.
+            Exception: on failure to load data from uncompressed files.
+
+        Note:
+            All filenames have the same basename with extensions indicating which data
+                they contain. The filename contains a string like YYYY-MM-DD which
+                indicates which GBIF data dump the statistics were built upon.
+        """
+        try:
+            dataframe, meta_dict, table_type, datestr = cls.uncompress_zipped_data(
+                zip_filename, local_path=local_path, overwrite=overwrite)
+        except Exception:
+            raise
+
+        # Create
+        summary_mtx = SummaryMatrix(dataframe, table_type, datestr)
+
+        return summary_mtx
 
     # ...............................................
     @property
@@ -130,7 +165,7 @@ class SummaryMatrix(_AggregateDataMatrix):
         return labels
 
     # .............................................................................
-    def compress_to_file(self, local_path="/tmp"):
+    def compress_to_file(self, local_path=TMP_PATH):
         """Compress this SparseMatrix to a zipped npz and json file.
 
         Args:
@@ -173,7 +208,7 @@ class SummaryMatrix(_AggregateDataMatrix):
     # .............................................................................
     @classmethod
     def uncompress_zipped_data(
-            cls, zip_filename, local_path="/tmp", overwrite=False):
+            cls, zip_filename, local_path=TMP_PATH, overwrite=False):
         """Uncompress a zipped SparseMatrix into a coo_array and row/column categories.
 
         Args:
@@ -186,14 +221,14 @@ class SummaryMatrix(_AggregateDataMatrix):
             dataframe (pandas.DataFrame): dataframe containing summary matrix data.
             meta_dict (dict): metadata for the matrix
             table_type (aws.aws_constants.SUMMARY_TABLE_TYPES): type of table data
-            data_datestr (str): date string in format YYYY_MM_DD
+            datestr (str): date string in format YYYY_MM_DD
 
         Raises:
             Exception: on failure to uncompress files.
             Exception: on failure to load data from uncompressed files.
         """
         try:
-            mtx_fname, meta_fname, table_type, data_datestr = cls._uncompress_files(
+            mtx_fname, meta_fname, table_type, datestr = cls._uncompress_files(
                 zip_filename, local_path, overwrite=overwrite)
         except Exception:
             raise
@@ -204,7 +239,7 @@ class SummaryMatrix(_AggregateDataMatrix):
         except Exception:
             raise
 
-        return dataframe, meta_dict, table_type, data_datestr
+        return dataframe, meta_dict, table_type, datestr
 
     # .............................................................................
     @classmethod
@@ -219,7 +254,7 @@ class SummaryMatrix(_AggregateDataMatrix):
             dataframe (pandas.DataFrame): dataframe containing summary matrix data.
             meta_dict (dict): metadata for the matrix
             table_type (aws.aws_constants.SUMMARY_TABLE_TYPES): type of table data
-            data_datestr (str): date string in format YYYY_MM_DD
+            datestr (str): date string in format YYYY_MM_DD
 
         Raises:
             Exception: on unable to load CSV file
