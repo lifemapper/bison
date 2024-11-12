@@ -98,6 +98,9 @@ class TASK:
 
         Returns:
             fname (str): filename for EC2 userdata to execute task.
+
+        Raises:
+            Exception: on unsupported task string.
         """
         if task not in cls.tasks():
             raise Exception(f"Unknown task {task}")
@@ -294,6 +297,11 @@ class AGGREGATION_TYPE:
     # ...........................
     @classmethod
     def all(cls):
+        """Get all aggregated data type codes.
+
+        Returns:
+            list of supported codes for datatypes.
+        """
         return (cls.LIST, cls.COUNT, cls.SUMMARY, cls.MATRIX)
 
 
@@ -581,11 +589,14 @@ class SUMMARY:
 
         Returns:
             tables: dictionary of summary table metadata.
+
+        Raises:
+            Exception: on invalid table_type
         """
         try:
             table = cls.tables()[table_type]
         except KeyError:
-            return None
+            raise Exception(f"Invalid table_type {table_type}")
         cpy_table = copy.deepcopy(table)
         if datestr is not None:
             fname_tmpl = cpy_table["fname"]

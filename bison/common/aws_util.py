@@ -200,6 +200,10 @@ class EC2:
 
         Returns:
             ver_num: version number of the newly created template version.
+
+        Raises:
+            KeyError: on missing expected keys in response.
+            Exception: on missing element in response.
         """
         userdata_filename = TASK.get_userdata_filename(task)
         base64_script_text = self.get_userdata(userdata_filename, local_path=local_path)
@@ -212,11 +216,11 @@ class EC2:
         )
         try:
             v_meta = response["LaunchTemplateVersion"]
-        except Exception:
+            desc = v_meta["VersionDescription"]
+            ver_num = v_meta["VersionNumber"]
+        except KeyError:
             raise
 
-        desc = v_meta["VersionDescription"]
-        ver_num = v_meta["VersionNumber"]
         if desc != task:
             raise Exception(f"Bad description {desc} in version response {response}")
 
@@ -623,6 +627,7 @@ class S3:
             local_filename: Full path to local file for upload.
             bucket: name of the S3 bucket destination.
             s3_key: the data destination inside the S3 bucket (WITH filename).
+            overwrite: flag indicating to overwrite all existing files.
 
         Returns:
             uploaded_fname: the S3 path to the uploaded file.
@@ -657,9 +662,8 @@ class S3:
         """Upload a file to S3.
 
         Args:
-            local_filename: Full path to local file for upload.
             bucket: name of the S3 bucket destination.
-            axis: the data destination inside the S3 bucket (WITH filename).
+            s3_key: the data destination inside the S3 bucket (WITH filename).
 
         Returns:
             uploaded_fname: the S3 path to the uploaded file.

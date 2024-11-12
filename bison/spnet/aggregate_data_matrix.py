@@ -24,6 +24,9 @@ class _AggregateDataMatrix:
             logger (object): An optional local logger to use for logging output
                 with consistent options
 
+        Raises:
+            Exception: on invalid table_type.
+
         Note: in the first implementation, because species are generally far more
             numerous, rows are always species, columns are datasets.  This allows
             easier exporting to other formats (i.e. Excel), which allows more rows than
@@ -36,9 +39,10 @@ class _AggregateDataMatrix:
         """
         self._table_type = table_type
         self._data_datestr = data_datestr
-        self._table = SUMMARY.get_table(table_type, datestr=data_datestr)
-        if self._table is None:
-            raise Exception(f"Table type {table_type} is invalid.")
+        try:
+            self._table = SUMMARY.get_table(table_type, datestr=data_datestr)
+        except Exception as e:
+            raise Exception(f"Cannot create _AggregateDataMatrix: {e}")
         self._keys = SNKeys.get_keys_for_table(table_type)
         self._logger = logger
         self._report = {}

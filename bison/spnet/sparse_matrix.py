@@ -349,13 +349,16 @@ class SparseMatrix(_AggregateDataMatrix):
             idx (int): index for the vector (zeros and non-zeros) in the sparse matrix
 
         Raises:
-            IndexError: on label does not exist in category
+            Exception: on label does not exist in category
             Exception: on axis not in (0, 1)
         """
         try:
             idx = self._get_code_from_category(label, axis=axis)
         except IndexError:
-            raise
+            axis_type = self._y_fld
+            if axis == 1:
+                axis_type = self._x_fld
+            raise Exception(f"Label {label} does not exist in axis {axis}, {axis_type}")
         if axis == 0:
             vector = self._coo_array.getrow(idx)
         elif axis == 1:

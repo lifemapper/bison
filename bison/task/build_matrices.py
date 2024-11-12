@@ -9,7 +9,6 @@ from bison.common.log import logit
 from bison.common.util import get_current_datadate_str
 from bison.spnet.sparse_matrix import SparseMatrix
 from bison.spnet.summary_matrix import SummaryMatrix
-from obsolete.src.aws_scripts.ec2_tools import local_path
 
 """
 Note:
@@ -73,6 +72,16 @@ def create_sparse_matrix_from_records(
 
 # ...............................................
 def test_stacked_vs_matrix(stack_df, sparse_mtx):
+    """Test values in stacked dataframe against those in sparse matrix for consistency.
+
+    Args:
+        stack_df: dataframe containing stacked data records
+        sparse_mtx (SparseMatrix): object containing a scipy.sparse.coo_array
+            with 3 columns from the stacked_df arranged as rows and columns with values
+
+    Returns:
+        success (bool): flag indicating success of all or failure of any tests.
+    """
     success = True
 
     # Test raw counts
@@ -247,6 +256,9 @@ def _test_stacked_to_aggregate_extremes(
     Returns:
         success (bool): Flag indicating success of all or failure of any tests.
 
+    Raises:
+        Exception: on label does not exist in axis.
+
     Postcondition:
         Printed information for successful or failed tests.
 
@@ -280,7 +292,7 @@ def _test_stacked_to_aggregate_extremes(
         try:
             # Get row/column (sparse array), and its index
             vector, vct_idx = sparse_mtx.get_vector_from_label(sp_lbl, axis=axis)
-        except IndexError:
+        except Exception:
             raise
         agg_target_val, agg_labels = sparse_mtx.get_extreme_val_labels_for_vector(
             vector, axis=axis, is_max=is_max)

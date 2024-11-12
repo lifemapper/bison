@@ -81,8 +81,7 @@ def create_sparse_matrix_from_records(
     # Create matrix from record data, then test consistency and upload.
     try:
         agg_sparse_mtx = SparseMatrix.init_from_stacked_data(
-            stk_df, axis0_label, axis1_label, val_label, mtx_table_type, datestr,
-            logger=logger)
+            stk_df, axis0_label, axis1_label, val_label, mtx_table_type, datestr)
     except Exception as e:
         logger.log(f"Failed to read {stacked_table_type} to sparse matrix. ({e})")
         raise(e)

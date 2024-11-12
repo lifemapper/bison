@@ -41,6 +41,7 @@ def logit(msg, logger=None, refname=None, print_obj=None, log_level=logging.INFO
         msg: message to print.
         logger (bison.common.log.Logger): logger instance or None
         refname: calling function name.
+        print_obj: object to pretty print for increased readability.
         log_level: logging constant error level (logging.INFO, logging.DEBUG,
             logging.WARNING, logging.ERROR)
     """

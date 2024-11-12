@@ -273,7 +273,7 @@ def lambda_handler(event, context):
     # -------------------------------------
     # Find obsolete annotated RIIS input data from S3
     # -------------------------------------
-    keys_to_delete = []
+    keys_to_delete = set()
     riis_keys = []
     try:
         tr_response = s3_client.list_objects_v2(
@@ -293,7 +293,7 @@ def lambda_handler(event, context):
                 print(f"***      {key}")
 
     if annotated_riis_key in riis_keys and old_annotated_riis_key in riis_keys:
-        keys_to_delete.append(old_annotated_riis_key)
+        keys_to_delete.add(old_annotated_riis_key)
 
     # -------------------------------------
     # Last: List then remove obsolete summary data from S3
