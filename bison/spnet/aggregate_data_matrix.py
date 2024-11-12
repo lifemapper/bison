@@ -14,13 +14,15 @@ class _AggregateDataMatrix:
     """Class for managing computations for counts of species x aggregator."""
 
     # ...........................
-    def __init__(self, table_type, data_datestr, logger=None):
+    def __init__(self, dim0, dim1, table_type, datestr, logger=None):
         """Constructor for species by dataset comparisons.
 
         Args:
+            dim0 (bison.common.constants.ANALYSIS_DIM): dimension for axis 0, rows
+            dim1 (bison.common.constants.ANALYSIS_DIM): dimension for axis 1, columns
             table_type (code from bison.common.constants.SUMMARY): predefined type of
                 data indicating type and contents.
-            data_datestr (str): date of the source data in YYYY_MM_DD format.
+            datestr (str): date of the source data in YYYY_MM_DD format.
             logger (object): An optional local logger to use for logging output
                 with consistent options
 
@@ -37,12 +39,23 @@ class _AggregateDataMatrix:
                 they contain. The filename contains a string like YYYY-MM-DD which
                 indicates which GBIF data dump the statistics were built upon.
         """
+        # Test that table type agrees with provided dimensions
+        _, dim0code, dim1code, _ = SUMMARY.parse_table_type(table_type)
+        if dim0["code"] != dim0code:
+            raise Exception(f"Dimension 0 {dim0['code']} != {dim0code} from {table_type}")
+        if dim1["code"] != dim1code:
+            raise Exception(f"Dimension 1 {dim1['code']} != {dim1code} from {table_type}")
+
+        self._row_dim = dim0
+        self._col_dim = dim1
         self._table_type = table_type
-        self._data_datestr = data_datestr
+        self._datestr = datestr
+
         try:
-            self._table = SUMMARY.get_table(table_type, datestr=data_datestr)
+            self._table = SUMMARY.get_table(table_type, datestr=datestr)
         except Exception as e:
             raise Exception(f"Cannot create _AggregateDataMatrix: {e}")
+
         self._keys = SNKeys.get_keys_for_table(table_type)
         self._logger = logger
         self._report = {}
@@ -54,8 +67,8 @@ class _AggregateDataMatrix:
 
     # ...........................
     @property
-    def data_datestr(self):
-        return self._data_datestr
+    def datestr(self):
+        return self._datestr
 
     # ...............................................
     def _logme(self, msg, refname="", log_level=None):
@@ -217,7 +230,7 @@ class _AggregateDataMatrix:
             row_categ (pandas.api.types.CategoricalDtype): row categories
             col_categ (pandas.api.types.CategoricalDtype): column categories
             table_type (aws.aws_constants.SUMMARY_TABLE_TYPES): type of table data
-            data_datestr (str): date string in format YYYY_MM_DD
+            datestr (str): date string in format YYYY_MM_DD
 
         Raises:
             Exception: on missing input zipfile

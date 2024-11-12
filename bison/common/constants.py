@@ -285,6 +285,28 @@ class ANALYSIS_DIM:
                 return dim
         raise Exception(f"No dimension `{code}` in ANALYSIS_DIM")
 
+    # ...........................
+    @classmethod
+    def get_from_key_fld(cls, key_fld):
+        """Get the data analyses dimension for the key_fld.
+
+        Args:
+            key_fld (str): Field name for the analysis dimension to be returned.
+
+        Returns:
+            Data dimension.
+
+        Raises:
+            Exception: on unknown code.
+        """
+        for dim in (
+                ANALYSIS_DIM.STATE, ANALYSIS_DIM.COUNTY, ANALYSIS_DIM.AIANNH,
+                ANALYSIS_DIM.SPECIES):
+            if key_fld == dim["key_fld"]:
+                return dim
+        raise Exception(f"No dimension for field `{key_fld}` in ANALYSIS_DIM")
+
+
 
 # .............................................................................
 class AGGREGATION_TYPE:
@@ -513,15 +535,8 @@ class SUMMARY:
         mtxs = {}
         for analysis_code in cls.ANALYSIS_DIMENSIONS:
             dim0 = analysis_code
-            dim0_dict = ANALYSIS_DIM.get(analysis_code)
             dim1 = ANALYSIS_DIM.species_code()
-            dim1_dict = ANALYSIS_DIM.SPECIES
             table_type = cls.get_table_type(AGGREGATION_TYPE.MATRIX, dim0, dim1)
-            # # Create from summary tables?
-            # row_input = cls.get_table_type("summary", dim0, dim1)
-            # col_input = cls.get_table_type("summary", dim1, dim0)
-            # # Create from stacked records (list) table
-            # data_input = cls.get_table_type(AGGREGATION_TYPE.LIST, dim0, dim1)
 
             # Dimension/Axis 0/row is always region or other analysis dimension
             meta = {
@@ -531,11 +546,9 @@ class SUMMARY:
                 "matrix_extension": ".npz",
                 "data_type": "matrix",
 
-                # Dimension 0 is row (aka Axis 0), 1 is column (aka Axis 1)
-                "axis0_fld": dim0_dict["key_fld"],
-                "dimension0": dim0,
-                "axis1_fld": dim1_dict["key_fld"],
-                "dimension1": dim1,
+                # Dimensions: 0 is row (aka Axis 0), 1 is column (aka Axis 1)
+                "dim_0_code": dim0,
+                "dim_1_code": dim1,
 
                 # These are all filled in for compressing data, reading data
                 "row_categories": [],
@@ -599,6 +612,7 @@ class SUMMARY:
             raise Exception(f"Invalid table_type {table_type}")
         cpy_table = copy.deepcopy(table)
         if datestr is not None:
+            cpy_table["datestr"] = datestr
             fname_tmpl = cpy_table["fname"]
             cpy_table["fname"] = fname_tmpl.replace(cls.dt_token, datestr)
         return cpy_table
@@ -732,18 +746,18 @@ class SUMMARY:
 
         Returns:
             table_type (SUMMARY_TABLE_TYPES type): type of table.
-            data_datestr (str): date of data in "YYYY_MM_DD" format.
+            datestr (str): date of data in "YYYY_MM_DD" format.
 
         Raises:
             Exception: on failure to get tabletype and datestring from this filename.
         """
         try:
-            datacontents, dim0, dim1, datatype, data_datestr, _rest = \
+            datacontents, dim0, dim1, datatype, datestr, _rest = \
                 cls._parse_filename(filename)
             table_type = f"{datacontents}{cls.sep}{datatype}"
         except Exception:
             raise
-        return table_type, data_datestr
+        return table_type, datestr
 
 
 # .............................................................................

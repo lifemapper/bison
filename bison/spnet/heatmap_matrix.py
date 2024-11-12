@@ -14,7 +14,7 @@ class HeatmapMatrix(_AggregateDataMatrix):
 
     # ...........................
     def __init__(
-            self, summary_df, table_type, data_datestr, logger=None):
+            self, summary_df, table_type, datestr, logger=None):
         """Constructor for occurrence/species counts by region/analysis_dim comparisons.
 
         Args:
@@ -24,7 +24,7 @@ class HeatmapMatrix(_AggregateDataMatrix):
                 * Column 1 contains the count of the number of columns in  that row
                 * Column 2 contains the total of values in that row.
             table_type (aws_constants.SUMMARY_TABLE_TYPES): type of aggregated data
-            data_datestr (str): date of the source data in YYYY_MM_DD format.
+            datestr (str): date of the source data in YYYY_MM_DD format.
             logger (object): An optional local logger to use for logging output
                 with consistent options
 
@@ -39,4 +39,4 @@ class HeatmapMatrix(_AggregateDataMatrix):
                 counts of occurrences and species for a county
         """
         self._df = summary_df
-        _AggregateDataMatrix.__init__(self, table_type, data_datestr, logger=logger)
+        _AggregateDataMatrix.__init__(self, table_type, datestr, logger=logger)

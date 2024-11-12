@@ -654,7 +654,7 @@ class S3:
             raise
         else:
             uploaded_fname = f"s3://{bucket}/{s3_key}"
-            print(f"Success uploading file {uploaded_fname}.")
+            print(f"Success uploading file to {uploaded_fname}.")
         return uploaded_fname
 
     # ----------------------------------------------------
@@ -680,10 +680,10 @@ class S3:
             print(f"Failed to authenticate for delete_object {s3_uri}.")
             raise
         except Exception:
-            print(f"Failed to upload_file {s3_uri}.")
+            print(f"Failed to delete_object {s3_uri}.")
             raise
         else:
-            print(f"Success uploading file {s3_uri}.")
+            print(f"Success deleting object {s3_uri}.")
         return s3_uri
 
     # ----------------------------------------------------

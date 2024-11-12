@@ -1,4 +1,5 @@
 """Matrix to summarize 2 dimensions of data by counts of a third in a sparse matrix."""
+from copy import deepcopy
 from logging import ERROR
 import numpy as np
 import pandas as pd
@@ -6,7 +7,7 @@ from pandas.api.types import CategoricalDtype
 import random
 import scipy.sparse
 
-from bison.common.constants import SNKeys, SUMMARY
+from bison.common.constants import ANALYSIS_DIM, SNKeys, SUMMARY, TMP_PATH
 from bison.spnet.aggregate_data_matrix import _AggregateDataMatrix
 
 
@@ -16,108 +17,54 @@ class SparseMatrix(_AggregateDataMatrix):
 
     # ...........................
     def __init__(
-            self, sparse_coo_array, table_type, data_datestr, row_category,
-            column_category, y_fld=None, x_fld=None, val_fld=None):
+            self, sparse_coo_array, table_type, datestr, row_category,
+            column_category, dim0, dim1, val_fld):
         """Constructor for species by region/analysis_dim comparisons.
 
         Args:
             sparse_coo_array (scipy.sparse.coo_array): A 2d sparse array with count
-                values for one aggregator0 (i.e. species) rows (axis 0) by another
-                aggregator1 (i.e. dataset) columns (axis 1) to use for computations.
+                values for one dimension (i.e. region) rows (axis 0) by the
+                species dimension columns (axis 1) to use for computations.
             table_type (sppy.tools.s2n.constants.SUMMARY_TABLE_TYPES): type of
                 aggregated data
-            data_datestr (str): date of the source data in YYYY_MM_DD format.
+            datestr (str): date of the source data in YYYY_MM_DD format.
             row_category (pandas.api.types.CategoricalDtype): ordered row labels used
                 to identify axis 0/rows.
             column_category (pandas.api.types.CategoricalDtype): ordered column labels
                 used to identify axis 1/columns.
-            y_fld (str): column header from stacked input records containing values for
-                sparse matrix row headers
-            x_fld (str): column header from stacked input records containing values for
-                sparse matrix column headers
+            dim0 (bison.common.constants.ANALYSIS_DIM): dimension for axis 0, rows
+            dim1 (bison.common.constants.ANALYSIS_DIM): dimension for axis 1, columns
             val_fld (str): column header from stacked input records containing values
                 for sparse matrix cells
+
+        Raises:
+            Exception: on provided dimension 0 differs from table_type dimension 0.
+            Exception: on provided dimension 1 differs from table_type dimension 1.
 
         Note: y_fld, x_fld, val_fld refer to column headers from the original data
             used to construct the sparse matrix.  They are included to aid in testing
             the original data against the sparse matrix.
 
         Note: constructed from `stacked` records in table with datatype "list" in
-            bison.common.constants.SUMMARY.DATATYPES, i.e. county-x-species_list
+            bison.common.constants.SUMMARY.DATATYPES, i.e. county_x_species_list
             where each record has county, species, riis_status, occ_count, a list of
             species in a county.
 
-        Note: in the first implementation, because species are generally far more
-            numerous, rows are always species, columns are datasets.  This allows
-            easier exporting to other formats (i.e. Excel), which allows more rows than
-            columns.
+        Note: this matrix approximates a heatmap, and can easily be converted to a
+            Presence Absence Matrix (PAM), sites by species, with sites ~= region
+            (or other dimension that applies to all records for comparison).
         """
         self._coo_array = sparse_coo_array
         self._row_categ = row_category
         self._col_categ = column_category
-        self._y_fld = y_fld
-        self._x_fld = x_fld
         self._val_fld = val_fld
-        _AggregateDataMatrix.__init__(self, table_type, data_datestr)
 
-    # ...........................
-    @classmethod
-    def init_from_stacked_data(
-            cls, stacked_df, y_fld, x_fld, val_fld, table_type, data_datestr):
-        """Create a sparse matrix of rows by columns containing values from a table.
-
-        Args:
-            stacked_df (pandas.DataFrame): DataFrame of records containing columns to be
-                used as the new rows, new columns, and values.
-            y_fld: column in the input dataframe containing values to be used as rows
-                (axis 0)
-            x_fld: column in the input dataframe containing values to be used as
-                columns (axis 1)
-            val_fld: : column in the input dataframe containing values to be used as
-                values for the intersection of x and y fields
-            table_type (sppy.tools.s2n.constants.SUMMARY_TABLE_TYPES): table type of
-                sparse matrix aggregated data
-            data_datestr (str): date of the source data in YYYY_MM_DD format.
-
-        Returns:
-            sparse_matrix (bison.spnet.sparse_matrix.SparseMatrix): matrix of y values
-                (rows, y axis=0) by x values (columnns, x axis=1), with values from
-                another column.
-
-        Note:
-            The input dataframe must contain only one input record for any x and y value
-                combination, and each record must contain another value for the dataframe
-                contents.  The function was written for a table of records with
-                datasetkey (for the column labels/x), species (for the row labels/y),
-                and occurrence count.
-        """
-        # Get unique values to use as categories for scipy column and row indexes,
-        # remove None
-        unique_x_vals = list(stacked_df[x_fld].dropna().unique())
-        unique_y_vals = list(stacked_df[y_fld].dropna().unique())
-        # Categories allow using codes as the integer index for scipy matrix
-        row_categ = CategoricalDtype(unique_y_vals, ordered=True)
-        col_categ = CategoricalDtype(unique_x_vals, ordered=True)
-        # Create a list of category codes matching original stacked data to replace
-        #   column names from stacked data dataframe with integer codes for row and
-        #   column indexes in the new scipy matrix
-        col_idx = stacked_df[x_fld].astype(col_categ).cat.codes
-        row_idx = stacked_df[y_fld].astype(row_categ).cat.codes
-        # This creates a new matrix in Coordinate list (COO) format.  COO stores a list
-        # of (row, column, value) tuples.  Convert to CSR or CSC for efficient Row or
-        # Column slicing, respectively
-        sparse_coo = scipy.sparse.coo_array(
-            (stacked_df[val_fld], (row_idx, col_idx)),
-            shape=(row_categ.categories.size, col_categ.categories.size))
-        sparse_matrix = SparseMatrix(
-            sparse_coo, table_type, data_datestr, row_categ, col_categ,
-            y_fld=y_fld, x_fld=x_fld, val_fld=val_fld)
-        return sparse_matrix
+        _AggregateDataMatrix.__init__(self, dim0, dim1, table_type, datestr)
 
     # ...........................
     @classmethod
     def init_from_compressed_file(
-            cls, zip_filename, local_path="/tmp", overwrite=False):
+            cls, zip_filename, local_path=TMP_PATH, overwrite=False):
         """Construct a SparseMatrix from a compressed file.
 
         Args:
@@ -139,7 +86,7 @@ class SparseMatrix(_AggregateDataMatrix):
                 indicates which GBIF data dump the statistics were built upon.
         """
         try:
-            mtx_fname, meta_fname, table_type, data_datestr = cls._uncompress_files(
+            mtx_fname, meta_fname, table_type, datestr = cls._uncompress_files(
                 zip_filename, local_path=local_path, overwrite=overwrite)
         except Exception:
             raise
@@ -150,33 +97,139 @@ class SparseMatrix(_AggregateDataMatrix):
         except Exception:
             raise
 
+        dim0 = ANALYSIS_DIM.get(meta_dict["dim_0_code"])
+        dim1 = ANALYSIS_DIM.get(meta_dict["dim_1_code"])
+
         # Create
         sparse_mtx = SparseMatrix(
-            sparse_coo, meta_dict["code"], data_datestr, row_categ, col_categ,
-            y_fld=meta_dict["axis0_fld"], x_fld=meta_dict["axis1_fld"],
-            val_fld=meta_dict["val_fld"])
+            sparse_coo, meta_dict["code"], datestr, row_categ, col_categ, dim0, dim1,
+            val_fld=meta_dict["value_fld"])
 
         return sparse_mtx
 
     # ...........................
+    @classmethod
+    def init_from_stacked_data(
+            cls, stacked_df, y_fld, x_fld, val_fld, table_type, datestr):
+        """Create a sparse matrix of rows by columns containing values from a table.
+
+        Args:
+            stacked_df (pandas.DataFrame): DataFrame of records containing columns to be
+                used as the new rows, new columns, and values.
+            y_fld: column in the input dataframe containing values to be used as rows
+                (axis 0)
+            x_fld: column in the input dataframe containing values to be used as
+                columns (axis 1)
+            val_fld: : column in the input dataframe containing values to be used as
+                values for the intersection of x and y fields
+            table_type (sppy.tools.s2n.constants.SUMMARY_TABLE_TYPES): table type of
+                sparse matrix aggregated data
+            datestr (str): date of the source data in YYYY_MM_DD format.
+
+        Returns:
+            sparse_matrix (bison.spnet.sparse_matrix.SparseMatrix): matrix of y values
+                (rows, y axis=0) by x values (columnns, x axis=1), with values from
+                another column.
+
+        Note:
+            The input dataframe must contain only one input record for any x and y value
+                combination, and each record must contain another value for the dataframe
+                contents.  The function was written for a table of records with
+                datasetkey (for the column labels/x), species (for the row labels/y),
+                and occurrence count.
+        """
+        # Check that x,y fields correspond to a known data dimension
+        try:
+            _ = ANALYSIS_DIM.get_from_key_fld(y_fld)
+            _ = ANALYSIS_DIM.get_from_key_fld(x_fld)
+        except Exception:
+            raise
+
+        # Get unique values to use as categories for scipy column and row indexes,
+        # remove None
+        unique_x_vals = list(stacked_df[x_fld].dropna().unique())
+        unique_y_vals = list(stacked_df[y_fld].dropna().unique())
+        # Categories allow using codes as the integer index for scipy matrix
+        row_categ = CategoricalDtype(unique_y_vals, ordered=True)
+        col_categ = CategoricalDtype(unique_x_vals, ordered=True)
+        # Create a list of category codes matching original stacked data to replace
+        #   column names from stacked data dataframe with integer codes for row and
+        #   column indexes in the new scipy matrix
+        col_idx = stacked_df[x_fld].astype(col_categ).cat.codes
+        row_idx = stacked_df[y_fld].astype(row_categ).cat.codes
+
+        dim0 = ANALYSIS_DIM.get_from_key_fld(y_fld)
+        dim1 = ANALYSIS_DIM.get_from_key_fld(x_fld)
+        # This creates a new matrix in Coordinate list (COO) format.  COO stores a list
+        # of (row, column, value) tuples.  Convert to CSR or CSC for efficient Row or
+        # Column slicing, respectively
+        sparse_coo = scipy.sparse.coo_array(
+            (stacked_df[val_fld], (row_idx, col_idx)),
+            shape=(row_categ.categories.size, col_categ.categories.size))
+        sparse_matrix = SparseMatrix(
+            sparse_coo, table_type, datestr, row_categ, col_categ,
+            dim0, dim1, val_fld=val_fld)
+        return sparse_matrix
+
     @property
-    def input_y_fld(self):
+    def y_dimension(self):
         """Return column header from input data records (stacked data) for axis 0.
 
         Returns:
-            self._y_fld (str): Input field name for axis 0 (rows).
+            (str): Input field name for axis 0 (rows).
         """
-        return self._y_fld
+        return self._row_dim
+    # ...........................
 
     # ...........................
     @property
-    def input_x_fld(self):
+    def x_dimension(self):
         """Return column header from input data records (stacked data) for axis 1.
 
         Returns:
-            self._x_fld (str): Input field name for axis 1 (columns).
+            (str): Input field name for axis 1 (columns).
         """
-        return self._x_fld
+        return self._col_dim
+
+    # # ...........................
+    # @property
+    # def input_y_code(self):
+    #     """Return column header from input data records (stacked data) for axis 0.
+    #
+    #     Returns:
+    #         (str): Input field name for axis 0 (rows).
+    #     """
+    #     return self._row_dim["code"]
+    #
+    # # ...........................
+    # @property
+    # def input_x_code(self):
+    #     """Return column header from input data records (stacked data) for axis 1.
+    #
+    #     Returns:
+    #         (str): Input field name for axis 1 (columns).
+    #     """
+    #     return self._col_dim["code"]
+    #
+    # # ...........................
+    # @property
+    # def input_y_fld(self):
+    #     """Return column header from input data records (stacked data) for axis 0.
+    #
+    #     Returns:
+    #         (str): Input field name for axis 0 (rows).
+    #     """
+    #     return self._row_dim["key_fld"]
+    #
+    # # ...........................
+    # @property
+    # def input_x_fld(self):
+    #     """Return column header from input data records (stacked data) for axis 1.
+    #
+    #     Returns:
+    #         (str): Input field name for axis 1 (columns).
+    #     """
+    #     return self._col_dim["key_fld"]
 
     # ...........................
     @property
@@ -184,7 +237,7 @@ class SparseMatrix(_AggregateDataMatrix):
         """Return column header from input data records (stacked data) for matrix value.
 
         Returns:
-            self._val_fld (str): Input field name for values (matrix cells).
+            (str): Input field name for values (matrix cells).
         """
         return self._val_fld
 
@@ -355,9 +408,9 @@ class SparseMatrix(_AggregateDataMatrix):
         try:
             idx = self._get_code_from_category(label, axis=axis)
         except IndexError:
-            axis_type = self._y_fld
+            axis_type = self.y_dimension["code"]
             if axis == 1:
-                axis_type = self._x_fld
+                axis_type = self.x_dimension["code"]
             raise Exception(f"Label {label} does not exist in axis {axis}, {axis_type}")
         if axis == 0:
             vector = self._coo_array.getrow(idx)
@@ -761,7 +814,7 @@ class SparseMatrix(_AggregateDataMatrix):
 
     # ...............................................
     def get_totals(self, axis):
-        """Get a list of totals along the requested axis, down axis 0, across axis 1.
+        """Get a list of value totals along the axis, down axis 0, across axis 1.
 
         Args:
             axis (int): Axis to sum.
@@ -883,7 +936,7 @@ class SparseMatrix(_AggregateDataMatrix):
         return comparisons
 
     # .............................................................................
-    def compress_to_file(self, local_path="/tmp"):
+    def compress_to_file(self, local_path=TMP_PATH):
         """Compress this SparseMatrix to a zipped npz and json file.
 
         Args:
@@ -910,23 +963,20 @@ class SparseMatrix(_AggregateDataMatrix):
             raise Exception(msg)
 
         # Save table data and categories to json locally
-        # table_type, data_datestr, row_category,
-        #             column_category, y_fld=None, x_fld=None, val_fld=None
-        metadata = SUMMARY.get_table(self._table_type)
+        metadata = deepcopy(self._table)
         metadata["row_categories"] = self._row_categ.categories.tolist()
         metadata["column_categories"] = self._col_categ.categories.tolist()
-        metadata["datestr"] = self.data_datestr
-        metadata["val_fld"] = self.input_val_fld
+        metadata["value_fld"] = self.input_val_fld
         # Should be filled already, make sure they are consistent!
-        if metadata["axis0_fld"] != self.input_y_fld:
+        if metadata["dim_0_code"] != self.y_dimension["code"]:
             raise Exception(
-                f"metadata/axis0_fld {metadata['axis0_fld']} != "
-                f"y_fld {self.input_y_fld}"
+                f"metadata/dim_0_code {metadata['dim_0_code']} != "
+                f"y_dimension {self.y_dimension['code']}"
             )
-        if metadata["axis1_fld"] != self.input_x_fld:
+        if metadata["dim_1_code"] != self.x_dimension["code"]:
             raise Exception(
-                f"metadata/axis1_fld {metadata['axis1_fld']} != "
-                f"x_fld {self.input_x_fld}"
+                f"metadata/dim_1_code {metadata['dim_1_code']} != "
+                f"x_dimension {self.x_dimension['code']}"
             )
         try:
             self._dump_metadata(metadata, meta_fname)
@@ -944,7 +994,7 @@ class SparseMatrix(_AggregateDataMatrix):
     # .............................................................................
     @classmethod
     def uncompress_zipped_data(
-            cls, zip_filename, local_path="/tmp", overwrite=False):
+            cls, zip_filename, local_path=TMP_PATH, overwrite=False):
         """Uncompress a zipped SparseMatrix into a coo_array and row/column categories.
 
         Args:
@@ -959,7 +1009,7 @@ class SparseMatrix(_AggregateDataMatrix):
             col_categ (pandas.api.types.CategoricalDtype): column categories
             table_type (sppy.tools.s2n.constants.SUMMARY_TABLE_TYPES): type of table
                 data
-            data_datestr (str): date string in format YYYY_MM_DD
+            datestr (str): date string in format YYYY_MM_DD
 
         Raises:
             Exception: on failure to uncompress files.
@@ -971,7 +1021,7 @@ class SparseMatrix(_AggregateDataMatrix):
                 indicates which GBIF data dump the statistics were built upon.
         """
         try:
-            mtx_fname, meta_fname, table_type, data_datestr = cls._uncompress_files(
+            mtx_fname, meta_fname, table_type, datestr = cls._uncompress_files(
                 zip_filename, local_path=local_path, overwrite=overwrite)
         except Exception:
             raise
@@ -982,7 +1032,7 @@ class SparseMatrix(_AggregateDataMatrix):
         except Exception:
             raise
 
-        return sparse_coo, meta_dict, row_categ, col_categ, table_type, data_datestr
+        return sparse_coo, meta_dict, row_categ, col_categ, table_type, datestr
 
     # .............................................................................
     @classmethod
@@ -999,7 +1049,7 @@ class SparseMatrix(_AggregateDataMatrix):
             col_categ (pandas.api.types.CategoricalDtype): column categories
             table_type (sppy.tools.s2n.constants.SUMMARY_TABLE_TYPES): type of table
                 data
-            data_datestr (str): date string in format YYYY_MM_DD
+            datestr (str): date string in format YYYY_MM_DD
 
         Raises:
             Exception: on unable to load NPZ file

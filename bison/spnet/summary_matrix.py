@@ -3,7 +3,7 @@ from collections import OrderedDict
 import pandas as pd
 
 from bison.common.constants import (
-    COUNT_FLD, CSV_DELIMITER, SNKeys, TMP_PATH, TOTAL_FLD, SUMMARY
+    COUNT_FLD, CSV_DELIMITER, SNKeys, TMP_PATH, TOTAL_FLD, SUMMARY, AGGREGATION_TYPE
 )
 from bison.spnet.aggregate_data_matrix import _AggregateDataMatrix
 
@@ -14,7 +14,7 @@ class SummaryMatrix(_AggregateDataMatrix):
 
     # ...........................
     def __init__(
-            self, summary_df, table_type, datestr, logger=None):
+            self, summary_df, table_type, datestr, dim0, dim1):
         """Constructor for occurrence/species counts by region/analysis_dim comparisons.
 
         Args:
@@ -25,8 +25,10 @@ class SummaryMatrix(_AggregateDataMatrix):
                 * Column 2 contains the total of values in that row.
             table_type (aws_constants.SUMMARY_TABLE_TYPES): type of aggregated data
             datestr (str): date of the source data in YYYY_MM_DD format.
-            logger (object): An optional local logger to use for logging output
-                with consistent options
+            dim0 (str): (bison.common.constants.ANALYSIS_DIM): dimension for axis 0,
+                rows for which we will count and total dimension 1
+            dim1 (bison.common.constants.ANALYSIS_DIM): dimension for axis 1, with two
+                columns (count and total) for each value in dimension 0.
 
         Note: constructed from records in table with datatype "counts" in
             bison.common.constants.SUMMARY.DATATYPES,
@@ -39,19 +41,19 @@ class SummaryMatrix(_AggregateDataMatrix):
                 counts of occurrences and species for a county
         """
         self._df = summary_df
-        _AggregateDataMatrix.__init__(self, table_type, datestr, logger=logger)
+
+        _AggregateDataMatrix.__init__(self, dim0, dim1, table_type, datestr)
 
     # ...........................
     @classmethod
-    def init_from_sparse_matrix(cls, sp_mtx, axis=0, logger=None):
+    def init_from_sparse_matrix(cls, sp_mtx, axis=0):
         """Summarize a matrix into counts of one axis and values for the other axis.
 
         Args:
-            sp_mtx (sppy.aws.SparseMatrix): A sparse matrix with count
+            sp_mtx (sppy.aws.SparseMatrix): A 2d sparse matrix with count
                 values for one dimension, (i.e. region) rows (axis 0), by the species
                 dimension, columns (axis 1), to use for computations.
-            axis (int): Summarize rows (0) or columns (1).
-            logger (object): logger for saving relevant processing messages
+            axis (int): Summarize rows (0) for each column, or columns (1) for each row.
 
         Returns:
             sparse_coo (pandas.DataFrame): DataFrame summarizing rows by the count and
@@ -61,35 +63,46 @@ class SummaryMatrix(_AggregateDataMatrix):
             The input dataframe must contain only one input record for any x and y value
                 combination, and each record must contain another value for the
                 dataframe contents.
+
+        Note:
+            Total/Count down axis 0/row, rows for a column
+                across axis 1/column, columns for a row (aka species)
+            Axis 0 produces a matrix shape (col_count, 1),
+                1 row of values, total for each column
+            Axis 1 produces matrix shape (row_count, 1),
+                1 column of values, total for each row
         """
-        # Total/Count down axis 0/row, rows for a column
-        #             across axis 1/column, columns for a row (aka species)
-        # Axis 0 produces a matrix shape (col_count, 1),
-        #   1 row of values, total for each column
-        #
-        # Axis 1 produces matrix shape (row_count, 1),
-        #   1 column of values, total for each row
+        # Total of the values along the axis
         totals = sp_mtx.get_totals(axis=axis)
+        # Count of the non-zero values along the axis
         counts = sp_mtx.get_counts(axis=axis)
         data = {COUNT_FLD: counts, TOTAL_FLD: totals}
-        input_table_meta = SUMMARY.get_table(sp_mtx.table_type)
-        dim0 = input_table_meta["dimension0"]
-        dim1 = input_table_meta["dimension1"]
 
-        # Axis 0 summarizes each column/species (down axis 0) of sparse matrix
+        # Sparse matrix always has species in axis 1.
+        species_dim = sp_mtx.x_dimension["code"]
+        other_dim = sp_mtx.y_dimension["code"]
+
+        # Axis 0 summarizes down axis 0, each column/species, other dimension
+        # (i.e. region) counts and occurrence totals of other dimension in sparse matrix
         if axis == 0:
+            dim0 = species_dim
+            dim1 = other_dim
             index = sp_mtx.column_category.categories
-            table_type = SUMMARY.get_table_type("summary", dim0, dim1)
-        # Axis 1 summarizes each row (across axis 1) of sparse matrix
+            table_type = SUMMARY.get_table_type(
+                AGGREGATION_TYPE.SUMMARY, species_dim, other_dim)
+        # Axis 1 summarizes across axis 1, each row/other dimension, species counts and
+        # occurrence totals of species in sparse matrix
         elif axis == 1:
+            dim0 = other_dim
+            dim1 = species_dim
             index = sp_mtx.row_category.categories
-            table_type = SUMMARY.get_table_type("summary", dim1, dim0)
+            table_type = SUMMARY.get_table_type(
+                AGGREGATION_TYPE.SUMMARY, other_dim, species_dim)
 
         # summary fields = columns, sparse matrix axis = rows
         sdf = pd.DataFrame(data=data, index=index)
 
-        summary_matrix = SummaryMatrix(
-            sdf, table_type, sp_mtx.datestr, logger=logger)
+        summary_matrix = SummaryMatrix(sdf, table_type, sp_mtx.datestr, dim0, dim1)
         return summary_matrix
 
     # ...........................
@@ -126,6 +139,7 @@ class SummaryMatrix(_AggregateDataMatrix):
         summary_mtx = SummaryMatrix(dataframe, table_type, datestr)
 
         return summary_mtx
+    # ...........................
 
     # ...............................................
     @property
