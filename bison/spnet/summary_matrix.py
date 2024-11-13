@@ -1,9 +1,10 @@
 """Matrix to summarize each of 2 dimensions of data by counts of the other and a third."""
 from collections import OrderedDict
+from copy import deepcopy
 import pandas as pd
 
 from bison.common.constants import (
-    COUNT_FLD, CSV_DELIMITER, SNKeys, TMP_PATH, TOTAL_FLD, SUMMARY, AGGREGATION_TYPE
+    COUNT_FLD, CSV_DELIMITER, SNKeys, TMP_PATH, TOTAL_FLD, SUMMARY, AGGREGATION_TYPE, ANALYSIS_DIM
 )
 from bison.spnet.aggregate_data_matrix import _AggregateDataMatrix
 
@@ -25,14 +26,16 @@ class SummaryMatrix(_AggregateDataMatrix):
                 * Column 2 contains the total of values in that row.
             table_type (aws_constants.SUMMARY_TABLE_TYPES): type of aggregated data
             datestr (str): date of the source data in YYYY_MM_DD format.
-            dim0 (str): (bison.common.constants.ANALYSIS_DIM): dimension for axis 0,
+            dim0 (bison.common.constants.ANALYSIS_DIM): dimension for axis 0,
                 rows for which we will count and total dimension 1
             dim1 (bison.common.constants.ANALYSIS_DIM): dimension for axis 1, with two
                 columns (count and total) for each value in dimension 0.
 
+        Note: Count and total dim1 for every value in dim0
+
         Note: constructed from records in table with datatype "counts" in
             bison.common.constants.SUMMARY.DATATYPES,
-            i.e. county-x-riis_counts where each record has
+            i.e. county_x_riis_counts where each record has
                 county, riis_status, occ_count, species_count;
                 counts of occurrences and species by riis_status for a county
             OR
@@ -79,8 +82,8 @@ class SummaryMatrix(_AggregateDataMatrix):
         data = {COUNT_FLD: counts, TOTAL_FLD: totals}
 
         # Sparse matrix always has species in axis 1.
-        species_dim = sp_mtx.x_dimension["code"]
-        other_dim = sp_mtx.y_dimension["code"]
+        species_dim = sp_mtx.x_dimension
+        other_dim = sp_mtx.y_dimension
 
         # Axis 0 summarizes down axis 0, each column/species, other dimension
         # (i.e. region) counts and occurrence totals of other dimension in sparse matrix
@@ -89,7 +92,7 @@ class SummaryMatrix(_AggregateDataMatrix):
             dim1 = other_dim
             index = sp_mtx.column_category.categories
             table_type = SUMMARY.get_table_type(
-                AGGREGATION_TYPE.SUMMARY, species_dim, other_dim)
+                AGGREGATION_TYPE.SUMMARY, species_dim["code"], other_dim["code"])
         # Axis 1 summarizes across axis 1, each row/other dimension, species counts and
         # occurrence totals of species in sparse matrix
         elif axis == 1:
@@ -97,7 +100,7 @@ class SummaryMatrix(_AggregateDataMatrix):
             dim1 = species_dim
             index = sp_mtx.row_category.categories
             table_type = SUMMARY.get_table_type(
-                AGGREGATION_TYPE.SUMMARY, other_dim, species_dim)
+                AGGREGATION_TYPE.SUMMARY, other_dim["code"], species_dim["code"])
 
         # summary fields = columns, sparse matrix axis = rows
         sdf = pd.DataFrame(data=data, index=index)
@@ -135,11 +138,12 @@ class SummaryMatrix(_AggregateDataMatrix):
         except Exception:
             raise
 
+        dim0 = ANALYSIS_DIM.get(meta_dict["dim_0_code"])
+        dim1 = ANALYSIS_DIM.get(meta_dict["dim_1_code"])
         # Create
-        summary_mtx = SummaryMatrix(dataframe, table_type, datestr)
+        summary_mtx = SummaryMatrix(dataframe, table_type, datestr, dim0, dim1)
 
         return summary_mtx
-    # ...........................
 
     # ...............................................
     @property
@@ -205,7 +209,18 @@ class SummaryMatrix(_AggregateDataMatrix):
             raise Exception(msg)
 
         # Save table data and categories to json locally
-        metadata = SUMMARY.get_table(self._table_type)
+        metadata = deepcopy(self._table)
+        # Should be filled already, make sure they are consistent!
+        if metadata["dim_0_code"] != self.y_dimension["code"]:
+            raise Exception(
+                f"metadata/dim_0_code {metadata['dim_0_code']} != "
+                f"y_dimension {self.y_dimension['code']}"
+            )
+        if metadata["dim_1_code"] != self.x_dimension["code"]:
+            raise Exception(
+                f"metadata/dim_1_code {metadata['dim_1_code']} != "
+                f"x_dimension {self.x_dimension['code']}"
+            )
         try:
             self._dump_metadata(metadata, meta_fname)
         except Exception:
@@ -286,6 +301,29 @@ class SummaryMatrix(_AggregateDataMatrix):
             raise
 
         return dataframe, meta_dict
+
+    # ...............................................
+    def get_row_values(self, row_label):
+        """Get the labels and values for a row.
+
+        Args:
+            row_label: label of row to get values for.
+
+        Returns:
+            row_dict: Dictionary of labels and values for the row.
+
+        Raises:
+            Exception: on failure to find row_label in the dataframe index.
+        """
+        vals = {}
+        try:
+            row = self._df.loc[[row_label]].to_dict()
+        except KeyError:
+            raise Exception(f"Failed to find row {row_label} in index")
+
+        for lbl, valdict in row.items():
+            vals[lbl] = valdict[row_label]
+        return vals
 
     # ...............................................
     def get_measures(self, summary_key):

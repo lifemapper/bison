@@ -168,7 +168,8 @@ class ANALYSIS_DIM:
         "code": "state",
         # In summary records
         "fields": [
-            "census_state", UNIQUE_SPECIES_FLD, OCCURRENCE_STATUS_FLD, OCCURRENCE_COUNT_FLD
+            "census_state", UNIQUE_SPECIES_FLD, OCCURRENCE_STATUS_FLD,
+            OCCURRENCE_COUNT_FLD
         ],
         "key_fld": "census_state",
     }
@@ -183,7 +184,8 @@ class ANALYSIS_DIM:
     AIANNH = {
         "code": "aiannh",
         "fields": [
-            "aiannh_name", UNIQUE_SPECIES_FLD, OCCURRENCE_STATUS_FLD, OCCURRENCE_COUNT_FLD
+            "aiannh_name", UNIQUE_SPECIES_FLD, OCCURRENCE_STATUS_FLD,
+            OCCURRENCE_COUNT_FLD
         ],
         "key_fld": "aiannh_name",
     }
@@ -217,51 +219,27 @@ class ANALYSIS_DIM:
 
     # ...........................
     @classmethod
-    def analysis(cls, code=None):
+    def analysis_dimensions(cls):
         """Get one or all data analyses dimensions to be analyzed for species.
-
-        Args:
-            code (str): Code for the analysis dimension to be returned.
 
         Returns:
             dim_lst (list): List of data dimension(s) to be analyzed for species.
-
-        Raises:
-            Exception: on unknown code.
         """
-        if code is None:
-            dim_lst = [ANALYSIS_DIM.STATE, ANALYSIS_DIM.COUNTY, ANALYSIS_DIM.AIANNH]
-        else:
-            try:
-                dim_lst = [cls.get(code)]
-            except KeyError:
-                raise Exception(f"No dimension `{code}` in ANALYSIS_DIM")
+        dim_lst = [ANALYSIS_DIM.STATE, ANALYSIS_DIM.COUNTY, ANALYSIS_DIM.AIANNH]
         return dim_lst
 
     # ...........................
     @classmethod
-    def analysis_code(cls, code=None):
+    def analysis_codes(cls):
         """Get one or all codes for data analyses dimensions to be analyzed for species.
-
-        Args:
-            code (str): Code for the analysis dimension to be returned.
 
         Returns:
             code_lst (list): Codes of data dimension(s) to be analyzed for species.
-
-        Raises:
-            Exception: on unknown code.
         """
-        if code is None:
-            code_lst = [
+        code_lst = [
                 ANALYSIS_DIM.STATE["code"], ANALYSIS_DIM.COUNTY["code"],
                 ANALYSIS_DIM.AIANNH["code"]
-            ]
-        else:
-            try:
-                code_lst = [cls.get(code)["code"]]
-            except KeyError:
-                raise Exception(f"No dimension `{code}` in ANALYSIS_DIM")
+        ]
         return code_lst
 
     # ...........................
@@ -307,7 +285,6 @@ class ANALYSIS_DIM:
         raise Exception(f"No dimension for field `{key_fld}` in ANALYSIS_DIM")
 
 
-
 # .............................................................................
 class AGGREGATION_TYPE:
     """Types of tables created for aggregate species data analyses."""
@@ -336,7 +313,7 @@ class SUMMARY:
     DATATYPES = AGGREGATION_TYPE.all()
     SPECIES_DIMENSION = ANALYSIS_DIM.species_code()
     SPECIES_FIELD = ANALYSIS_DIM.SPECIES["key_fld"]
-    ANALYSIS_DIMENSIONS = ANALYSIS_DIM.analysis_code()
+    ANALYSIS_DIMENSIONS = ANALYSIS_DIM.analysis_codes()
 
     # ...........................
     @classmethod
@@ -366,25 +343,22 @@ class SUMMARY:
         Raises:
             Exception: on datatype not one of: "counts", "list", "summary", "matrix"
             Exception: on datatype "counts", dim0 not in ANALYSIS_DIMENSIONS
-            Exception: on datatype "counts", dim1 not OCCURRENCE_STATUS or None
-            Exception: on dim0 in ANALYSIS_DIMENSIONS and dim1 != SPECIES_DIMENSION
+            Exception: on datatype "counts", dim1 not None
+            Exception: on datatype "matrix", dim0 not in ANALYSIS_DIMENSIONS
+            Exception: on datatype "matrix", dim1 != SPECIES_DIMENSION
             Exception: on dim0 == SPECIES_DIMENSION and dim1 not in ANALYSIS_DIMENSIONS
-            Exception: on dim0 != SPECIES_DIMENSION and not in ANALYSIS_DIMENSIONS
+            Exception: on dim0 in ANALYSIS_DIMENSIONS and dim0 != SPECIES_DIMENSION
         """
         if datatype not in cls.DATATYPES:
             raise Exception(f"Datatype {datatype} is not in {cls.DATATYPES}.")
 
         if datatype == AGGREGATION_TYPE.COUNT:
             if dim0 in cls.ANALYSIS_DIMENSIONS:
-                if dim1 == OCCURRENCE_STATUS:
-                    # ex: state-x-riis_counts
-                    table_type = f"{dim0}{cls.dim_sep}{dim1}{cls.sep}{datatype}"
-                elif dim1 is None:
+                if dim1 is None:
                     # ex: state_counts
                     table_type = f"{dim0}{cls.sep}{datatype}"
                 else:
-                    raise Exception(
-                        f"Second dimension must be {OCCURRENCE_STATUS} or None")
+                    raise Exception("Second dimension must be None")
             else:
                 raise Exception(
                     f"First dimension for counts must be in {cls.ANALYSIS_DIMENSIONS}.")
@@ -403,7 +377,7 @@ class SUMMARY:
                 raise Exception(
                     f"Second dimension must be in {cls.ANALYSIS_DIMENSIONS}"
                 )
-            elif dim0 not in cls.ANALYSIS_DIMENSIONS and dim0 != cls.SPECIES_DIMENSION:
+            elif dim0 in cls.ANALYSIS_DIMENSIONS and dim1 != cls.SPECIES_DIMENSION:
                 raise Exception(
                     f"First dimension must be {cls.SPECIES_DIMENSION} or "
                     f"in {cls.ANALYSIS_DIMENSIONS}."
@@ -432,8 +406,10 @@ class SUMMARY:
             # name == table_type, ex: county_x_species_list
             meta = {
                 "code": table_type,
-                "fname": f"{table_type}{cls.sep}{cls.dt_token}{cls.sep}000",
-                "format": "Parquet",
+                "fname": f"{table_type}{cls.sep}{cls.dt_token}",
+                "table_format": "Parquet",
+                "file_extension": f"{cls.sep}000.parquet",
+
                 "fields": dim["fields"],
                 "key_fld": dim["key_fld"],
                 "species_fld": UNIQUE_SPECIES_FLD,
@@ -452,39 +428,46 @@ class SUMMARY:
                 project.
 
         Note:
+            This table type refers to a table assembled from original data records
+            and species and occurrence counts for a dimension.  The dimension can be
+            any unique set of attributes, such as county + riis_status.  For simplicity,
+            define each unique set of attributes as a single field/value
+
+        Note:
             The keys for the dictionary (and code in the metadata values) are table_type
+
+        TODO: Remove this from creation?  Can create from sparse matrix.
         """
         counts = {}
         for analysis_code in cls.ANALYSIS_DIMENSIONS:
-            dim0 = ANALYSIS_DIM.analysis(code=analysis_code)[0]
-            # Analysis (aka region) alone or with RIIS species status
-            for dim1 in (None, OCCURRENCE_STATUS):
-                table_type = cls.get_table_type(
-                    AGGREGATION_TYPE.COUNT, analysis_code, dim1)
+            dim0 = ANALYSIS_DIM.get(analysis_code)
+            table_type = cls.get_table_type(
+                AGGREGATION_TYPE.COUNT, analysis_code, None)
 
-                fields = copy.deepcopy(dim0["fields"])
-                # add species count
-                fields.append(SPECIES_COUNT_FLD)
-                # if just dim counts, remove RIIS status
-                if dim1 is None:
-                    fields.remove(OCCURRENCE_STATUS_FLD)
+            meta = {
+                "code": table_type,
+                "fname": f"{table_type}{cls.sep}{cls.dt_token}",
+                "table_format": "Parquet",
+                "file_extension": f"{cls.sep}000.parquet",
+                "data_type": "counts",
 
-                meta = {
-                    "code": table_type,
-                    "fname": f"{table_type}{cls.sep}{cls.dt_token}{cls.sep}000",
-                    "format": "Parquet",
-                    "key_fld": dim0["key_fld"],
-                    "fields": fields,
-                    "occurrence_count_fld": OCCURRENCE_COUNT_FLD,
-                    "species_count_fld": SPECIES_COUNT_FLD
-                }
-                counts[table_type] = meta
+                # Dimensions: 0 is row (aka Axis 0) list of records with counts
+                #   1 is column (aka Axis 1), count and total of dim for each row
+                "dim_0_code": analysis_code,
+                "dim_1_code": None,
+
+                "key_fld": dim0["key_fld"],
+                "occurrence_count_fld": OCCURRENCE_COUNT_FLD,
+                "species_count_fld": SPECIES_COUNT_FLD,
+                "fields": [dim0["key_fld"], OCCURRENCE_COUNT_FLD, SPECIES_COUNT_FLD]
+            }
+            counts[table_type] = meta
         return counts
 
     # ...........................
     @classmethod
     def summary(cls):
-        """Summary tables of species count and occurrence count for each dimension.
+        """Summary of dimension1 count and occurrence count for each dimension0 value.
 
         Returns:
             sums (dict): dict of dictionaries for each summary table defined by the
@@ -496,26 +479,31 @@ class SUMMARY:
                 ex: county, species, occ_count
         """
         sums = {}
+        species_code = ANALYSIS_DIM.species_code()
         for analysis_code in cls.ANALYSIS_DIMENSIONS:
-            # Analysis first
-            table_type1 = cls.get_table_type(
-                AGGREGATION_TYPE.SUMMARY, analysis_code, cls.SPECIES_DIMENSION)
-            # Species first
-            table_type2 = cls.get_table_type(
-                AGGREGATION_TYPE.SUMMARY, cls.SPECIES_DIMENSION, analysis_code)
-
-            for tt in (table_type1, table_type2):
+            for dim0, dim1 in (
+                    (analysis_code, species_code), (species_code, analysis_code)
+            ):
+                table_type = cls.get_table_type(
+                    AGGREGATION_TYPE.SUMMARY, dim0, dim1)
                 meta = {
-                    "code": tt,
-                    "fname": f"{tt}{cls.sep}{cls.dt_token}",
+                    "code": table_type,
+                    "fname": f"{table_type}{cls.sep}{cls.dt_token}",
                     "table_format": "Zip",
-                    "matrix_extension": ".csv",
+                    "file_extension": ".csv",
+                    "data_type": "summary",
+
+                    # Dimensions: 0 is row (aka Axis 0) list of values to summarize,
+                    #   1 is column (aka Axis 1), count and total of dim for each row
+                    "dim_0_code": dim0,
+                    "dim_1_code": dim1,
+
                     # Axis 1
                     "column": "measurement_type",
                     "fields": [COUNT_FLD, TOTAL_FLD],
                     # Matrix values
                     "value": "measure"}
-                sums[tt] = meta
+                sums[table_type] = meta
         return sums
 
     # ...........................
@@ -543,7 +531,7 @@ class SUMMARY:
                 "code": table_type,
                 "fname": f"{table_type}{cls.sep}{cls.dt_token}",
                 "table_format": "Zip",
-                "matrix_extension": ".npz",
+                "file_extension": ".npz",
                 "data_type": "matrix",
 
                 # Dimensions: 0 is row (aka Axis 0), 1 is column (aka Axis 1)
@@ -714,26 +702,6 @@ class SUMMARY:
         table_type = stripped_fn[:idx-1]
         datacontents, dim0, dim1, datatype = cls.parse_table_type(table_type)
 
-        # fn_parts = stripped_fn.split("_")
-        # if len(fn_parts) >= 5:
-        #     datacontents = fn_parts[0]
-        #     try:
-        #         dim0, dim1 = datacontents.split(cls.dim_sep)
-        #     except ValueError:
-        #         dim0 = dim1 = None
-        #     datatype = fn_parts[1]
-        #     yr = fn_parts[2]
-        #     mo = fn_parts[3]
-        #     day = fn_parts[4]
-        #     rest = fn_parts[5:]
-        #     if len(yr) == 4 and len(mo) == 2 and len(day) == 2:
-        #         datestr = f"{yr}_{mo}_{day}"
-        #     else:
-        #         raise Exception(
-        #             f"Length of elements year, month, day ({yr}, {mo}. {day}) should "
-        #             "be 4, 2, and 2")
-        # else:
-        #     raise Exception(f"{stripped_fn} does not follow the expected pattern")
         return datacontents, dim0, dim1, datatype, datestr, rest
 
     # ...............................................

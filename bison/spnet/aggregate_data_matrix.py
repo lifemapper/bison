@@ -70,6 +70,26 @@ class _AggregateDataMatrix:
     def datestr(self):
         return self._datestr
 
+    # ...........................
+    @property
+    def y_dimension(self):
+        """Return analysis dimension for axis 0.
+
+        Returns:
+            (bison.common.constants.ANALYSIS_DIM): Data dimension for axis 0 (rows).
+        """
+        return self._row_dim
+
+    # ...........................
+    @property
+    def x_dimension(self):
+        """Return analysis dimension for axis 1.
+
+        Returns:
+            (bison.common.constants.ANALYSIS_DIM): Data dimension for axis 1 (columns).
+        """
+        return self._col_dim
+
     # ...............................................
     def _logme(self, msg, refname="", log_level=None):
         logit(msg, logger=self._logger, refname=refname, log_level=log_level)
@@ -92,7 +112,7 @@ class _AggregateDataMatrix:
             Leave local_path as None to return S3 object names.
         """
         basename = table["fname"]
-        mtx_ext = table["matrix_extension"]
+        mtx_ext = table["file_extension"]
         mtx_fname = f"{basename}{mtx_ext}"
         meta_fname = f"{basename}.json"
         zip_fname = f"{basename}.zip"

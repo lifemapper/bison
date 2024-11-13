@@ -7,7 +7,7 @@ from pandas.api.types import CategoricalDtype
 import random
 import scipy.sparse
 
-from bison.common.constants import ANALYSIS_DIM, SNKeys, SUMMARY, TMP_PATH
+from bison.common.constants import ANALYSIS_DIM, SNKeys, TMP_PATH
 from bison.spnet.aggregate_data_matrix import _AggregateDataMatrix
 
 
@@ -33,13 +33,22 @@ class SparseMatrix(_AggregateDataMatrix):
             column_category (pandas.api.types.CategoricalDtype): ordered column labels
                 used to identify axis 1/columns.
             dim0 (bison.common.constants.ANALYSIS_DIM): dimension for axis 0, rows
-            dim1 (bison.common.constants.ANALYSIS_DIM): dimension for axis 1, columns
+            dim1 (bison.common.constants.ANALYSIS_DIM): dimension for axis 1, columns,
+                always species dimension in specnet sparse matrices
             val_fld (str): column header from stacked input records containing values
                 for sparse matrix cells
 
         Raises:
             Exception: on provided dimension 0 differs from table_type dimension 0.
             Exception: on provided dimension 1 differs from table_type dimension 1.
+            Exception: on provided dimension 1 is not species dimension
+
+        Note: the current Specnet implementation of SparseMatrix expects the species
+            dimension to be columns (axis/dimension 1).
+            Checks for this:
+                this constructor raises an Exception
+                bison.constants.SUMMARY matrix table_type defines
+                    dim1 = ANALYSIS_DIM.SPECIES
 
         Note: y_fld, x_fld, val_fld refer to column headers from the original data
             used to construct the sparse matrix.  They are included to aid in testing
@@ -58,6 +67,8 @@ class SparseMatrix(_AggregateDataMatrix):
         self._row_categ = row_category
         self._col_categ = column_category
         self._val_fld = val_fld
+        if dim1 != ANALYSIS_DIM.SPECIES:
+            raise Exception("SparseMatrix requires dimension1 (columns) to be Species")
 
         _AggregateDataMatrix.__init__(self, dim0, dim1, table_type, datestr)
 
@@ -131,6 +142,10 @@ class SparseMatrix(_AggregateDataMatrix):
                 (rows, y axis=0) by x values (columnns, x axis=1), with values from
                 another column.
 
+        Raises:
+            Exception: on failure to find a dimension for the fields to be used for the
+                x and y axes.
+
         Note:
             The input dataframe must contain only one input record for any x and y value
                 combination, and each record must contain another value for the dataframe
@@ -170,66 +185,6 @@ class SparseMatrix(_AggregateDataMatrix):
             sparse_coo, table_type, datestr, row_categ, col_categ,
             dim0, dim1, val_fld=val_fld)
         return sparse_matrix
-
-    @property
-    def y_dimension(self):
-        """Return column header from input data records (stacked data) for axis 0.
-
-        Returns:
-            (str): Input field name for axis 0 (rows).
-        """
-        return self._row_dim
-    # ...........................
-
-    # ...........................
-    @property
-    def x_dimension(self):
-        """Return column header from input data records (stacked data) for axis 1.
-
-        Returns:
-            (str): Input field name for axis 1 (columns).
-        """
-        return self._col_dim
-
-    # # ...........................
-    # @property
-    # def input_y_code(self):
-    #     """Return column header from input data records (stacked data) for axis 0.
-    #
-    #     Returns:
-    #         (str): Input field name for axis 0 (rows).
-    #     """
-    #     return self._row_dim["code"]
-    #
-    # # ...........................
-    # @property
-    # def input_x_code(self):
-    #     """Return column header from input data records (stacked data) for axis 1.
-    #
-    #     Returns:
-    #         (str): Input field name for axis 1 (columns).
-    #     """
-    #     return self._col_dim["code"]
-    #
-    # # ...........................
-    # @property
-    # def input_y_fld(self):
-    #     """Return column header from input data records (stacked data) for axis 0.
-    #
-    #     Returns:
-    #         (str): Input field name for axis 0 (rows).
-    #     """
-    #     return self._row_dim["key_fld"]
-    #
-    # # ...........................
-    # @property
-    # def input_x_fld(self):
-    #     """Return column header from input data records (stacked data) for axis 1.
-    #
-    #     Returns:
-    #         (str): Input field name for axis 1 (columns).
-    #     """
-    #     return self._col_dim["key_fld"]
 
     # ...........................
     @property
@@ -441,6 +396,27 @@ class SparseMatrix(_AggregateDataMatrix):
             raise
         total = vector.sum()
         return total
+
+    # ...............................................
+    def count_vector(self, label, axis=0):
+        """Count non-zero values in a single row or column.
+
+        Args:
+            label: label on the row (axis 0) or column (axis 1) to total.
+            axis (int): row (0) or column (1) header for vector to sum.
+
+        Returns:
+            int: The count of all non-zero values in one column
+
+        Raises:
+            IndexError: on label not present in vector header
+        """
+        try:
+            vector, _idx = self.get_vector_from_label(label, axis=axis)
+        except IndexError:
+            raise
+        count = vector.getnnz()
+        return count
 
     # ...............................................
     def get_row_labels_for_data_in_column(self, col, value=None):

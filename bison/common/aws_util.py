@@ -674,8 +674,7 @@ class S3:
         """
         s3_uri = f"s3://{bucket}/{s3_key}"
         try:
-            response = self._client.delete_object(Bucket=bucket, Key=s3_key)
-            print(f"Response to delete_object: {response}")
+            _ = self._client.delete_object(Bucket=bucket, Key=s3_key)
         except NoCredentialsError:
             print(f"Failed to authenticate for delete_object {s3_uri}.")
             raise

@@ -3,7 +3,8 @@ import os
 
 from bison.common.aws_util import S3
 from bison.common.constants import (
-    ANALYSIS_DIM, REGION, S3_BUCKET, S3_SUMMARY_DIR, SUMMARY, TMP_PATH
+    ANALYSIS_DIM, REGION, S3_BUCKET, S3_SUMMARY_DIR, SUMMARY, TMP_PATH, COUNT_FLD,
+    TOTAL_FLD
 )
 from bison.common.log import logit
 from bison.common.util import get_current_datadate_str
@@ -72,13 +73,15 @@ def create_sparse_matrix_from_records(
 
 
 # ...............................................
-def test_stacked_vs_matrix(stack_df, sparse_mtx, test_count=5):
+def test_stacked_vs_sparse(stack_df, sparse_mtx, test_count=5, logger=None):
     """Test values in stacked dataframe against those in sparse matrix for consistency.
 
     Args:
         stack_df: dataframe containing stacked data records
         sparse_mtx (SparseMatrix): object containing a scipy.sparse.coo_array
             with 3 columns from the stacked_df arranged as rows and columns with values
+        test_count (int): number of rows and columns to test.
+        logger (object): logger for saving relevant processing messages
 
     Returns:
         success (bool): flag indicating success of all or failure of any tests.
@@ -89,32 +92,19 @@ def test_stacked_vs_matrix(stack_df, sparse_mtx, test_count=5):
     for axis in (0, 1):
         # Test stacked column used for axis 0/1 against sparse matrix axis 0/1
         this_success = _test_stacked_to_aggregate_sum(
-            stack_df, sparse_mtx, axis=axis, test_count=test_count)
+            stack_df, sparse_mtx, axis=axis, test_count=test_count, logger=logger)
         success = success and this_success
 
     # Test min/max values for rows/columns
     for is_max in (False, True):
         for axis in (0, 1):
             this_success = _test_stacked_to_aggregate_extremes(
-                stack_df, sparse_mtx, axis=axis, test_count=test_count, is_max=is_max)
+                stack_df, sparse_mtx, axis=axis, test_count=test_count, is_max=is_max,
+                logger=logger
+            )
             success = success and this_success
 
     return success
-
-
-# ...............................................
-def test_sums(sum1_mtx, sum2_mtx):
-    """Test values in stacked dataframe against those in sparse matrix for consistency.
-
-    Args:
-        sum1_mtx: (bison.spnet.summary_matrix.SummaryMatrix) object containing
-            a summary of occurrence and species counts by stacked data records
-        sparse_mtx (SparseMatrix): object containing a scipy.sparse.coo_array
-            with 3 columns from the stacked_df arranged as rows and columns with values
-
-    Returns:
-        success (bool): flag indicating success of all or failure of any tests.
-    """
 
 
 # ...............................................
@@ -200,6 +190,72 @@ def _test_row_col_comparisons(sparse_mtx, test_count, logger):
     for x in x_vals:
         col_comps = sparse_mtx.compare_column_to_others(x)
         logit("Column comparisons:", logger=logger, print_obj=col_comps)
+
+
+# ...............................................
+def test_sparse_vs_summary(
+        sparse_mtx, summary_mtx_lst, test_count=5, logger=None):
+    """Test for equality of sums and counts in summary and aggregated dataframes.
+
+    Args:
+        sparse_mtx (bison.spnet.sparse_matrix.SparseMatrix): object containing a
+            2-D scipy.sparse.coo_array.
+        summary_mtx_lst (list of bison.spnet.summary_matrix.SummaryMatrix): list of 2
+            SummaryMatrices, each summarizing rows or columns of the sparse_mtx
+        test_count (int): number of rows and columns to test.
+        logger (object): logger for saving relevant processing messages
+
+    Returns:
+        success (bool): Flag indicating success of all or failure of any tests.
+
+    Postcondition:
+        Printed information for successful or failed tests.
+
+    Note: The summary matrices must have been created from dimensions in the sparse_mtx.
+    """
+    success = True
+    for summ_mtx in summary_mtx_lst:
+        # Count and total x_dim for each value in y_dim
+        count_total_dim = summ_mtx.x_dimension
+        count_total_code = count_total_dim["code"]
+        # each_value_in_dim = summ_mtx.y_dimension
+        if count_total_dim == ANALYSIS_DIM.SPECIES:
+            axis = 0
+        else:
+            axis = 1
+        summ_labels = sparse_mtx.get_random_labels(test_count, axis=axis)
+        logit("Total comparisons:", logger=logger)
+        for lbl in summ_labels:
+            summ_vals = summ_mtx.get_row_values(lbl)
+            # Test totals
+            sparse_sum = sparse_mtx.sum_vector(lbl, axis=axis)
+            if summ_vals[TOTAL_FLD] == sparse_sum:
+                logit(
+                    f"  Label {lbl}, Total {sparse_sum}: SparseMatrix == "
+                    f"SummaryMatrix in {count_total_code} axis {axis}", logger=logger
+                )
+            else:
+                logit(
+                    f"  !!! Label {lbl}, SparseMatrix total {sparse_sum} != "
+                    f"{summ_vals[TOTAL_FLD]} SummaryMatrix in {count_total_code} "
+                    f"axis {axis}", logger=logger
+                )
+                success = False
+            # Test counts
+            sparse_count = sparse_mtx.count_vector(lbl, axis=axis)
+            if summ_vals[COUNT_FLD] == sparse_count:
+                logit(
+                    f"  Label {lbl}, Count {sparse_count}: SparseMatrix == "
+                    f"SummaryMatrix in {count_total_code} axis {axis}", logger=logger
+                )
+            else:
+                logit(
+                    f"  !!! Label {lbl}, SparseMatrix count {sparse_count} != "
+                    f"{summ_vals[COUNT_FLD]} SummaryMatrix in {count_total_code} "
+                    f"axis {axis}", logger=logger
+                )
+                success = False
+    return success
 
 
 # ...............................................
@@ -413,7 +469,7 @@ if __name__ == "__main__":
     stack_df, sparse_mtx = create_sparse_matrix_from_records(
         s3, stacked_data_table_type, mtx_table_type, datestr)
 
-    success = test_stacked_vs_matrix(stack_df, sparse_mtx)
+    success = test_stacked_vs_sparse(stack_df, sparse_mtx)
     if success is False:
         raise Exception(
             "Failed tests comparing matrix created from stacked data to stacked data"
@@ -434,7 +490,7 @@ if __name__ == "__main__":
     sparse_mtx2 = SparseMatrix.init_from_compressed_file(
         zip_filename, local_path=TMP_PATH, overwrite=True)
 
-    success = test_stacked_vs_matrix(stack_df, sparse_mtx2)
+    success = test_stacked_vs_sparse(stack_df, sparse_mtx2)
     if success is False:
         raise Exception(
             "Failed tests comparing matrix created from compressed file to stacked data"
@@ -455,11 +511,14 @@ if __name__ == "__main__":
     s3_odsum_key = f"{S3_SUMMARY_DIR}/{os.path.basename(od_sum_filename)}"
     s3.upload(od_sum_filename, S3_BUCKET, s3_odsum_key, overwrite=True)
 
+    summary_mtx_lst = [sp_sum_mtx, od_sum_mtx]
+    success = test_sparse_vs_summary(sparse_mtx, summary_mtx_lst)
+
     # .................................
     # Download summary matrix files and recreate 2 summary matrices to test for corruption
     # .................................
     sp_table = SUMMARY.get_table(spsum_table_type, datestr=datestr)
-    _, _, sp_zip_fname = SummaryMatrix.get_matrix_meta_zip_filenames(table)
+    _, _, sp_zip_fname = SummaryMatrix.get_matrix_meta_zip_filenames(sp_table)
     sp_zip_filename = s3.download(
         S3_BUCKET, S3_SUMMARY_DIR, sp_zip_fname, local_path=TMP_PATH, overwrite=True)
     sp_sum_mtx2 = \
@@ -485,9 +544,10 @@ if __name__ == "__main__":
 from bison.task.build_matrices import *
 from bison.common.constants import *
 from pprint import pp
+
 local_path = TMP_PATH
 overwrite = True
-
+test_count = 5
 datestr = get_current_datadate_str()
 s3 = S3(region=REGION)
 logger = None
@@ -504,7 +564,7 @@ mtx_table_type = SUMMARY.get_table_type("matrix", dim_region, dim_species)
 stack_df, sparse_mtx = create_sparse_matrix_from_records(
     s3, stacked_data_table_type, mtx_table_type, datestr)
 
-success = test_stacked_vs_matrix(stack_df, sparse_mtx, test_count=3)
+success = test_stacked_vs_sparse(stack_df, sparse_mtx, test_count=3)
 if success is False:
     raise Exception(
         "Failed tests comparing matrix created from stacked data to stacked data"
@@ -525,7 +585,7 @@ zip_filename = s3.download(
 sparse_mtx2 = SparseMatrix.init_from_compressed_file(
     zip_filename, local_path=TMP_PATH, overwrite=True)
 
-success = test_stacked_vs_matrix(stack_df, sparse_mtx2)
+success = test_stacked_vs_sparse(stack_df, sparse_mtx2)
 if success is False:
     raise Exception(
         "Failed tests comparing matrix created from compressed file to stacked data"
@@ -535,12 +595,44 @@ if success is False:
 # Create a summary matrix for each dimension of sparse matrix and upload
 # .................................
 
-# Fail with compress summary matrix to CSV: created as NPZ and contents are binary
-
 sp_sum_mtx = SummaryMatrix.init_from_sparse_matrix(sparse_mtx, axis=0)
 spsum_table_type = sp_sum_mtx.table_type
 sp_sum_filename = sp_sum_mtx.compress_to_file()
 s3_spsum_key = f"{S3_SUMMARY_DIR}/{os.path.basename(sp_sum_filename)}"
 s3.upload(sp_sum_filename, S3_BUCKET, s3_spsum_key, overwrite=True)
+
+od_sum_mtx = SummaryMatrix.init_from_sparse_matrix(sparse_mtx, axis=1)
+odsum_table_type = od_sum_mtx.table_type
+od_sum_filename = od_sum_mtx.compress_to_file()
+s3_odsum_key = f"{S3_SUMMARY_DIR}/{os.path.basename(od_sum_filename)}"
+s3.upload(od_sum_filename, S3_BUCKET, s3_odsum_key, overwrite=True)
+
+summary_mtx_lst = [sp_sum_mtx, od_sum_mtx]
+success = test_sparse_vs_summary(sparse_mtx, summary_mtx_lst)
+
+# .................................
+# Download summary matrix files and recreate 2 summary matrices to test for corruption
+# .................................
+sp_table = SUMMARY.get_table(spsum_table_type, datestr=datestr)
+_, _, sp_zip_fname = SummaryMatrix.get_matrix_meta_zip_filenames(sp_table)
+
+sp_zip_filename = s3.download(
+    S3_BUCKET, S3_SUMMARY_DIR, sp_zip_fname, local_path=TMP_PATH, overwrite=True)
+sp_sum_mtx2 = \
+    SummaryMatrix.init_from_compressed_file(
+        sp_zip_filename, local_path=TMP_PATH, overwrite=True)
+
+# Other Dimension Summary
+od_table = SUMMARY.get_table(odsum_table_type, datestr=datestr)
+_, _, od_zip_fname = SummaryMatrix.get_matrix_meta_zip_filenames(od_table)
+
+od_zip_filename = s3.download(
+    S3_BUCKET, S3_SUMMARY_DIR, od_zip_fname, local_path=TMP_PATH, overwrite=True)
+od_sum_mtx2 = \
+    SummaryMatrix.init_from_compressed_file(
+        od_zip_filename, local_path=TMP_PATH, overwrite=True)
+
+summary_mtx_lst = [sp_sum_mtx2, od_sum_mtx2]
+success = test_sparse_vs_summary(sparse_mtx, summary_mtx_lst)
 
 """
