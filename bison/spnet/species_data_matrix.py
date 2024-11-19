@@ -10,7 +10,7 @@ from bison.common.log import logit
 
 
 # .............................................................................
-class _AggregateDataMatrix:
+class _SpeciesDataMatrix:
     """Class for managing computations for counts of species x aggregator."""
 
     # ...........................

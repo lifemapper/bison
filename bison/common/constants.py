@@ -646,8 +646,8 @@ class SUMMARY:
         Returns:
             tables: dictionary of summary table metadata.
         """
-        tables = cls.tables()
-        fname_tmpl = tables[table_type]["fname"]
+        table = cls.tables()[table_type]
+        fname_tmpl = table["fname"] + table["file_extension"]
         fname = fname_tmpl.replace(cls.dt_token, datestr)
         return fname
 

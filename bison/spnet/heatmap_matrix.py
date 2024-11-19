@@ -8,11 +8,11 @@ import random
 import scipy.sparse
 
 from bison.common.constants import ANALYSIS_DIM, SNKeys, TMP_PATH
-from bison.spnet.aggregate_data_matrix import _AggregateDataMatrix
+from bison.spnet.species_data_matrix import _SpeciesDataMatrix
 
 
 # .............................................................................
-class SparseMatrix(_AggregateDataMatrix):
+class HeatmapMatrix(_SpeciesDataMatrix):
     """Class for managing computations for counts of aggregator0 x aggregator1."""
 
     # ...........................
@@ -39,11 +39,12 @@ class SparseMatrix(_AggregateDataMatrix):
                 for sparse matrix cells
 
         Raises:
+            Exception: on input matrix not of correct type.
             Exception: on provided dimension 0 differs from table_type dimension 0.
             Exception: on provided dimension 1 differs from table_type dimension 1.
             Exception: on provided dimension 1 is not species dimension
 
-        Note: the current Specnet implementation of SparseMatrix expects the species
+        Note: the current Specnet implementation of HeatmapMatrix expects the species
             dimension to be columns (axis/dimension 1).
             Checks for this:
                 this constructor raises an Exception
@@ -63,20 +64,22 @@ class SparseMatrix(_AggregateDataMatrix):
             Presence Absence Matrix (PAM), sites by species, with sites ~= region
             (or other dimension that applies to all records for comparison).
         """
+        if type(sparse_coo_array) != scipy.sparse.coo_array:
+            raise Exception("Input matrix must be in scipy.sparse.coo_array format")
         self._coo_array = sparse_coo_array
         self._row_categ = row_category
         self._col_categ = column_category
         self._val_fld = val_fld
-        if dim1 != ANALYSIS_DIM.SPECIES:
-            raise Exception("SparseMatrix requires dimension1 (columns) to be Species")
+        if dim1["code"] != ANALYSIS_DIM.species_code():
+            raise Exception("HeatmapMatrix requires dimension1 (columns) to be Species")
 
-        _AggregateDataMatrix.__init__(self, dim0, dim1, table_type, datestr)
+        _SpeciesDataMatrix.__init__(self, dim0, dim1, table_type, datestr)
 
     # ...........................
     @classmethod
     def init_from_compressed_file(
             cls, zip_filename, local_path=TMP_PATH, overwrite=False):
-        """Construct a SparseMatrix from a compressed file.
+        """Construct a HeatmapMatrix from a compressed file.
 
         Args:
             zip_filename (str): Filename of zipped sparse matrix data to uncompress.
@@ -85,7 +88,7 @@ class SparseMatrix(_AggregateDataMatrix):
                 from the zip_filename.
 
         Returns:
-            sparse_mtx (bison.spnet.sparse_matrix.SparseMatrix): matrix for the data.
+            sparse_mtx (bison.spnet.sparse_matrix.HeatmapMatrix): matrix for the data.
 
         Raises:
             Exception: on failure to uncompress files.
@@ -112,9 +115,9 @@ class SparseMatrix(_AggregateDataMatrix):
         dim1 = ANALYSIS_DIM.get(meta_dict["dim_1_code"])
 
         # Create
-        sparse_mtx = SparseMatrix(
+        sparse_mtx = HeatmapMatrix(
             sparse_coo, meta_dict["code"], datestr, row_categ, col_categ, dim0, dim1,
-            val_fld=meta_dict["value_fld"])
+            meta_dict["value_fld"])
 
         return sparse_mtx
 
@@ -138,7 +141,7 @@ class SparseMatrix(_AggregateDataMatrix):
             datestr (str): date of the source data in YYYY_MM_DD format.
 
         Returns:
-            sparse_matrix (bison.spnet.sparse_matrix.SparseMatrix): matrix of y values
+            sparse_matrix (bison.spnet.sparse_matrix.HeatmapMatrix): matrix of y values
                 (rows, y axis=0) by x values (columnns, x axis=1), with values from
                 another column.
 
@@ -181,7 +184,7 @@ class SparseMatrix(_AggregateDataMatrix):
         sparse_coo = scipy.sparse.coo_array(
             (stacked_df[val_fld], (row_idx, col_idx)),
             shape=(row_categ.categories.size, col_categ.categories.size))
-        sparse_matrix = SparseMatrix(
+        sparse_matrix = HeatmapMatrix(
             sparse_coo, table_type, datestr, row_categ, col_categ,
             dim0, dim1, val_fld=val_fld)
         return sparse_matrix
@@ -226,34 +229,47 @@ class SparseMatrix(_AggregateDataMatrix):
             columns=self._col_categ.categories)
         return sdf
 
-    # ...............................................
-    def _get_code_from_category(self, label, axis=0):
-        if axis == 0:
-            categ = self._row_categ
-        elif axis == 1:
-            categ = self._col_categ
-        else:
-            raise Exception(f"2D sparse array does not have axis {axis}")
-
-        # returns a tuple of a single 1-dimensional array of locations
-        arr = np.where(categ.categories == label)[0]
-        try:
-            # labels are unique in categories so there will be 0 or 1 value in the array
-            code = arr[0]
-        except IndexError:
-            raise
-        return code
-
-    # ...............................................
-    def _get_category_from_code(self, code, axis=0):
-        if axis == 0:
-            categ = self._row_categ
-        elif axis == 1:
-            categ = self._col_categ
-        else:
-            raise Exception(f"2D sparse array does not have axis {axis}")
-        category = categ.categories[code]
-        return category
+    # # ...............................................
+    # def _get_code_from_category(self, label, axis=0):
+    #     if axis == 0:
+    #         categ = self._row_categ
+    #     elif axis == 1:
+    #         categ = self._col_categ
+    #     else:
+    #         raise Exception(f"2D sparse array does not have axis {axis}")
+    #
+    #     # returns a tuple of a single 1-dimensional array of locations
+    #     arr = np.where(categ.categories == label)[0]
+    #     try:
+    #         # labels are unique in categories so there will be 0 or 1 value in the array
+    #         code = arr[0]
+    #     except IndexError:
+    #         raise
+    #     return code
+    #
+    # # ...............................................
+    # def _get_category_from_code(self, code, axis=0):
+    #     if axis == 0:
+    #         categ = self._row_categ
+    #     elif axis == 1:
+    #         categ = self._col_categ
+    #     else:
+    #         raise Exception(f"2D sparse array does not have axis {axis}")
+    #     category = categ.categories[code]
+    #     return category
+    #
+    # # ...............................................
+    # def _get_categories_from_code(self, code_list, axis=0):
+    #     if axis == 0:
+    #         categ = self._row_categ
+    #     elif axis == 1:
+    #         categ = self._col_categ
+    #     else:
+    #         raise Exception(f"2D sparse array does not have axis {axis}")
+    #     category_labels = []
+    #     for code in code_list:
+    #         category_labels.append(categ.categories[code])
+    #     return category_labels
 
     # ...............................................
     def _export_categories(self, axis=0):
@@ -267,13 +283,26 @@ class SparseMatrix(_AggregateDataMatrix):
         return cat_lst
 
     # ...............................................
-    def _get_categories_from_code(self, code_list, axis=0):
-        if axis == 0:
-            categ = self._row_categ
-        elif axis == 1:
-            categ = self._col_categ
-        else:
-            raise Exception(f"2D sparse array does not have axis {axis}")
+    @classmethod
+    def _get_code_from_category(cls, label, categ):
+        # returns a tuple of a single 1-dimensional array of locations
+        arr = np.where(categ.categories == label)[0]
+        try:
+            # labels are unique in categories so there will be 0 or 1 value in the array
+            code = arr[0]
+        except IndexError:
+            raise
+        return code
+
+    # ...............................................
+    @classmethod
+    def _get_category_from_code(self, code, categ):
+        category = categ.categories[code]
+        return category
+
+    # ...............................................
+    @classmethod
+    def _get_categories_from_code(self, code_list, categ):
         category_labels = []
         for code in code_list:
             category_labels.append(categ.categories[code])
@@ -313,7 +342,7 @@ class SparseMatrix(_AggregateDataMatrix):
             raise Exception(f"2D sparse array does not have axis {axis}")
         # Get a random sample of category indexes
         idxs = random.sample(range(1, len(categ.categories)), count)
-        labels = [self._get_category_from_code(i, axis=axis) for i in idxs]
+        labels = [self._get_category_from_code(i, categ) for i in idxs]
         return labels
 
     # ...............................................
@@ -360,8 +389,12 @@ class SparseMatrix(_AggregateDataMatrix):
             Exception: on label does not exist in category
             Exception: on axis not in (0, 1)
         """
+        if axis == 0:
+            categ = self._row_categ
+        elif axis == 1:
+            categ = self._col_categ
         try:
-            idx = self._get_code_from_category(label, axis=axis)
+            idx = self._get_code_from_category(label, categ)
         except IndexError:
             axis_type = self.y_dimension["code"]
             if axis == 1:
@@ -440,7 +473,9 @@ class SparseMatrix(_AggregateDataMatrix):
             tmp_idx_lst = [tmp_idxs[i] for i in range(len(tmp_idxs))]
             # Row indexes of maxval in column
             idxs_lst = [row_idxs[i] for i in tmp_idx_lst]
-        row_labels = [self._get_category_from_code(idx, axis=0) for idx in idxs_lst]
+        row_labels = [
+            self._get_category_from_code(idx, self._row_categ) for idx in idxs_lst
+        ]
         return row_labels
 
     # ...............................................
@@ -494,18 +529,18 @@ class SparseMatrix(_AggregateDataMatrix):
         if axis == 0:
             # Column indexes of maxval in row
             idxs_lst = [col_idxs[i] for i in tmp_idx_lst]
-            # Label axis is the opposite of the vector axis
-            label_axis = 1
+            # Label category is the opposite of the vector axis
+            label_categ = self._col_categ
         elif axis == 1:
             # Row indexes of maxval in column
             idxs_lst = [row_idxs[j] for j in tmp_idx_lst]
-            label_axis = 0
+            label_categ = self._row_categ
         else:
             raise Exception(f"2D sparse array does not have axis {axis}")
 
         # Convert from indexes to labels
         labels = [
-            self._get_category_from_code(idx, axis=label_axis) for idx in idxs_lst]
+            self._get_category_from_code(idx, label_categ) for idx in idxs_lst]
         return labels
 
     # ...............................................
@@ -913,7 +948,7 @@ class SparseMatrix(_AggregateDataMatrix):
 
     # .............................................................................
     def compress_to_file(self, local_path=TMP_PATH):
-        """Compress this SparseMatrix to a zipped npz and json file.
+        """Compress this HeatmapMatrix to a zipped npz and json file.
 
         Args:
             local_path (str): Absolute path of local destination path
@@ -971,7 +1006,7 @@ class SparseMatrix(_AggregateDataMatrix):
     @classmethod
     def uncompress_zipped_data(
             cls, zip_filename, local_path=TMP_PATH, overwrite=False):
-        """Uncompress a zipped SparseMatrix into a coo_array and row/column categories.
+        """Uncompress a zipped HeatmapMatrix into a coo_array and row/column categories.
 
         Args:
             zip_filename (str): Filename of zipped sparse matrix data to uncompress.
@@ -1013,7 +1048,7 @@ class SparseMatrix(_AggregateDataMatrix):
     # .............................................................................
     @classmethod
     def read_data(cls, mtx_filename, meta_filename):
-        """Read SparseMatrix data files into a coo_array and row/column categories.
+        """Read HeatmapMatrix data files into a coo_array and row/column categories.
 
         Args:
             mtx_filename (str): Filename of scipy.sparse.coo_array data in npz format.

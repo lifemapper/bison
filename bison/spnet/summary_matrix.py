@@ -6,11 +6,11 @@ import pandas as pd
 from bison.common.constants import (
     COUNT_FLD, CSV_DELIMITER, SNKeys, TMP_PATH, TOTAL_FLD, SUMMARY, AGGREGATION_TYPE, ANALYSIS_DIM
 )
-from bison.spnet.aggregate_data_matrix import _AggregateDataMatrix
+from bison.spnet.species_data_matrix import _SpeciesDataMatrix
 
 
 # .............................................................................
-class SummaryMatrix(_AggregateDataMatrix):
+class SummaryMatrix(_SpeciesDataMatrix):
     """Class for holding summary counts of each of 2 dimensions of data."""
 
     # ...........................
@@ -45,7 +45,7 @@ class SummaryMatrix(_AggregateDataMatrix):
         """
         self._df = summary_df
 
-        _AggregateDataMatrix.__init__(self, dim0, dim1, table_type, datestr)
+        _SpeciesDataMatrix.__init__(self, dim0, dim1, table_type, datestr)
 
     # ...........................
     @classmethod
