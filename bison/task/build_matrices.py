@@ -22,7 +22,7 @@ Note:
 
 
 # .............................................................................
-def create_sparse_matrix_from_records(
+def create_heatmap_from_records(
         s3, stacked_table_type, mtx_table_type, datestr, logger=None):
     """Read stacked records from S3, aggregate into a sparse matrix of species x dim.
 
@@ -36,7 +36,7 @@ def create_sparse_matrix_from_records(
         logger (bison.common.log.Logger): for writing messages to file and console
 
     Returns:
-        sparse_mtx (bison.spnet.heatmap_matrix.HeatmapMatrix): sparse matrix
+        heatmap (bison.spnet.heatmap_matrix.HeatmapMatrix): sparse matrix
             containing data separated into 2 dimensions
         y_fld (str): column header from stacked input records containing values for
             sparse matrix row headers
@@ -64,23 +64,23 @@ def create_sparse_matrix_from_records(
 
     # Create matrix from record data, then test consistency and upload.
     try:
-        sparse_mtx = HeatmapMatrix.init_from_stacked_data(
+        heatmap = HeatmapMatrix.init_from_stacked_data(
             stk_df, y_fld, x_fld, val_fld, mtx_table_type, datestr)
     except Exception as e:
         logger.log(f"Failed to read {stacked_table_type} to sparse matrix. ({e})")
         raise(e)
     logit(f"Built {mtx_table_type} from stacked data.", logger=logger)
 
-    return stk_df, sparse_mtx
+    return stk_df, heatmap
 
 
 # ...............................................
-def test_stacked_vs_sparse(stack_df, sparse_mtx, test_count=5, logger=None):
+def test_stacked_vs_heatmap(stack_df, heatmap, test_count=5, logger=None):
     """Test values in stacked dataframe against those in sparse matrix for consistency.
 
     Args:
         stack_df: dataframe containing stacked data records
-        sparse_mtx (HeatmapMatrix): object containing a scipy.sparse.coo_array
+        heatmap (HeatmapMatrix): object containing a scipy.sparse.coo_array
             with 3 columns from the stacked_df arranged as rows and columns with values
         test_count (int): number of rows and columns to test.
         logger (object): logger for saving relevant processing messages
@@ -94,14 +94,14 @@ def test_stacked_vs_sparse(stack_df, sparse_mtx, test_count=5, logger=None):
     for axis in (0, 1):
         # Test stacked column used for axis 0/1 against sparse matrix axis 0/1
         this_success = _test_stacked_to_aggregate_sum(
-            stack_df, sparse_mtx, axis=axis, test_count=test_count, logger=logger)
+            stack_df, heatmap, axis=axis, test_count=test_count, logger=logger)
         success = success and this_success
 
     # Test min/max values for rows/columns
     for is_max in (False, True):
         for axis in (0, 1):
             this_success = _test_stacked_to_aggregate_extremes(
-                stack_df, sparse_mtx, axis=axis, test_count=test_count, is_max=is_max,
+                stack_df, heatmap, axis=axis, test_count=test_count, is_max=is_max,
                 logger=logger
             )
             success = success and this_success
@@ -170,11 +170,11 @@ def sum_stacked_data_vals_for_column(stacked_df, filter_fld, filter_value, val_f
 
 
 # ...............................................
-def _test_row_col_comparisons(sparse_mtx, test_count, logger):
+def _test_row_col_comparisons(heatmap, test_count, logger):
     """Test row comparisons between 1 and all, and column comparisons between 1 and all.
 
     Args:
-        sparse_mtx (HeatmapMatrix): object containing a scipy.sparse.coo_array
+        heatmap (HeatmapMatrix): object containing a scipy.sparse.coo_array
             with 3 columns from the stacked_df arranged as rows and columns with values
         test_count (int): number of rows and columns to test.
         logger (object): logger for saving relevant processing messages
@@ -184,26 +184,26 @@ def _test_row_col_comparisons(sparse_mtx, test_count, logger):
 
     Note: The aggregate_df must have been created from the stacked_df.
     """
-    y_vals = sparse_mtx.get_random_labels(test_count, axis=0)
-    x_vals = sparse_mtx.get_random_labels(test_count, axis=1)
+    y_vals = heatmap.get_random_labels(test_count, axis=0)
+    x_vals = heatmap.get_random_labels(test_count, axis=1)
     for y in y_vals:
-        row_comps = sparse_mtx.compare_row_to_others(y)
+        row_comps = heatmap.compare_row_to_others(y)
         logit("Row comparisons:", logger=logger, print_obj=row_comps)
     for x in x_vals:
-        col_comps = sparse_mtx.compare_column_to_others(x)
+        col_comps = heatmap.compare_column_to_others(x)
         logit("Column comparisons:", logger=logger, print_obj=col_comps)
 
 
 # ...............................................
-def test_sparse_vs_summary(
-        sparse_mtx, summary_mtx_lst, test_count=5, logger=None):
+def test_heatmap_vs_summary(
+        heatmap, summary_mtx_lst, test_count=5, logger=None):
     """Test for equality of sums and counts in summary and aggregated dataframes.
 
     Args:
-        sparse_mtx (bison.spnet.heatmap_matrix.HeatmapMatrix): object containing a
+        heatmap (bison.spnet.heatmap_matrix.HeatmapMatrix): object containing a
             2-D scipy.sparse.coo_array.
         summary_mtx_lst (list of bison.spnet.summary_matrix.SummaryMatrix): list of 2
-            SummaryMatrices, each summarizing rows or columns of the sparse_mtx
+            SummaryMatrices, each summarizing rows or columns of the heatmap
         test_count (int): number of rows and columns to test.
         logger (object): logger for saving relevant processing messages
 
@@ -213,7 +213,7 @@ def test_sparse_vs_summary(
     Postcondition:
         Printed information for successful or failed tests.
 
-    Note: The summary matrices must have been created from dimensions in the sparse_mtx.
+    Note: The summary matrices must have been created from dimensions in the heatmap.
     """
     success = True
     for summ_mtx in summary_mtx_lst:
@@ -225,12 +225,12 @@ def test_sparse_vs_summary(
             axis = 0
         else:
             axis = 1
-        summ_labels = sparse_mtx.get_random_labels(test_count, axis=axis)
+        summ_labels = heatmap.get_random_labels(test_count, axis=axis)
         logit("Total comparisons:", logger=logger)
         for lbl in summ_labels:
             summ_vals = summ_mtx.get_row_values(lbl)
             # Test totals
-            sparse_sum = sparse_mtx.sum_vector(lbl, axis=axis)
+            sparse_sum = heatmap.sum_vector(lbl, axis=axis)
             if summ_vals[TOTAL_FLD] == sparse_sum:
                 logit(
                     f"  Label {lbl}, Total {sparse_sum}: HeatmapMatrix == "
@@ -244,7 +244,7 @@ def test_sparse_vs_summary(
                 )
                 success = False
             # Test counts
-            sparse_count = sparse_mtx.count_vector(lbl, axis=axis)
+            sparse_count = heatmap.count_vector(lbl, axis=axis)
             if summ_vals[COUNT_FLD] == sparse_count:
                 logit(
                     f"  Label {lbl}, Count {sparse_count}: HeatmapMatrix == "
@@ -262,13 +262,13 @@ def test_sparse_vs_summary(
 
 # ...............................................
 def _test_stacked_to_aggregate_sum(
-        stk_df, sparse_mtx, axis=0, test_count=5, logger=None):
+        stk_df, heatmap, axis=0, test_count=5, logger=None):
     """Test for equality of sums in stacked and aggregated dataframes.
 
     Args:
         stk_df: dataframe of stacked data, containing records with columns of
             categorical values and counts.
-        sparse_mtx (HeatmapMatrix): object containing a scipy.sparse.coo_array
+        heatmap (HeatmapMatrix): object containing a scipy.sparse.coo_array
             with 3 columns from the stacked_df arranged as rows and columns with values]
         axis (int): Axis 0 (row) or 1 (column) that corresponds with the column
             label (stk_axis_col_label) in the original stacked data.
@@ -284,16 +284,16 @@ def _test_stacked_to_aggregate_sum(
     Note: The aggregate_df must have been created from the stacked_df.
     """
     success = True
-    val_fld = sparse_mtx.input_val_fld
+    val_fld = heatmap.input_val_fld
     if axis == 0:
-        col_fld = sparse_mtx.y_dimension["key_fld"]
+        col_fld = heatmap.y_dimension["key_fld"]
     else:
-        col_fld = sparse_mtx.x_dimension["key_fld"]
-    sparse_labels = sparse_mtx.get_random_labels(test_count, axis=axis)
+        col_fld = heatmap.x_dimension["key_fld"]
+    sparse_labels = heatmap.get_random_labels(test_count, axis=axis)
     # Test stacked column totals against aggregate x columns
     for sp_lbl in sparse_labels:
         stk_sum = sum_stacked_data_vals_for_column(stk_df, col_fld, sp_lbl, val_fld)
-        agg_sum = sparse_mtx.sum_vector(sp_lbl, axis=axis)
+        agg_sum = heatmap.sum_vector(sp_lbl, axis=axis)
         logit(f"Test axis {axis}: {sp_lbl}", logger=logger)
         if stk_sum == agg_sum:
             logit(
@@ -312,14 +312,62 @@ def _test_stacked_to_aggregate_sum(
 
 
 # ...............................................
+def test_heatmap_vs_filtered_vs_pam(
+        heatmap, min_count=3, test_count=5, logger=None):
+    """Test for equality of sums in stacked and aggregated dataframes.
+
+    Args:
+        heatmap (HeatmapMatrix): object containing a scipy.sparse.coo_array
+            with 3 columns from the stacked_df arranged as rows and columns with values]
+        axis (int): Axis 0 (row) or 1 (column) that corresponds with the column
+            label (stk_axis_col_label) in the original stacked data.
+        test_count (int): number of rows and columns to test.
+        logger (object): logger for saving relevant processing messages
+
+    Returns:
+        success (bool): Flag indicating success of all or failure of any tests.
+
+    Postcondition:
+        Printed information for successful or failed tests.
+
+    Note: The aggregate_df must have been created from the stacked_df.
+    """
+    success = True
+    heatmap_flt = heatmap.filter(min_count=min_count)
+    # pam = PAM.init_from_heatmap1(heatmap, min_count)
+    pam = PAM.init_from_heatmap2(heatmap, min_count)
+
+    axis = 0
+    labels = heatmap_flt.get_random_labels(test_count, axis=axis)
+    # Test stacked column totals against aggregate x columns
+    for lbl in labels:
+        sum_orig = heatmap.sum_vector(lbl, axis=axis)
+        sum_flt = heatmap_flt.sum_vector(lbl, axis=axis)
+        logit(f"Test axis {axis}: {lbl}", logger=logger)
+        if sum_orig == sum_flt:
+            logit(
+                f"  Sum of vector {lbl} == {sum_orig}: Original and filtered >= "
+                f"{min_count}, axis {axis}", logger=logger
+            )
+        else:
+            success = False
+            logit(
+                f"  !!! {sum_orig} != {sum_flt}: Sum of vector Original != "
+                f"filtered >= {min_count}, axis {axis}", logger=logger
+            )
+        logit("", logger=logger)
+    logit("", logger=logger)
+    return success
+
+
 def _test_stacked_to_aggregate_extremes(
-        stk_df, sparse_mtx, axis=0, test_count=5, logger=None, is_max=True):
+        stk_df, heatmap, axis=0, test_count=5, logger=None, is_max=True):
     """Test min/max counts for attributes in the sparse matrix vs. the stacked data.
 
     Args:
         stk_df: dataframe of stacked data, containing records with columns of
             categorical values and counts.
-        sparse_mtx (HeatmapMatrix): object containing a scipy.sparse.coo_array
+        heatmap (HeatmapMatrix): object containing a scipy.sparse.coo_array
             with 3 columns from the stacked_df arranged as rows and columns with values]
         axis (int): Axis 0 (row) or 1 (column) that corresponds with the column
             label (stk_axis_col_label) in the original stacked data.
@@ -339,10 +387,10 @@ def _test_stacked_to_aggregate_extremes(
     Note: The aggregate_df must have been created from the stacked_df.
     """
     success = True
-    sparse_labels = sparse_mtx.get_random_labels(test_count, axis=axis)
-    val_fld = sparse_mtx.input_val_fld
-    y_fld = sparse_mtx.y_dimension["key_fld"]
-    x_fld = sparse_mtx.x_dimension["key_fld"]
+    sparse_labels = heatmap.get_random_labels(test_count, axis=axis)
+    val_fld = heatmap.input_val_fld
+    y_fld = heatmap.y_dimension["key_fld"]
+    x_fld = heatmap.x_dimension["key_fld"]
     # for logging
     if is_max is True:
         extm = "Max"
@@ -365,10 +413,10 @@ def _test_stacked_to_aggregate_extremes(
         # Get sparse matrix results
         try:
             # Get row/column (sparse array), and its index
-            vector, vct_idx = sparse_mtx.get_vector_from_label(sp_lbl, axis=axis)
+            vector, vct_idx = heatmap.get_vector_from_label(sp_lbl, axis=axis)
         except Exception:
             raise
-        agg_target_val, agg_labels = sparse_mtx.get_extreme_val_labels_for_vector(
+        agg_target_val, agg_labels = heatmap.get_extreme_val_labels_for_vector(
             vector, axis=axis, is_max=is_max)
         logit(f"Test vector {sp_lbl} on axis {axis}", logger=logger)
         if stk_target_val == agg_target_val:
@@ -390,6 +438,7 @@ def _test_stacked_to_aggregate_extremes(
         logit("", logger=logger)
     logit("", logger=logger)
     return success
+# ...............................................
 
 
 # ...............................................
@@ -404,7 +453,7 @@ def _read_stacked_data_records(s3, stacked_data_table_type, datestr):
         datestr (str): date of the current dataset, in YYYY_MM_DD format
 
     Returns:
-        sparse_mtx (sppy.tools.s2n.heatmap_matrix.HeatmapMatrix): sparse matrix
+        heatmap (sppy.tools.s2n.heatmap_matrix.HeatmapMatrix): sparse matrix
             containing data separated into 2 dimensions
     """
     # Species in columns/x/axis1
@@ -467,16 +516,16 @@ if __name__ == "__main__":
     # .................................
     # Create, test, save a sparse matrix from stacked data
     # .................................
-    stack_df, sparse_mtx = create_sparse_matrix_from_records(
+    stack_df, heatmap = create_heatmap_from_records(
         s3, stacked_data_table_type, mtx_table_type, datestr)
 
-    # success = test_stacked_vs_sparse(stack_df, sparse_mtx)
+    # success = test_stacked_vs_heatmap(stack_df, heatmap)
     # if success is False:
     #     raise Exception(
     #         "Failed tests comparing matrix created from stacked data to stacked data"
     #     )
     #
-    # out_filename = sparse_mtx.compress_to_file(local_path=TMP_PATH)
+    # out_filename = heatmap.compress_to_file(local_path=TMP_PATH)
     # s3_mtx_key = f"{S3_SUMMARY_DIR}/{os.path.basename(out_filename)}"
     # s3.upload(out_filename, S3_BUCKET, s3_mtx_key, overwrite=True)
     #
@@ -491,7 +540,7 @@ if __name__ == "__main__":
     # sparse_mtx2 = HeatmapMatrix.init_from_compressed_file(
     #     zip_filename, local_path=TMP_PATH, overwrite=True)
     #
-    # success = test_stacked_vs_sparse(stack_df, sparse_mtx2)
+    # success = test_stacked_vs_heatmap(stack_df, sparse_mtx2)
     # if success is False:
     #     raise Exception(
     #         "Failed tests comparing matrix created from compressed file to stacked data"
@@ -500,20 +549,20 @@ if __name__ == "__main__":
     # # .................................
     # # Create a summary matrix for each dimension of sparse matrix and upload
     # # .................................
-    # sp_sum_mtx = SummaryMatrix.init_from_sparse_matrix(sparse_mtx, axis=0)
+    # sp_sum_mtx = SummaryMatrix.init_from_heatmap(heatmap, axis=0)
     # spsum_table_type = sp_sum_mtx.table_type
     # sp_sum_filename = sp_sum_mtx.compress_to_file()
     # s3_spsum_key = f"{S3_SUMMARY_DIR}/{os.path.basename(sp_sum_filename)}"
     # s3.upload(sp_sum_filename, S3_BUCKET, s3_spsum_key, overwrite=True)
     #
-    # od_sum_mtx = SummaryMatrix.init_from_sparse_matrix(sparse_mtx, axis=1)
+    # od_sum_mtx = SummaryMatrix.init_from_heatmap(heatmap, axis=1)
     # odsum_table_type = od_sum_mtx.table_type
     # od_sum_filename = od_sum_mtx.compress_to_file()
     # s3_odsum_key = f"{S3_SUMMARY_DIR}/{os.path.basename(od_sum_filename)}"
     # s3.upload(od_sum_filename, S3_BUCKET, s3_odsum_key, overwrite=True)
     #
     # summary_mtx_lst = [sp_sum_mtx, od_sum_mtx]
-    # success = test_sparse_vs_summary(sparse_mtx, summary_mtx_lst)
+    # success = test_heatmap_vs_summary(heatmap, summary_mtx_lst)
     #
     # # .................................
     # # Download summary matrix files and recreate 2 summary matrices to test for corruption
@@ -536,13 +585,38 @@ if __name__ == "__main__":
     #         od_zip_filename, local_path=TMP_PATH, overwrite=True)
     #
     # summary_mtx_lst = [sp_sum_mtx2, od_sum_mtx2]
-    # success = test_sparse_vs_summary(sparse_mtx, summary_mtx_lst)
+    # success = test_heatmap_vs_summary(heatmap, summary_mtx_lst)
 
     # .................................
     # Create PAM from Heatmap
     # .................................
+    print("Heatmap:")
+    print(heatmap.dimensions)
+    print(heatmap.shape)
+
+    heatmap_flt = heatmap.filter(min_count=3)
+    print("Heatmap:")
+    print(heatmap_flt.dimensions)
+    print(heatmap_flt.shape)
+
     min_presence = 3
-    pam = PAM.init_from_sparse_matrix(sparse_mtx, min_presence)
+    pam = PAM.init_from_heatmap(heatmap, min_presence)
+    vector, _idx = pam.get_vector_from_label(lbl, axis=axis)
+
+    print(f"PAM, min occurrence count = {min_presence}:")
+    print(pam.dimensions)
+    print(pam.shape)
+
+    min_presence = 3
+    pam2 = PAM.init_from_heatmap2(heatmap, min_presence)
+    print(f"PAM, min occurrence count = {min_presence}:")
+    print(pam.dimensions)
+    print(pam.shape)
+
+    pass
+
+    pa = pam._coo_array
+    hm = heatmap._coo_array
 
 """
 from bison.task.build_matrices import *
@@ -565,71 +639,13 @@ mtx_table_type = SUMMARY.get_table_type("matrix", dim_region, dim_species)
 # .................................
 # Create, test, save a sparse matrix from stacked data
 # .................................
-stack_df, sparse_mtx = create_sparse_matrix_from_records(
+stack_df, heatmap = create_heatmap_from_records(
     s3, stacked_data_table_type, mtx_table_type, datestr)
 
-min_presence = 3
-pam = PAM.init_from_sparse_matrix(sparse_mtx, min_presence)
+success = test_heatmap_vs_filtered_vs_pam(heatmap, min_count=3, test_count=5)
 
 
-(table_type, datestr, row_category, column_category, dim0, dim1) = (
-    sparse_mtx.table_type, sparse_mtx.datestr, 
-    sparse_mtx.row_category, sparse_mtx.column_category,
-    sparse_mtx.y_dimension, sparse_mtx.x_dimension)
-    
-(coo, row_categ, col_categ)= (binary_sparse_mtx, row_category, column_category)
-
-# Get non-zero column/row indices, includes duplicates
-nz_cidx = sparse.find(coo)[1]
-nz_ridx = sparse.find(coo)[0]
-
-# Which of non-zero indices are present in all indices (shape),
-# then negate to get indices of zeros
 
 
-nonzero_cidx = np.isin(np.arange(coo.shape[1]), nz_cidx)
-nonzero_ridx = np.isin(np.arange(coo.shape[0]), nz_ridx)
-
-zero_cols = list(zero_cidx)
-zero_rows = list(zero_ridx)
-
-# WARNING: Indices of altered axes are reset in the returned matrix
-# TODO: Modify categories associated with indices
-# Find cols (category and index) with all zeros
-zero_col_categories =  []
-for zidx in range(len(zero_cols)):
-    # If true (1) that this position contains a zero in the coo
-    if zero_cols[zidx] == 1:
-        zero_label = cls._get_category_from_code(zidx, col_categ)
-        zero_col_categories.append((zidx, zero_label))
-# Find rows (category and index) with all zeros
-zero_row_categories =  []
-for zidx in range(len(zero_rows)):
-    # If true (1) that this position contains a zero in the coo
-    if zero_rows[zidx] == 1:
-        zero_label = cls._get_category_from_code(zidx, row_categ)
-        zero_row_categories.append((zidx, zero_label))
-
-
-csr = coo.tocsr()
-if len(zero_rows) > 0 and len(zero_cols) > 0:
-    row_mask = np.ones(csr.shape[0], dtype=bool)
-    row_mask[zero_rows] = False
-    col_mask = np.ones(csr.shape[1], dtype=bool)
-    col_mask[zero_cols] = False
-    compressed_csr = csr[row_mask][:, col_mask]
-
-elif len(zero_rows) > 0:
-    mask = np.ones(csr.shape[0], dtype=bool)
-    mask[zero_rows] = False
-    compressed_csr = csr[mask]
-
-elif len(zero_cols) > 0:
-    mask = np.ones(csr.shape[1], dtype=bool)
-    mask[zero_cols] = False
-    compressed_csr = csr[:, mask]
-
-else:
-    compressed_csr = csr
 
 """

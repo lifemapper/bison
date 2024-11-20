@@ -90,6 +90,26 @@ class _SpeciesDataMatrix:
         """
         return self._col_dim
 
+    # ...........................
+    @property
+    def dimensions(self):
+        """Return analysis dimension for axis 1.
+
+        Returns:
+            (bison.common.constants.ANALYSIS_DIM): Data dimension for axis 1 (columns).
+        """
+        return (self._row_dim["code"], self._col_dim["code"])
+
+    # ...........................
+    @property
+    def shape(self):
+        """Return analysis dimension for axis 1.
+
+        Returns:
+            (bison.common.constants.ANALYSIS_DIM): Data dimension for axis 1 (columns).
+        """
+        return self._coo_array.shape
+
     # ...............................................
     def _logme(self, msg, refname="", log_level=None):
         logit(msg, logger=self._logger, refname=refname, log_level=log_level)

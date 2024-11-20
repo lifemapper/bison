@@ -88,7 +88,7 @@ class HeatmapMatrix(_SpeciesDataMatrix):
                 from the zip_filename.
 
         Returns:
-            sparse_mtx (bison.spnet.sparse_matrix.HeatmapMatrix): matrix for the data.
+            heatmap (bison.spnet.sparse_matrix.HeatmapMatrix): matrix for the data.
 
         Raises:
             Exception: on failure to uncompress files.
@@ -115,11 +115,11 @@ class HeatmapMatrix(_SpeciesDataMatrix):
         dim1 = ANALYSIS_DIM.get(meta_dict["dim_1_code"])
 
         # Create
-        sparse_mtx = HeatmapMatrix(
+        heatmap = HeatmapMatrix(
             sparse_coo, meta_dict["code"], datestr, row_categ, col_categ, dim0, dim1,
             meta_dict["value_fld"])
 
-        return sparse_mtx
+        return heatmap
 
     # ...........................
     @classmethod
@@ -319,6 +319,138 @@ class HeatmapMatrix(_SpeciesDataMatrix):
         # Convert to CSC format for efficient column slicing
         csc = self._coo_array.tocsr()
         return csc
+
+    # ...........................
+    @classmethod
+    def _get_nonzero_labels_zero_indexes(
+            cls, nonzero_ridx, nonzero_cidx, row_categ, col_categ):
+        # Save indexes of all-zero columns,
+        zero_cidx =  []
+        zero_ridx =  []
+        # Save category/labels of columns with at least one non-zero
+        nonzero_col_labels = []
+        nonzero_row_labels = []
+
+        # Create categories for only the rows, columns that are not all zero
+        for axis, nonzero_idx, categ, zero_idx, nonzero_labels in (
+                (0, nonzero_ridx, row_categ, zero_ridx, nonzero_row_labels),
+                (1, nonzero_cidx, col_categ, zero_cidx, nonzero_col_labels)
+        ):
+            # Examine each non-zero position found
+            for zidx in range(len(nonzero_idx)):
+                # If true that this position contains a non-zero in the row/column
+                if nonzero_idx[zidx] == True:
+                    # Save labels with non-zero elements for new category index
+                    label = cls._get_category_from_code(zidx, categ)
+                    nonzero_labels.append(label)
+                else:
+                    # Save position with only zero elements for deletion
+                    zero_idx.append(zidx)
+
+            # Compile categories from nonzero labels, assign to row or column var
+            if axis == 0:
+                cmp_row_categ = CategoricalDtype(nonzero_labels, ordered=True)
+            else:
+                cmp_col_categ = CategoricalDtype(nonzero_labels, ordered=True)
+
+        return (zero_ridx, zero_cidx, cmp_row_categ, cmp_col_categ)
+
+    # ...........................
+    @classmethod
+    def _remove_zeros(cls, coo, row_categ, col_categ):
+        """Remove any all-zero rows or columns.
+
+        Args:
+            coo (scipy.sparse.coo_array): binary sparse array in coo format
+
+        Returns:
+            compressed_coo (scipy.sparse.coo_array): sparse array with no rows or
+                columns containing all zeros.
+            row_category (pandas.api.types.CategoricalDtype): ordered row labels used
+                to identify axis 0/rows in the new compressed matrix.
+            column_category (pandas.api.types.CategoricalDtype): ordered column labels
+                used to identify axis 1/columns in the new compressed matrix.
+        """
+        # Get indices of col/rows that contain at least one non-zero element, with dupes
+        nz_cidx = scipy.sparse.find(coo)[1]
+        nz_ridx = scipy.sparse.find(coo)[0]
+
+        # Get a bool array with elements T if position holds a nonzero
+        nonzero_cidx = np.isin(np.arange(coo.shape[1]), nz_cidx)
+        nonzero_ridx = np.isin(np.arange(coo.shape[0]), nz_ridx)
+
+        # WARNING: Indices of altered axes are reset in the returned matrix, so we
+        #   will recreate categories with only non-zero vectors
+        (zero_ridx, zero_cidx, cmp_row_categ, cmp_col_categ
+         ) = cls._get_nonzero_labels_zero_indexes(
+            nonzero_ridx, nonzero_cidx, row_categ, col_categ)
+
+        # Construct masks
+        csr = coo.tocsr()
+        if len(zero_cidx) > 0:
+            col_mask = np.ones(csr.shape[1], dtype=bool)
+            col_mask[zero_cidx] = False
+        if len(zero_ridx) > 0:
+            row_mask = np.ones(csr.shape[0], dtype=bool)
+            row_mask[zero_ridx] = False
+
+        # Mask with indices to remove data
+        if len(zero_ridx) > 0 and len(zero_cidx) > 0:
+            compressed_csr = csr[row_mask][:, col_mask]
+        elif len(zero_ridx) > 0:
+            compressed_csr = csr[row_mask]
+        elif len(zero_cidx) > 0:
+            compressed_csr = csr[:, col_mask]
+        else:
+            compressed_csr = csr
+        cmp_coo = compressed_csr.tocoo()
+
+        return cmp_coo, cmp_row_categ, cmp_col_categ
+
+    # ...............................................
+    def filter(self, min_count=None, max_count=None):
+        """Filter the coo_array by parameters, then remove all-zero rows and columns.
+
+        Args:
+            min_count (int): filter all values below this value.
+            max_count (int): filter all values above this value.
+            divisible_by (int): filter all values not evenly divisible by this value.
+
+        Returns:
+            coo_array (scipy.sparse.coo_array): A 2d sparse array where values in the
+                array meet all of the provided conditions.
+            row_categ (pandas.api.types.CategoricalDtype): ordered row labels used
+                to identify axis 0/rows in the new filtered matrix.
+            column_categ (pandas.api.types.CategoricalDtype): ordered column labels
+                used to identify axis 1/columns in the new filtered matrix.
+
+        Raises:
+            Exception: on any filter parameter (min_count, max_count, divisible_by) < 1
+            Exception: on no parameters provided.
+        """
+        for pmt in (min_count, max_count):
+            if pmt is not None and pmt <= 0:
+                raise Exception(f"Filter parameter {pmt} must be an integer >= 1")
+        if (min_count is None and max_count is None):
+            raise Exception("No filters provided")
+
+        csr_array = self._coo_array.tocsr()
+        # Returns a CSR array of the same shape with filtered items set to zeros
+        if min_count is not None:
+            csr_array = csr_array.multiply(csr_array >= min_count)
+        if max_count is not None:
+            csr_array = csr_array.multiply(max_count >= csr_array)
+
+        coo_array = csr_array.tocoo()
+
+        cmp_coo, cmp_row_categ, cmp_col_categ = HeatmapMatrix._remove_zeros(
+            coo_array, self._row_categ, self._col_categ)
+
+        new_heatmap = HeatmapMatrix(
+            cmp_coo, self._table_type, self._datestr, cmp_row_categ, cmp_col_categ,
+            self._row_dim, self._col_dim, self._val_fld)
+
+        return new_heatmap
 
     # ...............................................
     def get_random_labels(self, count, axis=0):
