@@ -1,5 +1,7 @@
 """Matrix of sites as rows, species as columns, values are presence or absence (1/0)."""
+from copy import deepcopy
 import numpy as np
+import pandas as pd
 
 from bison.spnet.heatmap_matrix import HeatmapMatrix
 
@@ -7,6 +9,7 @@ from bison.spnet.heatmap_matrix import HeatmapMatrix
 # .............................................................................
 class PAM(HeatmapMatrix):
     """Class for analyzing presence/absence of aggregator0 x species (aggregator1)."""
+    # site_pam_dist_mtx_stats = [('pearson_correlation', pearson_correlation)]
 
     # ...........................
     def __init__(
@@ -31,7 +34,16 @@ class PAM(HeatmapMatrix):
                 always species dimension in specnet PAM matrices
 
         Raises:
-            Exception: on values
+            Exception: on values other than 0 or 1.
+
+        Note:
+            By definition, a Presence-Absence Matrix is site x species.  This
+                implementation defines `site` as any type of geographic (state, county,
+                Indian lands, Protected Areas) or other classification (dataset,
+                organization, US-RIIS status) where every occurrence contains at most
+                one `site` value. Some statistics may assume that all occurrences will
+                contain a site value, but this implementation does not enforce that
+                assumption.
         """
         # Check PAM is binary (0/1)
         tmp = binary_coo_array > 1
@@ -247,3 +259,269 @@ class PAM(HeatmapMatrix):
             (int): Number of `sites` (values on the y/0 axis)
         """
         return self._coo_array.shape[0]
+
+    # ...........................
+    def calc_diversity_stats(self):
+        """Calculate diversity statistics.
+
+        Returns:
+            diversity_matrix (pandas.DataFrame): a matrix with 1 column for each
+                statistic, and one row containing the values for each statistic.
+        """
+        diversity_stats = [
+            # ('c-score', self.c_score),
+            ('lande', self.lande),
+            ('legendre', self.legendre),
+            ('num sites', self.num_sites),
+            ('num species', self.num_species),
+            ('whittaker', self.whittaker),
+            ]
+        data = {}
+        for name, func in diversity_stats:
+            data[name] = func()
+        diversity_matrix = pd.DataFrame(data=data, index=["value"])
+        return diversity_matrix
+
+    # ...........................
+    def calc_site_stats(self):
+        """Calculate site-based statistics.
+
+        Returns:
+            site_stats_matrix (pandas.DataFrame): a matrix with 1 column for each
+                statistic, and one row for each site.
+        """
+        site_matrix_stats = [
+            ('alpha', self.alpha),
+            ('alpha proportional', self.alpha_proportional),
+            ('phi', self.phi),
+            ('phi average proportional', self.phi_average_proportional),
+        ]
+        site_index = self.row_category.categories
+        data = {}
+        for name, func in site_matrix_stats:
+            data[name] = func()
+
+        site_stats_matrix = pd.DataFrame(data=data, index=site_index)
+        return site_stats_matrix
+
+    # ...........................
+    def calculate_species_statistics(self):
+        """Calculate species-based statistics.
+
+        Returns:
+            site_stats_matrix (pandas.DataFrame): a matrix with 1 column for each
+                statistic, and one row for each species.
+        """
+        species_matrix_stats = [
+            ('omega', self.omega),
+            ('omega_proportional', self.omega_proportional),
+            ('psi', self.psi),
+            ('psi_average_proportional', self.psi_average_proportional),
+        ]
+        species_index = self._col_categ.categories
+        data = {}
+        for name, func in species_matrix_stats:
+            data[name] = func()
+
+        species_stats_matrix = pd.DataFrame(data, index=species_index)
+        return species_stats_matrix
+
+    # # ...........................
+    # TODO: test matrices created in these stats (sparse or dense)
+    # def calc_covariance_statistics(self):
+    #     """Calculate covariance statistics matrices.
+    #
+    #     Returns:
+    #         list of tuple: A list of metric name, matrix tuples for covariance stats.
+    #     """
+    #     covariance_stats = [
+    #         ('sigma sites', self.sigma_sites),
+    #         ('sigma species', self.sigma_species)
+    #     ]
+    #     stats_matrices = []
+    #     for name, func in covariance_stats:
+    #         mtx, headers = func()
+    #         mtx.set_headers(headers)
+    #         stats_matrices.append((name, mtx))
+    #     return stats_matrices
+
+    # .............................................................................
+    # Diversity metrics
+    # .............................................................................
+    # TODO: test the matrices created by sigma functions within these diversity stats
+    def schluter_species_variance_ratio(self):
+        """Calculate Schluter's species variance ratio.
+
+        Returns:
+            float: The Schluter species variance ratio for the PAM.
+        """
+        sigma_species_, _hdrs = self.sigma_species()
+        return float(sigma_species_.sum() / sigma_species_.trace())
+
+    # .............................................................................
+    def schluter_site_variance_ratio(self):
+        """Calculate Schluter's site variance ratio.
+        Returns:
+            float: The Schluter site variance ratio for the PAM.
+        """
+        sigma_sites_, _hdrs = self.sigma_sites()
+        return float(sigma_sites_.sum() / sigma_sites_.trace())
+
+    # .............................................................................
+    def whittaker(self):
+        """Calculate Whittaker's beta diversity metric for a PAM.
+
+        Returns:
+            float: Whittaker's beta diversity for the PAM.
+        """
+        omega_prop = self.omega_proportional()
+        return float(self.num_species / omega_prop.sum())
+
+    # .............................................................................
+    def lande(self):
+        """Calculate Lande's beta diversity metric for a PAM.
+
+        Returns:
+            float: Lande's beta diversity for the PAM.
+        """
+        omega_fl = self.omega().astype(float)
+        return float(
+            self.num_species - (omega_fl / self.num_sites).sum()
+        )
+
+    # .............................................................................
+    def legendre(self):
+        """Calculate Legendre's beta diversity metric for a PAM.
+
+        Returns:
+            float: Legendre's beta diversity for the PAM.
+        """
+        omega_ = self.omega
+        return float(omega_.sum() - (float((omega_ ** 2).sum()) / self.num_sites))
+
+    # # ...........................
+    # def c_score(self):
+    #     """Calculate the checker board score for the PAM.
+    #
+    #     Returns:
+    #         float: The checkerboard score for the PAM.
+    #     """
+    #     temp = 0.0
+    #     # Cache these so we don't recompute
+    #     omega_ = self.omega()  # Cache so we don't waste computations
+    #     num_species_ = self.num_species
+    #
+    #     for i in range(num_species_):
+    #         for j in range(i, num_species_):
+    #             num_shared = len(np.where(np.sum(self.pam[:, [i, j]], axis=1) == 2)[0])
+    #             p_1 = omega_[i] - num_shared
+    #             p_2 = omega_[j] - num_shared
+    #             temp += p_1 * p_2
+    #     return 2 * temp / (num_species_ * (num_species_ - 1))
+
+    # .............................................................................
+    # Species metrics
+    # .............................................................................
+    def omega(self):
+        """Calculate the range `size` per species.
+
+        Returns:
+            Matrix: A row of range `sizes` (each site counts as 1) for each species in the PAM.
+
+        Note:
+            function assumes all `sites` (analysis dimension) are equal size.
+        """
+        return self._coo_array.sum(axis=0)
+
+    # ...........................
+    def omega_proportional(self):
+        """Calculate the mean proportional range size of each species.
+
+        Returns:
+            Matrix: A row of the proportional range sizes for each species in the PAM.
+        """
+        omega_ = self.omega()
+        return omega_.astype(float) / self.num_sites
+
+    # .............................................................................
+    # Site-based statistics
+    # .............................................................................
+    def alpha(self):
+        """Calculate alpha diversity, the number of species in each site.
+
+        Returns:
+            Matrix: A column of alpha diversity values for each site in the PAM.
+        """
+        return self._coo_array.sum(axis=1)
+
+    # .............................................................................
+    def alpha_proportional(self):
+        """Calculate proportional alpha diversity.
+
+        Returns:
+            Matrix: A column of proportional alpha diversity values for each site in the
+                PAM.
+        """
+        alpha_ = self.alpha()
+        return alpha_.astype(float) / self.num_species
+
+    # .............................................................................
+    def phi(self):
+        """Calculate phi, the range size per site.
+
+        Returns:
+            Matrix: A column of the sum of the range sizes for the species present at each
+                site in the PAM.
+        """
+        omega_ = self.omega()
+        return self._coo_array.dot(omega_)
+
+    # .............................................................................
+    def phi_average_proportional(self):
+        """Calculate proportional range size per site.
+
+        Returns:
+            Matrix: A column of the proportional value of the sum of the range sizes for
+                the species present at each site in the PAM.
+        """
+        omega_fl = self.omega().astype(float)
+        alpha_ = self.alpha()
+        return self._coo_array.dot(omega_fl) / (self.num_sites * alpha_)
+
+    # .............................................................................
+    # Covariance metrics
+    # .............................................................................
+    # TODO: test the type of matrix returned by these sigma functions
+    def sigma_sites(self):
+        """Compute the site sigma metric for a PAM.
+
+        Returns:
+            Matrix: Matrix of covariance of composition of sites.
+        """
+        site_by_site = self.pam.dot(self.pam.T).astype(float)
+        alpha_prop = self.alpha_proportional()
+        mtx = (site_by_site / self.num_species()) - np.outer(alpha_prop, alpha_prop)
+        # Output is sites x sites, so use site headers for column headers too
+        headers = {
+            "0": deepcopy(self.row_category),
+            "1": deepcopy(self.column_category)
+        }
+        return mtx, headers
+
+    # .............................................................................
+    def sigma_species(self):
+        """Compute the species sigma metric for a PAM.
+
+        Returns:
+            Matrix: Matrix of covariance of composition of species.
+        """
+        pam = self._coo_array
+        species_by_site = pam.T.dot(pam).astype(float)
+        omega_prop = self.omega_proportional()
+        mtx = (species_by_site / self.num_sites()) - np.outer(omega_prop, omega_prop)
+        # Output is species x species, so use species headers for row headers too
+        headers = {
+            "0": deepcopy(self.row_category),
+            "1": deepcopy(self.column_category)
+        }
+        return mtx, headers
