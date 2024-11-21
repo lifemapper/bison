@@ -1,7 +1,5 @@
 """Matrix of sites as rows, species as columns, values are presence or absence (1/0)."""
 import numpy as np
-from pandas.api.types import CategoricalDtype
-from scipy import sparse
 
 from bison.spnet.heatmap_matrix import HeatmapMatrix
 
@@ -20,6 +18,7 @@ class PAM(HeatmapMatrix):
             binary_coo_array (scipy.sparse.coo_array): A 2d sparse array with
                 presence (1) or absence (0) values for one dimension (i.e. region) rows
                 (axis 0) by the species dimension columns (axis 1) to use for analyses.
+            min_presence_count (int): minimum value to be considered presence.
             table_type (sppy.tools.s2n.constants.SUMMARY_TABLE_TYPES): type of
                 aggregated data
             datestr (str): date of the source data in YYYY_MM_DD format.
@@ -51,6 +50,62 @@ class PAM(HeatmapMatrix):
             self, cmp_pam_coo_array, table_type, datestr, cmp_row_categ, cmp_col_categ,
             dim0, dim1, val_fld)
 
+    # # ...........................
+    # @classmethod
+    # def init_from_heatmap(cls, heatmap, min_presence_count):
+    #     """Create a sparse matrix of rows by columns containing values from a table.
+    #
+    #     Args:
+    #         heatmap (bison.spnet.heatmap_matrix.HeatmapMatrix): Matrix of occurrence
+    #             counts for sites (or other dimension), rows, by species, columns.
+    #         min_presence_count (int): Minimum occurrence count for a species to be
+    #             considered present at that site.
+    #
+    #     Returns:
+    #         pam (bison.spnet.presence_absence_matrix.PAM): matrix of
+    #             sites (rows, axis=0) by species (columnns, axis=1), with binary values
+    #             indicating presence/absence.
+    #     """
+    #     # Apply minimum value filter; converts to CSR format
+    #     bool_csr_array = heatmap._coo_array >= min_presence_count
+    #     pam_csr_array = bool_csr_array.astype(np.int8)
+    #     # Go back to COO format
+    #     pam_coo_array = pam_csr_array.tocoo()
+    #
+    #     pam = PAM(
+    #         pam_coo_array, min_presence_count, heatmap.table_type, heatmap.datestr,
+    #         heatmap.row_category, heatmap.column_category,
+    #         heatmap.y_dimension, heatmap.x_dimension)
+    #     return pam
+
+    # # ...........................
+    # @classmethod
+    # def init_from_heatmap1(cls, heatmap, min_presence_count):
+    #     """Create a sparse matrix of rows by columns containing values from a table.
+    #
+    #     Args:
+    #         heatmap (bison.spnet.heatmap_matrix.HeatmapMatrix): Matrix of occurrence
+    #             counts for sites (or other dimension), rows, by species, columns.
+    #         min_presence_count (int): Minimum occurrence count for a species to be
+    #             considered present at that site.
+    #
+    #     Returns:
+    #         pam (bison.spnet.presence_absence_matrix.PAM): matrix of
+    #             sites (rows, axis=0) by species (columnns, axis=1), with binary values
+    #             indicating presence/absence.
+    #     """
+    #     # Apply minimum value filter; converts to CSR format
+    #     bool_csr_array = heatmap._coo_array >= min_presence_count
+    #     pam_csr_array = bool_csr_array.astype(np.int8)
+    #     # Go back to COO format
+    #     pam_coo_array = pam_csr_array.tocoo()
+    #
+    #     pam = PAM(
+    #         pam_coo_array, min_presence_count, heatmap.table_type, heatmap.datestr,
+    #         heatmap.row_category, heatmap.column_category,
+    #         heatmap.y_dimension, heatmap.x_dimension)
+    #     return pam
+    #
     # ...........................
     @classmethod
     def init_from_heatmap(cls, heatmap, min_presence_count):
@@ -63,71 +118,9 @@ class PAM(HeatmapMatrix):
                 considered present at that site.
 
         Returns:
-            pam (bison.spnet.presence_absence_matrix.PAM): matrix of sites (rows, axis=0) by
-                species (columnns, axis=1), with binary values indicating presence/absence.
-
-        Raises:
-            Exception: on
-        """
-        # Apply minimum value filter; converts to CSR format
-        bool_csr_array = heatmap._coo_array >= min_presence_count
-        pam_csr_array = bool_csr_array.astype(np.int8)
-        # Go back to COO format
-        pam_coo_array = pam_csr_array.tocoo()
-
-        pam = PAM(
-            pam_coo_array, min_presence_count, heatmap.table_type, heatmap.datestr,
-            heatmap.row_category, heatmap.column_category,
-            heatmap.y_dimension, heatmap.x_dimension)
-        return pam
-
-    # ...........................
-    @classmethod
-    def init_from_heatmap1(cls, heatmap, min_presence_count):
-        """Create a sparse matrix of rows by columns containing values from a table.
-
-        Args:
-            heatmap (bison.spnet.heatmap_matrix.HeatmapMatrix): Matrix of occurrence
-                counts for sites (or other dimension), rows, by species, columns.
-            min_presence_count (int): Minimum occurrence count for a species to be
-                considered present at that site.
-
-        Returns:
-            pam (bison.spnet.presence_absence_matrix.PAM): matrix of sites (rows, axis=0) by
-                species (columnns, axis=1), with binary values indicating presence/absence.
-
-        Raises:
-            Exception: on
-        """
-        # Apply minimum value filter; converts to CSR format
-        bool_csr_array = heatmap._coo_array >= min_presence_count
-        pam_csr_array = bool_csr_array.astype(np.int8)
-        # Go back to COO format
-        pam_coo_array = pam_csr_array.tocoo()
-
-        pam = PAM(
-            pam_coo_array, min_presence_count, heatmap.table_type, heatmap.datestr,
-            heatmap.row_category, heatmap.column_category,
-            heatmap.y_dimension, heatmap.x_dimension)
-        return pam
-
-    # ...........................
-    @classmethod
-    def init_from_heatmap2(cls, heatmap, min_presence_count):
-        """Create a sparse matrix of rows by columns containing values from a table.
-
-        Args:
-            heatmap (bison.spnet.heatmap_matrix.HeatmapMatrix): Matrix of occurrence
-                counts for sites (or other dimension), rows, by species, columns.
-            min_presence_count (int): Minimum occurrence count for a species to be
-                considered present at that site.
-
-        Returns:
-            pam (bison.spnet.presence_absence_matrix.PAM): matrix of sites (rows, axis=0) by
-                species (columnns, axis=1), with binary values indicating presence/absence.
-
-        Raises:
-            Exception: on
+            pam (bison.spnet.presence_absence_matrix.PAM): matrix of
+                sites (rows, axis=0) by species (columnns, axis=1), with binary values
+                indicating presence/absence.
         """
         filtered_heatmap = heatmap.filter(
             min_count=min_presence_count)
@@ -228,9 +221,29 @@ class PAM(HeatmapMatrix):
     # ...........................
     @property
     def pam(self):
-        return self._coo_array
+        """Return binary sparse_array.
+
+        Returns:
+            (scipy.sparse.coo_array): Binary sparse_array (PAM) for the object.
+        """
+        return self.sparse_array
 
     # ...........................
     @property
     def num_species(self):
-        self._coo_array.shape[1]
+        """Return number of species in the array (on the x/1 axis).
+
+        Returns:
+            (int): Number of species (values on the x/1 axis)
+        """
+        return self._coo_array.shape[1]
+
+    # ...........................
+    @property
+    def num_sites(self):
+        """Return number of `sites` in the array (on the y/0 axis).
+
+        Returns:
+            (int): Number of `sites` (values on the y/0 axis)
+        """
+        return self._coo_array.shape[0]

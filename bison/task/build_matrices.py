@@ -1,6 +1,5 @@
 """Create a matrix of occurrence or species counts by (geospatial) analysis dimension."""
 import os
-from inspect import stack
 
 from bison.common.aws_util import S3
 from bison.common.constants import (
@@ -318,9 +317,8 @@ def test_heatmap_vs_filtered_vs_pam(
 
     Args:
         heatmap (HeatmapMatrix): object containing a scipy.sparse.coo_array
-            with 3 columns from the stacked_df arranged as rows and columns with values]
-        axis (int): Axis 0 (row) or 1 (column) that corresponds with the column
-            label (stk_axis_col_label) in the original stacked data.
+            with 3 columns from the stacked_df arranged as rows and columns with values
+        min_count (int): minimum value to be included in filtered data or PAM.
         test_count (int): number of rows and columns to test.
         logger (object): logger for saving relevant processing messages
 
@@ -335,31 +333,47 @@ def test_heatmap_vs_filtered_vs_pam(
     success = True
     heatmap_flt = heatmap.filter(min_count=min_count)
     # pam = PAM.init_from_heatmap1(heatmap, min_count)
-    pam = PAM.init_from_heatmap2(heatmap, min_count)
+    pam = PAM.init_from_heatmap(heatmap, min_count)
 
     axis = 0
     labels = heatmap_flt.get_random_labels(test_count, axis=axis)
     # Test stacked column totals against aggregate x columns
     for lbl in labels:
-        sum_orig = heatmap.sum_vector(lbl, axis=axis)
+        sum_orig = heatmap.sum_vector_ge_than(lbl, min_count, axis=axis)
         sum_flt = heatmap_flt.sum_vector(lbl, axis=axis)
+        count_orig = heatmap.count_vector_ge_than(lbl, min_count, axis=axis)
+        count_flt = heatmap_flt.count_vector(lbl, axis=axis)
+        count_pam = pam.count_vector(lbl, axis=axis)
         logit(f"Test axis {axis}: {lbl}", logger=logger)
         if sum_orig == sum_flt:
             logit(
-                f"  Sum of vector {lbl} == {sum_orig}: Original and filtered >= "
+                f"  Sum of vector {lbl} == {sum_orig}: original, filtered >= "
                 f"{min_count}, axis {axis}", logger=logger
             )
         else:
             success = False
             logit(
-                f"  !!! {sum_orig} != {sum_flt}: Sum of vector Original != "
+                f"  !!! {sum_orig} != {sum_flt}: Sum of vector original != "
                 f"filtered >= {min_count}, axis {axis}", logger=logger
+            )
+        if count_orig == count_flt == count_pam:
+            logit(
+                f"  Count of vector {lbl} == {count_orig}: original, filtered, "
+                f"pam >= {min_count}, axis {axis}", logger=logger
+            )
+        else:
+            success = False
+            logit(
+                f"  !!! {count_orig} != {count_flt} != {count_pam}: Count of "
+                f"vector original != filtered != pam >= {min_count}, axis {axis}",
+                logger=logger
             )
         logit("", logger=logger)
     logit("", logger=logger)
     return success
 
 
+# ...............................................
 def _test_stacked_to_aggregate_extremes(
         stk_df, heatmap, axis=0, test_count=5, logger=None, is_max=True):
     """Test min/max counts for attributes in the sparse matrix vs. the stacked data.
@@ -519,104 +533,86 @@ if __name__ == "__main__":
     stack_df, heatmap = create_heatmap_from_records(
         s3, stacked_data_table_type, mtx_table_type, datestr)
 
-    # success = test_stacked_vs_heatmap(stack_df, heatmap)
-    # if success is False:
-    #     raise Exception(
-    #         "Failed tests comparing matrix created from stacked data to stacked data"
-    #     )
-    #
-    # out_filename = heatmap.compress_to_file(local_path=TMP_PATH)
-    # s3_mtx_key = f"{S3_SUMMARY_DIR}/{os.path.basename(out_filename)}"
-    # s3.upload(out_filename, S3_BUCKET, s3_mtx_key, overwrite=True)
-    #
-    # # .................................
-    # # Create, test a sparse matrix from saved file
-    # # .................................
-    # table = SUMMARY.get_table(mtx_table_type, datestr)
-    # zip_fname = f"{table['fname']}.zip"
-    # zip_filename = s3.download(
-    #     S3_BUCKET, S3_SUMMARY_DIR, zip_fname, TMP_PATH, overwrite=True)
-    #
-    # sparse_mtx2 = HeatmapMatrix.init_from_compressed_file(
-    #     zip_filename, local_path=TMP_PATH, overwrite=True)
-    #
-    # success = test_stacked_vs_heatmap(stack_df, sparse_mtx2)
-    # if success is False:
-    #     raise Exception(
-    #         "Failed tests comparing matrix created from compressed file to stacked data"
-    #     )
-    #
-    # # .................................
-    # # Create a summary matrix for each dimension of sparse matrix and upload
-    # # .................................
-    # sp_sum_mtx = SummaryMatrix.init_from_heatmap(heatmap, axis=0)
-    # spsum_table_type = sp_sum_mtx.table_type
-    # sp_sum_filename = sp_sum_mtx.compress_to_file()
-    # s3_spsum_key = f"{S3_SUMMARY_DIR}/{os.path.basename(sp_sum_filename)}"
-    # s3.upload(sp_sum_filename, S3_BUCKET, s3_spsum_key, overwrite=True)
-    #
-    # od_sum_mtx = SummaryMatrix.init_from_heatmap(heatmap, axis=1)
-    # odsum_table_type = od_sum_mtx.table_type
-    # od_sum_filename = od_sum_mtx.compress_to_file()
-    # s3_odsum_key = f"{S3_SUMMARY_DIR}/{os.path.basename(od_sum_filename)}"
-    # s3.upload(od_sum_filename, S3_BUCKET, s3_odsum_key, overwrite=True)
-    #
-    # summary_mtx_lst = [sp_sum_mtx, od_sum_mtx]
-    # success = test_heatmap_vs_summary(heatmap, summary_mtx_lst)
-    #
-    # # .................................
-    # # Download summary matrix files and recreate 2 summary matrices to test for corruption
-    # # .................................
-    # sp_table = SUMMARY.get_table(spsum_table_type, datestr=datestr)
-    # _, _, sp_zip_fname = SummaryMatrix.get_matrix_meta_zip_filenames(sp_table)
-    # sp_zip_filename = s3.download(
-    #     S3_BUCKET, S3_SUMMARY_DIR, sp_zip_fname, local_path=TMP_PATH, overwrite=True)
-    # sp_sum_mtx2 = \
-    #     SummaryMatrix.init_from_compressed_file(
-    #         sp_zip_filename, local_path=TMP_PATH, overwrite=True)
-    #
-    # # Other Dimension Summary
-    # od_table = SUMMARY.get_table(odsum_table_type, datestr=datestr)
-    # _, _, od_zip_fname = SummaryMatrix.get_matrix_meta_zip_filenames(od_table)
-    # od_zip_filename = s3.download(
-    #     S3_BUCKET, S3_SUMMARY_DIR, od_zip_fname, local_path=TMP_PATH, overwrite=True)
-    # od_sum_mtx2 = \
-    #     SummaryMatrix.init_from_compressed_file(
-    #         od_zip_filename, local_path=TMP_PATH, overwrite=True)
-    #
-    # summary_mtx_lst = [sp_sum_mtx2, od_sum_mtx2]
-    # success = test_heatmap_vs_summary(heatmap, summary_mtx_lst)
+    success = test_stacked_vs_heatmap(stack_df, heatmap)
+    if success is False:
+        raise Exception(
+            "Failed tests comparing matrix created from stacked data to stacked data"
+        )
+
+    out_filename = heatmap.compress_to_file(local_path=TMP_PATH)
+    s3_mtx_key = f"{S3_SUMMARY_DIR}/{os.path.basename(out_filename)}"
+    s3.upload(out_filename, S3_BUCKET, s3_mtx_key, overwrite=True)
+
+    # .................................
+    # Create, test a sparse matrix from saved file
+    # .................................
+    table = SUMMARY.get_table(mtx_table_type, datestr)
+    zip_fname = f"{table['fname']}.zip"
+    zip_filename = s3.download(
+        S3_BUCKET, S3_SUMMARY_DIR, zip_fname, TMP_PATH, overwrite=True)
+
+    sparse_mtx2 = HeatmapMatrix.init_from_compressed_file(
+        zip_filename, local_path=TMP_PATH, overwrite=True)
+
+    success = test_stacked_vs_heatmap(stack_df, sparse_mtx2)
+    if success is False:
+        raise Exception(
+            "Failed tests comparing matrix created from compressed file to stacked data"
+        )
+
+    # .................................
+    # Create a summary matrix for each dimension of sparse matrix and upload
+    # .................................
+    sp_sum_mtx = SummaryMatrix.init_from_heatmap(heatmap, axis=0)
+    spsum_table_type = sp_sum_mtx.table_type
+    sp_sum_filename = sp_sum_mtx.compress_to_file()
+    s3_spsum_key = f"{S3_SUMMARY_DIR}/{os.path.basename(sp_sum_filename)}"
+    s3.upload(sp_sum_filename, S3_BUCKET, s3_spsum_key, overwrite=True)
+
+    od_sum_mtx = SummaryMatrix.init_from_heatmap(heatmap, axis=1)
+    odsum_table_type = od_sum_mtx.table_type
+    od_sum_filename = od_sum_mtx.compress_to_file()
+    s3_odsum_key = f"{S3_SUMMARY_DIR}/{os.path.basename(od_sum_filename)}"
+    s3.upload(od_sum_filename, S3_BUCKET, s3_odsum_key, overwrite=True)
+
+    summary_mtx_lst = [sp_sum_mtx, od_sum_mtx]
+    success = test_heatmap_vs_summary(heatmap, summary_mtx_lst)
+
+    # .................................
+    # Download summary matrix files and recreate 2 summary matrices to test for corruption
+    # .................................
+    sp_table = SUMMARY.get_table(spsum_table_type, datestr=datestr)
+    _, _, sp_zip_fname = SummaryMatrix.get_matrix_meta_zip_filenames(sp_table)
+    sp_zip_filename = s3.download(
+        S3_BUCKET, S3_SUMMARY_DIR, sp_zip_fname, local_path=TMP_PATH, overwrite=True)
+    sp_sum_mtx2 = \
+        SummaryMatrix.init_from_compressed_file(
+            sp_zip_filename, local_path=TMP_PATH, overwrite=True)
+
+    # Other Dimension Summary
+    od_table = SUMMARY.get_table(odsum_table_type, datestr=datestr)
+    _, _, od_zip_fname = SummaryMatrix.get_matrix_meta_zip_filenames(od_table)
+    od_zip_filename = s3.download(
+        S3_BUCKET, S3_SUMMARY_DIR, od_zip_fname, local_path=TMP_PATH, overwrite=True)
+    od_sum_mtx2 = \
+        SummaryMatrix.init_from_compressed_file(
+            od_zip_filename, local_path=TMP_PATH, overwrite=True)
+
+    summary_mtx_lst = [sp_sum_mtx2, od_sum_mtx2]
+    success = test_heatmap_vs_summary(heatmap, summary_mtx_lst)
 
     # .................................
     # Create PAM from Heatmap
     # .................................
+    min_count = 3
+    test_count = 5
     print("Heatmap:")
     print(heatmap.dimensions)
     print(heatmap.shape)
+    success = test_heatmap_vs_filtered_vs_pam(
+        heatmap, min_count=min_count, test_count=test_count)
+    print(f"Success is {success}")
 
-    heatmap_flt = heatmap.filter(min_count=3)
-    print("Heatmap:")
-    print(heatmap_flt.dimensions)
-    print(heatmap_flt.shape)
-
-    min_presence = 3
-    pam = PAM.init_from_heatmap(heatmap, min_presence)
-    vector, _idx = pam.get_vector_from_label(lbl, axis=axis)
-
-    print(f"PAM, min occurrence count = {min_presence}:")
-    print(pam.dimensions)
-    print(pam.shape)
-
-    min_presence = 3
-    pam2 = PAM.init_from_heatmap2(heatmap, min_presence)
-    print(f"PAM, min occurrence count = {min_presence}:")
-    print(pam.dimensions)
-    print(pam.shape)
-
-    pass
-
-    pa = pam._coo_array
-    hm = heatmap._coo_array
 
 """
 from bison.task.build_matrices import *

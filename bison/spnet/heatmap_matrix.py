@@ -76,6 +76,36 @@ class HeatmapMatrix(_SpeciesDataMatrix):
         _SpeciesDataMatrix.__init__(self, dim0, dim1, table_type, datestr)
 
     # ...........................
+    @property
+    def shape(self):
+        """Return analysis dimension for axis 1.
+
+        Returns:
+            (bison.common.constants.ANALYSIS_DIM): Data dimension for axis 1 (columns).
+        """
+        return self._coo_array.shape
+
+    # ...........................
+    @property
+    def sparse_array(self):
+        """Return sparse_array.
+
+        Returns:
+            (scipy.sparse.coo_array): Sparse_array for the object.
+        """
+        return self._coo_array
+
+    # ...........................
+    @property
+    def data(self):
+        """Return sparse_array data.
+
+        Returns:
+            (scipy.sparse.coo_array): Data in sparse_array.
+        """
+        return self._coo_array.data
+
+    # ...........................
     @classmethod
     def init_from_compressed_file(
             cls, zip_filename, local_path=TMP_PATH, overwrite=False):
@@ -325,8 +355,8 @@ class HeatmapMatrix(_SpeciesDataMatrix):
     def _get_nonzero_labels_zero_indexes(
             cls, nonzero_ridx, nonzero_cidx, row_categ, col_categ):
         # Save indexes of all-zero columns,
-        zero_cidx =  []
-        zero_ridx =  []
+        zero_cidx = []
+        zero_ridx = []
         # Save category/labels of columns with at least one non-zero
         nonzero_col_labels = []
         nonzero_row_labels = []
@@ -339,7 +369,8 @@ class HeatmapMatrix(_SpeciesDataMatrix):
             # Examine each non-zero position found
             for zidx in range(len(nonzero_idx)):
                 # If true that this position contains a non-zero in the row/column
-                if nonzero_idx[zidx] == True:
+                #   value is type numpy.bool_ and `is True` only works after typecasting
+                if bool(nonzero_idx[zidx]) is True:
                     # Save labels with non-zero elements for new category index
                     label = cls._get_category_from_code(zidx, categ)
                     nonzero_labels.append(label)
@@ -362,6 +393,10 @@ class HeatmapMatrix(_SpeciesDataMatrix):
 
         Args:
             coo (scipy.sparse.coo_array): binary sparse array in coo format
+            row_categ (pandas.api.types.CategoricalDtype): ordered row labels used
+                to identify axis 0/rows in the input matrix.
+            col_categ (pandas.api.types.CategoricalDtype): ordered column labels
+                used to identify axis 1/columns in the input matrix.
 
         Returns:
             compressed_coo (scipy.sparse.coo_array): sparse array with no rows or
@@ -414,7 +449,6 @@ class HeatmapMatrix(_SpeciesDataMatrix):
         Args:
             min_count (int): filter all values below this value.
             max_count (int): filter all values above this value.
-            divisible_by (int): filter all values not evenly divisible by this value.
 
         Returns:
             coo_array (scipy.sparse.coo_array): A 2d sparse array where values in the
@@ -582,6 +616,60 @@ class HeatmapMatrix(_SpeciesDataMatrix):
             raise
         count = vector.getnnz()
         return count
+
+    # ...............................................
+    def sum_vector_ge_than(self, label, min_val, axis=0):
+        """Get the total of values >= min_val in a single row or column.
+
+        Args:
+            label: label on the row (axis 0) or column (axis 1) to total.
+            min_val (int): minimum value to be included in sum.
+            axis (int): row (0) or column (1) header for vector to sum.
+
+        Returns:
+            int: The total of all values >= min_val in one column
+
+        Raises:
+            IndexError: on label not present in vector header
+        """
+        try:
+            vector, _idx = self.get_vector_from_label(label, axis=axis)
+        except IndexError:
+            raise
+
+        # Create a mask for values greater than x
+        mask = vector >= min_val
+
+        # Sum the values greater than x
+        sum_ge_than = np.sum(vector[mask])
+        return sum_ge_than
+
+    # ...............................................
+    def count_vector_ge_than(self, label, min_val, axis=0):
+        """Get the count of values >= min_val in a single row or column.
+
+        Args:
+            label: label on the row (axis 0) or column (axis 1) to total.
+            min_val (int): minimum value to be included in count.
+            axis (int): row (0) or column (1) header for vector to sum.
+
+        Returns:
+            int: The count of all values >= min_val in one column
+
+        Raises:
+            IndexError: on label not present in vector header
+        """
+        try:
+            vector, _idx = self.get_vector_from_label(label, axis=axis)
+        except IndexError:
+            raise
+
+        # Create a mask for values greater than x
+        mask = vector >= min_val
+
+        # Sum the values greater than x
+        count_ge_than = len(vector[mask])
+        return count_ge_than
 
     # ...............................................
     def get_row_labels_for_data_in_column(self, col, value=None):
