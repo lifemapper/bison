@@ -49,13 +49,13 @@ class SummaryMatrix(_SpeciesDataMatrix):
 
     # ...........................
     @classmethod
-    def init_from_sparse_matrix(cls, sp_mtx, axis=0):
+    def init_from_heatmap(cls, heatmap, axis=0):
         """Summarize a matrix into counts of one axis and values for the other axis.
 
         Args:
-            sp_mtx (sppy.aws.SparseMatrix): A 2d sparse matrix with count
-                values for one dimension, (i.e. region) rows (axis 0), by the species
-                dimension, columns (axis 1), to use for computations.
+            heatmap (bison.spnet.heatmap_matrix.HeatmapMatrix): A 2d sparse matrix with
+                count values for one dimension, (i.e. region) rows (axis 0), by the
+                species dimension, columns (axis 1), to use for computations.
             axis (int): Summarize rows (0) for each column, or columns (1) for each row.
 
         Returns:
@@ -76,21 +76,21 @@ class SummaryMatrix(_SpeciesDataMatrix):
                 1 column of values, total for each row
         """
         # Total of the values along the axis
-        totals = sp_mtx.get_totals(axis=axis)
+        totals = heatmap.get_totals(axis=axis)
         # Count of the non-zero values along the axis
-        counts = sp_mtx.get_counts(axis=axis)
+        counts = heatmap.get_counts(axis=axis)
         data = {COUNT_FLD: counts, TOTAL_FLD: totals}
 
         # Sparse matrix always has species in axis 1.
-        species_dim = sp_mtx.x_dimension
-        other_dim = sp_mtx.y_dimension
+        species_dim = heatmap.x_dimension
+        other_dim = heatmap.y_dimension
 
         # Axis 0 summarizes down axis 0, each column/species, other dimension
         # (i.e. region) counts and occurrence totals of other dimension in sparse matrix
         if axis == 0:
             dim0 = species_dim
             dim1 = other_dim
-            index = sp_mtx.column_category.categories
+            index = heatmap.column_category.categories
             table_type = SUMMARY.get_table_type(
                 AGGREGATION_TYPE.SUMMARY, species_dim["code"], other_dim["code"])
         # Axis 1 summarizes across axis 1, each row/other dimension, species counts and
@@ -98,14 +98,14 @@ class SummaryMatrix(_SpeciesDataMatrix):
         elif axis == 1:
             dim0 = other_dim
             dim1 = species_dim
-            index = sp_mtx.row_category.categories
+            index = heatmap.row_category.categories
             table_type = SUMMARY.get_table_type(
                 AGGREGATION_TYPE.SUMMARY, other_dim["code"], species_dim["code"])
 
         # summary fields = columns, sparse matrix axis = rows
         sdf = pd.DataFrame(data=data, index=index)
 
-        summary_matrix = SummaryMatrix(sdf, table_type, sp_mtx.datestr, dim0, dim1)
+        summary_matrix = SummaryMatrix(sdf, table_type, heatmap.datestr, dim0, dim1)
         return summary_matrix
 
     # ...........................

@@ -292,6 +292,7 @@ class AGGREGATION_TYPE:
     COUNT = "counts"
     SUMMARY = "summary"
     MATRIX = "matrix"
+    PAM = "pam"
 
     # ...........................
     @classmethod
@@ -407,7 +408,7 @@ class SUMMARY:
             meta = {
                 "code": table_type,
                 "fname": f"{table_type}{cls.sep}{cls.dt_token}",
-                "table_format": "Parquet",
+                # "table_format": "Parquet",
                 "file_extension": f"{cls.sep}000.parquet",
 
                 "fields": dim["fields"],
@@ -447,7 +448,7 @@ class SUMMARY:
             meta = {
                 "code": table_type,
                 "fname": f"{table_type}{cls.sep}{cls.dt_token}",
-                "table_format": "Parquet",
+                # "table_format": "Parquet",
                 "file_extension": f"{cls.sep}000.parquet",
                 "data_type": "counts",
 
@@ -489,7 +490,7 @@ class SUMMARY:
                 meta = {
                     "code": table_type,
                     "fname": f"{table_type}{cls.sep}{cls.dt_token}",
-                    "table_format": "Zip",
+                    "compressed_extension": "zip",
                     "file_extension": ".csv",
                     "data_type": "summary",
 
@@ -530,7 +531,8 @@ class SUMMARY:
             meta = {
                 "code": table_type,
                 "fname": f"{table_type}{cls.sep}{cls.dt_token}",
-                "table_format": "Zip",
+                # "table_format": "Zip",
+                "compressed_extension": "zip",
                 "file_extension": ".npz",
                 "data_type": "matrix",
 
@@ -546,6 +548,58 @@ class SUMMARY:
 
                 # Matrix values
                 "value": OCCURRENCE_COUNT_FLD,
+            }
+            mtxs[table_type] = meta
+        return mtxs
+
+    # ...........................
+    @classmethod
+    def pam(cls):
+        """Species by <dimension> matrix defined for this project.
+
+        Returns:
+            mtxs (dict): dict of dictionaries for each matrix/table defined for this
+                project.
+
+        Note:
+            Similar to a Presence/Absence Matrix (PAM),
+                Rows will always have analysis dimension (i.e. region or other category)
+                Columns will have species
+        """
+        # TODO: Is this an ephemeral data structure used only for computing stats?
+        #       If we want to save it, we must add compress_to_file,
+        #       uncompress_zipped_data, read_data.
+        #       If we only save computations, must save input HeatmapMatrix metadata
+        #       and min_presence_count
+        #       Note bison.spnet.pam_matrix.PAM
+        mtxs = {}
+        for analysis_code in cls.ANALYSIS_DIMENSIONS:
+            dim0 = analysis_code
+            dim1 = ANALYSIS_DIM.species_code()
+            table_type = cls.get_table_type(AGGREGATION_TYPE.MATRIX, dim0, dim1)
+
+            # Dimension/Axis 0/row is always region or other analysis dimension
+            meta = {
+                "code": table_type,
+                "fname": f"{table_type}{cls.sep}{cls.dt_token}",
+                # "table_format": "Zip",
+                "compressed_extension": "zip",
+                "file_extension": ".npz",
+                "data_type": "matrix",
+
+                # Dimensions: 0 is row (aka Axis 0), 1 is column (aka Axis 1)
+                "dim_0_code": dim0,
+                "dim_1_code": dim1,
+
+                # These are all filled in for compressing data, reading data
+                "row_categories": [],
+                "column_categories": [],
+                "value_fld": "",
+                "datestr": cls.dt_token,
+
+                # Matrix values
+                "value": "presence",
+                "min_presence_count": 1,
             }
             mtxs[table_type] = meta
         return mtxs
@@ -635,7 +689,7 @@ class SUMMARY:
 
     # ...............................................
     @classmethod
-    def get_filename(cls, table_type, datestr):
+    def get_filename(cls, table_type, datestr, is_compressed=False):
         """Update the filename in a metadata dictionary for one table, and return.
 
         Args:
@@ -647,7 +701,10 @@ class SUMMARY:
             tables: dictionary of summary table metadata.
         """
         table = cls.tables()[table_type]
-        fname_tmpl = table["fname"] + table["file_extension"]
+        ext = table["file_extension"]
+        if is_compressed is True:
+            ext = table["compressed_extension"]
+        fname_tmpl = f"{table['fname']}{ext}"
         fname = fname_tmpl.replace(cls.dt_token, datestr)
         return fname
 

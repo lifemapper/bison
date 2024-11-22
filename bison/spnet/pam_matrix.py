@@ -6,6 +6,12 @@ import pandas as pd
 from bison.spnet.heatmap_matrix import HeatmapMatrix
 
 
+# TODO: Is this an ephemeral data structure used only for computing stats?
+#       If we want to save it, we must add compress_to_file,
+#       uncompress_zipped_data, read_data.
+#       If we only save computations, must save input HeatmapMatrix metadata
+#       and min_presence_count.
+#       Note table_type and metadata in bison.common.constants.SUMMARY
 # .............................................................................
 class PAM(HeatmapMatrix):
     """Class for analyzing presence/absence of aggregator0 x species (aggregator1)."""
@@ -305,7 +311,7 @@ class PAM(HeatmapMatrix):
         return site_stats_matrix
 
     # ...........................
-    def calculate_species_statistics(self):
+    def calc_species_stats(self):
         """Calculate species-based statistics.
 
         Returns:
@@ -313,22 +319,27 @@ class PAM(HeatmapMatrix):
                 statistic, and one row for each species.
         """
         species_matrix_stats = [
-            ('omega', self.omega),
-            ('omega_proportional', self.omega_proportional),
-            ('psi', self.psi),
-            ('psi_average_proportional', self.psi_average_proportional),
+            ('omega', self.omega, None),
+            ('omega_proportional', self.omega_proportional, 'omega'),
+            ('psi', self.psi, None),
+            ('psi_average_proportional', self.psi_average_proportional, 'psi'),
         ]
         species_index = self._col_categ.categories
         data = {}
-        for name, func in species_matrix_stats:
-            data[name] = func()
+        for name, func, input_name in species_matrix_stats:
+            try:
+                input_data = data[input_name]
+            except:
+                data[name] = func()
+            else:
+                data[name] = func(input_data)
 
         species_stats_matrix = pd.DataFrame(data, index=species_index)
         return species_stats_matrix
 
     # # ...........................
     # TODO: test matrices created in these stats (sparse or dense)
-    # def calc_covariance_statistics(self):
+    # def calc_covariance_stats(self):
     #     """Calculate covariance statistics matrices.
     #
     #     Returns:
@@ -426,22 +437,52 @@ class PAM(HeatmapMatrix):
         """Calculate the range `size` per species.
 
         Returns:
-            Matrix: A row of range `sizes` (each site counts as 1) for each species in the PAM.
+            sp_range_size_vct (numpy.ndarray): 1D ndarray of range `sizes`
+                (each site counts as 1), one element for each species (axis 1) of PAM.
 
         Note:
             function assumes all `sites` (analysis dimension) are equal size.
         """
-        return self._coo_array.sum(axis=0)
+        sp_range_size_vct = self._coo_array.sum(axis=0)
+        return sp_range_size_vct
 
     # ...........................
-    def omega_proportional(self):
+    def omega_proportional(self, omega_vct):
         """Calculate the mean proportional range size of each species.
 
         Returns:
             Matrix: A row of the proportional range sizes for each species in the PAM.
         """
-        omega_ = self.omega()
-        return omega_.astype(float) / self.num_sites
+        if omega_vct is None:
+            omega_vct = self.omega()
+        return omega_vct.astype(float) / self.num_sites
+
+    # .............................................................................
+    def psi(self):
+        """Calculate the range richness of each species.
+
+        Returns:
+            psi_vct (numpy.ndarray): 1D array of range richness for the sites that each species is present in.
+        """
+        pam = self._coo_array.todense(order='C')
+        sp_range_richness_vct = self._coo_array.sum(axis=1).dot(pam)
+        return sp_range_richness_vct
+
+    # .............................................................................
+    def psi_average_proportional(self, psi_vct):
+        """Calculate the mean proportional species diversity.
+
+        Args:
+            psi_vct (numpy.ndarray):
+        Returns:
+            Matrix: A row of proportional range richness for the sites that each species
+                the PAM is present.
+        """
+        if psi_vct is None:
+            psi_vct =  self.psi()
+        sp_range_size_vector = self.num_species * self.omega()
+        psi_avg_prop = psi_vct.astype(float) / sp_range_size_vector
+        return psi_avg_prop
 
     # .............................................................................
     # Site-based statistics
@@ -450,43 +491,53 @@ class PAM(HeatmapMatrix):
         """Calculate alpha diversity, the number of species in each site.
 
         Returns:
-            Matrix: A column of alpha diversity values for each site in the PAM.
-        """
-        return self._coo_array.sum(axis=1)
-
-    # .............................................................................
-    def alpha_proportional(self):
-        """Calculate proportional alpha diversity.
-
-        Returns:
-            Matrix: A column of proportional alpha diversity values for each site in the
-                PAM.
-        """
-        alpha_ = self.alpha()
-        return alpha_.astype(float) / self.num_species
-
-    # .............................................................................
-    def phi(self):
-        """Calculate phi, the range size per site.
-
-        Returns:
-            Matrix: A column of the sum of the range sizes for the species present at each
+            sp_count_vct (numpy.ndarray): 1D ndarray of species count for each
                 site in the PAM.
         """
-        omega_ = self.omega()
-        return self._coo_array.dot(omega_)
+        sp_count_vct = self._coo_array.sum(axis=1)
+        return sp_count_vct
 
     # .............................................................................
-    def phi_average_proportional(self):
-        """Calculate proportional range size per site.
+    def alpha_proportional(self, alpha_vct):
+        """Calculate proportional alpha diversity.
+
+        Args:
+            alpha_vct (numpy.ndarray): 1D array of species count per site.
 
         Returns:
-            Matrix: A column of the proportional value of the sum of the range sizes for
-                the species present at each site in the PAM.
+            alpha_prop_vct (numpy.ndarray): 1D array, row, of proportional alpha
+                diversity values for each site in the PAM.
         """
-        omega_fl = self.omega().astype(float)
-        alpha_ = self.alpha()
-        return self._coo_array.dot(omega_fl) / (self.num_sites * alpha_)
+        if alpha_vct is None:
+            alpha_vct = self.alpha()
+        alpha_prop_vct = alpha_vct.astype(float) / self.num_species
+        return alpha_prop_vct
+
+    # # .............................................................................
+    # def phi(self):
+    #     """Calculate phi, the range size per site.
+    #
+    #     Returns:
+    #         Matrix: A column of the sum of the range sizes for the species present at each
+    #             site in the PAM.
+    #     """
+    #     omega_vct = self.omega()
+    #     phi_mtx = self._coo_array.dot(omega_vct)
+    #     return phi_mtx
+    #
+    # # .............................................................................
+    # def phi_average_proportional(self, phi_vct):
+    #     """Calculate proportional range size per site.
+    #
+    #     Returns:
+    #         Matrix: A column of the proportional value of the sum of the range sizes for
+    #             the species present at each site in the PAM.
+    #     """
+    #     if phi_vct is None:
+    #         phi_vct  = self.phi()
+    #     omega_fl = self.omega().astype(float)
+    #     alpha_ = self.alpha()
+    #     return self._coo_array.dot(omega_fl) / (self.num_sites * alpha_)
 
     # .............................................................................
     # Covariance metrics
@@ -498,7 +549,8 @@ class PAM(HeatmapMatrix):
         Returns:
             Matrix: Matrix of covariance of composition of sites.
         """
-        site_by_site = self.pam.dot(self.pam.T).astype(float)
+        pam = self._coo_array.todense(order='C')
+        site_by_site = pam.dot(pam.T).astype(float)
         alpha_prop = self.alpha_proportional()
         mtx = (site_by_site / self.num_species()) - np.outer(alpha_prop, alpha_prop)
         # Output is sites x sites, so use site headers for column headers too
@@ -515,7 +567,7 @@ class PAM(HeatmapMatrix):
         Returns:
             Matrix: Matrix of covariance of composition of species.
         """
-        pam = self._coo_array
+        pam = self._coo_array.todense(order='C')
         species_by_site = pam.T.dot(pam).astype(float)
         omega_prop = self.omega_proportional()
         mtx = (species_by_site / self.num_sites()) - np.outer(omega_prop, omega_prop)
