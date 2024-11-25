@@ -179,11 +179,11 @@ if __name__ == "__main__":
     species_stats_mtx = pam.calc_species_stats()
     print(species_stats_mtx)
 
-    # site_stats_mtx = pam.calc_site_stats()
-    # print(site_stats_mtx)
-    #
-    # diversity_stats_mtx = pam.calc_diversity_stats()
-    # print(diversity_stats_mtx)
+    site_stats_mtx = pam.calc_site_stats()
+    print(site_stats_mtx)
+
+    diversity_stats_mtx = pam.calc_diversity_stats()
+    print(diversity_stats_mtx)
 
 """
 from bison.task.build_matrices import *
