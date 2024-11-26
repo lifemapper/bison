@@ -1,21 +1,22 @@
 """Matrix of sites as rows, species as columns, values are presence or absence (1/0)."""
 from copy import deepcopy
-import numpy as np
-import pandas as pd
+from fileinput import filename
 
+import numpy as np
+import os
+import pandas as pd
+from zipfile import ZipFile
+
+from fastparquet.api import statistics
+
+from bison.common.constants import (
+    CSV_DELIMITER, JSON_EXTENSION, STATISTICS_TYPE, SUMMARY, TMP_PATH, ZIP_EXTENSION, CSV_EXTENSION)
 from bison.spnet.heatmap_matrix import HeatmapMatrix
 
 
-# TODO: Is this an ephemeral data structure used only for computing stats?
-#       If we want to save it, we must add compress_to_file,
-#       uncompress_zipped_data, read_data.
-#       If we only save computations, must save input HeatmapMatrix metadata
-#       and min_presence_count.
-#       Note table_type and metadata in bison.common.constants.SUMMARY
 # .............................................................................
 class PAM(HeatmapMatrix):
     """Class for analyzing presence/absence of aggregator0 x species (aggregator1)."""
-    # site_pam_dist_mtx_stats = [('pearson_correlation', pearson_correlation)]
 
     # ...........................
     def __init__(
@@ -64,6 +65,11 @@ class PAM(HeatmapMatrix):
         self._min_presence = min_presence_count
         val_fld = "presence"
 
+        # Populate this on computation, with keys used in filename construction
+        self.stats_matrices = {}
+        for key in STATISTICS_TYPE.all():
+            self.stats_matrices[key] = None
+
         HeatmapMatrix.__init__(
             self, cmp_pam_coo_array, table_type, datestr, cmp_row_categ, cmp_col_categ,
             dim0, dim1, val_fld)
@@ -96,34 +102,6 @@ class PAM(HeatmapMatrix):
     #         heatmap.y_dimension, heatmap.x_dimension)
     #     return pam
 
-    # # ...........................
-    # @classmethod
-    # def init_from_heatmap1(cls, heatmap, min_presence_count):
-    #     """Create a sparse matrix of rows by columns containing values from a table.
-    #
-    #     Args:
-    #         heatmap (bison.spnet.heatmap_matrix.HeatmapMatrix): Matrix of occurrence
-    #             counts for sites (or other dimension), rows, by species, columns.
-    #         min_presence_count (int): Minimum occurrence count for a species to be
-    #             considered present at that site.
-    #
-    #     Returns:
-    #         pam (bison.spnet.presence_absence_matrix.PAM): matrix of
-    #             sites (rows, axis=0) by species (columnns, axis=1), with binary values
-    #             indicating presence/absence.
-    #     """
-    #     # Apply minimum value filter; converts to CSR format
-    #     bool_csr_array = heatmap._coo_array >= min_presence_count
-    #     pam_csr_array = bool_csr_array.astype(np.int8)
-    #     # Go back to COO format
-    #     pam_coo_array = pam_csr_array.tocoo()
-    #
-    #     pam = PAM(
-    #         pam_coo_array, min_presence_count, heatmap.table_type, heatmap.datestr,
-    #         heatmap.row_category, heatmap.column_category,
-    #         heatmap.y_dimension, heatmap.x_dimension)
-    #     return pam
-    #
     # ...........................
     @classmethod
     def init_from_heatmap(cls, heatmap, min_presence_count):
@@ -150,101 +128,250 @@ class PAM(HeatmapMatrix):
         # Go back to COO format
         pam_coo_array = pam_csr_array.tocoo()
 
+        dim0, dim1 = heatmap.dimensions
+        pam_table_type = SUMMARY.get_table_type("pam", dim0, dim1)
+
         pam = PAM(
-            pam_coo_array, min_presence_count, heatmap.table_type, heatmap.datestr,
+            pam_coo_array, min_presence_count, pam_table_type, heatmap.datestr,
             heatmap.row_category, heatmap.column_category,
             heatmap.y_dimension, heatmap.x_dimension)
         return pam
 
-    # # ...........................
-    # @classmethod
-    # def _remove_zeros(cls, coo, row_categ, col_categ):
-    #     """Remove any all-zero rows or columns.
-    #
-    #     Args:
-    #         coo (scipy.sparse.coo_array): binary sparse array in coo format
-    #
-    #     Returns:
-    #         compressed_coo (scipy.sparse.coo_array): sparse array with no rows or
-    #             columns containing all zeros.
-    #         row_category (pandas.api.types.CategoricalDtype): ordered row labels used
-    #             to identify axis 0/rows in the new compressed matrix.
-    #         column_category (pandas.api.types.CategoricalDtype): ordered column labels
-    #             used to identify axis 1/columns in the new compressed matrix.
-    #     """
-    #     # Get indices of col/rows that contain at least one non-zero element, with dupes
-    #     nz_cidx = sparse.find(coo)[1]
-    #     nz_ridx = sparse.find(coo)[0]
-    #
-    #     # Get a bool array with elements T if position holds a nonzero
-    #     nonzero_cidx = np.isin(np.arange(coo.shape[1]), nz_cidx)
-    #     nonzero_ridx = np.isin(np.arange(coo.shape[0]), nz_ridx)
-    #
-    #     # WARNING: Indices of altered axes are reset in the returned matrix
-    #     # TODO: Modify categories associated with indices
-    #     # Find cols (category and index) with all zeros
-    #     zero_col_idx =  []
-    #     nonzero_col_labels = []
-    #     for zidx in range(len(nonzero_cidx)):
-    #         # If position does not contain a non-zero, mark index/category for deletion
-    #         #   Directly address this 1d boolean numpy.ndarray
-    #         if nonzero_cidx[zidx] == True:
-    #             # Save labels with non-zero elements
-    #             label = cls._get_category_from_code(zidx, col_categ)
-    #             nonzero_col_labels.append(label)
-    #         else:
-    #             # Save indexes with all zero elements
-    #             zero_col_idx.append(zidx)
-    #     cmp_col_categ = CategoricalDtype(nonzero_col_labels, ordered=True)
-    #
-    #     # Find rows (category and index) with all zeros
-    #     zero_row_idx =  []
-    #     nonzero_row_labels = []
-    #     for zidx in range(len(nonzero_ridx)):
-    #         # If true (1) that this position contains a zero in the coo
-    #         if nonzero_ridx[zidx] == True:
-    #             # Save labels with non-zero elements
-    #             label = cls._get_category_from_code(zidx, row_categ)
-    #             nonzero_row_labels.append(label)
-    #         else:
-    #             # Save indexes with all zero elements
-    #             zero_row_idx.append(zidx)
-    #     cmp_row_categ = CategoricalDtype(nonzero_row_labels, ordered=True)
-    #
-    #     # Mask with indices to remove data
-    #     csr = coo.tocsr()
-    #     if len(zero_row_idx) > 0 and len(zero_col_idx) > 0:
-    #         row_mask = np.ones(csr.shape[0], dtype=bool)
-    #         row_mask[zero_row_idx] = False
-    #         col_mask = np.ones(csr.shape[1], dtype=bool)
-    #         col_mask[zero_col_idx] = False
-    #         compressed_csr = csr[row_mask][:, col_mask]
-    #
-    #     elif len(zero_row_idx) > 0:
-    #         mask = np.ones(csr.shape[0], dtype=bool)
-    #         mask[zero_row_idx] = False
-    #         compressed_csr = csr[mask]
-    #
-    #     elif len(zero_col_idx) > 0:
-    #         mask = np.ones(csr.shape[1], dtype=bool)
-    #         mask[zero_col_idx] = False
-    #         compressed_csr = csr[:, mask]
-    #
-    #     else:
-    #         compressed_csr = csr
-    #
-    #     cmp_coo = compressed_csr.tocoo()
-    #     return cmp_coo, cmp_row_categ, cmp_col_categ
+    # .............................................................................
+    @classmethod
+    def get_stats_filenames(cls, base_filename, local_path=TMP_PATH):
+        """Get the statistics compressed filename and its matrix and metadata contents.
 
-    # ...........................
-    @property
-    def pam(self):
-        """Return binary sparse_array.
+        Args:
+            local_path (str): Absolute path of local destination path
 
         Returns:
-            (scipy.sparse.coo_array): Binary sparse_array (PAM) for the object.
+            expected_files (dict): Dictionary of keys: zip_fname and statistics names,
+                and values, a list of the zip filename or matrix and metadata filenames.
         """
-        return self.sparse_array
+        expected_file_dict = {}
+        zip_fname = f"{base_filename}{ZIP_EXTENSION}"
+        if local_path is not None:
+            zip_fname = os.path.join(local_path, zip_fname)
+        expected_file_dict["zip_fname"] = [zip_fname]
+
+        for stats_type in STATISTICS_TYPE.all():
+            fname = f"{base_filename}_{stats_type}"
+            mtx_fname = f"{fname}{CSV_EXTENSION}"
+            meta_fname = f"{fname}{JSON_EXTENSION}"
+            if local_path is not None:
+                mtx_fname = os.path.join(local_path, mtx_fname)
+                meta_fname = os.path.join(local_path, meta_fname)
+            expected_file_dict[stats_type] = [mtx_fname, meta_fname]
+
+        return expected_file_dict
+
+    # .............................................................................
+    def _write_files(self, stats_type, stats_df, mtx_fname, meta_fname):
+        # Always delete local files before compressing this data.
+        try:
+            stats_df.to_csv(mtx_fname, sep=CSV_DELIMITER)
+        except Exception as e:
+            msg = f"Failed to write {mtx_fname}: {e}"
+            raise Exception(msg)
+
+        # Save table data and categories to json locally
+        metadata = deepcopy(self._table)
+        metadata["statistics_type"] = stats_type
+        # Should be filled already, make sure they are consistent!
+        if metadata["dim_0_code"] != self.y_dimension["code"]:
+            raise Exception(
+                f"metadata/dim_0_code {metadata['dim_0_code']} != "
+                f"y_dimension {self.y_dimension['code']}"
+            )
+        if metadata["dim_1_code"] != self.x_dimension["code"]:
+            raise Exception(
+                f"metadata/dim_1_code {metadata['dim_1_code']} != "
+                f"x_dimension {self.x_dimension['code']}"
+            )
+        try:
+            self._dump_metadata(metadata, meta_fname)
+        except Exception:
+            raise
+
+    # .............................................................................
+    def compress_stats_to_file(self, local_path=TMP_PATH):
+        """Compress all statistics matrices to zipped npz and json files, then zip all.
+
+        Args:
+            local_path (str): Absolute path of local destination path
+
+        Returns:
+            zip_fname (str): Local output zip filename.
+
+        Raises:
+            Exception: on failure to write matrix and metadata files to zipfile.
+        """
+        # Always delete local zipfile before compressing this data.
+        base_filename = self._table["fname"]
+        expected_file_dict = self.get_stats_filenames(
+            base_filename, local_path=local_path)
+        for fname_lst in expected_file_dict.values():
+            for fn in fname_lst:
+                if os.path.exists(fn):
+                    os.remove(fn)
+
+        input_fnames = []
+        # Save each matrix with metadata locally
+        for stats_type, stats_df in self.stats_matrices.items():
+            if stats_df is not None:
+                # Dictionaries stats_matrices and expected files use stat_name as key
+                mtx_fname, meta_fname =  expected_file_dict[stats_type]
+                # Write matrix and metadata files
+                self._write_files(stats_type, stats_df, mtx_fname, meta_fname)
+
+                input_fnames.extend((mtx_fname, meta_fname))
+
+        # Compress all matrices and metadata
+        zip_fname = expected_file_dict["zip_fname"][0]
+        try:
+            self._compress_files(input_fnames, zip_fname)
+        except Exception:
+            raise
+
+        return zip_fname
+
+    # .............................................................................
+    @classmethod
+    def uncompress_zipped_data(cls, zip_filename, local_path=TMP_PATH):
+        """Uncompress a zipped SparseMatrix into a coo_array and row/column categories.
+
+        Args:
+            zip_filename (str): Filename of output data to write to S3.
+            local_path (str): Absolute path of local destination path
+
+        Returns:
+            statistics_dict (dict of pandas.DataFrame): dict of statistic types and
+                corresponding dataframes containing statistics data.
+            meta_dict (dict): metadata for the set of matrices
+            table_type (aws.aws_constants.SUMMARY_TABLE_TYPES): type of table data
+            datestr (str): date string in format YYYY_MM_DD
+
+        Raises:
+            Exception: on failure to uncompress files.
+            Exception: on failure to load data from uncompressed files.
+        """
+        base_filename, _ext = os.path.splitext(os.path.basename(zip_filename))
+        try:
+            out_filenames, table_type, datestr = cls._uncompress_files(
+                zip_filename, local_path)
+        except Exception:
+            raise
+
+        # TODO: parse filenames instead of look for expected
+        stats_fname_dict = {}
+        expected_file_dict = cls.get_stats_filenames(
+            base_filename, local_path=local_path)
+        for key, fnames in expected_file_dict.items():
+            if key != "zip_fname":
+                for fn in fnames:
+                    if fn in out_filenames:
+                        try:
+                            stats_fname_dict[key].append(fn)
+                        except KeyError:
+                            stats_fname_dict[key] = [fn]
+
+        # Read matrix data from local files
+        try:
+            stats_data_dict, stats_meta_dict = cls.read_data(stats_fname_dict)
+        except Exception:
+            raise
+
+        return stats_data_dict, stats_meta_dict, table_type, datestr
+
+    # .............................................................................
+    @classmethod
+    def _uncompress_files(cls, zip_filename, local_path):
+        """Uncompress a zipped set of PAM statistics matrices and their metadata.
+
+        Args:
+            zip_filename (str): Filename of output data to write to S3.
+            local_path (str): Absolute path of local destination path
+
+        Returns:
+            sparse_coo (scipy.sparse.coo_array): Sparse Matrix containing data.
+            row_categ (pandas.api.types.CategoricalDtype): row categories
+            col_categ (pandas.api.types.CategoricalDtype): column categories
+            table_type (aws.aws_constants.SUMMARY_TABLE_TYPES): type of table data
+            datestr (str): date string in format YYYY_MM_DD
+
+        Raises:
+            Exception: on missing input zipfile
+            Exception: on failure to parse filename
+            Exception: on missing expected file from zipfile
+
+        Note:
+            Always delete existing files before uncompress
+        """
+        if not os.path.exists(zip_filename):
+            raise Exception(f"Missing file {zip_filename}")
+        try:
+            table_type, datestr = SUMMARY.get_tabletype_datestring_from_filename(
+                zip_filename)
+        except Exception:
+            raise
+
+        # Delete all pre-existing matrix, metadata files
+        table = SUMMARY.get_table(table_type, datestr=datestr)
+        base_filename = table["fname"]
+        expected_file_dict = cls.get_stats_filenames(
+            base_filename, local_path=local_path)
+        for key, fname_lst in expected_file_dict.items():
+            if key != "zip_fname":
+                for fn in fname_lst:
+                    if os.path.exists(fn):
+                        os.remove(fn)
+
+        # Unzip to local dir
+        with ZipFile(zip_filename, mode="r") as archive:
+            fnames = archive.namelist()
+            archive.extractall(path=local_path)
+
+        out_filenames = [os.path.join(local_path, fn) for fn in fnames]
+
+        return out_filenames, table_type, datestr
+
+
+    # .............................................................................
+    @classmethod
+    def read_data(cls, statistics_fname_dict):
+        """Read SummaryMatrix data files into a dataframe and metadata dictionary.
+
+        Args:
+            statistics_fname_dict (dict): Statistics type with list of filenames of
+                pandas.DataFrame data in csv format and JSON metadata.
+
+        Returns:
+            dataframe (pandas.DataFrame): dataframe containing summary matrix data.
+            meta_dict (dict): metadata for the matrix
+            table_type (aws.aws_constants.SUMMARY_TABLE_TYPES): type of table data
+            datestr (str): date string in format YYYY_MM_DD
+
+        Raises:
+            Exception: on unable to load CSV file
+            Exception: on unable to load JSON metadata
+        """
+        # Read dataframe from local CSV file
+        stats_data_dict = {}
+        stats_meta_dict = {}
+        for stat_type, filename_lst in statistics_fname_dict.items():
+            for fn in filename_lst:
+                try:
+                    if fn.endswith(CSV_EXTENSION):
+                        dataframe = pd.read_csv(fn, sep=CSV_DELIMITER, index_col=0)
+                        stats_data_dict[stat_type] = dataframe
+                    elif fn.endswith(JSON_EXTENSION):
+                        meta_dict = cls.load_metadata(fn)
+                        stats_meta_dict[stat_type] = meta_dict
+                except Exception as e:
+                    raise Exception(f"Failed to load {fn}: {e}")
+
+        return stats_data_dict, stats_meta_dict
 
     # ...........................
     def num_species(self):
@@ -265,12 +392,34 @@ class PAM(HeatmapMatrix):
         return self._coo_array.shape[0]
 
     # ...........................
+    def calc_covariance_stats(self):
+        """Calculate the site sigma metric and species sigma metric.
+
+        Postcondition:
+            The stats_matrices dictionary is populated with:
+                cov_site_mtx (pandas.DataFrame): a matrix
+                cov_species_mtx (pandas.DataFrame): a matrix
+
+        Note:
+            Both of these computations are too memory intensive for a very large
+            number of sites or species.
+
+        TODO: make covariance computation more efficient.
+        """
+        cov_site_mtx = self.sigma_sites()
+        cov_species_mtx = self.sigma_species()
+        self.stats_matrices[STATISTICS_TYPE.SIGMA_SITE] = cov_site_mtx
+        self.stats_matrices[STATISTICS_TYPE.SIGMA_SPECIES] = cov_species_mtx
+
+
+    # ...........................
     def calc_diversity_stats(self):
         """Calculate diversity statistics.
 
-        Returns:
-            diversity_matrix (pandas.DataFrame): a matrix with 1 column for each
-                statistic, and one row containing the values for each statistic.
+        Postcondition:
+            The stats_matrices dictionary is populated with:
+                diversity_matrix (pandas.DataFrame): a matrix with 1 column for each
+                    statistic, and one row containing the values for each statistic.
         """
         diversity_stats = [
             ('num sites', self.num_sites),
@@ -284,15 +433,16 @@ class PAM(HeatmapMatrix):
         for name, func in diversity_stats:
             data[name] = func()
         diversity_matrix = pd.DataFrame(data=data, index=["value"])
-        return diversity_matrix
+        self.stats_matrices[STATISTICS_TYPE.DIVERSITY] = diversity_matrix
 
     # ...........................
     def calc_site_stats(self):
         """Calculate site-based statistics.
 
-        Returns:
-            site_stats_matrix (pandas.DataFrame): a matrix with 1 column for each
-                statistic, and one row for each site.
+        Postcondition:
+            The stats_matrices dictionary is populated with:
+                site_stats_matrix (pandas.DataFrame): a matrix with 1 column for each
+                    statistic, and one row for each site.
         """
         site_matrix_stats = [
             ("alpha", self.alpha, None),
@@ -311,15 +461,16 @@ class PAM(HeatmapMatrix):
                 data[name] = func(input_data)
 
         site_stats_matrix = pd.DataFrame(data=data, index=site_index)
-        return site_stats_matrix
+        self.stats_matrices[STATISTICS_TYPE.SITE] = site_stats_matrix
 
     # ...........................
     def calc_species_stats(self):
         """Calculate species-based statistics.
 
-        Returns:
-            site_stats_matrix (pandas.DataFrame): a matrix with 1 column for each
-                statistic, and one row for each species.
+        Postcondition:
+            The stats_matrices dictionary is populated with:
+                site_stats_matrix (pandas.DataFrame): a matrix with 1 column for each
+                    statistic, and one row for each species.
         """
         species_matrix_stats = [
             ("omega", self.omega, None),
@@ -338,26 +489,7 @@ class PAM(HeatmapMatrix):
                 data[name] = func(input_data)
 
         species_stats_matrix = pd.DataFrame(data, index=species_index)
-        return species_stats_matrix
-
-    # # ...........................
-    # TODO: test matrices created in these stats (sparse or dense)
-    # def calc_covariance_stats(self):
-    #     """Calculate covariance statistics matrices.
-    #
-    #     Returns:
-    #         list of tuple: A list of metric name, matrix tuples for covariance stats.
-    #     """
-    #     covariance_stats = [
-    #         ('sigma sites', self.sigma_sites),
-    #         ('sigma species', self.sigma_species)
-    #     ]
-    #     stats_matrices = []
-    #     for name, func in covariance_stats:
-    #         mtx, headers = func()
-    #         mtx.set_headers(headers)
-    #         stats_matrices.append((name, mtx))
-    #     return stats_matrices
+        self.stats_matrices[STATISTICS_TYPE.SPECIES] = species_stats_matrix
 
     # .............................................................................
     # Diversity metrics

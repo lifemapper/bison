@@ -5,7 +5,7 @@ from numpy import integer as np_int, floating as np_float, ndarray
 import os
 from zipfile import ZipFile
 
-from bison.common.constants import SNKeys, SUMMARY, TMP_PATH
+from bison.common.constants import SNKeys, SUMMARY, TMP_PATH, JSON_EXTENSION, ZIP_EXTENSION
 from bison.common.log import logit
 
 
@@ -124,8 +124,8 @@ class _SpeciesDataMatrix:
         basename = table["fname"]
         mtx_ext = table["file_extension"]
         mtx_fname = f"{basename}{mtx_ext}"
-        meta_fname = f"{basename}.json"
-        zip_fname = f"{basename}.zip"
+        meta_fname = f"{basename}{JSON_EXTENSION}"
+        zip_fname = f"{basename}{ZIP_EXTENSION}"
         if local_path is not None:
             mtx_fname = os.path.join(local_path, mtx_fname)
             meta_fname = os.path.join(local_path, meta_fname)

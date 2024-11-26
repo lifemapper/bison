@@ -67,6 +67,9 @@ ENCODING = "utf-8"
 ERR_SEPARATOR = "------------"
 USER_DATA_TOKEN = "###SCRIPT_GOES_HERE###"
 CSV_DELIMITER = ","
+ZIP_EXTENSION = ".zip"
+JSON_EXTENSION = ".json"
+CSV_EXTENSION = ".csv"
 
 
 class TASK:
@@ -286,13 +289,34 @@ class ANALYSIS_DIM:
 
 
 # .............................................................................
+class STATISTICS_TYPE:
+    SIGMA_SITE = "sigma-site"
+    SIGMA_SPECIES = "sigma-species"
+    DIVERSITY = "diversity"
+    SITE = "site"
+    SPECIES = "species"
+
+# ...........................
+    @classmethod
+    def all(cls):
+        """Get all aggregated data type codes.
+
+        Returns:
+            list of supported codes for datatypes.
+        """
+        return (cls.SIGMA_SITE, cls.SIGMA_SPECIES, cls.DIVERSITY, cls.SITE, cls.SPECIES)
+
+
+# .............................................................................
 class AGGREGATION_TYPE:
     """Types of tables created for aggregate species data analyses."""
+    # TODO: decide whether to keep PAM
     LIST = "list"
     COUNT = "counts"
-    SUMMARY = "summary"
     MATRIX = "matrix"
     PAM = "pam"
+    STATISTICS = "stats"
+    SUMMARY = "summary"
 
     # ...........................
     @classmethod
@@ -302,7 +326,7 @@ class AGGREGATION_TYPE:
         Returns:
             list of supported codes for datatypes.
         """
-        return (cls.LIST, cls.COUNT, cls.SUMMARY, cls.MATRIX)
+        return (cls.LIST, cls.COUNT, cls.MATRIX, cls.PAM, cls.STATISTICS, cls.SUMMARY)
 
 
 # .............................................................................
@@ -490,7 +514,6 @@ class SUMMARY:
                 meta = {
                     "code": table_type,
                     "fname": f"{table_type}{cls.sep}{cls.dt_token}",
-                    "compressed_extension": "zip",
                     "file_extension": ".csv",
                     "data_type": "summary",
 
@@ -522,17 +545,15 @@ class SUMMARY:
                 Columns will have species
         """
         mtxs = {}
+        dim1 = ANALYSIS_DIM.species_code()
         for analysis_code in cls.ANALYSIS_DIMENSIONS:
             dim0 = analysis_code
-            dim1 = ANALYSIS_DIM.species_code()
             table_type = cls.get_table_type(AGGREGATION_TYPE.MATRIX, dim0, dim1)
 
             # Dimension/Axis 0/row is always region or other analysis dimension
             meta = {
                 "code": table_type,
                 "fname": f"{table_type}{cls.sep}{cls.dt_token}",
-                # "table_format": "Zip",
-                "compressed_extension": "zip",
                 "file_extension": ".npz",
                 "data_type": "matrix",
 
@@ -554,17 +575,59 @@ class SUMMARY:
 
     # ...........................
     @classmethod
+    def statistics(cls):
+        """Species by <dimension> statistics matrix/table defined for this project.
+
+        Returns:
+            stats (dict): dict of dictionaries for each matrix/table defined for this
+                project.
+
+        Note:
+            Rows will always have analysis dimension (i.e. region or other category)
+            Columns will have species
+        """
+        stats = {}
+        # Axis 1 of PAM is always species
+        dim1 = ANALYSIS_DIM.species_code()
+        for analysis_code in cls.ANALYSIS_DIMENSIONS:
+            # Axis 0 of PAM is always 'site'
+            dim0 = analysis_code
+            table_type = cls.get_table_type(AGGREGATION_TYPE.STATISTICS, dim0, dim1)
+            meta = {
+                "code": table_type,
+                "fname": f"{table_type}{cls.sep}{cls.dt_token}",
+                "file_extension": ".csv",
+                "data_type": "stats",
+                "datestr": cls.dt_token,
+
+                # Dimensions refer to the PAM matrix, site x species, from which the
+                # stats are computed.
+                "dim_0_code": dim0,
+                "dim_1_code": dim1,
+
+                # Minimum count defining 'presence' in the PAM
+                "min_presence_count": 1,
+
+                # TODO: Remove.  pandas.DataFrame contains row and column headers
+                # # Categories refer to the statistics matrix headers
+                # "row_categories": [],
+                # "column_categories": []
+            }
+            stats[table_type] = meta
+        return stats
+
+    # ...........................
+    @classmethod
     def pam(cls):
         """Species by <dimension> matrix defined for this project.
 
         Returns:
-            mtxs (dict): dict of dictionaries for each matrix/table defined for this
+            pams (dict): dict of dictionaries for each matrix/table defined for this
                 project.
 
         Note:
-            Similar to a Presence/Absence Matrix (PAM),
-                Rows will always have analysis dimension (i.e. region or other category)
-                Columns will have species
+            Rows will always have analysis dimension (i.e. region or other category)
+            Columns will have species
         """
         # TODO: Is this an ephemeral data structure used only for computing stats?
         #       If we want to save it, we must add compress_to_file,
@@ -572,18 +635,16 @@ class SUMMARY:
         #       If we only save computations, must save input HeatmapMatrix metadata
         #       and min_presence_count
         #       Note bison.spnet.pam_matrix.PAM
-        mtxs = {}
+        pams = {}
         for analysis_code in cls.ANALYSIS_DIMENSIONS:
             dim0 = analysis_code
             dim1 = ANALYSIS_DIM.species_code()
-            table_type = cls.get_table_type(AGGREGATION_TYPE.MATRIX, dim0, dim1)
+            table_type = cls.get_table_type(AGGREGATION_TYPE.PAM, dim0, dim1)
 
             # Dimension/Axis 0/row is always region or other analysis dimension
             meta = {
                 "code": table_type,
                 "fname": f"{table_type}{cls.sep}{cls.dt_token}",
-                # "table_format": "Zip",
-                "compressed_extension": "zip",
                 "file_extension": ".npz",
                 "data_type": "matrix",
 
@@ -601,8 +662,8 @@ class SUMMARY:
                 "value": "presence",
                 "min_presence_count": 1,
             }
-            mtxs[table_type] = meta
-        return mtxs
+            pams[table_type] = meta
+        return pams
 
     # ...............................................
     @classmethod
@@ -623,6 +684,8 @@ class SUMMARY:
         tables.update(cls.counts())
         tables.update(cls.summary())
         tables.update(cls.matrix())
+        tables.update(cls.pam())
+        tables.update(cls.statistics())
         if datestr is not None:
             # Update filename in summary tables
             for key, meta in tables.items():
@@ -703,7 +766,7 @@ class SUMMARY:
         table = cls.tables()[table_type]
         ext = table["file_extension"]
         if is_compressed is True:
-            ext = table["compressed_extension"]
+            ext = ZIP_EXTENSION
         fname_tmpl = f"{table['fname']}{ext}"
         fname = fname_tmpl.replace(cls.dt_token, datestr)
         return fname
@@ -746,6 +809,8 @@ class SUMMARY:
     # ...............................................
     @classmethod
     def _parse_filename(cls, filename):
+        # This will parse a filename for the compressed file of statistics, but
+        #             not individual matrix and metadata files for each stat.
         # <datacontents>_<datatype>_<YYYY_MM_DD><_optional parquet extension>
         fname = os.path.basename(filename)
         if fname.endswith(S3_RS_TABLE_SUFFIX):
@@ -775,6 +840,10 @@ class SUMMARY:
 
         Raises:
             Exception: on failure to get tabletype and datestring from this filename.
+
+        Note:
+            This will parse a filename for the compressed file of statistics, but
+            not individual matrix and metadata files for each stat.
         """
         try:
             datacontents, dim0, dim1, datatype, datestr, _rest = \
@@ -853,6 +922,7 @@ class SNKeys(Enum):
             Exception: on un-implemented table type.
         """
         datacontents, dim0, dim1, datatype = SUMMARY.parse_table_type(table_type)
+        keys = None
         if datatype == "matrix":
             # dim0 is row/axis0, dim1 is column/axis1, matrix values are occurrences
             keys = {
@@ -968,6 +1038,9 @@ class SNKeys(Enum):
                 cls.ALL_MEDIAN_COUNT: f"median_{dim1}_count_of_all_{dim0}",
                 cls.ALL_MAX_COUNT: f"max_{dim1}_count_of_all_{dim0}",
             }
+        elif datatype == "pam":
+            # None needed
+            pass
         else:
             raise Exception(f"Keys not defined for {datatype} table")
         return keys

@@ -176,14 +176,15 @@ if __name__ == "__main__":
     # .................................
     min_count = 3
     pam = PAM.init_from_heatmap(heatmap, min_count)
-    species_stats_mtx = pam.calc_species_stats()
-    print(species_stats_mtx)
 
-    site_stats_mtx = pam.calc_site_stats()
-    print(site_stats_mtx)
+    pam.calc_species_stats()
+    pam.calc_site_stats()
+    pam.calc_diversity_stats()
+    # pam.calc_covariance_stats()
 
-    diversity_stats_mtx = pam.calc_diversity_stats()
-    print(diversity_stats_mtx)
+    stats_filename = pam.compress_stats_to_file(local_path=TMP_PATH)
+    stats_data_dict, stats_meta_dict, table_type, datestr = PAM.uncompress_zipped_data(
+        stats_filename)
 
 """
 from bison.task.build_matrices import *

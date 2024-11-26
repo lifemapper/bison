@@ -1167,24 +1167,7 @@ class HeatmapMatrix(_SpeciesDataMatrix):
         return comparisons
 
     # .............................................................................
-    def compress_to_file(self, local_path=TMP_PATH):
-        """Compress this HeatmapMatrix to a zipped npz and json file.
-
-        Args:
-            local_path (str): Absolute path of local destination path
-
-        Returns:
-            zip_fname (str): Local output zip filename.
-
-        Raises:
-            Exception: on failure to write sparse matrix to NPZ file.
-            Exception: on failure to serialize or write metadata.
-            Exception: on failure to write matrix and metadata files to zipfile.
-        """
-        # Always delete local files before compressing this data.
-        [mtx_fname, meta_fname, zip_fname] = self._remove_expected_files(
-            local_path=local_path)
-
+    def _write_files(self, mtx_fname, meta_fname):
         # Save matrix to npz locally
         try:
             scipy.sparse.save_npz(mtx_fname, self._coo_array, compressed=True)
@@ -1213,6 +1196,25 @@ class HeatmapMatrix(_SpeciesDataMatrix):
             self._dump_metadata(metadata, meta_fname)
         except Exception:
             raise
+
+    # .............................................................................
+    def compress_to_file(self, local_path=TMP_PATH):
+        """Compress this HeatmapMatrix to a zipped npz and json file.
+
+        Args:
+            local_path (str): Absolute path of local destination path
+
+        Returns:
+            zip_fname (str): Local output zip filename.
+
+        Raises:
+            Exception: on failure to write matrix and metadata files to zipfile.
+        """
+        # Always delete local files before compressing this data.
+        [mtx_fname, meta_fname, zip_fname] = self._remove_expected_files(
+            local_path=local_path)
+
+        self._write_files(mtx_fname, meta_fname)
 
         # Compress matrix with metadata
         try:
