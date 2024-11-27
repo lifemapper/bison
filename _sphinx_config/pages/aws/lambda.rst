@@ -1,16 +1,28 @@
 Create lambda function to initiate processing
 --------------------------------------------
 
-Lambda functions can execute tasks in a workflow.  They can be initiated when a trigger
-condition occurs, set (separately) in the Amazon EventBridge as either Rules or
-Schedules.
+Lambda functions can execute tasks in a workflow.  They can be initiated manually, or
+automatically with the Amazon EventBridge by either a trigger condition (through Rules)
+or on a timetable (through Schedules).
 
-Lambda functions can only execute for up to 15 minutes at a time, but can launch longer
-running processes in another service, such as launch an EC2 instance to run a
-BISON workflow tasks.
+Lambda functions can only execute for up to 15 minutes at a time, but can initiate
+longer running processes in another service, such as launch an EC2 instance to run a
+BISON workflow task.
+
+Short tasks that require specific or in-development code, may be run in a Docker
+container on an EC2 instance.  The Docker image can be built with code pulled from a
+repository or the pre-built image pulled from a Docker Hub.
 
 Lambda functions log directly to AWS Cloudwatch - make sure the role executing
-the lambda function has Create/Write permissions to AWS Cloudwatch.
+the lambda function has Create/Write permissions to AWS Cloudwatch.  All print
+statements will go to the log.  More information is in the
+
+The BISON workflow has two steps that are run on an EC2 instance.  Both launch an EC2
+instance from a template which contains a startup script in the `userdata` for the
+EC2 instance.  The startup script builds a Docker image from the latest code in the
+BISON Github repository, then executes a task defined in that code.  The steps are
+the first and last of the workflow: **bison_s1_annotate_riis** and
+**bison_s8_calc_stats**, both in the bison/aws/lambda directory.
 
 Edit the Configuration for lambda function
 --------------------------------------------

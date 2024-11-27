@@ -43,9 +43,15 @@ name in the RIIS record to the GBIF 'species' API, to find the accepted name,
 
 * Create an AWS EventBridge Schedule
 
+  * Specify schedule detail: Name, Recurring, Cron-based schedule (allow enough time for
+    the previously scheduled task to complete).
+  * Select target: All APIs, AWS Lambda Invoke
+  * Settings:
+
+
 * Create a lambda function for execution when the trigger condition is activated, in
   this case, the time/date in the schedule.
-  aws/lambda/bison_s0_annotate_riis_lambda.py
+  aws/lambda/bison_s1_annotate_riis_lambda.py
 
   * The lambda function will make sure the data to be created does not already exist
     in S3, execute if needed, return if it does not.
@@ -62,10 +68,10 @@ schedule, roughly estimating completion of the previous step.  These steps with 
 dependency on previous outputs will first check for the existence of required inputs,
 failing immediately if inputs are not present.
 
-Automatic execution (TODO):  The successful deposition of output of the first
+Triggered execution (TODO):  The successful deposition of output of the first
 (scheduled) and all following steps into S3 or Redshift triggers subsequent steps.
 
-Both automatic and scheduled execution will require examining the logs to ensure
+Both triggered and scheduled execution will require examining the logs to ensure
 successful completion.
 
 
