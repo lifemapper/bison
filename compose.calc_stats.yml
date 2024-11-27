@@ -1,0 +1,25 @@
+version: "3.9"
+services:
+
+  bison_task:
+    build:
+      context: ./.
+      target: task
+    environment:
+      - TASK_APP=bison.task.calc_stats
+    env_file:
+      ./.env.task.conf
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: us-east-1
+        awslogs-group: bison_task_calc_stats
+        awslogs-stream: $timestamp
+    volumes:
+      # bind mount from host machine
+      - "/home/ubuntu/aws_data:/volumes/bison_data"
+      # volumes
+      - "scratch-path:/scratch-path"
+
+volumes:
+  scratch-path:
