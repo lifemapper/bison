@@ -178,6 +178,15 @@ state_x_riis_counts_stmt = f"""
                             AND {gbif_sp_fld} IS NOT NULL
         GROUP BY {b_st_fld}, {b_ass_fld};
 """
+state_x_riis_counts_export_stmt = f"""
+    UNLOAD (
+        'SELECT * FROM {pub_schema}.{state_list_tbl} ORDER BY {b_st_fld}, {gbif_sp_fld}')
+        TO '{s3_out}/{state_list_tbl}_'
+        IAM_role DEFAULT
+        ALLOWOVERWRITE
+        FORMAT AS PARQUET
+        PARALLEL OFF;
+"""
 # Note: in county agggregate, include states bc county names are not unique
 county_counts_stmt = f"""
     CREATE TABLE {pub_schema}.{county_counts_tbl} AS
@@ -205,7 +214,7 @@ county_x_riis_counts_stmt = f"""
                             AND {gbif_sp_fld} IS NOT NULL
         GROUP BY {unique_cty_fld}, {b_ass_fld};
 """
-
+# TODO: county_x_riis_counts_export_stmt
 aiannh_counts_stmt = f"""
     CREATE TABLE {pub_schema}.{aiannh_counts_tbl} AS
         SELECT DISTINCT {b_nm_fld},
@@ -232,6 +241,7 @@ aiannh_x_riis_counts_stmt = f"""
                             AND {gbif_sp_fld} IS NOT NULL
         GROUP BY {b_nm_fld}, {b_ass_fld};
 """
+# TODO: aiannh_x_riis_counts_export_stmt
 # ...............................................
 # Records of species, assessment, occ_count by region
 # ...............................................
@@ -251,14 +261,7 @@ state_list_export_stmt = f"""
         FORMAT AS PARQUET
         PARALLEL OFF;
 """
-state_x_riis_counts_export_stmt = f"""
-    UNLOAD (
-        'SELECT * FROM {pub_schema}.{state_list_tbl} ORDER BY {b_st_fld}, {gbif_sp_fld}')
-        TO '{s3_out}/{state_list_tbl}_'
-        IAM_role DEFAULT
-        FORMAT AS PARQUET
-        PARALLEL OFF;
-"""
+
 county_list_stmt = f"""
     CREATE TABLE {pub_schema}.{county_list_tbl} AS
         SELECT DISTINCT {unique_cty_fld}, {b_st_fld}, {b_cty_fld}, {unique_sp_fld},
@@ -275,6 +278,7 @@ county_list_export_stmt = f"""
         FORMAT AS PARQUET
         PARALLEL OFF;
 """
+
 aiannh_list_stmt = f"""
     CREATE TABLE {pub_schema}.{aiannh_list_tbl} AS
         SELECT DISTINCT {b_nm_fld}, {unique_sp_fld}, {gbif_tx_fld}, {gbif_sp_fld},
@@ -290,6 +294,69 @@ aiannh_list_export_stmt = f"""
         FORMAT AS PARQUET
         PARALLEL OFF;
 """
+# ...............................................
+# CSV exports for delivery
+# ...............................................
+state_counts_export_stmt2 = f"""
+    UNLOAD (
+        'SELECT * FROM {pub_schema}.{state_counts_tbl} ORDER BY {b_st_fld}')
+        TO '{s3_out}/{state_counts_tbl}_csv_'
+        IAM_role DEFAULT
+        ALLOWOVERWRITE
+        CSV DELIMITER AS ','
+        HEADER
+        PARALLEL OFF;
+"""
+county_counts_export_stmt2 = f"""
+    UNLOAD (
+        'SELECT * FROM {pub_schema}.{county_counts_tbl} ORDER BY {unique_cty_fld}')
+        TO '{s3_out}/{county_counts_tbl}_csv_'
+        IAM_role DEFAULT
+        ALLOWOVERWRITE
+        CSV DELIMITER AS ','
+        HEADER
+        PARALLEL OFF;
+"""
+aiannh_counts_export_stmt2 = f"""
+    UNLOAD (
+        'SELECT * FROM {pub_schema}.{aiannh_counts_tbl} ORDER BY {b_nm_fld}')
+        TO '{s3_out}/{aiannh_counts_tbl}_csv_'
+        IAM_role DEFAULT
+        ALLOWOVERWRITE
+        CSV DELIMITER AS ','
+        HEADER
+        PARALLEL OFF;
+"""
+state_list_export_stmt2 = f"""
+    UNLOAD (
+        'SELECT * FROM {pub_schema}.{state_list_tbl} ORDER BY {b_st_fld}, {gbif_sp_fld}')
+        TO '{s3_out}/{state_list_tbl}_csv_'
+        IAM_role DEFAULT
+        ALLOWOVERWRITE
+        CSV DELIMITER AS ','
+        HEADER
+        PARALLEL OFF;
+"""
+county_list_export_stmt2 = f"""
+    UNLOAD (
+        'SELECT * FROM {pub_schema}.{county_list_tbl} ORDER BY {unique_cty_fld}, {gbif_sp_fld}')
+        TO '{s3_out}/{county_list_tbl}_csv_'
+        IAM_role DEFAULT
+        ALLOWOVERWRITE
+        CSV DELIMITER AS ','
+        HEADER
+        PARALLEL OFF;
+"""
+aiannh_list_export_stmt2 = f"""
+    UNLOAD (
+        'SELECT * FROM {pub_schema}.{aiannh_list_tbl} ORDER BY {b_nm_fld}, {gbif_sp_fld}')
+        TO '{s3_out}/{aiannh_list_tbl}_csv_'
+        IAM_role DEFAULT
+        ALLOWOVERWRITE
+        CSV DELIMITER AS ','
+        HEADER
+        PARALLEL OFF;
+"""
 query_tables_stmt = f"SHOW TABLES FROM SCHEMA {database}.{pub_schema} LIKE '%_{bison_datestr}';"
 
 REDSHIFT_COMMANDS = [
@@ -297,17 +364,23 @@ REDSHIFT_COMMANDS = [
     # Create tables of region with species counts, occurrence counts
     ("create_counts_by_state", state_counts_stmt, state_counts_tbl),
     ("export_state_counts", state_counts_export_stmt, state_counts_tbl),
+    ("export_state_counts_csv", state_counts_export_stmt2, state_counts_tbl),
     ("create_counts_by_county", county_counts_stmt, county_counts_tbl),
     ("export_county_counts", county_counts_export_stmt, county_counts_tbl),
+    ("export_county_counts_csv", county_counts_export_stmt2, county_counts_tbl),
     ("create_counts_by_aiannh", aiannh_counts_stmt, aiannh_counts_tbl),
     ("export_aiannh_counts", aiannh_counts_export_stmt, aiannh_counts_tbl),
+    ("export_aiannh_counts_csv", aiannh_counts_export_stmt2, aiannh_counts_tbl),
     # Create lists of region with species, riis status, occurrence counts, then export
     ("create_list_state_species", state_list_stmt, state_list_tbl),
     ("export_state_species", state_list_export_stmt, state_list_tbl),
+    ("export_state_species_csv", state_list_export_stmt2, state_list_tbl),
     ("create_list_county_species", county_list_stmt, county_list_tbl),
     ("export_county_species", county_list_export_stmt, county_list_tbl),
+    ("export_county_species_csv", county_list_export_stmt2, county_list_tbl),
     ("create_list_aiannh_species", aiannh_list_stmt, aiannh_list_tbl),
     ("export_aiannh_species", aiannh_list_export_stmt, aiannh_list_tbl),
+    ("export_aiannh_species_csv", aiannh_list_export_stmt2, aiannh_list_tbl),
     ]
 
 
