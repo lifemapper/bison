@@ -1,16 +1,15 @@
 """Matrix of sites as rows, species as columns, values are presence or absence (1/0)."""
 from copy import deepcopy
-from fileinput import filename
 
 import numpy as np
 import os
 import pandas as pd
 from zipfile import ZipFile
 
-from fastparquet.api import statistics
-
 from bison.common.constants import (
-    CSV_DELIMITER, JSON_EXTENSION, STATISTICS_TYPE, SUMMARY, TMP_PATH, ZIP_EXTENSION, CSV_EXTENSION)
+    CSV_DELIMITER, JSON_EXTENSION, STATISTICS_TYPE, SUMMARY, TMP_PATH, CSV_EXTENSION,
+    ZIP_EXTENSION
+)
 from bison.spnet.heatmap_matrix import HeatmapMatrix
 
 
@@ -143,6 +142,8 @@ class PAM(HeatmapMatrix):
         """Get the statistics compressed filename and its matrix and metadata contents.
 
         Args:
+            base_filename (str): Base filename (without path or extension) for the
+                compressed file of statistics matrices and metadata.
             local_path (str): Absolute path of local destination path
 
         Returns:
@@ -221,7 +222,7 @@ class PAM(HeatmapMatrix):
         for stats_type, stats_df in self.stats_matrices.items():
             if stats_df is not None:
                 # Dictionaries stats_matrices and expected files use stat_name as key
-                mtx_fname, meta_fname =  expected_file_dict[stats_type]
+                mtx_fname, meta_fname = expected_file_dict[stats_type]
                 # Write matrix and metadata files
                 self._write_files(stats_type, stats_df, mtx_fname, meta_fname)
 
@@ -336,7 +337,6 @@ class PAM(HeatmapMatrix):
 
         return out_filenames, table_type, datestr
 
-
     # .............................................................................
     @classmethod
     def read_data(cls, statistics_fname_dict):
@@ -411,7 +411,6 @@ class PAM(HeatmapMatrix):
         self.stats_matrices[STATISTICS_TYPE.SIGMA_SITE] = cov_site_mtx
         self.stats_matrices[STATISTICS_TYPE.SIGMA_SPECIES] = cov_species_mtx
 
-
     # ...........................
     def calc_diversity_stats(self):
         """Calculate diversity statistics.
@@ -455,7 +454,7 @@ class PAM(HeatmapMatrix):
         for name, func, input_name in site_matrix_stats:
             try:
                 input_data = data[input_name]
-            except:
+            except KeyError:
                 data[name] = func()
             else:
                 data[name] = func(input_data)
@@ -483,7 +482,7 @@ class PAM(HeatmapMatrix):
         for name, func, input_name in species_matrix_stats:
             try:
                 input_data = data[input_name]
-            except:
+            except KeyError:
                 data[name] = func()
             else:
                 data[name] = func(input_data)
@@ -499,7 +498,7 @@ class PAM(HeatmapMatrix):
         """Calculate Schluter's species variance ratio.
 
         Returns:
-            float: The Schluter species variance ratio for the PAM.
+            schl_sp (float): The Schluter species variance ratio for the PAM.
         """
         sigma_species_, _hdrs = self.sigma_species()
         trace = sigma_species_.trace()
@@ -509,8 +508,9 @@ class PAM(HeatmapMatrix):
     # .............................................................................
     def schluter_site_variance_ratio(self):
         """Calculate Schluter's site variance ratio.
+
         Returns:
-            float: The Schluter site variance ratio for the PAM.
+            schl_site (float): The Schluter site variance ratio for the PAM.
         """
         sigma_sites_, _hdrs = self.sigma_sites()
         trace = sigma_sites_.trace()
@@ -522,7 +522,7 @@ class PAM(HeatmapMatrix):
         """Calculate Whittaker's beta diversity metric for a PAM.
 
         Returns:
-            float: Whittaker's beta diversity for the PAM.
+            whit (float): Whittaker's beta diversity for the PAM.
         """
         omg = None
         omega_prp = self.omega_proportional(omg)
@@ -534,7 +534,7 @@ class PAM(HeatmapMatrix):
         """Calculate Lande's beta diversity metric for a PAM.
 
         Returns:
-            float: Lande's beta diversity for the PAM.
+            land (float): Lande's beta diversity for the PAM.
         """
         # range size (count) per species
         omg = None
@@ -547,32 +547,36 @@ class PAM(HeatmapMatrix):
         """Calculate Legendre's beta diversity metric for a PAM.
 
         Returns:
-            float: Legendre's beta diversity for the PAM.
+            leg (float): Legendre's beta diversity for the PAM.
         """
         # range size (count) per species
         omega_fl = self.omega().astype(float)
         leg = omega_fl.sum() - (omega_fl ** 2).sum() / self.num_sites()
         return leg
 
-    # # ...........................
-    # def c_score(self):
-    #     """Calculate the checker board score for the PAM.
-    #
-    #     Returns:
-    #         float: The checkerboard score for the PAM.
-    #     """
-    #     temp = 0.0
-    #     # Cache these so we don't recompute
-    #     omega_ = self.omega()  # Cache so we don't waste computations
-    #     num_species_ = self.num_species()
-    #
-    #     for i in range(num_species_):
-    #         for j in range(i, num_species_):
-    #             num_shared = len(np.where(np.sum(self.pam[:, [i, j]], axis=1) == 2)[0])
-    #             p_1 = omega_[i] - num_shared
-    #             p_2 = omega_[j] - num_shared
-    #             temp += p_1 * p_2
-    #     return 2 * temp / (num_species_ * (num_species_ - 1))
+    # ...........................
+    def c_score(self):
+        """Calculate the checkerboard score for the PAM.
+
+        Returns:
+            chk (float): The checkerboard score for the PAM.
+
+        TODO: Test and integrate into diversity stats
+        """
+        temp = 0.0
+        # Cache these so we don't recompute
+        omega_ = self.omega()
+        num_species_ = self.num_species()
+        pam = self._coo_array.todense()
+
+        for i in range(num_species_):
+            for j in range(i, num_species_):
+                num_shared = len(np.where(np.sum(pam[:, [i, j]], axis=1) == 2)[0])
+                p_1 = omega_[i] - num_shared
+                p_2 = omega_[j] - num_shared
+                temp += p_1 * p_2
+        chk = 2 * temp / (num_species_ * (num_species_ - 1))
+        return chk
 
     # .............................................................................
     # Species metrics
@@ -594,9 +598,12 @@ class PAM(HeatmapMatrix):
     def omega_proportional(self, omg=None):
         """Calculate the mean proportional range size of each species.
 
+        Args:
+            omg (numpy.ndarray): array of number of sites per species.
+
         Returns:
-            Matrix: A row of the range sizes for each species proportional to the site
-                count.
+            omega_prp (numpy.ndarray): A row of the range sizes for each species
+                proportional to the site count.
         """
         if omg is None:
             omg = self.omega()
@@ -622,13 +629,14 @@ class PAM(HeatmapMatrix):
         """Calculate the mean proportional range richness of each species.
 
         Args:
-            psi_vct (numpy.ndarray):
+            psi_vct (numpy.ndarray): array of range richness per species
+
         Returns:
             psi_vct (numpy.ndarray): 1D array of range richness for the sites of each
                 species proportional to all species' range size.
         """
         if psi_vct is None:
-            psi_vct =  self.psi()
+            psi_vct = self.psi()
         sp_range_size_vector = self.num_species() * self.omega()
         psi_avg_prop = psi_vct.astype(float) / sp_range_size_vector
         return psi_avg_prop
@@ -679,13 +687,16 @@ class PAM(HeatmapMatrix):
     def phi_average_proportional(self, phi_vct=None):
         """Calculate proportional range size per site.
 
+        Args:
+            phi_vct (numpy.ndarray): array of average range size
+
         Returns:
             phi_avg_prop_mtx (numpy.ndarray): A 1D matrix of the value of
                 the sum of the range sizes for species present at each site in the PAM
                 proportional to the number of species in that site.
         """
         if phi_vct is None:
-            phi_vct  = self.phi()
+            phi_vct = self.phi()
         alpha_ = self.alpha()
         phi_avg_prop_mtx = phi_vct / (self.num_sites() * alpha_)
         return phi_avg_prop_mtx
@@ -693,12 +704,14 @@ class PAM(HeatmapMatrix):
     # .............................................................................
     # Covariance metrics
     # .............................................................................
-    # TODO: test the type of matrix returned by these sigma functions
     def sigma_sites(self):
         """Compute the site sigma metric for a PAM.
 
         Returns:
-            Matrix: Matrix of covariance of composition of sites.
+            mtx (numpy.ndarray): Matrix of covariance of composition of sites.
+            headers (dict): categories for axis 0 and 1 headers.
+
+        TODO: find a more efficient implementation, difficult on very large datasets
         """
         pam = self._coo_array.todense(order="C")
         site_by_site = pam.dot(pam.T).astype(float)
@@ -717,7 +730,10 @@ class PAM(HeatmapMatrix):
         """Compute the species sigma metric for a PAM.
 
         Returns:
-            Matrix: Matrix of covariance of composition of species.
+            mtx (numpy.ndarray): Matrix of covariance of composition of species.
+            headers (dict): categories for axis 0 and 1 headers.
+
+        TODO: find a more efficient implementation, difficult on very large datasets
         """
         pam = self._coo_array.todense(order="C")
         species_by_site = pam.T.dot(pam).astype(float)

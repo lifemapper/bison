@@ -3,8 +3,7 @@ import os
 
 from bison.common.aws_util import S3
 from bison.common.constants import (
-    ANALYSIS_DIM, REGION, S3_BUCKET, S3_SUMMARY_DIR, SUMMARY, TMP_PATH, COUNT_FLD,
-    TOTAL_FLD
+    ANALYSIS_DIM, REGION, S3_BUCKET, S3_SUMMARY_DIR, SUMMARY, TMP_PATH
 )
 from bison.common.log import logit
 from bison.common.util import get_current_datadate_str
@@ -135,6 +134,7 @@ def download_dataframe(s3, table_type, datestr, bucket, bucket_dir):
 # --------------------------------------------------------------------------------------
 if __name__ == "__main__":
     """Main script creates a SPECIES_DATASET_MATRIX from county/species list."""
+    overwrite = True
     datestr = get_current_datadate_str()
     s3 = S3(region=REGION)
     logger = None
@@ -151,25 +151,24 @@ if __name__ == "__main__":
     stack_df, heatmap = create_heatmap_from_records(
         s3, stacked_data_table_type, mtx_table_type, datestr)
 
-    # out_filename = heatmap.compress_to_file(local_path=TMP_PATH)
-    # s3_mtx_key = f"{S3_SUMMARY_DIR}/{os.path.basename(out_filename)}"
-    # s3.upload(out_filename, S3_BUCKET, s3_mtx_key, overwrite=True)
-    #
-    #
-    # # .................................
-    # # Create a summary matrix for each dimension of sparse matrix and upload
-    # # .................................
-    # sp_sum_mtx = SummaryMatrix.init_from_heatmap(heatmap, axis=0)
-    # spsum_table_type = sp_sum_mtx.table_type
-    # sp_sum_filename = sp_sum_mtx.compress_to_file()
-    # s3_spsum_key = f"{S3_SUMMARY_DIR}/{os.path.basename(sp_sum_filename)}"
-    # s3.upload(sp_sum_filename, S3_BUCKET, s3_spsum_key, overwrite=True)
-    #
-    # od_sum_mtx = SummaryMatrix.init_from_heatmap(heatmap, axis=1)
-    # odsum_table_type = od_sum_mtx.table_type
-    # od_sum_filename = od_sum_mtx.compress_to_file()
-    # s3_odsum_key = f"{S3_SUMMARY_DIR}/{os.path.basename(od_sum_filename)}"
-    # s3.upload(od_sum_filename, S3_BUCKET, s3_odsum_key, overwrite=True)
+    out_filename = heatmap.compress_to_file(local_path=TMP_PATH)
+    s3_mtx_key = f"{S3_SUMMARY_DIR}/{os.path.basename(out_filename)}"
+    s3.upload(out_filename, S3_BUCKET, s3_mtx_key, overwrite=overwrite)
+
+    # .................................
+    # Create a summary matrix for each dimension of sparse matrix and upload
+    # .................................
+    sp_sum_mtx = SummaryMatrix.init_from_heatmap(heatmap, axis=0)
+    spsum_table_type = sp_sum_mtx.table_type
+    sp_sum_filename = sp_sum_mtx.compress_to_file()
+    s3_spsum_key = f"{S3_SUMMARY_DIR}/{os.path.basename(sp_sum_filename)}"
+    s3.upload(sp_sum_filename, S3_BUCKET, s3_spsum_key, overwrite=overwrite)
+
+    od_sum_mtx = SummaryMatrix.init_from_heatmap(heatmap, axis=1)
+    odsum_table_type = od_sum_mtx.table_type
+    od_sum_filename = od_sum_mtx.compress_to_file()
+    s3_odsum_key = f"{S3_SUMMARY_DIR}/{os.path.basename(od_sum_filename)}"
+    s3.upload(od_sum_filename, S3_BUCKET, s3_odsum_key, overwrite=overwrite)
 
     # .................................
     # Create PAM from Heatmap
@@ -182,18 +181,17 @@ if __name__ == "__main__":
     pam.calc_diversity_stats()
     # pam.calc_covariance_stats()
 
-    stats_filename = pam.compress_stats_to_file(local_path=TMP_PATH)
+    stats_zip_filename = pam.compress_stats_to_file(local_path=TMP_PATH)
     stats_data_dict, stats_meta_dict, table_type, datestr = PAM.uncompress_zipped_data(
-        stats_filename)
+        stats_zip_filename)
+    stats_key = f"{S3_SUMMARY_DIR}/{os.path.basename(stats_zip_filename)}"
+    s3.upload(stats_zip_filename, S3_BUCKET, stats_key, overwrite=overwrite)
 
 """
 from bison.task.build_matrices import *
 from bison.common.constants import *
-from pprint import pp
 
-local_path = TMP_PATH
 overwrite = True
-test_count = 5
 datestr = get_current_datadate_str()
 s3 = S3(region=REGION)
 logger = None
@@ -204,5 +202,46 @@ stacked_data_table_type = SUMMARY.get_table_type("list", dim_region, dim_species
 # Species are always columns (for PAM)
 mtx_table_type = SUMMARY.get_table_type("matrix", dim_region, dim_species)
 
+# .................................
+# Build heatmap, upload
+# .................................
+stack_df, heatmap = create_heatmap_from_records(
+    s3, stacked_data_table_type, mtx_table_type, datestr)
 
+out_filename = heatmap.compress_to_file(local_path=TMP_PATH)
+s3_mtx_key = f"{S3_SUMMARY_DIR}/{os.path.basename(out_filename)}"
+s3.upload(out_filename, S3_BUCKET, s3_mtx_key, overwrite=overwrite)
+
+
+# .................................
+# Create a summary matrix for each dimension of sparse matrix and upload
+# .................................
+sp_sum_mtx = SummaryMatrix.init_from_heatmap(heatmap, axis=0)
+spsum_table_type = sp_sum_mtx.table_type
+sp_sum_filename = sp_sum_mtx.compress_to_file()
+s3_spsum_key = f"{S3_SUMMARY_DIR}/{os.path.basename(sp_sum_filename)}"
+s3.upload(sp_sum_filename, S3_BUCKET, s3_spsum_key, overwrite=overwrite)
+
+od_sum_mtx = SummaryMatrix.init_from_heatmap(heatmap, axis=1)
+odsum_table_type = od_sum_mtx.table_type
+od_sum_filename = od_sum_mtx.compress_to_file()
+s3_odsum_key = f"{S3_SUMMARY_DIR}/{os.path.basename(od_sum_filename)}"
+s3.upload(od_sum_filename, S3_BUCKET, s3_odsum_key, overwrite=overwrite)
+
+# .................................
+# Create PAM from Heatmap
+# .................................
+min_count = 3
+pam = PAM.init_from_heatmap(heatmap, min_count)
+
+pam.calc_species_stats()
+pam.calc_site_stats()
+pam.calc_diversity_stats()
+# pam.calc_covariance_stats()
+
+stats_zip_filename = pam.compress_stats_to_file(local_path=TMP_PATH)
+stats_data_dict, stats_meta_dict, table_type, datestr = PAM.uncompress_zipped_data(
+    stats_zip_filename)
+stats_key = f"{S3_SUMMARY_DIR}/{os.path.basename(stats_zip_filename)}"
+s3.upload(stats_zip_filename, S3_BUCKET, stats_key, overwrite=overwrite)
 """

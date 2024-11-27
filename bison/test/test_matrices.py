@@ -1,18 +1,16 @@
-"""Script to read RIIS records from a file, annotate them, then output to a file."""
-"""Create a matrix of occurrence or species counts by (geospatial) analysis dimension."""
+"""Test creation of species by site matrices, then summaries and statistics."""
 import os
 
 from bison.common.aws_util import S3
 from bison.common.constants import (
-    ANALYSIS_DIM, REGION, S3_BUCKET, S3_SUMMARY_DIR, SUMMARY, TMP_PATH, COUNT_FLD,
-    TOTAL_FLD
+    ANALYSIS_DIM, REGION, SUMMARY, TMP_PATH, COUNT_FLD, TOTAL_FLD
 )
 from bison.common.log import logit
 from bison.common.util import get_current_datadate_str
 from bison.spnet.heatmap_matrix import HeatmapMatrix
 from bison.spnet.pam_matrix import PAM
 from bison.spnet.summary_matrix import SummaryMatrix
-from bison.task.build_matrices import (create_heatmap_from_records)
+from bison.task.calc_stats import (create_heatmap_from_records)
 
 """
 Note:
@@ -400,8 +398,6 @@ def _test_stacked_to_aggregate_extremes(
         logit("", logger=logger)
     logit("", logger=logger)
     return success
-# ...............................................
-
 
 
 # .............................................................................
@@ -459,7 +455,6 @@ if __name__ == "__main__":
     sp_sum_mtx = SummaryMatrix.init_from_heatmap(heatmap, axis=0)
     spsum_table_type = sp_sum_mtx.table_type
     sp_sum_filename = sp_sum_mtx.compress_to_file(local_path=TMP_PATH)
-
 
     od_sum_mtx = SummaryMatrix.init_from_heatmap(heatmap, axis=1)
     odsum_table_type = od_sum_mtx.table_type
