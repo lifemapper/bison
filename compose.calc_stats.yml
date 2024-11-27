@@ -13,8 +13,10 @@ services:
       driver: awslogs
       options:
         awslogs-region: us-east-1
-        awslogs-group: bison_task_calc_stats
-        awslogs-stream: $timestamp
+        awslogs-group: bison_task
+        awslogs-stream: calc_stats
+        # awslogs-group: bison_task_calc_stats
+        # awslogs-stream: $timestamp
     volumes:
       # bind mount from host machine
       - "/home/ubuntu/aws_data:/volumes/bison_data"
