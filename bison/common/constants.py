@@ -72,12 +72,16 @@ JSON_EXTENSION = ".json"
 CSV_EXTENSION = ".csv"
 
 
+# .............................................................................
+# BISON Workflow: scripts, docker compose files, EC2 launch template versions,
+#   Cloudwatch streams
 class TASK:
     """Workflow tasks to be executed on EC2 instances."""
     TEST = "test_task"
+    # Step 1
     ANNOTATE_RIIS = "annotate_riis"
-    SUMMARIZE = "summarize"
-    BUILD_HEATMAP = "build_heatmap"
+    # Step 8
+    CALC_STATS = "calc_stats"
     userdata_extension = ".userdata.sh"
 
     # ...........................
@@ -88,7 +92,7 @@ class TASK:
         Returns:
             (list of str): all valid tasks
         """
-        return (cls.TEST, cls.ANNOTATE_RIIS, cls.SUMMARIZE, cls.BUILD_HEATMAP)
+        return (cls.TEST, cls.ANNOTATE_RIIS, cls.CALC_STATS)
 
     # ...........................
     @classmethod
@@ -290,6 +294,7 @@ class ANALYSIS_DIM:
 
 # .............................................................................
 class STATISTICS_TYPE:
+    """Biodiversity statistics for a Site by Species presence-absence matrix (PAM)."""
     SIGMA_SITE = "sigma-site"
     SIGMA_SPECIES = "sigma-species"
     DIVERSITY = "diversity"
@@ -757,8 +762,10 @@ class SUMMARY:
 
         Args:
             table_type (str): predefined type of data indicating type and contents.
-            datestr: Datestring contained in the filename indicating the current version
+            datestr (str): Datestring contained in the filename indicating the current version
                 of the data.
+            is_compressed (bool): flag indicating to return a filename for a compressed
+                file.
 
         Returns:
             tables: dictionary of summary table metadata.
