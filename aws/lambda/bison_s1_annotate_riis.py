@@ -37,7 +37,7 @@ RIIS_BASENAME = "USRIISv2_MasterList"
 annotated_riis_key = f"{S3_IN_DIR}/{RIIS_BASENAME}_annotated_{bison_datestr}.csv"
 
 # EC2 launch template/version
-EC2_SPOT_TEMPLATE = "bison_spot_task_template"
+EC2_SPOT_TEMPLATE = f"{PROJECT}_spot_task_template"
 TASK = "annotate_riis"
 
 # .............................................................................
@@ -110,7 +110,7 @@ def lambda_handler(event, context):
 
     print("*** ---------------------------------------")
     print("*** Launch EC2 instance with task template version")
-    instance_name = f"bison_{TASK}"
+    instance_name = f"{PROJECT}_{TASK}"
 
     try:
         response = ec2_client.run_instances(
@@ -147,5 +147,5 @@ def lambda_handler(event, context):
 
     return {
         "statusCode": 200,
-        "body": f"Executed bison_s1_annotate_riis lambda starting EC2 {instance_id}"
+        "body": f"Executed {PROJECT}_s1_{TASK} lambda starting EC2 {instance_id}"
     }
