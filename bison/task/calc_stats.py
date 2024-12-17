@@ -5,7 +5,6 @@ from bison.common.aws_util import S3
 from bison.common.constants import (
     ANALYSIS_DIM, REGION, S3_BUCKET, S3_SUMMARY_DIR, SUMMARY, TMP_PATH
 )
-from bison.common.log import logit
 from bison.common.util import get_current_datadate_str
 from bison.spnet.heatmap_matrix import HeatmapMatrix
 from bison.spnet.pam_matrix import PAM
@@ -21,7 +20,7 @@ Note:
 
 # .............................................................................
 def create_heatmap_from_records(
-        s3, stacked_table_type, mtx_table_type, datestr, logger=None):
+        s3, stacked_table_type, mtx_table_type, datestr):
     """Read stacked records from S3, aggregate into a sparse matrix of species x dim.
 
     Args:
@@ -31,7 +30,6 @@ def create_heatmap_from_records(
         mtx_table_type (code from bison.common.constants.SUMMARY): predefined type
             of data to create from the stacked data.
         datestr (str): date of the current dataset, in YYYY_MM_DD format
-        logger (bison.common.log.Logger): for writing messages to file and console
 
     Returns:
         heatmap (bison.spnet.heatmap_matrix.HeatmapMatrix): sparse matrix
@@ -53,21 +51,18 @@ def create_heatmap_from_records(
         y_fld, x_fld, val_fld, stk_df = \
             _read_stacked_data_records(s3, stacked_table_type, datestr)
     except Exception as e:
-        logit(
-            f"Failed to read {stacked_table_type} to dataframe. ({e})",
-            logger=logger
-        )
+        print(f"Failed to read {stacked_table_type} to dataframe. ({e})")
         raise
-    logit(f"Read stacked data {stacked_table_type}.", logger=logger)
+    print(f"Read stacked data {stacked_table_type}.")
 
     # Create matrix from record data, then test consistency and upload.
     try:
         heatmap = HeatmapMatrix.init_from_stacked_data(
             stk_df, y_fld, x_fld, val_fld, mtx_table_type, datestr)
     except Exception as e:
-        logger.log(f"Failed to read {stacked_table_type} to sparse matrix. ({e})")
+        print(f"Failed to read {stacked_table_type} to sparse matrix. ({e})")
         raise(e)
-    logit(f"Built {mtx_table_type} from stacked data.", logger=logger)
+    print(f"Built {mtx_table_type} from stacked data.")
 
     return stk_df, heatmap
 
@@ -137,7 +132,6 @@ if __name__ == "__main__":
     overwrite = True
     datestr = get_current_datadate_str()
     s3 = S3(region=REGION)
-    logger = None
 
     dim_region = ANALYSIS_DIM.COUNTY["code"]
     dim_species = ANALYSIS_DIM.species_code()
@@ -195,7 +189,6 @@ from bison.common.constants import *
 overwrite = True
 datestr = get_current_datadate_str()
 s3 = S3(region=REGION)
-logger = None
 
 dim_region = ANALYSIS_DIM.COUNTY["code"]
 dim_species = ANALYSIS_DIM.species_code()
