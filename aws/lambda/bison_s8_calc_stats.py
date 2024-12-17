@@ -27,16 +27,10 @@ WORKFLOW_ROLE_NAME = f"{PROJECT}_redshift_lambda_role"
 WORKFLOW_ROLE_ARN = f"arn:aws:iam::{PROJECT}:role/service-role/{WORKFLOW_ROLE_NAME}"
 WORKFLOW_USER = f"project.{PROJECT}"
 
-# S3 locations
-S3_BUCKET = f"{PROJECT}-{AWS_ACCOUNT}-{REGION}"
-S3_IN_DIR = "input"
-S3_OUT_DIR = "output"
-S3_LOG_DIR = "log"
-S3_SUMMARY_DIR = "summary"
-
 # EC2 launch template/version
-EC2_SPOT_TEMPLATE = "bison_spot_task_template"
+EC2_SPOT_TEMPLATE = f"{PROJECT}_spot_task_template"
 TASK = "calc_stats"
+EC2_INSTANCE_NAME = f"{PROJECT}_{TASK}"
 
 # .............................................................................
 # Initialize Botocore session
@@ -46,7 +40,7 @@ timeout = 300
 session = boto3.session.Session()
 bc_session = bc.get_session()
 session = boto3.Session(botocore_session=bc_session, region_name=REGION)
-# Initialize Redshift client
+# Initialize EC2 client
 config = Config(connect_timeout=timeout, read_timeout=timeout)
 ec2_client = session.client("ec2", config=config)
 
@@ -89,7 +83,6 @@ def lambda_handler(event, context):
 
     print("*** ---------------------------------------")
     print("*** Launch EC2 instance with task template version")
-    instance_name = f"bison_{TASK}"
 
     try:
         response = ec2_client.run_instances(
@@ -101,7 +94,7 @@ def lambda_handler(event, context):
                 {
                     "ResourceType": "instance",
                     "Tags": [
-                        {"Key": "Name", "Value": instance_name},
+                        {"Key": "Name", "Value": EC2_INSTANCE_NAME},
                         {"Key": "TemplateName", "Value": EC2_SPOT_TEMPLATE}
                     ]
                 }

@@ -133,7 +133,7 @@ def download_dataframe(s3, table_type, datestr, bucket, bucket_dir):
 # Main
 # --------------------------------------------------------------------------------------
 if __name__ == "__main__":
-    """Main script creates a SPECIES_DATASET_MATRIX from county/species list."""
+    """Main script creates county_x_species_matrix from a county/species list."""
     overwrite = True
     datestr = get_current_datadate_str()
     s3 = S3(region=REGION)
@@ -141,7 +141,8 @@ if __name__ == "__main__":
 
     dim_region = ANALYSIS_DIM.COUNTY["code"]
     dim_species = ANALYSIS_DIM.species_code()
-    stacked_data_table_type = SUMMARY.get_table_type("list", dim_region, dim_species)
+    stacked_data_table_type = SUMMARY.get_table_type(
+        "list", dim_region, dim_species)
     # Species are always columns (for PAM)
     mtx_table_type = SUMMARY.get_table_type("matrix", dim_region, dim_species)
 

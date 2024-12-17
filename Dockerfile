@@ -1,6 +1,7 @@
 # syntax=docker/dockerfile:1
 # ........................................................
 # Backend base image
+# ........................................................
 #FROM python:3.12.3-alpine3.20 as base
 FROM python:3.12-slim-bookworm as base
 
@@ -40,6 +41,7 @@ COPY --chown=bison:bison ./data ./data
 
 # ........................................................
 # Task image from base
+# ........................................................
 FROM base as task
 # Install dev dependencies for debugging
 RUN venv/bin/pip install debugpy
@@ -56,6 +58,7 @@ CMD venv/bin/python -m ${TASK_APP}
 
 # ........................................................
 # Development flask image from base
+# ........................................................
 FROM base as dev-flask
 # Install dev dependencies for debugging
 RUN venv/bin/pip install debugpy
@@ -71,6 +74,7 @@ CMD venv/bin/python -m debugpy --listen 0.0.0.0:${DEBUG_PORT} -m ${FLASK_MANAGE}
 
 # ........................................................
 # Production flask image from base
+# ........................................................
 FROM base as flask
 
 COPY --chown=bison:bison ./flask_app ./flask_app
@@ -79,6 +83,7 @@ CMD venv/bin/python -m gunicorn -w 4 --bind 0.0.0.0:5000 ${FLASK_APP}
 
 # ........................................................
 # Frontend base image (for development)
+# ........................................................
 FROM node:16.10.0-buster as base-front-end
 
 LABEL maintainer="Specify Collections Consortium <github.com/specify>"
@@ -97,6 +102,7 @@ COPY --chown=node:node bison/frontend/js_src .
 
 # ........................................................
 # Frontend image (for production) from base-front-end
+# ........................................................
 FROM base-front-end as front-end
 
 RUN npm run build

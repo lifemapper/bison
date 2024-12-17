@@ -21,6 +21,7 @@ SELECT current_user;
 GRANT CREATE
     ON DATABASE dev
     TO IAMR:bison_redshift_lambda_role
+
 SELECT has_database_privilege('IAMR:bison_redshift_lambda_role', 'dev', 'create');
 
 GRANT ALL
