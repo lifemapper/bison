@@ -3,7 +3,7 @@ import os
 
 from bison.common.aws_util import S3
 from bison.common.constants import (
-    ANALYSIS_DIM, REGION, S3_BUCKET, S3_SUMMARY_DIR, SUMMARY, TMP_PATH
+    ANALYSIS_DIM, REGION, S3_BUCKET, S3_OUT_DIR, S3_SUMMARY_DIR, SUMMARY, TMP_PATH
 )
 from bison.common.util import get_current_datadate_str
 from bison.spnet.heatmap_matrix import HeatmapMatrix
@@ -179,11 +179,11 @@ if __name__ == "__main__":
     stats_zip_filename = pam.compress_stats_to_file(local_path=TMP_PATH)
     stats_data_dict, stats_meta_dict, table_type, datestr = PAM.uncompress_zipped_data(
         stats_zip_filename)
-    stats_key = f"{S3_SUMMARY_DIR}/{os.path.basename(stats_zip_filename)}"
+    stats_key = f"{S3_OUT_DIR}/{os.path.basename(stats_zip_filename)}"
     s3.upload(stats_zip_filename, S3_BUCKET, stats_key, overwrite=overwrite)
 
 """
-from bison.task.build_matrices import *
+from bison.task.calc_stats import *
 from bison.common.constants import *
 
 overwrite = True
@@ -192,7 +192,8 @@ s3 = S3(region=REGION)
 
 dim_region = ANALYSIS_DIM.COUNTY["code"]
 dim_species = ANALYSIS_DIM.species_code()
-stacked_data_table_type = SUMMARY.get_table_type("list", dim_region, dim_species)
+stacked_data_table_type = SUMMARY.get_table_type(
+    "list", dim_region, dim_species)
 # Species are always columns (for PAM)
 mtx_table_type = SUMMARY.get_table_type("matrix", dim_region, dim_species)
 
@@ -205,7 +206,6 @@ stack_df, heatmap = create_heatmap_from_records(
 out_filename = heatmap.compress_to_file(local_path=TMP_PATH)
 s3_mtx_key = f"{S3_SUMMARY_DIR}/{os.path.basename(out_filename)}"
 s3.upload(out_filename, S3_BUCKET, s3_mtx_key, overwrite=overwrite)
-
 
 # .................................
 # Create a summary matrix for each dimension of sparse matrix and upload
