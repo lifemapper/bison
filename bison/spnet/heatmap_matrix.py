@@ -1082,7 +1082,7 @@ class HeatmapMatrix(_SpeciesDataMatrix):
         """
         # all_counts = self._coo_array.getnnz(axis=axis).tolist()
         if axis == 0:
-            sp_arr = self._coo_array.tocsr()
+            sp_arr = self._coo_array.tocsc()
         else:
             sp_arr = self._coo_array.tocsr()
 
