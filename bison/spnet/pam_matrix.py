@@ -53,7 +53,7 @@ class PAM(HeatmapMatrix):
         """
         # Check PAM is binary (0/1)
         tmp = binary_coo_array > 1
-        if tmp.getnnz() > 0:
+        if tmp.count_nonzero() > 0:
             raise Exception("Only 0 and 1 are allowed in a Presence-Absence Matrix")
         # Check PAM is numpy.int8
         if binary_coo_array.dtype != np.int8:

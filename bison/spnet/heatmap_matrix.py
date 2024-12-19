@@ -566,10 +566,12 @@ class HeatmapMatrix(_SpeciesDataMatrix):
             if axis == 1:
                 axis_type = self.x_dimension["code"]
             raise Exception(f"Label {label} does not exist in axis {axis}, {axis_type}")
+
+        lil = self._coo_array.tolil()
         if axis == 0:
-            vector = self._coo_array.getrow(idx)
+            vector = lil.getrow(idx)
         elif axis == 1:
-            vector = self._coo_array.getcol(idx)
+            vector = lil.T.getrow(idx)
         else:
             raise Exception(f"2D sparse array does not have axis {axis}")
         idx = self.convert_np_vals_for_json(idx)
@@ -867,8 +869,10 @@ class HeatmapMatrix(_SpeciesDataMatrix):
         max_total_labels = self.get_labels_for_val_in_vector(
             all_totals, max_total, axis=1)
 
-        # Get number of non-zero entries for every row (column, numpy.ndarray)
-        all_counts = self._coo_array.getnnz(axis=1)
+        # For every row, get number of non-zero entries
+        csr = self._coo_array.tocsr()
+        all_counts = np.diff(csr.indptr)
+
         min_count = all_counts.min()
         min_count_number = self.count_val_in_vector(all_counts, min_count)
         max_count = all_counts.max()
@@ -998,8 +1002,10 @@ class HeatmapMatrix(_SpeciesDataMatrix):
         max_total_labels = self.get_labels_for_val_in_vector(
             all_totals, max_total, axis=0)
 
-        # Get number of non-zero rows for every column (row, numpy.ndarray)
-        all_counts = self._coo_array.getnnz(axis=0)
+        # For every column, get number of non-zero rows
+        csc = self._coo_array.tocsc()
+        all_counts = np.diff(csc.indptr)
+
         # Min count and columns that contain that
         min_count = all_counts.min()
         min_count_number = self.count_val_in_vector(all_counts, min_count)
@@ -1074,7 +1080,13 @@ class HeatmapMatrix(_SpeciesDataMatrix):
         Returns:
             all_counts (list): list of values for the axis.
         """
-        all_counts = self._coo_array.getnnz(axis=axis).tolist()
+        # all_counts = self._coo_array.getnnz(axis=axis).tolist()
+        if axis == 0:
+            sp_arr = self._coo_array.tocsr()
+        else:
+            sp_arr = self._coo_array.tocsr()
+
+        all_counts = np.diff(sp_arr.indptr)
         return all_counts
 
     # ...............................................
