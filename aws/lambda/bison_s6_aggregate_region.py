@@ -37,7 +37,8 @@ S3_LOG_DIR = "log"
 S3_SUMMARY_DIR = "summary"
 s3_summary_prefix = f"{S3_SUMMARY_DIR}/"
 s3_summary_suffix = "_000.parquet"
-s3_out = f"s3://{S3_BUCKET}/summary"
+s3_summary = f"s3://{S3_BUCKET}/{S3_SUMMARY_DIR}"
+s3_out = f"s3://{S3_BUCKET}/{S3_OUT_DIR}"
 
 # Redshift
 # namespace, workgroup both = 'bison'
@@ -164,7 +165,7 @@ state_counts_stmt = f"""
 state_counts_export_stmt = f"""
     UNLOAD (
         'SELECT * FROM {pub_schema}.{state_counts_tbl} ORDER BY {b_st_fld}')
-        TO '{s3_out}/{state_counts_tbl}_'
+        TO '{s3_summary}/{state_counts_tbl}_'
         IAM_role DEFAULT
         FORMAT AS PARQUET
         PARALLEL OFF;
@@ -181,7 +182,7 @@ state_x_riis_counts_stmt = f"""
 state_x_riis_counts_export_stmt = f"""
     UNLOAD (
         'SELECT * FROM {pub_schema}.{state_list_tbl} ORDER BY {b_st_fld}, {gbif_sp_fld}')
-        TO '{s3_out}/{state_list_tbl}_'
+        TO '{s3_summary}/{state_list_tbl}_'
         IAM_role DEFAULT
         ALLOWOVERWRITE
         FORMAT AS PARQUET
@@ -200,7 +201,7 @@ county_counts_stmt = f"""
 county_counts_export_stmt = f"""
     UNLOAD (
         'SELECT * FROM {pub_schema}.{county_counts_tbl} ORDER BY {unique_cty_fld}')
-        TO '{s3_out}/{county_counts_tbl}_'
+        TO '{s3_summary}/{county_counts_tbl}_'
         IAM_role DEFAULT
         FORMAT AS PARQUET
         PARALLEL OFF;
@@ -227,7 +228,7 @@ aiannh_counts_stmt = f"""
 aiannh_counts_export_stmt = f"""
     UNLOAD (
         'SELECT * FROM {pub_schema}.{aiannh_counts_tbl} ORDER BY {b_nm_fld}')
-        TO '{s3_out}/{aiannh_counts_tbl}_'
+        TO '{s3_summary}/{aiannh_counts_tbl}_'
         IAM_role DEFAULT
         FORMAT AS PARQUET
         PARALLEL OFF;
@@ -256,7 +257,7 @@ state_list_stmt = f"""
 state_list_export_stmt = f"""
     UNLOAD (
         'SELECT * FROM {pub_schema}.{state_list_tbl} ORDER BY {b_st_fld}, {gbif_sp_fld}')
-        TO '{s3_out}/{state_list_tbl}_'
+        TO '{s3_summary}/{state_list_tbl}_'
         IAM_role DEFAULT
         FORMAT AS PARQUET
         PARALLEL OFF;
@@ -273,7 +274,7 @@ county_list_stmt = f"""
 county_list_export_stmt = f"""
     UNLOAD (
         'SELECT * FROM {pub_schema}.{county_list_tbl} ORDER BY {unique_cty_fld}, {gbif_sp_fld}')
-        TO '{s3_out}/{county_list_tbl}_'
+        TO '{s3_summary}/{county_list_tbl}_'
         IAM_role DEFAULT
         FORMAT AS PARQUET
         PARALLEL OFF;
@@ -289,7 +290,7 @@ aiannh_list_stmt = f"""
 aiannh_list_export_stmt = f"""
     UNLOAD (
         'SELECT * FROM {pub_schema}.{aiannh_list_tbl} ORDER BY {b_nm_fld}, {gbif_sp_fld}')
-        TO '{s3_out}/{aiannh_list_tbl}_'
+        TO '{s3_summary}/{aiannh_list_tbl}_'
         IAM_role DEFAULT
         FORMAT AS PARQUET
         PARALLEL OFF;
