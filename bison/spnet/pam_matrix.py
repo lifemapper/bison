@@ -66,8 +66,6 @@ class PAM(HeatmapMatrix):
 
         # Populate this on computation, with keys used in filename construction
         self.stats_matrices = {}
-        for key in STATISTICS_TYPE.all():
-            self.stats_matrices[key] = None
 
         HeatmapMatrix.__init__(
             self, cmp_pam_coo_array, table_type, datestr, cmp_row_categ, cmp_col_categ,
