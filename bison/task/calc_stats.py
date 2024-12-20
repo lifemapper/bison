@@ -236,6 +236,6 @@ pam.calc_diversity_stats()
 stats_zip_filename = pam.compress_stats_to_file(local_path=TMP_PATH)
 stats_data_dict, stats_meta_dict, table_type, datestr = PAM.uncompress_zipped_data(
     stats_zip_filename)
-stats_key = f"{S3_SUMMARY_DIR}/{os.path.basename(stats_zip_filename)}"
+stats_key = f"{S3_OUT_DIR}/{os.path.basename(stats_zip_filename)}"
 _uri = s3.upload(stats_zip_filename, S3_BUCKET, stats_key, overwrite=overwrite)
 """

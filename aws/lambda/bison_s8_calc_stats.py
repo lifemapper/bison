@@ -5,8 +5,9 @@ import botocore.session as bc
 from botocore.client import Config
 from datetime import datetime
 
-print("*** Loading function bison_s8_calc_stats")
 PROJECT = "bison"
+TASK = "calc_stats"
+print(f"*** Loading function {PROJECT}_s8_{TASK}")
 
 # .............................................................................
 # Dataload filename postfixes
@@ -29,7 +30,6 @@ WORKFLOW_USER = f"project.{PROJECT}"
 
 # EC2 launch template/version
 EC2_SPOT_TEMPLATE = f"{PROJECT}_spot_task_template"
-TASK = "calc_stats"
 EC2_INSTANCE_NAME = f"{PROJECT}_{TASK}"
 
 # .............................................................................

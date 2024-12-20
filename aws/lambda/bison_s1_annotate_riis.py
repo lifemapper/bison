@@ -5,8 +5,9 @@ import botocore.session as bc
 from botocore.client import Config
 from datetime import datetime
 
-print("*** Loading function bison_s1_annotate_riis")
 PROJECT = "bison"
+TASK = "annotate_riis"
+print(f"*** Loading function {PROJECT}_s1_{TASK}")
 
 # .............................................................................
 # Dataload filename postfixes
@@ -38,7 +39,7 @@ annotated_riis_key = f"{S3_IN_DIR}/{RIIS_BASENAME}_annotated_{bison_datestr}.csv
 
 # EC2 launch template/version
 EC2_SPOT_TEMPLATE = f"{PROJECT}_spot_task_template"
-TASK = "annotate_riis"
+EC2_INSTANCE_NAME = f"{PROJECT}_{TASK}"
 
 # .............................................................................
 # Initialize Botocore session
@@ -48,7 +49,7 @@ timeout = 300
 session = boto3.session.Session()
 bc_session = bc.get_session()
 session = boto3.Session(botocore_session=bc_session, region_name=REGION)
-# Initialize Redshift client
+# Initialize AWS clients
 config = Config(connect_timeout=timeout, read_timeout=timeout)
 s3_client = session.client("s3", config=config, region_name=REGION)
 ec2_client = session.client("ec2", config=config)
@@ -110,7 +111,6 @@ def lambda_handler(event, context):
 
     print("*** ---------------------------------------")
     print("*** Launch EC2 instance with task template version")
-    instance_name = f"{PROJECT}_{TASK}"
 
     try:
         response = ec2_client.run_instances(
@@ -122,7 +122,7 @@ def lambda_handler(event, context):
                 {
                     "ResourceType": "instance",
                     "Tags": [
-                        {"Key": "Name", "Value": instance_name},
+                        {"Key": "Name", "Value": EC2_INSTANCE_NAME},
                         {"Key": "TemplateName", "Value": EC2_SPOT_TEMPLATE}
                     ]
                 }
