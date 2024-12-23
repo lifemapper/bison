@@ -5,8 +5,8 @@ from botocore.client import Config
 from datetime import datetime
 import time
 
-print("*** Loading function bison_s3_create_bison")
 PROJECT = "bison"
+print(f"*** Loading function {PROJECT}_s3_create_bison")
 
 # .............................................................................
 # Dataload filename postfixes

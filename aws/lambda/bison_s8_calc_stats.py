@@ -7,7 +7,7 @@ from datetime import datetime
 
 PROJECT = "bison"
 TASK = "calc_stats"
-print(f"*** Loading function {PROJECT}_s8_{TASK}")
+print(f"*** Loading function {PROJECT} workflow step {TASK}")
 
 # .............................................................................
 # Dataload filename postfixes
@@ -119,5 +119,5 @@ def lambda_handler(event, context):
 
     return {
         "statusCode": 200,
-        "body": f"Executed bison_s1_annotate_riis lambda starting EC2 {instance_id}"
+        "body": f"Executed {PROJECT} {TASK} lambda starting EC2 {instance_id}"
     }
