@@ -437,8 +437,8 @@ class SUMMARY:
             meta = {
                 "code": table_type,
                 "fname": f"{table_type}{cls.sep}{cls.dt_token}",
-                # "table_format": "Parquet",
-                "file_extension": f"{cls.sep}000.parquet",
+                # "table_format": "CSV",
+                "file_extension": f"{cls.sep}csv{cls.sep}000",
 
                 "fields": dim["fields"],
                 "key_fld": dim["key_fld"],
