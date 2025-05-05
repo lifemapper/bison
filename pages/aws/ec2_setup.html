@@ -1,0 +1,371 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EC2 instance creation &mdash; LmBISON documentation 1.0a1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=036e6a88"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Create lambda function to initiate processing" href="lambda.html" />
+    <link rel="prev" title="AWS Resource Setup" href="aws_setup.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            LmBISON documentation
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../about.html">About</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../workflow.html">AWS workflow</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="aws_setup.html">AWS Resource Setup</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">EC2 instance creation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#create-console">Create (Console)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#create-an-ssh-key-for-github-clone">Create an SSH key for Github clone</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#install-software">Install software</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#for-api-deployment">for API deployment</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#ssl-certificates">SSL certificates</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#configure-for-aws-access">Configure for AWS access</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#ec2-for-workflow-tasks">EC2 for Workflow Tasks</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#credentials">Credentials</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#hop-limit-for-aws-communication">Hop Limit for AWS communication</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#ec2-docker-setup">EC2/Docker setup</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="lambda.html">Create lambda function to initiate processing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="lambda.html#edit-the-configuration-for-lambda-function">Edit the Configuration for lambda function</a></li>
+<li class="toctree-l1"><a class="reference internal" href="lambda.html#lambda-to-query-redshift">Lambda to query Redshift</a></li>
+<li class="toctree-l1"><a class="reference internal" href="lambda.html#lambda-to-start-ec2-for-task">Lambda to start EC2 for task</a></li>
+<li class="toctree-l1"><a class="reference internal" href="roles.html">Roles, Policies, Trust Relationships</a></li>
+<li class="toctree-l1"><a class="reference internal" href="automation.html">Workflow Automation</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../interaction/debug.html">Debugging Flask and Docker instances</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../interaction/deploy.html">Deploy BISON</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../history/year4_planB.html">Year 4, Part 2, 2023-2024</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../history/year4_planA.html">Year 4, Part 1, 2023</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../history/year3.html">Year 3, 2021-2022</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../history/year5.html">Year 5, 2024</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../history/aws_experiments.html">AWS workflow experiments</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../history/aws_experiments.html#glue-interactive-development">Glue - Interactive Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../history/aws_experiments.html#bison-aws-data-tools">BISON AWS data/tools</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">LmBISON documentation</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">EC2 instance creation</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/pages/aws/ec2_setup.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="ec2-instance-creation">
+<h1>EC2 instance creation<a class="headerlink" href="#ec2-instance-creation" title="Link to this heading"></a></h1>
+<section id="create-console">
+<h2>Create (Console)<a class="headerlink" href="#create-console" title="Link to this heading"></a></h2>
+<ul>
+<li><p>Future - create and save an AMI or template for consistent reproduction</p></li>
+<li><p>via Console, without launch template:</p>
+<ul>
+<li><p>Ubuntu Server 24.04 LTS, SSD Volume Type (free tier eligible), Arm architecture</p></li>
+<li><p>Instance type t4g.micro (1gb RAM, 2 vCPU)</p></li>
+<li><p>Security Group: launch-wizard-1</p></li>
+<li><p>15 Gb General Purpose SSD (gp3)</p></li>
+<li><p>Modify <cite>IAM instance profile</cite> - to role created for s3 access (bison_ec2_s3_role)</p></li>
+<li><p>Use the security group created for this region (currently launch-wizard-1)</p></li>
+<li><p>(no?) Use the bison-ec2-role for this instance</p></li>
+<li><p>Assign your key pair to this instance</p>
+<ul class="simple">
+<li><p>If you do not have a keypair, create one for SSH access (tied to region) on initial
+EC2 launch</p></li>
+<li><p>One chance only: Download the private key (.pem file for Linux and OSX) to local
+machine</p></li>
+<li><p>Set file permissions to 400</p></li>
+</ul>
+</li>
+<li><p>Launch</p></li>
+<li><p>Test by SSH-ing to the instance with the Public IPv4 DNS address, with default user
+(for ubuntu instance) <cite>ubuntu</cite>:</p>
+<p>ssh  -i .ssh/&lt;aws_keyname&gt;.pem  ubuntu&#64;&lt;ec2-xxx-xxx-xxx-xxx.compute-x.amazonaws.com&gt;</p>
+</li>
+</ul>
+</li>
+</ul>
+</section>
+<section id="create-an-ssh-key-for-github-clone">
+<h2>Create an SSH key for Github clone<a class="headerlink" href="#create-an-ssh-key-for-github-clone" title="Link to this heading"></a></h2>
+<ul>
+<li><p>Generate an SSH key:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">ssh</span><span class="o">-</span><span class="n">keygen</span> <span class="o">-</span><span class="n">t</span> <span class="n">ed25519</span> <span class="o">-</span><span class="n">C</span> <span class="s2">&quot;bison@whereever&quot;</span>
+</pre></div>
+</div>
+</li>
+<li><p>Add the public key to your Github profile,
+<a class="reference external" href="https://docs.github.com/en/authentication/connecting-to-github-with-ssh/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent">https://docs.github.com/en/authentication/connecting-to-github-with-ssh/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent</a></p></li>
+</ul>
+</section>
+<section id="install-software">
+<h2>Install software<a class="headerlink" href="#install-software" title="Link to this heading"></a></h2>
+<ul>
+<li><p>Update apt and install unzip:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">sudo</span> <span class="n">apt</span> <span class="n">update</span>
+<span class="n">sudo</span> <span class="n">apt</span> <span class="n">install</span> <span class="n">unzip</span>
+</pre></div>
+</div>
+</li>
+<li><p>AWS Client tools</p>
+<blockquote>
+<div><ul>
+<li><p>Use instructions to install the awscli package (Linux):
+<a class="reference external" href="https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html">https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html</a>.</p></li>
+<li><p>Make sure to use the instructions with the right architecture (x86 vs Arm)</p></li>
+<li><p>Test by listing the contents of bison bucket (permission from role bison_ec2_s3_role):</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">aws</span> <span class="n">s3</span> <span class="n">ls</span> <span class="n">s3</span><span class="p">:</span><span class="o">//</span><span class="n">bison</span><span class="o">-</span><span class="mi">321942852011</span><span class="o">-</span><span class="n">us</span><span class="o">-</span><span class="n">east</span><span class="o">-</span><span class="mi">1</span><span class="o">/</span><span class="nb">input</span><span class="o">/</span>
+</pre></div>
+</div>
+</li>
+</ul>
+</div></blockquote>
+</li>
+<li><p>install docker for BISON application deployment:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">sudo</span> <span class="n">apt</span> <span class="n">install</span> <span class="n">docker</span><span class="o">.</span><span class="n">io</span>
+<span class="n">sudo</span> <span class="n">apt</span> <span class="n">install</span> <span class="n">docker</span><span class="o">-</span><span class="n">compose</span><span class="o">-</span><span class="n">v2</span>
+</pre></div>
+</div>
+</li>
+<li><p>BISON code (for building docker image during development/testing)</p>
+<blockquote>
+<div><ul>
+<li><p>Download the BISON code repository:</p>
+<p>git clone <a class="reference external" href="https://github.com/lifemapper/bison.git">https://github.com/lifemapper/bison.git</a></p>
+</li>
+<li><p>Edit the .env.conf (Docker environment variables) and nginx.conf (webserver address)
+files with the FQDN of the server being deployed. For development/testing EC2 servers,
+use the Public IPv4 DNS for the EC2 instance.</p></li>
+</ul>
+</div></blockquote>
+</li>
+</ul>
+</section>
+<section id="for-api-deployment">
+<h2>for API deployment<a class="headerlink" href="#for-api-deployment" title="Link to this heading"></a></h2>
+<section id="ssl-certificates">
+<h3>SSL certificates<a class="headerlink" href="#ssl-certificates" title="Link to this heading"></a></h3>
+<ul>
+<li><p>install apache for getting/managing certificates</p></li>
+<li><p>install certbot for Let’s Encrypt certificates:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">sudo</span> <span class="n">apt</span> <span class="n">install</span> <span class="n">apache2</span> <span class="n">certbot</span> <span class="n">plocate</span>
+</pre></div>
+</div>
+</li>
+<li><p>Create an SSL certificate on the EC2 instance.</p></li>
+<li><p>For testing/development, use self-signed certificates because Cerbot will not create
+certificates for an AWS EC2 Public IPv4 DNS, or an IP address.</p>
+<ul>
+<li><p>Edit the compose.yml file under <cite>nginx</cite> service (which intercepts all web
+requests) in <cite>volumes</cite> to bind-mount the directory containing self-signed
+certificates to /etc/letsencrypt:</p>
+<p>services:
+…</p>
+<blockquote>
+<div><p>nginx:
+…
+volumes:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>“/home/ubuntu/certificates:/etc/letsencrypt:ro”</p></li>
+</ul>
+</div></blockquote>
+</div></blockquote>
+</li>
+</ul>
+</li>
+</ul>
+</section>
+</section>
+<section id="configure-for-aws-access">
+<h2>Configure for AWS access<a class="headerlink" href="#configure-for-aws-access" title="Link to this heading"></a></h2>
+<p>In the home directory, create the directory and file .aws/config, with the following
+content:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">default</span><span class="p">]</span>
+<span class="n">region</span> <span class="o">=</span> <span class="n">us</span><span class="o">-</span><span class="n">east</span><span class="o">-</span><span class="mi">1</span>
+<span class="n">output</span> <span class="o">=</span> <span class="n">json</span>
+<span class="n">duration_seconds</span> <span class="o">=</span> <span class="mi">43200</span>
+<span class="n">credential_source</span> <span class="o">=</span> <span class="n">Ec2InstanceMetadata</span>
+</pre></div>
+</div>
+</section>
+<section id="ec2-for-workflow-tasks">
+<h2>EC2 for Workflow Tasks<a class="headerlink" href="#ec2-for-workflow-tasks" title="Link to this heading"></a></h2>
+<section id="credentials">
+<h3>Credentials<a class="headerlink" href="#credentials" title="Link to this heading"></a></h3>
+<p>EC2 must be set up with a role for temporary credentials to enable applications to
+retrieve those credentials for AWS permissions to other services (i.e. S3).
+By default, the instance allows IMDSv1 or IMDSv2, though making v2 required is recommended.</p>
+<p>TOKEN=`curl -X PUT “<a class="reference external" href="http://169.254.169.254/latest/api/token">http://169.254.169.254/latest/api/token</a>” -H “X-aws-ec2-metadata-token-ttl-seconds: 21600”` &amp;&amp; curl -H “X-aws-ec2-metadata-token: $TOKEN” <a class="reference external" href="http://169.254.169.254/latest/meta-data/iam/security-credentials/s3access">http://169.254.169.254/latest/meta-data/iam/security-credentials/s3access</a></p>
+<p>Using IMDSv2, first get a token:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>TOKEN=`curl -X PUT &quot;http://169.254.169.254/latest/api/token&quot; -H &quot;X-aws-ec2-metadata-token-ttl-seconds: 21600&quot;`
+</pre></div>
+</div>
+<p>Then get top level metadata:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">curl</span> <span class="o">-</span><span class="n">H</span> <span class="s2">&quot;X-aws-ec2-metadata-token: $TOKEN&quot;</span> <span class="n">http</span><span class="p">:</span><span class="o">//</span><span class="mf">169.254.169.254</span><span class="o">/</span><span class="n">latest</span><span class="o">/</span><span class="n">meta</span><span class="o">-</span><span class="n">data</span><span class="o">/</span>
+</pre></div>
+</div>
+<p>To set up config to use/assume a role:
+<a class="reference external" href="https://docs.aws.amazon.com/sdkref/latest/guide/feature-assume-role-credentials.html">https://docs.aws.amazon.com/sdkref/latest/guide/feature-assume-role-credentials.html</a></p>
+<p>More info:</p>
+<p><a class="reference external" href="https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-metadata.html">https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-metadata.html</a></p>
+</section>
+<section id="hop-limit-for-aws-communication">
+<h3>Hop Limit for AWS communication<a class="headerlink" href="#hop-limit-for-aws-communication" title="Link to this heading"></a></h3>
+<ul>
+<li><p>Extend the hop limit for getting metadata about permissions to 2
+host –&gt; dockercontainer –&gt; metadata
+<a class="reference external" href="https://specifydev.slack.com/archives/DQSAVMMHN/p1717706137817839">https://specifydev.slack.com/archives/DQSAVMMHN/p1717706137817839</a></p></li>
+<li><p>SSH to the ec2 instance, then run</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">aws</span> <span class="n">ec2</span> <span class="n">modify</span><span class="o">-</span><span class="n">instance</span><span class="o">-</span><span class="n">metadata</span><span class="o">-</span><span class="n">options</span> \
+    <span class="o">--</span><span class="n">instance</span><span class="o">-</span><span class="nb">id</span> <span class="n">i</span><span class="o">-</span><span class="mf">082e751</span><span class="n">b94e476987</span> \
+    <span class="o">--</span><span class="n">http</span><span class="o">-</span><span class="n">put</span><span class="o">-</span><span class="n">response</span><span class="o">-</span><span class="n">hop</span><span class="o">-</span><span class="n">limit</span> <span class="mi">2</span> \
+    <span class="o">--</span><span class="n">http</span><span class="o">-</span><span class="n">endpoint</span> <span class="n">enabled</span>
+</pre></div>
+</div>
+</li>
+<li><p>or in console, add metadata tag/value HttpPutResponseHopLimit/2</p></li>
+</ul>
+</section>
+<section id="ec2-docker-setup">
+<h3>EC2/Docker setup<a class="headerlink" href="#ec2-docker-setup" title="Link to this heading"></a></h3>
+<ul>
+<li><p>Create the first EC2 Launch Template as a “one-time” Spot instance, no hibernation</p></li>
+<li><p>The Launch template should have the following settings:</p>
+<p>Name: bison_spot_task
+Application and OS Images: Ubuntu
+AMI: Ubuntu 24.04 LTS
+Architecture: 64-bit ARM
+Instance type: t4g.micro
+Key pair: bison-task-key
+Network settings/Select existing security group: launch-wizard-1
+Configure storage: 8 Gb gp3 (default)</p>
+<blockquote>
+<div><p>Details - encrypted</p>
+</div></blockquote>
+<dl class="simple">
+<dt>Advanced Details:</dt><dd><p>IAM instance profile: bison_ec2_s3_role
+Shutdown behavior: Terminate
+Cloudwatch monitoring: Enable
+Purchasing option: Spot instances
+Request type: One-time</p>
+</dd>
+</dl>
+</li>
+<li><p>Use the launch template to create a version for each task.</p></li>
+<li><p>The launch template task versions must have the task name in the description, and
+have the following script in the userdata:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="ch">#!/bin/bash</span>
+<span class="n">sudo</span> <span class="n">apt</span><span class="o">-</span><span class="n">get</span> <span class="o">-</span><span class="n">y</span> <span class="n">update</span>
+<span class="n">sudo</span> <span class="n">apt</span><span class="o">-</span><span class="n">get</span> <span class="o">-</span><span class="n">y</span> <span class="n">install</span> <span class="n">docker</span><span class="o">.</span><span class="n">io</span>
+<span class="n">sudo</span> <span class="n">apt</span><span class="o">-</span><span class="n">get</span> <span class="o">-</span><span class="n">y</span> <span class="n">install</span> <span class="n">docker</span><span class="o">-</span><span class="n">compose</span><span class="o">-</span><span class="n">v2</span>
+<span class="n">git</span> <span class="n">clone</span> <span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">github</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">lifemapper</span><span class="o">/</span><span class="n">bison</span><span class="o">.</span><span class="n">git</span>
+<span class="n">cd</span> <span class="n">bison</span>
+<span class="n">sudo</span> <span class="n">docker</span> <span class="n">compose</span> <span class="o">-</span><span class="n">f</span> <span class="n">compose</span><span class="o">.</span><span class="n">test_task</span><span class="o">.</span><span class="n">yml</span> <span class="n">up</span>
+<span class="n">sudo</span> <span class="n">shutdown</span> <span class="o">-</span><span class="n">h</span> <span class="n">now</span>
+</pre></div>
+</div>
+</li>
+<li><p>For each task <strong>compose.test_task.yml</strong> must be replaced with the appropriate compose file.</p></li>
+<li><p>On EC2 instance startup, the userdata script will execute</p></li>
+<li><p>The compose file sets an environment variable (TASK_APP) containing a python module
+to be executed from the Dockerfile.</p></li>
+<li><p>Tasks should deposit outputs and logfiles into S3.</p></li>
+<li><p>After completion, the docker container will stop automatically and the EC2 instance
+will stop because of the shutdown command in the final line of the userdata script.</p></li>
+<li><p><strong>TODO</strong>: once the workflow is stable, to eliminate Docker build time, create a Docker
+image and download it in userdata script.</p></li>
+</ul>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="aws_setup.html" class="btn btn-neutral float-left" title="AWS Resource Setup" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="lambda.html" class="btn btn-neutral float-right" title="Create lambda function to initiate processing" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, LmBISON Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

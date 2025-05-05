@@ -1,0 +1,586 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Year 4, Part 1, 2023 &mdash; LmBISON documentation 1.0a1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=036e6a88"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Year 3, 2021-2022" href="year3.html" />
+    <link rel="prev" title="Year 4, Part 2, 2023-2024" href="year4_planB.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            LmBISON documentation
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../about.html">About</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../workflow.html">AWS workflow</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../aws/aws_setup.html">AWS Resource Setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../aws/ec2_setup.html">EC2 instance creation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../aws/lambda.html">Create lambda function to initiate processing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../aws/lambda.html#edit-the-configuration-for-lambda-function">Edit the Configuration for lambda function</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../aws/lambda.html#lambda-to-query-redshift">Lambda to query Redshift</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../aws/lambda.html#lambda-to-start-ec2-for-task">Lambda to start EC2 for task</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../aws/roles.html">Roles, Policies, Trust Relationships</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../aws/automation.html">Workflow Automation</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../interaction/debug.html">Debugging Flask and Docker instances</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../interaction/deploy.html">Deploy BISON</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="year4_planB.html">Year 4, Part 2, 2023-2024</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Year 4, Part 1, 2023</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#installation">Installation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#local-hardware-requirements">Local Hardware Requirements</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#download-this-repository">Download this Repository</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#download-large-data">Download Large Data</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#data-preparation">Data Preparation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#usgs-riis-data">USGS RIIS data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#gbif-data">GBIF data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#geographic-data-for-aggregation">Geographic Data for aggregation</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#data-location">Data location</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#pre-processing">Pre-Processing</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#census-state-and-county">Census: State and County</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#census-aiannh">Census: AIANNH</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#protected-areas-database-us-pad-not-currently-used">Protected Areas Database, US-PAD (not currently used)</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#processing-steps">Processing Steps</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#step-1-annotate-riis-with-gbif-taxa">Step 1: Annotate RIIS with GBIF Taxa</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#step-2-split-large-gbif-data-into-manageable-files">Step 2: Split large GBIF data into manageable files</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#step-3-annotate-gbif-records-with-riis-determinations-and-geographical-regions">Step 3: Annotate GBIF records with RIIS determinations and geographical regions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#step-4-summarize-annotations">Step 4: Summarize annotations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#step-5-create-a-heat-matrix-for-counties-x-species">Step 5: Create a heat matrix for counties x species</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#step-6-create-a-presence-absence-matrix-pam-and-compute-stats">Step 6: Create a Presence-Absence Matrix (PAM) and compute stats</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#development-and-testing">Development and Testing</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#create-expected-file-structure">Create expected file structure</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#local-data-layout">Local Data Layout</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="year3.html">Year 3, 2021-2022</a></li>
+<li class="toctree-l1"><a class="reference internal" href="year5.html">Year 5, 2024</a></li>
+<li class="toctree-l1"><a class="reference internal" href="aws_experiments.html">AWS workflow experiments</a></li>
+<li class="toctree-l1"><a class="reference internal" href="aws_experiments.html#glue-interactive-development">Glue - Interactive Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="aws_experiments.html#bison-aws-data-tools">BISON AWS data/tools</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">LmBISON documentation</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Year 4, Part 1, 2023</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/pages/history/year4_planA.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="year-4-part-1-2023">
+<h1>Year 4, Part 1, 2023<a class="headerlink" href="#year-4-part-1-2023" title="Link to this heading"></a></h1>
+<p>2023, Year 4 SOW specifies building the project as a Docker application, so that USGS
+personnel can run the analyses where they choose, whether using a Windows, Mac,
+or Linux operating system.  All processing is done in a Docker container on a local or
+remote machine.</p>
+<p>The overall goals include annotating a subset of <strong>GBIF occurrence</strong> records with
+designations from the <strong>US Registry of Introduced and Invasive Species</strong>
+(RIIS), then summarizing the data by different regions and RIIS status, and finally
+aggregating data counts by species into a geospatial grid of counties, and computing
+biodiversity statistics.</p>
+<p>Regions include <strong>US Census state and county boundaries</strong>,
+<strong>American Indian, Alaskan Native, and Native Hawaiian</strong> (AIANNH) regions and
+<strong>US Federal Protected Areas</strong> (US‐PAD).  All regions (state, county, AIANNH, PAD) will
+be summarized by count and proportion for species, occurrences, and RIIS status.</p>
+<section id="installation">
+<h2>Installation<a class="headerlink" href="#installation" title="Link to this heading"></a></h2>
+<p>LMBison can be run either locally on a powerful machine with a large amount of storage,
+or in a Docker container on AWS.  In either case, Docker is required.</p>
+<section id="local-hardware-requirements">
+<h3>Local Hardware Requirements<a class="headerlink" href="#local-hardware-requirements" title="Link to this heading"></a></h3>
+<p>Data processing for BISON annotation, summary, and statistics requires a powerful
+machine with a large amount of available storage.  The most processing intensive
+step, annotate, intersects each record with 4 geospatial data files.  This
+implementation can run this process in parallel, and uses the number of CPUs on the
+machine minus 2.  In Aug 2023, using 18 (of 20) cores, on 904 million
+records, the process took 5 days.</p>
+<p>These processes are all written in Python, and the implementation has been tested
+on a machine running Ubuntu Linux.  Scripts will need minimal modfication to run
+on Windows or OSX successfully.</p>
+</section>
+<section id="download-this-repository">
+<h3>Download this Repository<a class="headerlink" href="#download-this-repository" title="Link to this heading"></a></h3>
+<p>The <a class="reference external" href="https://github.com/lifemapper/bison">LmBISON repository</a>  can be installed by
+downloading from Github.  This code repository contains scripts, Docker composition
+files, configuration files, and test data for creating the outputs.</p>
+<p>Type <cite>git</cite> at the command prompt to see if you have git installed.  If you do not,
+download and install git from <a class="reference external" href="https://git-scm.com/downloads">https://git-scm.com/downloads</a> .</p>
+<p>Download the LmBISON repository, containing test data and configurations, by typing at
+the command line:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">git</span> <span class="n">clone</span> <span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">github</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">lifemapper</span><span class="o">/</span><span class="n">bison</span>
+</pre></div>
+</div>
+<p>When the clone is complete, move to the top directory of the repository, <cite>bison</cite>.
+All hands-on commands will be executed in a command prompt window from this
+directory location.  In Linux or OSX, open a Terminal
+window.</p>
+</section>
+<section id="download-large-data">
+<h3>Download Large Data<a class="headerlink" href="#download-large-data" title="Link to this heading"></a></h3>
+<p>Download newest versions of geospatial data.  Links and more information at <a class="reference external" href="data_input">Input Data</a> .  In each case, new versions of the data might have different
+fieldnames which are used as constants in the project.  Fields and their meaning/use
+are identified in the same file, along with the constants that may need editing.  If
+no new version is available, constants and fieldnames do not have to be checked.</p>
+<p>Required Data not included in Github repo:</p>
+<ul class="simple">
+<li><p>US-RIIS data should be provided by the USGS.</p></li>
+<li><p>GBIF data may be downloaded at any time.  Fieldnames should remain constant.</p></li>
+<li><p>Census data:
+* county (includes state field)
+* American Indian/Alaska Native Areas/Hawaiian Home Lands (AIANNH)</p></li>
+</ul>
+</section>
+</section>
+<section id="data-preparation">
+<h2>Data Preparation<a class="headerlink" href="#data-preparation" title="Link to this heading"></a></h2>
+<dl class="simple">
+<dt>2023, Year 4 SOW specifies:</dt><dd><ul class="simple">
+<li><p>US Registry of Introduced and Invasive Species</p></li>
+<li><p>GBIF occurrence data from the US with coordinates</p></li>
+<li><p>US Census state and county boundaries</p></li>
+<li><p>American Indian and Alaskan Native Land Area Representations (AIAN‐LAR)</p></li>
+<li><p>US Federal Protected Areas (US‐PAD)</p></li>
+<li><p>Summarize (count and proportion) regions by species name/RIIS</p></li>
+</ul>
+</dd>
+</dl>
+<p>Data inputs may be updated regularly, so constants in some files may change with the
+updates.  In each section are constants and their file locations that should be checked
+and possibly modified anytime input data is updated.</p>
+<p>The US-PAD dataset proved unsupportable in any configuration tried so far.  More
+information is below under <strong>Protected Areas Database</strong>.</p>
+<section id="usgs-riis-data">
+<h3>USGS RIIS data<a class="headerlink" href="#usgs-riis-data" title="Link to this heading"></a></h3>
+<p>US-RIIS V2.0, November 2022, available at <a class="reference external" href="https://doi.org/10.5066/P9KFFTOD">https://doi.org/10.5066/P9KFFTOD</a>
+webpage: <a class="reference external" href="https://www.sciencebase.gov/catalog/item/62d59ae5d34e87fffb2dda99">https://www.sciencebase.gov/catalog/item/62d59ae5d34e87fffb2dda99</a></p>
+<p>US-RIIS records consist of a list of species and the areas in which they are considered
+Introduced or Invasive.  Any other species/region combinations encountered will be
+identified as “presumed-native”  Areas are classified as the lower 48 states, Alaska,
+and Hawaii (L48, AK, HI).  Species are a scientific name string.  To align these records
+with GBIF occurrence records, the processing will resolve the RIIS species to the
+GBIF accepted taxon.</p>
+<p><strong>Data location</strong>:  The RIIS data may be placed in any accessible directory, but must
+be specified in the “riis_filename” value of the configuration file <a class="reference external" href="https://github.com/lifemapper/bison/tree/main/data/config/process_gbif.json">process_gbif.json</a>.  The
+RIIS annotation process will place the annotated file, with a postfix of “_annotated”
+in the same directory.</p>
+<p>The latest US-RIIS data is present in this Github repository in the <a class="reference external" href="https://github.com/lifemapper/bison/tree/main/data/input">data/input</a> directory.  If a new
+version is available, update it, and the following:</p>
+<p><strong>Possible Code Edits</strong>:
+* Check/modify attributes in the RIIS_DATA class in the <a href="#id1"><span class="problematic" id="id2">`</span></a>constants.py</p>
+<blockquote>
+<div><p>&lt;<a class="reference external" href="https://github.com/lifemapper/bison/tree/main/bison/common/constants.py">https://github.com/lifemapper/bison/tree/main/bison/common/constants.py</a>&gt;`_ file:</p>
+</div></blockquote>
+<ul class="simple">
+<li><p>Edit the filename in DATA_DICT_FNAME</p></li>
+<li><p>Check the file header, and if necessary, edit the fields in SPECIES_GEO_HEADER and
+matching fields in SPECIES_GEO_KEY, GBIF_KEY, ITIS_KEY, LOCALITY_FLD, KINGDOM_FLD,
+SCINAME_FLD, SCIAUTHOR_FLD, RANK_FLD, ASSESSMENT_FLD, TAXON_AUTHORITY_FLD.</p></li>
+</ul>
+</section>
+<section id="gbif-data">
+<h3>GBIF data<a class="headerlink" href="#gbif-data" title="Link to this heading"></a></h3>
+<dl class="simple">
+<dt>To get a current version of GBIF data:</dt><dd><ul class="simple">
+<li><p>Create a user account on the GBIF website, then login and</p></li>
+<li><p>request the data by putting the following URL in a browser:
+<a class="reference external" href="https://www.gbif.org/occurrence/search?country=US&amp;has_coordinate=true&amp;has_geospatial_issue=false&amp;occurrence_status=present">https://www.gbif.org/occurrence/search?country=US&amp;has_coordinate=true&amp;has_geospatial_issue=false&amp;occurrence_status=present</a></p></li>
+<li><p>adding a restriction to occurrence data identified to species or a lower rank
+will reduce the amount of data that will be filtered out after download.</p></li>
+</ul>
+</dd>
+</dl>
+<p>The query will request a download, which will take some time for GBIF to assemble.
+GBIF will send an email with a link for downloading the Darwin Core Archive, a
+very large zipped file.  Only the occurrence.txt file is required for data processing.
+Rename the file with the date for clarity on what data is being used. Use
+the following pattern gbif_yyyy-mm-dd.csv so that interim data filenames can be
+created and parsed consistently.  Note the underscore (_) between ‘gbif’ and the date,
+and the dash (-) between date elements.</p>
+<blockquote>
+<div><div class="highlight-default notranslate"><div class="highlight"><pre><span></span>
+</pre></div>
+</div>
+<p>unzip &lt;dwca zipfile&gt; occurrence.txt
+mv occurrence.txt gbif_2023-08-23.csv</p>
+</div></blockquote>
+<p><strong>Data location</strong>:  The GBIF data may be placed in any accessible directory, but must
+be specified in the “gbif_filename” value of the configuration file <a class="reference external" href="https://github.com/lifemapper/bison/tree/main/data/config/process_gbif.json">process_gbif.json</a>.  The
+temporary output files, such as raw chunks, annotated chunks, and summaries of chunks,
+will be placed in the directory specified in the “process_path” value of the
+configuration file, with postfixes “_raw”, “_annotate”, and “_summary” respectively.
+Final output files will be placed in the directory specified in the “output_path” value.</p>
+<p>Verify that the file occurrence.txt contains GBIF occurrence records that will be the
+primary input file.  The primary input file will contain fieldnames in the first line
+of the file, and those listed as values for GBIF class attributes with (attribute)
+names ending in _FLD or _KEY should all be among the fields.</p>
+<p><strong>Possible Code Edits</strong>: Check/modify attributes in the GBIF class in the <a class="reference external" href="https://github.com/lifemapper/bison/tree/main/bison/common/constants.py">constants.py</a> file:</p>
+<ul class="simple">
+<li><p>Edit the filename in DATA_DICT_FNAME</p></li>
+<li><p>Verify that the DWCA_META_FNAME is still the correct file for field definitions.</p></li>
+</ul>
+</section>
+<section id="geographic-data-for-aggregation">
+<h3>Geographic Data for aggregation<a class="headerlink" href="#geographic-data-for-aggregation" title="Link to this heading"></a></h3>
+<section id="data-location">
+<h4>Data location<a class="headerlink" href="#data-location" title="Link to this heading"></a></h4>
+<p>The geospatial data may be placed in any accessible directory, but
+must be specified in the “geo_path” value of the configuration file <a class="reference external" href="https://github.com/lifemapper/bison/tree/main/data/config/process_gbif.json">process_gbif.json</a>.
+Relative filepaths to the data are specified in the REGION class of the file
+<a class="reference external" href="https://github.com/lifemapper/bison/tree/main/bison/common/constants.py">constants.py</a> .</p>
+</section>
+<section id="pre-processing">
+<h4>Pre-Processing<a class="headerlink" href="#pre-processing" title="Link to this heading"></a></h4>
+<p>Currently, much of our input data (GBIF, census county/state and AIANNH) are in
+EPSG:4326, using decimal degrees.  The DOI dataset is in NAD_1983_Albers/EPSG:6269, and
+the PAD datasets are in USA_Contiguous_Albers_Equal_Area_Conic_USGS_version/EPSG:9822.
+These, and possibly other updated datasets must be projected to EPSG:4326 before
+intersecting points and annotating records.  A sample script is in <a class="reference external" href="https://github.com/lifemapper/bison/tree/main/bison/data/project_doi_pad.sh">project_doi_pad.sh</a></p>
+<p>USGS may choose to change the geospatial regions for aggregation.  If so, the REGION
+class in <a class="reference external" href="https://github.com/lifemapper/bison/tree/main/bison/common/constants.py">constants.py</a>
+must be changed, and code changed slightly.  Only the county/state data is required for
+matching RIIS records to occurrence records.</p>
+</section>
+<section id="census-state-and-county">
+<h4>Census: State and County<a class="headerlink" href="#census-state-and-county" title="Link to this heading"></a></h4>
+<p>Up-to-date census data including state and county boundaries are available at:
+<a class="reference external" href="https://www.census.gov/geographies/mapping-files/time-series/geo/cartographic-boundary.html">https://www.census.gov/geographies/mapping-files/time-series/geo/cartographic-boundary.html</a></p>
+<p>Shapefiles used for 2023 processing (2022 was not yet available at time of download):
+Census, Cartographic Boundary Files, 2021
+* <a class="reference external" href="https://www.census.gov/geographies/mapping-files/time-series/geo/cartographic-boundary.html">https://www.census.gov/geographies/mapping-files/time-series/geo/cartographic-boundary.html</a></p>
+<p><strong>Counties</strong>
+* 1:500,000, cb_2021_us_county_500k.zip</p>
+<p><strong>Possible Code Edits</strong>: Check/modify attributes in the REGION class in the
+<a class="reference external" href="https://github.com/lifemapper/bison/tree/main/bison/common/constants.py">constants.py</a> file:
+including:  COUNTY[“file”] for the filename and the keys in COUNTY[“map”] for
+fieldnames within that shapefile.</p>
+</section>
+<section id="census-aiannh">
+<h4>Census: AIANNH<a class="headerlink" href="#census-aiannh" title="Link to this heading"></a></h4>
+<p>2021 American Indian, Alaska Native, and Native Hawaiian lands
+are available at:
+<a class="reference external" href="https://www.census.gov/geographies/mapping-files/time-series/geo/cartographic-boundary.html">https://www.census.gov/geographies/mapping-files/time-series/geo/cartographic-boundary.html</a></p>
+<p><strong>American Indian/Alaska Native Areas/Hawaiian Home Lands</strong>, AIANNH
+* 1:500,000, cb_2021_us_aiannh_500k.zip</p>
+<p><strong>Possible Code Edits</strong>: Check/modify attributes in the REGION class in the
+<a class="reference external" href="https://github.com/lifemapper/bison/tree/main/bison/common/constants.py">constants.py</a> file:
+including:  AIANNH[“file”] for the filename and the keys in AIANNH[“map”] for
+fieldnames within that shapefile.</p>
+</section>
+<section id="protected-areas-database-us-pad-not-currently-used">
+<h4>Protected Areas Database, US-PAD (not currently used)<a class="headerlink" href="#protected-areas-database-us-pad-not-currently-used" title="Link to this heading"></a></h4>
+<p>U.S. Geological Survey (USGS) Gap Analysis Project (GAP), 2022, Protected Areas Database
+of the United States (PAD-US) 3.0: U.S. Geological Survey data release,
+<a class="reference external" href="https://doi.org/10.5066/P9Q9LQ4B">https://doi.org/10.5066/P9Q9LQ4B</a>.`</p>
+<p><strong>Plan</strong>: Annotate points with US-PAD regions for aggregation by species and
+RIIS status.  US Protected Areas are split into files by Department of Interior regions,
+and by state.  DOI region files are still very complex, and slow, so to efficiently
+intersect points with US-PAD, we intersect with census data for the correct state
+abbreviation, then intersect with the US-PAD file for that state.</p>
+<dl class="simple">
+<dt>Data:</dt><dd><ul class="simple">
+<li><p><a class="reference external" href="https://www.usgs.gov/programs/gap-analysis-project/science/pad-us-data-download">https://www.usgs.gov/programs/gap-analysis-project/science/pad-us-data-download</a></p></li>
+</ul>
+</dd>
+</dl>
+<p>The state US-PAD datasets still proved too complex to intersect at an acceptable speed.
+Intersecting with 900 million records was projected to take 60 days.  I tested this data
+in multiple implementations (local machine or Docker containers) and with multiple
+versions of the data (split by Dept of Interior, DOI, regions, or by states) and with
+multiple Docker configurations, all without success.  For this reason, US-PAD was
+abandoned until a good solution can be found.</p>
+<p>The next configuration to try will use different AWS tools.  I was unable to insert
+these data into AWS RDS, PostgreSQL with PostGIS (other polygon datasets succeeded).</p>
+<p>Project the dataset to EPSG:4326 with commands like A sample script is in
+<a class="reference external" href="https://github.com/lifemapper/bison/tree/main/bison/data/project_doi_pad.sh">project_doi_pad.sh</a></p>
+<p>Reported problems with projected dataset:
+* TopologyException: side location conflict
+* Invalid polygon with 3 points instead of 0 or &gt;= 4</p>
+<ul>
+<li><dl class="simple">
+<dt>US_PAD for DOI regions 1-12</dt><dd><ul class="simple">
+<li><p><a class="reference external" href="https://www.sciencebase.gov/catalog/item/62226321d34ee0c6b38b6be3">https://www.sciencebase.gov/catalog/item/62226321d34ee0c6b38b6be3</a></p></li>
+<li><p>Metadata: <a class="reference external" href="https://www.sciencebase.gov/catalog/item/622262c8d34ee0c6b38b6bcf">https://www.sciencebase.gov/catalog/item/622262c8d34ee0c6b38b6bcf</a></p></li>
+<li><dl class="simple">
+<dt>Citation:</dt><dd><p>U.S. Geological Survey (USGS) Gap Analysis Project (GAP), 2022,
+Protected Areas Database of the United States (PAD-US) 3.0:
+U.S. Geological Survey data release, <a class="reference external" href="https://doi.org/10.5066/P9Q9LQ4B">https://doi.org/10.5066/P9Q9LQ4B</a>.</p>
+</dd>
+</dl>
+</li>
+<li><p>Geographic areas in separate shapefiles for Designation, Easement, Fee,
+Proclamation, Marine</p></li>
+<li><dl class="simple">
+<dt>target GAP status 1-3</dt><dd><ul>
+<li><p>1 - managed for biodiversity - disturbance events proceed or are mimicked</p></li>
+<li><p>2 - managed for biodiversity - disturbance events suppressed</p></li>
+<li><p>3 - managed for multiple uses - subject to extractive (e.g. mining or logging) or OHV use</p></li>
+<li><p>4 - no known mandate for biodiversity protection</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+</ul>
+</dd>
+</dl>
+<ul class="simple">
+<li><p>Citation: U.S. Geological Survey (USGS) Gap Analysis Project (GAP), 2022, Protected
+Areas Database of the United States (PAD-US) 3.0: U.S. Geological Survey data
+release, <a class="reference external" href="https://doi.org/10.5066/P9Q9LQ4B">https://doi.org/10.5066/P9Q9LQ4B</a>.</p></li>
+</ul>
+</li>
+</ul>
+</section>
+</section>
+</section>
+<section id="processing-steps">
+<h2>Processing Steps<a class="headerlink" href="#processing-steps" title="Link to this heading"></a></h2>
+<p>Processing consists of 6 unique steps, each initiated with the process_gbif.py script
+and 2 arguments: command and a parameter file.</p>
+<p>Local data files, input and output paths, and other parameters are specified in the
+user-created configuration file.  The local file used by the author to test and execute
+the workflow is in the <a class="reference external" href="https://github.com/lifemapper/bison/tree/main/data/config/process_gbif.json">process_gbif.json</a> file.
+All filenames and paths include either the full path, or a path relative to the top
+level of the local repository.  Required parameters include:</p>
+<ul class="simple">
+<li><p>riis_filename (str): filename of input USGS RIIS data in CSV format.</p></li>
+<li><p>gbif_filename (str):  filename of input GBIF occurrence data in CSV format.</p></li>
+<li><p>do_split (bool): Flag indicating whether the local GBIF datafile is to be (or has
+been) split into smaller subsets. The JSON value must be true or false (no quotes).</p></li>
+<li><p>run_parallel (bool): Flag indicating whether the annotation process is to be run in
+parallel threads. The JSON value must be true or false (no quotes).</p></li>
+<li><p>geo_path (str): Source directory containing all geospatial input data.</p></li>
+<li><p>process_path (str): Destination directory for temporary data.</p></li>
+<li><p>output_path (str): Destination directory for output data.</p></li>
+</ul>
+<section id="step-1-annotate-riis-with-gbif-taxa">
+<h3>Step 1: Annotate RIIS with GBIF Taxa<a class="headerlink" href="#step-1-annotate-riis-with-gbif-taxa" title="Link to this heading"></a></h3>
+<p>We determine the Introduced and Invasive Species status of a GBIF record by first
+resolving the scientificName in the US Registry of Introduced and Invasive Species
+(RIIS) to the closest matching name in GBIF.</p>
+<p>For this step, we will
+* use the GBIF API to find the GBIF acceptedScientificName, and its acceptedTaxonKey,</p>
+<blockquote>
+<div><p>corresponding to every RIIS record scientificName, and</p>
+</div></blockquote>
+<ul class="simple">
+<li><p>append acceptedScientificName and acceptedTaxonKey to each RIIS record</p></li>
+</ul>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ python process_gbif.py --config_file=data/config/process_gbif.json  resolve
+</pre></div>
+</div>
+</section>
+<section id="step-2-split-large-gbif-data-into-manageable-files">
+<h3>Step 2: Split large GBIF data into manageable files<a class="headerlink" href="#step-2-split-large-gbif-data-into-manageable-files" title="Link to this heading"></a></h3>
+<p>We split the large GBIF data file into smaller chunks to reduce the memory footprint
+of each process, allow for easier debugging, and facilitate parallel processing for
+time-intensive, but not CPU-intensive, data processes.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ python process_gbif.py  --config_file=data/config/process_gbif.json  chunk
+</pre></div>
+</div>
+</section>
+<section id="step-3-annotate-gbif-records-with-riis-determinations-and-geographical-regions">
+<h3>Step 3: Annotate GBIF records with RIIS determinations and geographical regions<a class="headerlink" href="#step-3-annotate-gbif-records-with-riis-determinations-and-geographical-regions" title="Link to this heading"></a></h3>
+<dl class="simple">
+<dt>Annotate GBIF occurrence records (each subset file) with:</dt><dd><ul class="simple">
+<li><p>state</p></li>
+<li><p>county</p></li>
+<li><p>AIANNH</p></li>
+<li><p>PAD geospatial regions (complex data caused unreasonably slow intersections,
+time estimation = 60+ days)</p></li>
+<li><p>RIIS determinations (introduced, invasive, presumed_native) using state and
+GBIF accepted taxon in GBIF records to match GBIF accepted taxon added
+to RIIS records, and region in those records.</p></li>
+</ul>
+</dd>
+</dl>
+<p>Occasionally, a point intersects with a state or county envelope (created for a spatial
+index) but not be contained within the returned geometry.  In that case, the program
+returns the values from the geometry nearest to the point.</p>
+<p>When doing the intersection/annotation step in parallel on 18 of 20 CPUs, including the
+PAD data, the process ran slowly, and was projected to take over 60 days. The same
+processing, without the PAD data, took 5 days.</p>
+<p>At this point, further work went towards developing a solution on AWS.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ python process_gbif.py  --config_file=data/config/process_gbif.json  annotate
+</pre></div>
+</div>
+</section>
+<section id="step-4-summarize-annotations">
+<h3>Step 4: Summarize annotations<a class="headerlink" href="#step-4-summarize-annotations" title="Link to this heading"></a></h3>
+<dl class="simple">
+<dt>Summarize annotated GBIF occurrence records (each subset file), by:</dt><dd><ul class="simple">
+<li><p>location type (state, county, American Indian, Alaskan Native, and Native Hawaiian
+lands (AIANNH), and US-Protected Areas Database (PAD)).</p></li>
+<li><p>location value</p></li>
+<li><p>combined RIIS region and taxon key (RIIS region: AK, HI, L48)</p></li>
+<li><p>scientific name, species name (for convenience in final aggregation outputs)</p></li>
+<li><p>count</p></li>
+</ul>
+</dd>
+</dl>
+<p>Then summarize the subset summaries into a single file, and aggregate single summary
+into files of species and counts for each region:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ python process_gbif.py   --config_file=data/config/process_gbif.json  summarize
+</pre></div>
+</div>
+</section>
+<section id="step-5-create-a-heat-matrix-for-counties-x-species">
+<h3>Step 5: Create a heat matrix for counties x species<a class="headerlink" href="#step-5-create-a-heat-matrix-for-counties-x-species" title="Link to this heading"></a></h3>
+<p>Create a 2d matrix of counties (rows) by species (columns) with a count for each species
+found at that location.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ python process_gbif.py  --config_file=data/config/process_gbif.json  heat_matrix
+</pre></div>
+</div>
+</section>
+<section id="step-6-create-a-presence-absence-matrix-pam-and-compute-stats">
+<h3>Step 6: Create a Presence-Absence Matrix (PAM) and compute stats<a class="headerlink" href="#step-6-create-a-presence-absence-matrix-pam-and-compute-stats" title="Link to this heading"></a></h3>
+<p>Convert the heat matrix into a binary PAM, and compute diversity statistics: overall
+diversity of the entire region (gamma), county diversities (alpha) and county
+diversities (alpha) and total diversity to county diversities (beta).  In addition,
+compute species statistics: range size (omega) and mean proportional range size
+(omega_proportional).</p>
+<p>python process_gbif.py  –config_file=data/config/process_gbif.json  resolve</p>
+<p>Stats references for alpha, beta, gamma diversity:
+* <a class="reference external" href="https://www.frontiersin.org/articles/10.3389/fpls.2022.839407/full">https://www.frontiersin.org/articles/10.3389/fpls.2022.839407/full</a>
+* <a class="reference external" href="https://specifydev.slack.com/archives/DQSAVMMHN/p1693260539704259">https://specifydev.slack.com/archives/DQSAVMMHN/p1693260539704259</a>
+* <a class="reference external" href="https://bio.libretexts.org/Bookshelves/Ecology/Biodiversity_(Bynum)/7%3A_Alpha_Beta_and_Gamma_Diversity">https://bio.libretexts.org/Bookshelves/Ecology/Biodiversity_(Bynum)/7%3A_Alpha_Beta_and_Gamma_Diversity</a></p>
+</section>
+</section>
+<section id="development-and-testing">
+<h2>Development and Testing<a class="headerlink" href="#development-and-testing" title="Link to this heading"></a></h2>
+<section id="create-expected-file-structure">
+<h3>Create expected file structure<a class="headerlink" href="#create-expected-file-structure" title="Link to this heading"></a></h3>
+<p>Base data paths are specified in the user-created configuration file.  The configuration
+file used by the author to test and execute the workflow is in the <a class="reference external" href="https://github.com/lifemapper/bison/tree/main/data/config/process_gbif.json">process_gbif.json</a> file.
+In this example configuration file, all paths are relative to the local repository
+directory.</p>
+</section>
+<section id="local-data-layout">
+<h3>Local Data Layout<a class="headerlink" href="#local-data-layout" title="Link to this heading"></a></h3>
+<ul>
+<li><p>For local setup and testing, create directories to mimic the volumes created by the Dockerfile.</p></li>
+<li><p>Create a local /volumes/bison directory.  Everything contained in this
+directory will be a symlink to the repository or to the large data directory discussed next.</p></li>
+<li><p>Identify a directory with plenty of space, and create directories to contain
+large data files
+* input:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>big_data/gbif</p></li>
+<li><p>big_data/geodata</p></li>
+</ul>
+</div></blockquote>
+<ul class="simple">
+<li><p>temporary processing files:
+* big_data/process</p></li>
+<li><p>final output files:
+* big_data/output</p></li>
+</ul>
+</li>
+<li><p>In the big_data/gbif directory, place the gbif occurrence file</p></li>
+<li><p>In the big_data/geodata directory, place all geospatial data files.  All data within
+this directory will be referenced by relative filenames</p></li>
+<li><p>In the /volumes/bison directory create symbolic links to the large directory:
+* big_data</p></li>
+<li><p>and to the local repository
+* config (bison/data/config)
+* input (bison/data/input)
+* tests (bison/tests/data)</p></li>
+</ul>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="year4_planB.html" class="btn btn-neutral float-left" title="Year 4, Part 2, 2023-2024" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="year3.html" class="btn btn-neutral float-right" title="Year 3, 2021-2022" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, LmBISON Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,284 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Workflow Automation &mdash; LmBISON documentation 1.0a1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=036e6a88"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Debugging Flask and Docker instances" href="../interaction/debug.html" />
+    <link rel="prev" title="Roles, Policies, Trust Relationships" href="roles.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            LmBISON documentation
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../about.html">About</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../workflow.html">AWS workflow</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="aws_setup.html">AWS Resource Setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ec2_setup.html">EC2 instance creation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="lambda.html">Create lambda function to initiate processing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="lambda.html#edit-the-configuration-for-lambda-function">Edit the Configuration for lambda function</a></li>
+<li class="toctree-l1"><a class="reference internal" href="lambda.html#lambda-to-query-redshift">Lambda to query Redshift</a></li>
+<li class="toctree-l1"><a class="reference internal" href="lambda.html#lambda-to-start-ec2-for-task">Lambda to start EC2 for task</a></li>
+<li class="toctree-l1"><a class="reference internal" href="roles.html">Roles, Policies, Trust Relationships</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Workflow Automation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#lambda-functions-for-step-execution">Lambda Functions For Step Execution</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#overview">Overview</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#bison-steps">BISON Steps</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#lambda-launched-ec2-tasks">Lambda-launched EC2 tasks</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#initiate-steps-with-aws-eventbridge-schedule">Initiate Steps with AWS Eventbridge Schedule</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#the-bison-workflow">The BISON Workflow</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#preconditions">Preconditions:</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#step-1-annotate-riis-with-gbif-accepted-taxa">Step 1: Annotate RIIS with GBIF accepted taxa</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#step-2-load-ancillary-data-from-s3-into-redshift">Step 2: Load ancillary data from S3 into Redshift</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#todo-create-trigger-rule">TODO: Create trigger rule</a></li>
+</ul>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../interaction/debug.html">Debugging Flask and Docker instances</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../interaction/deploy.html">Deploy BISON</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../history/year4_planB.html">Year 4, Part 2, 2023-2024</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../history/year4_planA.html">Year 4, Part 1, 2023</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../history/year3.html">Year 3, 2021-2022</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../history/year5.html">Year 5, 2024</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../history/aws_experiments.html">AWS workflow experiments</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../history/aws_experiments.html#glue-interactive-development">Glue - Interactive Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../history/aws_experiments.html#bison-aws-data-tools">BISON AWS data/tools</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">LmBISON documentation</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Workflow Automation</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/pages/aws/automation.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="workflow-automation">
+<h1>Workflow Automation<a class="headerlink" href="#workflow-automation" title="Link to this heading"></a></h1>
+<section id="lambda-functions-for-step-execution">
+<h2>Lambda Functions For Step Execution<a class="headerlink" href="#lambda-functions-for-step-execution" title="Link to this heading"></a></h2>
+<section id="overview">
+<h3>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h3>
+<p>Lambda functions:</p>
+<ul class="simple">
+<li><p>may run code using AWS data or resources.</p></li>
+<li><p>can run for 15 minutes or less</p></li>
+<li><p>must contain only a single function</p></li>
+</ul>
+<p>Therefore, long-running processes and computations that require a complex programming
+are less suitable for Lambda.</p>
+</section>
+<section id="bison-steps">
+<h3>BISON Steps<a class="headerlink" href="#bison-steps" title="Link to this heading"></a></h3>
+<p>The first and last steps of the BISON workflow both use BISON code modules and run for
+longer than the Lambda 15 minute limit.  For each of these steps, the lambda function
+launches an EC2 instance to build a Docker container to execute the process. In
+future iterations, we will download a pre-built Docker image.</p>
+<p>Other BISON steps run processes reading, writing, or analyzing data on S3 and Redshift.</p>
+</section>
+<section id="lambda-launched-ec2-tasks">
+<h3>Lambda-launched EC2 tasks<a class="headerlink" href="#lambda-launched-ec2-tasks" title="Link to this heading"></a></h3>
+<p>EC2 instances launched by BISON workflow lambda functions use an EC2 Launch Template.
+There are multiple versions of the launch template, one for each task.  Each task
+version contains a userdata script that executes the Docker compose command  with
+a compose file specific to that task.  Compose files are at the root of this repository.
+Userdata scripts are in <strong>aws/userdata/</strong> directory of this repo.  Task scripts used in
+the compose files are in the <strong>bison/task</strong> directory.</p>
+</section>
+</section>
+<section id="initiate-steps-with-aws-eventbridge-schedule">
+<h2>Initiate Steps with AWS Eventbridge Schedule<a class="headerlink" href="#initiate-steps-with-aws-eventbridge-schedule" title="Link to this heading"></a></h2>
+<p>The first step will be executed on a schedule, such as the second day of the month
+(GBIF data is deposited on the first day of the month).</p>
+<p>Each step after the first is also executed on a schedule, scheduled some appropriate
+amount of time after expected completion of the previous step.  Steps with a
+dependency on previous outputs will first check for the existence of required inputs,
+failing immediately if inputs are not present.</p>
+<p>For each step, create an AWS EventBridge Schedule</p>
+<ul class="simple">
+<li><p>Detail: name matching the lambda function it will execute, recurring, cron expression
+for the 2nd day of the month, and a time adequate for the previous step to complete.</p></li>
+<li><p>target: All APIs, AWS Lambda Invoke, choose lambda function to execute</p></li>
+<li><p>Execution role: the same role given to the lambda function, allowing access to
+redshift, S3, EC2, Cloudwatch, etc (bison_redshift_lambda_role)</p></li>
+<li><p>Retry policy: 1 day, 5 times</p></li>
+</ul>
+</section>
+<section id="the-bison-workflow">
+<h2>The BISON Workflow<a class="headerlink" href="#the-bison-workflow" title="Link to this heading"></a></h2>
+<p>For the BISON workflow the first step is to annotate RIIS records with GBIF accepted
+taxa, a process that takes 30-60 minutes to resolve the approximately 15K names in RIIS.</p>
+<p>The final step is to build 2d matrices, species by region, from the data, and compute
+biogeographic statistics on them.  This process requires more complex code which is
+present in the BISON codebase.</p>
+<p>All steps, including both Lambda functions, and EC2 instances launched by Lambda, log
+statements to Cloudwatch logs.  Lambda functions log to a Log Group named identically
+to the lambda function name.  Docker logs from the EC2 instance log to the ‘bison_task’
+LogGroup, with the stream named the same as the task name.</p>
+<p>Code for all lambda steps is in <strong>bison/aws/lambda/</strong>.</p>
+<section id="preconditions">
+<h3>Preconditions:<a class="headerlink" href="#preconditions" title="Link to this heading"></a></h3>
+<p>In S3:</p>
+<ul class="simple">
+<li><p>In the BISON bucket, create sub folders:</p>
+<ul>
+<li><p>input</p></li>
+<li><p>log</p></li>
+<li><p>output</p></li>
+<li><p>summary</p></li>
+</ul>
+</li>
+<li><p>Update the <strong>AWS constants</strong> in common/constants.py with the correct account number,
+bucket name, region,</p></li>
+</ul>
+<p>Load ancillary data and most recent RIIS data into an accessible S3 bucket,</p>
+</section>
+<section id="step-1-annotate-riis-with-gbif-accepted-taxa">
+<h3>Step 1: Annotate RIIS with GBIF accepted taxa<a class="headerlink" href="#step-1-annotate-riis-with-gbif-accepted-taxa" title="Link to this heading"></a></h3>
+<p>This ensures that we can match RIIS records with the GBIF records that we
+will annotate with RIIS determination.  This process requires sending the scientific
+name in the RIIS record to the GBIF ‘species’ API, to find the accepted name,
+<cite>acceptedScientificName</cite> (and GBIF identifier, <cite>acceptedTaxonKey</cite>).</p>
+<p>This script runs first in the workflow to ensure that the name resolution is current
+with the GBIF data being processed.</p>
+<p>The lambda function will make sure the data to be created does not already exist
+in S3, execute if needed, return if it does not.</p>
+<p>The EventBridge Schedule name and Lambda name is <cite>bison_s1_annotate_riis</cite>.  The
+schedule cron expression is <cite>0 0 2 * ? *</cite> (min, hour, day of month, month, day of week, year)</p>
+</section>
+<section id="step-2-load-ancillary-data-from-s3-into-redshift">
+<h3>Step 2: Load ancillary data from S3 into Redshift<a class="headerlink" href="#step-2-load-ancillary-data-from-s3-into-redshift" title="Link to this heading"></a></h3>
+</section>
+</section>
+<section id="todo-create-trigger-rule">
+<h2>TODO: Create trigger rule<a class="headerlink" href="#todo-create-trigger-rule" title="Link to this heading"></a></h2>
+<p>Initiate lambda function based on outputs of previous step:</p>
+<ul>
+<li><p>Check for existence of new GBIF data</p></li>
+<li><p>Use a blueprint, python, “Get S3 Object”</p></li>
+<li><p>Function name: bison_find_current_gbif_lambda</p></li>
+<li><p>S3 trigger:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Bucket: arn:aws:s3:::gbif-open-data-us-east-1</p></li>
+</ul>
+</div></blockquote>
+</li>
+<li><p>Create a rule in EventBridge to use as the trigger</p>
+<ul class="simple">
+<li><p>Event source : AWS events or EventBridge partner events</p></li>
+<li><p>Sample event, “S3 Object Created”, aws/events/test_trigger_event.json</p></li>
+<li><p>Creation method: Use pattern form</p></li>
+<li><p>Event pattern</p>
+<ul>
+<li><p>Event Source: AWS services</p></li>
+<li><p>AWS service: S3</p></li>
+<li><p>Event type: Object-Level API Call via CloudTrail</p></li>
+<li><p>Event Type Specifications</p>
+<ul>
+<li><p>Specific operation(s): GetObject</p></li>
+<li><p>Specific bucket(s) by name: arn:aws:s3:::bison-321942852011-us-east-1</p></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p>Select target(s)</p>
+<ul>
+<li><p>AWS service</p></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="roles.html" class="btn btn-neutral float-left" title="Roles, Policies, Trust Relationships" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../interaction/debug.html" class="btn btn-neutral float-right" title="Debugging Flask and Docker instances" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, LmBISON Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

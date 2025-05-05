@@ -1,0 +1,228 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AWS Resource Setup &mdash; LmBISON documentation 1.0a1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=036e6a88"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="EC2 instance creation" href="ec2_setup.html" />
+    <link rel="prev" title="AWS workflow" href="../workflow.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            LmBISON documentation
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../about.html">About</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../workflow.html">AWS workflow</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">AWS Resource Setup</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#security">Security</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#create-policies-and-roles">Create policies and roles</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#create-a-security-group-for-the-region">Create a Security Group for the region</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#redshift-namespace-and-workgroup">Redshift Namespace and Workgroup</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#namespace-and-workgroup">Namespace and Workgroup</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#external-schema">External Schema</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="ec2_setup.html">EC2 instance creation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="lambda.html">Create lambda function to initiate processing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="lambda.html#edit-the-configuration-for-lambda-function">Edit the Configuration for lambda function</a></li>
+<li class="toctree-l1"><a class="reference internal" href="lambda.html#lambda-to-query-redshift">Lambda to query Redshift</a></li>
+<li class="toctree-l1"><a class="reference internal" href="lambda.html#lambda-to-start-ec2-for-task">Lambda to start EC2 for task</a></li>
+<li class="toctree-l1"><a class="reference internal" href="roles.html">Roles, Policies, Trust Relationships</a></li>
+<li class="toctree-l1"><a class="reference internal" href="automation.html">Workflow Automation</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../interaction/debug.html">Debugging Flask and Docker instances</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../interaction/deploy.html">Deploy BISON</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../history/year4_planB.html">Year 4, Part 2, 2023-2024</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../history/year4_planA.html">Year 4, Part 1, 2023</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../history/year3.html">Year 3, 2021-2022</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../history/year5.html">Year 5, 2024</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../history/aws_experiments.html">AWS workflow experiments</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../history/aws_experiments.html#glue-interactive-development">Glue - Interactive Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../history/aws_experiments.html#bison-aws-data-tools">BISON AWS data/tools</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">LmBISON documentation</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">AWS Resource Setup</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/pages/aws/aws_setup.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="aws-resource-setup">
+<h1>AWS Resource Setup<a class="headerlink" href="#aws-resource-setup" title="Link to this heading"></a></h1>
+<section id="security">
+<h2>Security<a class="headerlink" href="#security" title="Link to this heading"></a></h2>
+<section id="create-policies-and-roles">
+<h3>Create policies and roles<a class="headerlink" href="#create-policies-and-roles" title="Link to this heading"></a></h3>
+<p>The <span class="xref std std-ref">_bison_redshift_lambda_role</span> allows access to the bison Redshift
+namespace/workgroup, lambda functions, EventBridge Scheduler, and S3 data.
+The Trusted Relationships on this policy allow each to</p>
+<p>The :ref:<a href="#id1"><span class="problematic" id="id2">`</span></a>_bison_redshift_lambda_role_trusted_relationships policy allow</p>
+<p>The <span class="xref std std-ref">_bison_ec2_s3_role</span> allows an EC2 instance to access the public S3 data and
+the bison S3 bucket.  Its trust relationship grants AssumeRole to ec2 and s3 services.
+This role will be assigned to an EC2 instance that will initiate
+computations and compute matrices.</p>
+<p>The <span class="xref std std-ref">_bison_redshift_s3_role</span> allows Redshift to access public S3 data and
+the bison S3 bucket, and allows Redshift to perform glue functions. Its trust
+relationship grants AssumeRole to redshift service.</p>
+<p>Make sure that the same role granted to the namespace is used for creating an external
+schema and lambda functions.  When mounting external data as a redshift table to the
+external schema, you may encounter an error indicating that the “dev” database does not
+exist.  This refers to the external database, and may indicate that the role used by the
+command and/or namespace differs from the role granted to the schema upon creation.</p>
+</section>
+<section id="create-a-security-group-for-the-region">
+<h3>Create a Security Group for the region<a class="headerlink" href="#create-a-security-group-for-the-region" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Test this group!</p></li>
+<li><p>Create a security group for the project/region</p>
+<ul>
+<li><p>inbound rules allow:</p>
+<ul>
+<li><p>Custom TCP, port 8000</p></li>
+<li><p>Custom TCP, port 8080</p></li>
+<li><p>HTTPS, port 80</p></li>
+<li><p>HTTPS, port 443</p></li>
+<li><p>SSH, port 22</p></li>
+</ul>
+</li>
+<li><p>Consider restricting SSH to campus</p></li>
+</ul>
+</li>
+<li><p>or use launch-wizard-1 security group (created by some EC2 instance creation in 2023)</p>
+<ul>
+<li><p>inbound rules IPv4:</p>
+<ul>
+<li><p>Custom TCP 8000</p></li>
+<li><p>Custom TCP 8080</p></li>
+<li><p>SSH 22</p></li>
+<li><p>HTTP 80</p></li>
+<li><p>HTTPS 443</p></li>
+</ul>
+</li>
+<li><p>outbound rules IPv4, IPv6:</p>
+<ul>
+<li><p>All traffic all ports</p></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</section>
+<section id="redshift-namespace-and-workgroup">
+<h3>Redshift Namespace and Workgroup<a class="headerlink" href="#redshift-namespace-and-workgroup" title="Link to this heading"></a></h3>
+<section id="namespace-and-workgroup">
+<h4>Namespace and Workgroup<a class="headerlink" href="#namespace-and-workgroup" title="Link to this heading"></a></h4>
+<p>A namespace is storage-related, with database objects and users.  A workspace is
+a collection of compute resources such as security groups and other properties and
+limitations.
+<a class="reference external" href="https://docs.aws.amazon.com/redshift/latest/mgmt/serverless-workgroup-namespace.html">https://docs.aws.amazon.com/redshift/latest/mgmt/serverless-workgroup-namespace.html</a></p>
+</section>
+<section id="external-schema">
+<h4>External Schema<a class="headerlink" href="#external-schema" title="Link to this heading"></a></h4>
+<p>The command below creates an external schema, redshift_spectrum, and also creates a
+<strong>new</strong> external database “dev”.  It appears in the console to be the same “dev”
+database that contains the public schema, but it is separate.  Also note the IAM role
+used to create the schema must match the role attached to the namespace:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">CREATE</span> <span class="n">external</span> <span class="n">schema</span> <span class="n">redshift_spectrum</span>
+    <span class="n">FROM</span> <span class="n">data</span> <span class="n">catalog</span>
+    <span class="n">DATABASE</span> <span class="n">dev</span>
+    <span class="n">IAM_ROLE</span> <span class="s1">&#39;arn:aws:iam::321942852011:role/bison_redshift_s3_role&#39;</span>
+    <span class="n">CREATE</span> <span class="n">external</span> <span class="n">database</span> <span class="k">if</span> <span class="n">NOT</span> <span class="n">exists</span><span class="p">;</span>
+</pre></div>
+</div>
+</section>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../workflow.html" class="btn btn-neutral float-left" title="AWS workflow" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="ec2_setup.html" class="btn btn-neutral float-right" title="EC2 instance creation" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, LmBISON Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

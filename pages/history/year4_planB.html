@@ -1,0 +1,486 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Year 4, Part 2, 2023-2024 &mdash; LmBISON documentation 1.0a1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=036e6a88"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Year 4, Part 1, 2023" href="year4_planA.html" />
+    <link rel="prev" title="Deploy BISON" href="../interaction/deploy.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            LmBISON documentation
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../about.html">About</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../workflow.html">AWS workflow</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../aws/aws_setup.html">AWS Resource Setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../aws/ec2_setup.html">EC2 instance creation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../aws/lambda.html">Create lambda function to initiate processing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../aws/lambda.html#edit-the-configuration-for-lambda-function">Edit the Configuration for lambda function</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../aws/lambda.html#lambda-to-query-redshift">Lambda to query Redshift</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../aws/lambda.html#lambda-to-start-ec2-for-task">Lambda to start EC2 for task</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../aws/roles.html">Roles, Policies, Trust Relationships</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../aws/automation.html">Workflow Automation</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../interaction/debug.html">Debugging Flask and Docker instances</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../interaction/deploy.html">Deploy BISON</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Year 4, Part 2, 2023-2024</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#installation">Installation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#local-hardware-requirements">Local Hardware requirements</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#download-this-repository">Download this Repository</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#install-dependencies-in-a-virtual-python-environment">Install dependencies in a Virtual Python Environment</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#data-preparation">Data Preparation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#amazon-s3-storage">Amazon S3 storage</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#gbif-data">GBIF data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#usgs-riis-data">USGS RIIS data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#census-state-and-county-aiannh">Census: State and County, AIANNH</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#protected-areas-database-us-pad-not-currently-used">Protected Areas Database, US-PAD (not currently used)</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#processing-steps">Processing Steps</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="year4_planA.html">Year 4, Part 1, 2023</a></li>
+<li class="toctree-l1"><a class="reference internal" href="year3.html">Year 3, 2021-2022</a></li>
+<li class="toctree-l1"><a class="reference internal" href="year5.html">Year 5, 2024</a></li>
+<li class="toctree-l1"><a class="reference internal" href="aws_experiments.html">AWS workflow experiments</a></li>
+<li class="toctree-l1"><a class="reference internal" href="aws_experiments.html#glue-interactive-development">Glue - Interactive Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="aws_experiments.html#bison-aws-data-tools">BISON AWS data/tools</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">LmBISON documentation</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Year 4, Part 2, 2023-2024</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/pages/history/year4_planB.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="year-4-part-2-2023-2024">
+<h1>Year 4, Part 2, 2023-2024<a class="headerlink" href="#year-4-part-2-2023-2024" title="Link to this heading"></a></h1>
+<p>The Docker implementation created for Year 4 was unable to handle the most
+resource-intensive step, geospatial intersection of records with shapefiles for
+annotating records with state, county, PAD, AIANNH.</p>
+<p>The overall goals include annotating a subset of <strong>GBIF occurrence</strong> records with
+designations from the <strong>US Registry of Introduced and Invasive Species</strong>
+(RIIS), then summarizing the data by different regions and RIIS status, and finally
+aggregating data counts by species into a geospatial grid of counties, and computing
+biodiversity statistics.</p>
+<p>Regions include <strong>US Census state and county boundaries</strong>,
+<strong>American Indian, Alaskan Native, and Native Hawaiian</strong> (AIANNH) regions and
+<strong>US Federal Protected Areas</strong> (US‐PAD).  All regions (state, county, AIANNH, PAD) will
+be summarized by count and proportion for species, occurrences, and RIIS status.</p>
+<p>GBIF record annotation and region summaries are performed on AWS, while RIIS record
+resolution to GBIF names (an interim step, not a deliverable), and computing
+biodiversity statistics are executed locally.</p>
+<section id="installation">
+<h2>Installation<a class="headerlink" href="#installation" title="Link to this heading"></a></h2>
+<p>The resource intensive steps in this workflow use AWS, while the first and last steps
+are only implemented locally.  This is the first step towards a fully AWS workflow in
+Year 5.</p>
+<section id="local-hardware-requirements">
+<h3>Local Hardware requirements<a class="headerlink" href="#local-hardware-requirements" title="Link to this heading"></a></h3>
+<p>Since only the first and last steps of the workflow, both not resource-intensive,
+are performed locally, a smaller machine is appropriate for execution.  Since these
+steps will be moved to AWS in the next iteration of the workflow, they are not
+performed in Docker containers, and do require some software dependencies.</p>
+</section>
+<section id="download-this-repository">
+<h3>Download this Repository<a class="headerlink" href="#download-this-repository" title="Link to this heading"></a></h3>
+<p>The <a class="reference external" href="https://github.com/lifemapper/bison">LmBISON repository</a>  can be installed by
+downloading from Github.  This code repository contains python code, scripts for AWS
+tools, Docker composition files, configuration files, and test data for creating the
+outputs.</p>
+<p>Type <cite>git</cite> at the command prompt to see if you have git installed.  If you do not,
+download and install git from <a class="reference external" href="https://git-scm.com/downloads">https://git-scm.com/downloads</a> .</p>
+<p>Download the LmBISON repository, containing test data and configurations, by typing at
+the command line:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">git</span> <span class="n">clone</span> <span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">github</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">lifemapper</span><span class="o">/</span><span class="n">bison</span>
+</pre></div>
+</div>
+<p>When the clone is complete, move to the top directory of the repository, <cite>bison</cite>.
+All hands-on commands will be executed in a command prompt window from this
+directory location.  In Linux or OSX, open a Terminal
+window.</p>
+</section>
+<section id="install-dependencies-in-a-virtual-python-environment">
+<h3>Install dependencies in a Virtual Python Environment<a class="headerlink" href="#install-dependencies-in-a-virtual-python-environment" title="Link to this heading"></a></h3>
+<p>Setup a virtual python environment named <cite>venv</cite> at the top level of the repository,
+i.e. ~/git/bison.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">python</span> <span class="o">-</span><span class="n">m</span> <span class="n">venv</span> <span class="n">venv</span>
+<span class="o">.</span> <span class="n">venv</span><span class="o">/</span><span class="nb">bin</span><span class="o">/</span><span class="n">activate</span>
+<span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">r</span> <span class="n">requirements</span><span class="o">.</span><span class="n">txt</span>
+</pre></div>
+</div>
+<p>If GDAL fails to install because its underlying library in the OS is not met, first
+install libgdal using instructions here:
+<a class="reference external" href="https://mapscaping.com/installing-gdal-for-beginners/">https://mapscaping.com/installing-gdal-for-beginners/</a> , then run
+<strong>pip install -r requirements.txt</strong> again.</p>
+</section>
+</section>
+<section id="data-preparation">
+<h2>Data Preparation<a class="headerlink" href="#data-preparation" title="Link to this heading"></a></h2>
+<dl class="simple">
+<dt>2023, Year 4 SOW specifies:</dt><dd><ul class="simple">
+<li><p>US Registry of Introduced and Invasive Species</p></li>
+<li><p>GBIF occurrence data from the US with coordinates</p></li>
+<li><p>US Census state and county boundaries</p></li>
+<li><p>American Indian and Alaskan Native Land Area Representations (AIAN‐LAR)</p></li>
+<li><p>US Federal Protected Areas (US‐PAD)</p></li>
+<li><p>Summarize (count and proportion) regions by species name/RIIS</p></li>
+</ul>
+</dd>
+</dl>
+<p>Data inputs may be updated regularly, so constants in some files may change with the
+updates.  In each section are constants and their file locations that should be checked
+and possibly modified anytime input data is updated.</p>
+<p>The US-PAD dataset proved unsupportable in any configuration tried so far.  More
+information is below under <strong>Protected Areas Database</strong>.  New strategies will be
+tried in Year 5.</p>
+<p>Download newest versions of geospatial data.  Links and more information at <a class="reference external" href="data_input">Input Data</a> .  In each case, new versions of the data might have different
+fieldnames which are used as constants in the project.  Fields and their meaning/use
+are identified in the same file, along with the constants that may need editing.  If
+no new version is available, constants and fieldnames do not have to be checked.</p>
+<p>Required Data not included in Github repo:</p>
+<ul class="simple">
+<li><p>GBIF occurrence data is updated monthly on AWS Open Data Registry</p></li>
+<li><p>US-RIIS data should be provided by the USGS.</p></li>
+<li><p>Protected Areas Database will be revisited in Year 5</p></li>
+<li><p>Census data:
+* county (includes state field)
+* American Indian/Alaska Native Areas/Hawaiian Home Lands (AIANNH)</p></li>
+</ul>
+<section id="amazon-s3-storage">
+<h3>Amazon S3 storage<a class="headerlink" href="#amazon-s3-storage" title="Link to this heading"></a></h3>
+<p>All input data, except GBIF records, are to be placed in a bucket on Amazon S3 in a
+folder called <cite>input_data</cite>.  Details on data upload procedure are in the sections
+describing each dataset.</p>
+<p>Choose a region, then create an S3 bucket for BISON inputs and outputs, using the naming
+convention &lt;name&gt;-&lt;region&gt;, for example bison-us-east-1.  Under
+the bucket, create the directories (and subdirectories):</p>
+<ul class="simple">
+<li><p><strong>annotated_records</strong>: for annotated GBIF occurrence records</p></li>
+<li><dl class="simple">
+<dt><strong>input_data</strong>: for</dt><dd><ul>
+<li><p>US census data AIANNH and US counties</p></li>
+<li><p>US-RIIS annotated data (with GBIF accepted taxon name and key)</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><p><strong>lib</strong>: for python libraries needed by scripts, namely SQLAlchemy</p></li>
+<li><p><strong>log</strong>: for output logfiles</p></li>
+<li><p><strong>out_data</strong>: for output datafiles</p></li>
+<li><p><strong>scripts</strong>: for scripts to be run on AWS resources</p></li>
+</ul>
+</section>
+<section id="gbif-data">
+<h3>GBIF data<a class="headerlink" href="#gbif-data" title="Link to this heading"></a></h3>
+<p>GBIF data is updated monthly on the AWS Registry of Open Data
+<a class="reference external" href="https://registry.opendata.aws/gbif/">https://registry.opendata.aws/gbif/</a>, and available for all regions.
+Our process mounts GBIF data in Amazon Redshift directly from the AWS Open Data Registry
+in S3.  From this mounted dataset, the process mounts a subset of the records into
+another table with filters:</p>
+<ul class="simple">
+<li><p>countrycode = ‘US’</p></li>
+<li><p>decimallatitude IS NOT NULL</p></li>
+<li><p>decimallongitude IS NOT NULL</p></li>
+<li><p>occurrencestatus = ‘PRESENT’</p></li>
+<li><p>taxonrank IN
+(‘SPECIES’, ‘SUBSPECIES’, ‘FORM’, ‘INFRASPECIFIC_NAME’, ‘INFRASUBSPECIFIC_NAME’)</p></li>
+<li><p>basisofrecord IN
+(‘HUMAN_OBSERVATION’, ‘OBSERVATION’, ‘OCCURRENCE’, ‘PRESERVED_SPECIMEN’);</p></li>
+</ul>
+<p><strong>Move to Amazon Redshift</strong>: Mount the original GBIF data in Amazon Redshift directly from
+the AWS Open Data Registry in S3.  From this mounted dataset, create a  subset of the
+records into another table with filters.  (<strong>Processing Steps / Step 2</strong>)</p>
+</section>
+<section id="usgs-riis-data">
+<h3>USGS RIIS data<a class="headerlink" href="#usgs-riis-data" title="Link to this heading"></a></h3>
+<p>US-RIIS V2.0, November 2022, available at <a class="reference external" href="https://doi.org/10.5066/P9KFFTOD">https://doi.org/10.5066/P9KFFTOD</a>
+webpage: <a class="reference external" href="https://www.sciencebase.gov/catalog/item/62d59ae5d34e87fffb2dda99">https://www.sciencebase.gov/catalog/item/62d59ae5d34e87fffb2dda99</a></p>
+<p>US-RIIS records consist of a list of species and the areas in which they are considered
+Introduced or Invasive.  Any other species/region combinations encountered will be
+identified as “presumed-native”</p>
+<p>The latest US-RIIS data is present in this Github repository in the <a class="reference external" href="https://github.com/lifemapper/bison/tree/main/data/input">data/input</a> directory.  If a new
+version is available, update it, and the following:</p>
+<p><strong>Move to Amazon S3</strong>: Using the S3 console interface, upload the original US-RIIS
+datafile, and the annotated version (created in <strong>Processing Steps / Step 1</strong>) to the
+input_data folder in the BISON bucket.</p>
+</section>
+<section id="census-state-and-county-aiannh">
+<h3>Census: State and County, AIANNH<a class="headerlink" href="#census-state-and-county-aiannh" title="Link to this heading"></a></h3>
+<p>Up-to-date census data including state and county boundaries are available at:
+<a class="reference external" href="https://www.census.gov/geographies/mapping-files/time-series/geo/cartographic-boundary.html">https://www.census.gov/geographies/mapping-files/time-series/geo/cartographic-boundary.html</a></p>
+<p>Shapefiles used for 2023 processing (2022 was not yet available at time of download):
+Census, Cartographic Boundary Files, 2021
+* <a class="reference external" href="https://www.census.gov/geographies/mapping-files/time-series/geo/cartographic-boundary.html">https://www.census.gov/geographies/mapping-files/time-series/geo/cartographic-boundary.html</a></p>
+<ul class="simple">
+<li><dl class="simple">
+<dt>US County Boundaries, 1:500,000</dt><dd><ul>
+<li><p>cb_2021_us_county_500k.shp</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>American Indian/Alaska Native Areas/Hawaiian Home Lands, AIANNH, 1:500,000</dt><dd><ul>
+<li><p>cb_2021_us_aiannh_500k.zip</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+</ul>
+<p><strong>Move to Amazon S3</strong>: Using the S3 console interface, upload the shapefiles to the
+input_data folder in the BISON bucket.</p>
+</section>
+<section id="protected-areas-database-us-pad-not-currently-used">
+<h3>Protected Areas Database, US-PAD (not currently used)<a class="headerlink" href="#protected-areas-database-us-pad-not-currently-used" title="Link to this heading"></a></h3>
+<p>U.S. Geological Survey (USGS) Gap Analysis Project (GAP), 2022, Protected Areas Database
+of the United States (PAD-US) 3.0: U.S. Geological Survey data release,
+<a class="reference external" href="https://doi.org/10.5066/P9Q9LQ4B">https://doi.org/10.5066/P9Q9LQ4B</a>.</p>
+<p>The US-PAD dataset proved too complex to intersect at an acceptable speed.  Intersecting
+with 900 million records was projected to take 60 days.  I tested this data in
+multiple implementations (local machine or Docker containers) and with multiple versions
+of the data (split by Dept of Interior, DOI, regions, or by states) and with multiple
+Docker configurations, with no success.  For this reason, US-PAD was abandoned until a
+good solution can be found.</p>
+<p>Reported problems during local processing with dataset:
+* TopologyException: side location conflict
+* Invalid polygon with 3 points instead of 0 or &gt;= 4</p>
+<ul>
+<li><dl class="simple">
+<dt>US_PAD for DOI regions 1-12</dt><dd><ul class="simple">
+<li><p><a class="reference external" href="https://www.sciencebase.gov/catalog/item/62226321d34ee0c6b38b6be3">https://www.sciencebase.gov/catalog/item/62226321d34ee0c6b38b6be3</a></p></li>
+<li><p>Metadata: <a class="reference external" href="https://www.sciencebase.gov/catalog/item/622262c8d34ee0c6b38b6bcf">https://www.sciencebase.gov/catalog/item/622262c8d34ee0c6b38b6bcf</a></p></li>
+<li><dl class="simple">
+<dt>Citation:</dt><dd><p>U.S. Geological Survey (USGS) Gap Analysis Project (GAP), 2022,
+Protected Areas Database of the United States (PAD-US) 3.0:
+U.S. Geological Survey data release, <a class="reference external" href="https://doi.org/10.5066/P9Q9LQ4B">https://doi.org/10.5066/P9Q9LQ4B</a>.</p>
+</dd>
+</dl>
+</li>
+<li><p>Geographic areas in separate shapefiles for Designation, Easement, Fee,
+Proclamation, Marine</p></li>
+<li><dl class="simple">
+<dt>target GAP status 1-3</dt><dd><ul>
+<li><p>1 - managed for biodiversity - disturbance events proceed or are mimicked</p></li>
+<li><p>2 - managed for biodiversity - disturbance events suppressed</p></li>
+<li><p>3 - managed for multiple uses - subject to extractive (e.g. mining or logging) or OHV use</p></li>
+<li><p>4 - no known mandate for biodiversity protection</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+</ul>
+</dd>
+</dl>
+<ul class="simple">
+<li><p>Citation: U.S. Geological Survey (USGS) Gap Analysis Project (GAP), 2022, Protected
+Areas Database of the United States (PAD-US) 3.0: U.S. Geological Survey data
+release, <a class="reference external" href="https://doi.org/10.5066/P9Q9LQ4B">https://doi.org/10.5066/P9Q9LQ4B</a>.</p></li>
+</ul>
+</li>
+</ul>
+<p>Mark Wiltermuth, USGS, suggested the “flattened” datasets:
+In terms of PAD-US v 3.0, I’d recommend the following options, if decided to revisit:
+PAD-US 3.0 Vector Analysis File <a class="reference external" href="https://www.sciencebase.gov/catalog/item/6196b9ffd34eb622f691aca7">https://www.sciencebase.gov/catalog/item/6196b9ffd34eb622f691aca7</a>
+PAD-US 3.0 Raster Analysis File <a class="reference external" href="https://www.sciencebase.gov/catalog/item/6196bc01d34eb622f691acb5">https://www.sciencebase.gov/catalog/item/6196bc01d34eb622f691acb5</a></p>
+<blockquote>
+<div><p>Tese are “flattened” though spatial analysis prioritized by GAP Status Code</p>
+</div></blockquote>
+<p>(ie GAP 1 &gt; GAP 2 &gt; GAP &gt; 3 &gt; GAP 4), these are found on bottom of
+<a class="reference external" href="https://www.usgs.gov/programs/gap-analysis-project/science/pad-us-data-download">https://www.usgs.gov/programs/gap-analysis-project/science/pad-us-data-download</a> page.
+However, the vector datasets are available only as ESRI Geodatabases.  Try these and the
+flattened raster dataset in AWS Redshift.</p>
+<p>The next configuration to try will use different AWS tools.  I was unable to insert
+these data into AWS RDS, PostgreSQL with PostGIS (other polygon datasets succeeded).
+Future experiments will use AWS Redshift and the flattened/simplified datasets described
+below.</p>
+</section>
+</section>
+<section id="processing-steps">
+<h2>Processing Steps<a class="headerlink" href="#processing-steps" title="Link to this heading"></a></h2>
+<p>To address new difficulties processing the data locally with newly added datasets,
+we moved some steps from local or Docker execution to Amazon Web Services AWS, and kept
+others to be executed locally.  To simplify, we abandoned the Docker implementation,
+since the steps it was intended to speed up were moved to AWS.</p>
+<p>The goal is to also move
+locally executed steps over to AWS, removing the requirement of local installation, and
+allowing the workflow to be initiated by an event, with the completion of each step
+triggering subsequent steps.</p>
+<p>Local processing consists of 2 steps, each initiated with the process_gbif.py script,
+a parameter file, and a command.  Local data files, input and output paths, and other
+parameters are specified in the configuration file.  The local file used by the author
+to test and execute the workflow is in the <a class="reference external" href="https://github.com/lifemapper/bison/tree/main/data/config/process_gbif.json">process_gbif.json</a> file.</p>
+<p>Required parameters include:</p>
+<ul class="simple">
+<li><p>riis_filename (str): full filename of input USGS RIIS data in CSV format.</p></li>
+<li><p>gbif_filename (str): full filename of input GBIF occurrence data in CSV format.</p></li>
+<li><dl class="simple">
+<dt>do_split (bool): Flag indicating whether the GBIF data is to be (or has been) split into</dt><dd><p>smaller subsets. The JSON value must be true or false (no quotes).</p>
+</dd>
+</dl>
+</li>
+<li><p>run_parallel (bool): Flag indicating whether the annotation process is to be run in
+parallel threads. The JSON value must be true or false (no quotes).</p></li>
+<li><p>geo_path (str): Source directory containing geospatial input data.</p></li>
+<li><p>process_path (str): Destination directory for temporary data.</p></li>
+<li><p>output_path (str): Destination directory for output data.</p></li>
+</ul>
+<p>We determine the Introduced and Invasive Species status of a GBIF record by first
+resolving the scientificName in the US Registry of Introduced and Invasive Species
+(RIIS) to the closest matching name in GBIF.</p>
+<p>For this step, we will
+* use the GBIF API to find the GBIF acceptedScientificName, and its acceptedTaxonKey,</p>
+<blockquote>
+<div><p>corresponding to every RIIS record scientificName, and</p>
+</div></blockquote>
+<ul class="simple">
+<li><p>append acceptedScientificName and acceptedTaxonKey to each RIIS record</p></li>
+</ul>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ python ./aws_scripts/bison_annotate_riis.py --riis_file=data/input/US-RIIS_MasterList_2021.csv
+</pre></div>
+</div>
+<p><strong>Move to Amazon S3</strong>: In the AWS S3 console interface, upload the following data file
+to the <strong>&lt;BISON bucket&gt;/input_data</strong> folder:</p>
+<ul class="simple">
+<li><p>original US-RIIS datafile</p></li>
+<li><p>annotated US-RIIS datafile (“_annotated_yyyy-mm-dd” appended to the base filename.</p></li>
+<li><p>US County Boundaries, cb_2021_us_county_500k.shp (and supporting files)</p></li>
+<li><p>AIANNH, cb_2021_us_aiannh_500k.shp (and supporting files)</p></li>
+</ul>
+<p>Mount the GBIF data directly from the Amazon Open Data Registry into Redshift for
+filtering into a BISON subset for processing.</p>
+<p>In the AWS Redshift console interface, open the “query editor”, and paste in the
+contents of the file <strong>aws_scripts/rs_subset_gbif.sql</strong>.  Run the script to mount GBIF
+data, filter GBIF data into a <strong>BISON subset</strong> table, and unmount the GBIF data.</p>
+<p>Mount the input data uploaded to S3 in Step 2 to Redshift for later processing with
+the BISON subset.</p>
+<p>In the AWS Redshift console interface, open the “query editor”, and paste in the
+contents of the file <strong>aws_scripts/rs_load_ancillary_data.sql</strong>.  Run the script to load
+county, AIANNH, and RIIS data into tables.</p>
+<p>Intersect the ancillary geospatial datasets with the BISON subset, and join BISON
+records with annotated RIIS records to annotate BISON with geospatial regions and
+RIIS status.</p>
+<p>In the AWS Redshift console interface, open the “query editor”, and paste in the
+contents of the file <strong>aws_scripts/rs_intersect_append.sql</strong>.  Run the script to
+annotate BISON records with county, state, and AIANNH regions and RIIS determinations,
+then export data in CSV format to the <strong>&lt;BISON bucket&gt;/annotated_records</strong> folder on S3.</p>
+<p>Summarize BISON records by region and RIIS status, with counts of occurrences and
+species.  Create lists of species for regions, including RIIS status and occurrence
+counts.</p>
+<p>In the AWS Redshift console interface, open the “query editor”, and paste in the
+contents of the file <strong>aws_scripts/rs_aggregate_export.sql</strong>.  Run the script to
+summarize records by region, then export to the <strong>&lt;BISON bucket&gt;/out_data</strong> folder on
+S3.  Tables named &lt;region&gt;_counts_yyyy_mm_dd contain records of</p>
+<blockquote>
+<div><p>region, riis status, occurrence count, and species count.</p>
+</div></blockquote>
+<dl class="simple">
+<dt>Outputs named &lt;region&gt;_lists_yyyy_mm_dd contain records of</dt><dd><p>region, taxonkey, species, riis_assessment, and occurrence count</p>
+</dd>
+</dl>
+<p>Create a 2d ‘heat matrix’ of counties (rows) by species (columns) with a count for each
+species found at that location.  Convert the heat matrix into a binary PAM, and compute
+diversity statistics: overall diversity of the entire region (gamma), county
+diversities (alpha) and total diversity to county diversities (beta).  In addition,
+compute species statistics: range size (omega) and mean proportional range size
+(omega_proportional).</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ python ./aws_scripts/bison_matrix_stats.py
+</pre></div>
+</div>
+<p>Stats references for alpha, beta, gamma diversity:
+* <a class="reference external" href="https://www.frontiersin.org/articles/10.3389/fpls.2022.839407/full">https://www.frontiersin.org/articles/10.3389/fpls.2022.839407/full</a>
+* <a class="reference external" href="https://specifydev.slack.com/archives/DQSAVMMHN/p1693260539704259">https://specifydev.slack.com/archives/DQSAVMMHN/p1693260539704259</a>
+* <a class="reference external" href="https://bio.libretexts.org/Bookshelves/Ecology/Biodiversity_(Bynum)/7%3A_Alpha_Beta_and_Gamma_Diversity">https://bio.libretexts.org/Bookshelves/Ecology/Biodiversity_(Bynum)/7%3A_Alpha_Beta_and_Gamma_Diversity</a></p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../interaction/deploy.html" class="btn btn-neutral float-left" title="Deploy BISON" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="year4_planA.html" class="btn btn-neutral float-right" title="Year 4, Part 1, 2023" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, LmBISON Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

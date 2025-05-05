@@ -1,0 +1,232 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Roles, Policies, Trust Relationships &mdash; LmBISON documentation 1.0a1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=036e6a88"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Workflow Automation" href="automation.html" />
+    <link rel="prev" title="Create lambda function to initiate processing" href="lambda.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            LmBISON documentation
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../about.html">About</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../workflow.html">AWS workflow</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="aws_setup.html">AWS Resource Setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ec2_setup.html">EC2 instance creation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="lambda.html">Create lambda function to initiate processing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="lambda.html#edit-the-configuration-for-lambda-function">Edit the Configuration for lambda function</a></li>
+<li class="toctree-l1"><a class="reference internal" href="lambda.html#lambda-to-query-redshift">Lambda to query Redshift</a></li>
+<li class="toctree-l1"><a class="reference internal" href="lambda.html#lambda-to-start-ec2-for-task">Lambda to start EC2 for task</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Roles, Policies, Trust Relationships</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#bison-ec2-s3-role">bison_ec2_s3_role</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#bison-redshift-lambda-role">bison_redshift_lambda_role</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#id3">bison_ec2_s3_role</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="automation.html">Workflow Automation</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../interaction/debug.html">Debugging Flask and Docker instances</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../interaction/deploy.html">Deploy BISON</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../history/year4_planB.html">Year 4, Part 2, 2023-2024</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../history/year4_planA.html">Year 4, Part 1, 2023</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../history/year3.html">Year 3, 2021-2022</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../history/year5.html">Year 5, 2024</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../history/aws_experiments.html">AWS workflow experiments</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../history/aws_experiments.html#glue-interactive-development">Glue - Interactive Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../history/aws_experiments.html#bison-aws-data-tools">BISON AWS data/tools</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">LmBISON documentation</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Roles, Policies, Trust Relationships</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/pages/aws/roles.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="roles-policies-trust-relationships">
+<h1>Roles, Policies, Trust Relationships<a class="headerlink" href="#roles-policies-trust-relationships" title="Link to this heading"></a></h1>
+<section id="bison-ec2-s3-role">
+<span id="bison-redshift-s3-role"></span><h2>bison_ec2_s3_role<a class="headerlink" href="#bison-ec2-s3-role" title="Link to this heading"></a></h2>
+<p>Attach to BISON namespace (Redshift)
+* Regular role
+* Trust relationships</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>service: “redshift.amazonaws.com”</p></li>
+</ul>
+</div></blockquote>
+<ul class="simple">
+<li><p>Policies:</p>
+<ul>
+<li><p>AmazonRedshiftAllCommandsFullAccess (AWS managed)</p></li>
+<li><p>AmazonRedshiftDataFullAccess (AWS managed)</p></li>
+<li><p>AmazonRedshiftFullAccess (AWS managed)</p></li>
+<li><p>bison_create_run_ec2_policy (Describe, Start, Stop EC2 instances)</p></li>
+<li><p>bison_invoke_lambda_policy (invoke lambda functions starting with <cite>bison</cite>)</p></li>
+<li><p>bison_lambda_log_policy (write CloudWatch logs to log groups starting with <cite>bison</cite>)</p></li>
+<li><p>bison_redshift_policy.json (for Redshift and Glue interactions)</p></li>
+<li><p>bison_s3_policy (read public/GBIF S3 data and read/write S3 data in bison bucket)</p></li>
+</ul>
+</li>
+<li><p>for Redshift - Customizable</p>
+<ul>
+<li><p>TODO: change to Redshift - Scheduler when automated</p></li>
+</ul>
+</li>
+</ul>
+<dl>
+<dt>{</dt><dd><p>“Version”: “2012-10-17”,
+“Statement”: [</p>
+<blockquote>
+<div><dl>
+<dt>{</dt><dd><p>“Effect”: “Allow”,
+“Action”: [</p>
+<blockquote>
+<div><p>“lambda:InvokeFunction”</p>
+</div></blockquote>
+<p>],
+“Resource”: [</p>
+<blockquote>
+<div><p>“arn:aws:lambda:us-east-1:321942852011:function:bison_s0_test_schedule:<a href="#id1"><span class="problematic" id="id2">*</span></a>”,
+“arn:aws:lambda:us-east-1:321942852011:function:bison_s0_test_schedule”</p>
+</div></blockquote>
+<p>]</p>
+</dd>
+</dl>
+<p>}</p>
+</div></blockquote>
+<p>]</p>
+</dd>
+</dl>
+<p>}</p>
+</section>
+<section id="bison-redshift-lambda-role">
+<h2>bison_redshift_lambda_role<a class="headerlink" href="#bison-redshift-lambda-role" title="Link to this heading"></a></h2>
+<ul>
+<li><p>Service role</p></li>
+<li><p>Trust relationships:
+../../aws/bison_redshift_lambda_role_trusted_relationships.json</p></li>
+<li><p>Policies:</p>
+<ul class="simple">
+<li><p>same as bison_redshift_s3_role</p></li>
+</ul>
+</li>
+<li><p>In Redshift, GRANT permissions to database:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">GRANT</span> <span class="n">CREATE</span>
+    <span class="n">ON</span> <span class="n">DATABASE</span> <span class="n">dev</span>
+    <span class="n">TO</span> <span class="n">IAMR</span><span class="p">:</span><span class="n">bison_redshift_lambda_role</span>
+</pre></div>
+</div>
+</li>
+<li><p>Attached to BISON lambda functions</p></li>
+<li><p>Attach to BISON namespace (Redshift)</p></li>
+</ul>
+</section>
+<section id="id3">
+<span id="id4"></span><h2>bison_ec2_s3_role<a class="headerlink" href="#id3" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Trusted entity type: AWS Service</p></li>
+<li><p>for S3</p></li>
+<li><p>Includes policies:</p>
+<ul>
+<li><p>bison_s3_policy.json (read public/GBIF S3 data and read/write bison S3 data)</p></li>
+<li><p>SecretsManagerReadWrite (AWS managed)</p></li>
+</ul>
+</li>
+<li><p>Trust relationship:</p>
+<ul>
+<li><p>ec2_s3_role_trust_policy.json edit trust policy for both ec2 and s3</p></li>
+</ul>
+</li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="lambda.html" class="btn btn-neutral float-left" title="Create lambda function to initiate processing" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="automation.html" class="btn btn-neutral float-right" title="Workflow Automation" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, LmBISON Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

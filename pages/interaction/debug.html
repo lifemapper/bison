@@ -1,0 +1,281 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Debugging Flask and Docker instances &mdash; LmBISON documentation 1.0a1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=036e6a88"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Deploy BISON" href="deploy.html" />
+    <link rel="prev" title="Workflow Automation" href="../aws/automation.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            LmBISON documentation
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../about.html">About</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../workflow.html">AWS workflow</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../aws/aws_setup.html">AWS Resource Setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../aws/ec2_setup.html">EC2 instance creation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../aws/lambda.html">Create lambda function to initiate processing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../aws/lambda.html#edit-the-configuration-for-lambda-function">Edit the Configuration for lambda function</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../aws/lambda.html#lambda-to-query-redshift">Lambda to query Redshift</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../aws/lambda.html#lambda-to-start-ec2-for-task">Lambda to start EC2 for task</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../aws/roles.html">Roles, Policies, Trust Relationships</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../aws/automation.html">Workflow Automation</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Debugging Flask and Docker instances</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#ide-debugging-of-functions">IDE debugging of functions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#local-debugging">Local debugging</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#of-flask-app">Of flask app</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#of-python-scripts">Of python scripts</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#docker-debugging">Docker debugging</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#run-docker-containers-development">Run Docker containers (development)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#rebuild-restart">Rebuild/restart</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#examine-container">Examine container</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#troubleshooting">Troubleshooting</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#general-debug-messages-for-the-flask-container">General debug messages for the flask container</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#problem-failed-programming-external-connectivity">Problem: Failed programming external connectivity</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#solution">Solution</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="deploy.html">Deploy BISON</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../history/year4_planB.html">Year 4, Part 2, 2023-2024</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../history/year4_planA.html">Year 4, Part 1, 2023</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../history/year3.html">Year 3, 2021-2022</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../history/year5.html">Year 5, 2024</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../history/aws_experiments.html">AWS workflow experiments</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../history/aws_experiments.html#glue-interactive-development">Glue - Interactive Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../history/aws_experiments.html#bison-aws-data-tools">BISON AWS data/tools</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">LmBISON documentation</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Debugging Flask and Docker instances</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/pages/interaction/debug.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="debugging-flask-and-docker-instances">
+<h1>Debugging Flask and Docker instances<a class="headerlink" href="#debugging-flask-and-docker-instances" title="Link to this heading"></a></h1>
+<section id="ide-debugging-of-functions">
+<h2>IDE debugging of functions<a class="headerlink" href="#ide-debugging-of-functions" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Set up python virtual environment for the project</p></li>
+<li><p>Connect IDE to venv python interpreter</p></li>
+</ul>
+</section>
+<section id="local-debugging">
+<h2>Local debugging<a class="headerlink" href="#local-debugging" title="Link to this heading"></a></h2>
+<section id="of-flask-app">
+<h3>Of flask app<a class="headerlink" href="#of-flask-app" title="Link to this heading"></a></h3>
+<ul>
+<li><p>Run flask at command prompt</p>
+<blockquote>
+<div><p><code class="docutils literal notranslate"><span class="pre">`zsh</span>
+<span class="pre">export</span> <span class="pre">FLASK_ENV=development</span>
+<span class="pre">export</span> <span class="pre">FLASK_APP=flask_app.bison.routes</span>
+<span class="pre">flask</span> <span class="pre">run</span>
+<span class="pre">`</span></code></p>
+</div></blockquote>
+</li>
+<li><p>The development port will be 5000.  Connect to
+<a class="reference external" href="http://127.0.0.1:5000">http://127.0.0.1:5000</a> in browser,</p>
+<ul class="simple">
+<li><p>Bison
+<a class="reference external" href="http://127.0.0.1:5000/api/v1/describe">http://127.0.0.1:5000/api/v1/describe</a></p></li>
+</ul>
+</li>
+<li><p>Flask will auto-update on file save.</p></li>
+<li><p>Refresh browser after changes</p></li>
+</ul>
+</section>
+<section id="of-python-scripts">
+<h3>Of python scripts<a class="headerlink" href="#of-python-scripts" title="Link to this heading"></a></h3>
+<ul>
+<li><p>Step 1, annotate RIIS with GBIF accepted taxa:</p>
+<ul>
+<li><p>directly run script to annotate RIIS in EC2 docker container.  The script will
+execute from the /home/bison directory, which contains the venv (python virtual
+environment) and bison directories:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">sudo</span> <span class="n">docker</span> <span class="n">exec</span> <span class="n">bison</span><span class="o">-</span><span class="n">bison</span><span class="o">-</span><span class="mi">1</span> <span class="n">venv</span><span class="o">/</span><span class="nb">bin</span><span class="o">/</span><span class="n">python</span> <span class="n">bison</span><span class="o">/</span><span class="n">tools</span><span class="o">/</span><span class="n">annotate_riis</span><span class="o">.</span><span class="n">py</span>
+</pre></div>
+</div>
+</li>
+<li><p>If script fails, try interacting with the container directly.:</p>
+<p>sudo docker exec -it bison-bison-1 /bin/sh
+$ pwd
+/home/bison
+$ venv/bin/python</p>
+</li>
+</ul>
+</li>
+<li><p>Step 7.</p></li>
+</ul>
+</section>
+</section>
+<section id="docker-debugging">
+<h2>Docker debugging<a class="headerlink" href="#docker-debugging" title="Link to this heading"></a></h2>
+<section id="run-docker-containers-development">
+<h3>Run Docker containers (development)<a class="headerlink" href="#run-docker-containers-development" title="Link to this heading"></a></h3>
+<p>Note that the development compose file, compose.development.yml, is referenced
+first on the command line.  It has elements that override those defined in the
+general compose file, compose.yml:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">sudo</span> <span class="n">docker</span> <span class="n">compose</span> <span class="o">-</span><span class="n">f</span> <span class="n">compose</span><span class="o">.</span><span class="n">development</span><span class="o">.</span><span class="n">yml</span> <span class="o">-</span><span class="n">f</span> <span class="n">compose</span><span class="o">.</span><span class="n">yml</span>  <span class="n">up</span>
+</pre></div>
+</div>
+<p>Flask has hot-reload enabled.</p>
+</section>
+<section id="rebuild-restart">
+<h3>Rebuild/restart<a class="headerlink" href="#rebuild-restart" title="Link to this heading"></a></h3>
+<p>To delete all containers, images, networks and volumes, stop any running
+containers:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">sudo</span> <span class="n">docker</span> <span class="n">compose</span> <span class="n">stop</span>
+</pre></div>
+</div>
+<p>And run this command (which ignores running container):</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">sudo</span> <span class="n">docker</span> <span class="n">system</span> <span class="n">prune</span> <span class="o">--</span><span class="nb">all</span> <span class="o">--</span><span class="n">volumes</span>
+</pre></div>
+</div>
+<p>Then rebuild/restart:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">sudo</span> <span class="n">docker</span> <span class="n">compose</span> <span class="o">-</span><span class="n">f</span> <span class="n">compose</span><span class="o">.</span><span class="n">development</span><span class="o">.</span><span class="n">yml</span> <span class="o">-</span><span class="n">f</span> <span class="n">compose</span><span class="o">.</span><span class="n">yml</span>  <span class="n">up</span>
+</pre></div>
+</div>
+</section>
+<section id="examine-container">
+<h3>Examine container<a class="headerlink" href="#examine-container" title="Link to this heading"></a></h3>
+<p>To examine flask container at a shell prompt, or print logs:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">sudo</span> <span class="n">docker</span> <span class="n">exec</span> <span class="o">-</span><span class="n">it</span> <span class="n">bison</span><span class="o">-</span><span class="n">nginx</span><span class="o">-</span><span class="mi">1</span> <span class="o">/</span><span class="nb">bin</span><span class="o">/</span><span class="n">sh</span>
+<span class="n">sudo</span> <span class="n">docker</span> <span class="n">logs</span> <span class="n">bison</span><span class="o">-</span><span class="n">nginx</span><span class="o">-</span><span class="mi">1</span> <span class="o">--</span><span class="n">tail</span> <span class="mi">100</span>
+</pre></div>
+</div>
+<p>Or examine backend container:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">sudo</span> <span class="n">docker</span> <span class="n">exec</span> <span class="o">-</span><span class="n">it</span> <span class="n">bison</span><span class="o">-</span><span class="n">bison</span><span class="o">-</span><span class="mi">1</span> <span class="o">/</span><span class="nb">bin</span><span class="o">/</span><span class="n">sh</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="troubleshooting">
+<h2>Troubleshooting<a class="headerlink" href="#troubleshooting" title="Link to this heading"></a></h2>
+<section id="general-debug-messages-for-the-flask-container">
+<h3>General debug messages for the flask container<a class="headerlink" href="#general-debug-messages-for-the-flask-container" title="Link to this heading"></a></h3>
+<ul>
+<li><p>Print logs:</p>
+<p>sudo docker logs bison-nginx-1 –tail 100</p>
+</li>
+</ul>
+</section>
+<section id="problem-failed-programming-external-connectivity">
+<h3>Problem: Failed programming external connectivity<a class="headerlink" href="#problem-failed-programming-external-connectivity" title="Link to this heading"></a></h3>
+<dl class="simple">
+<dt>[+] Running 6/5</dt><dd><p>✔ Network bison_default        Created                                                                                                                                                          0.1s
+✔ Network bison_nginx          Created                                                                                                                                                          0.1s
+✔ Container bison-front-end-1  Created                                                                                                                                                          0.2s
+✔ Container bison-bison-1     Created                                                                                                                                                          0.2s 0.2s
+✔ Container bison-nginx-1      Created                                                                                                                                                          0.1s</p>
+</dd>
+</dl>
+<p>Attaching to bison-1, front-end-1, nginx-1
+Error response from daemon: driver failed programming external connectivity on endpoint
+bison-nginx-1 (1feeaa264a757ddf815a34db5dd541f48d3f57aa21ef104e3d5823efbb35f9ab):
+Error starting userland proxy: listen tcp4 0.0.0.0:80: bind: address already in use</p>
+<section id="solution">
+<h4>Solution<a class="headerlink" href="#solution" title="Link to this heading"></a></h4>
+<p>Stop apache2 on the host machine</p>
+</section>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../aws/automation.html" class="btn btn-neutral float-left" title="Workflow Automation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="deploy.html" class="btn btn-neutral float-right" title="Deploy BISON" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, LmBISON Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,392 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Year 3, 2021-2022 &mdash; LmBISON documentation 1.0a1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=036e6a88"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Year 5, 2024" href="year5.html" />
+    <link rel="prev" title="Year 4, Part 1, 2023" href="year4_planA.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            LmBISON documentation
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../about.html">About</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../workflow.html">AWS workflow</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../aws/aws_setup.html">AWS Resource Setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../aws/ec2_setup.html">EC2 instance creation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../aws/lambda.html">Create lambda function to initiate processing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../aws/lambda.html#edit-the-configuration-for-lambda-function">Edit the Configuration for lambda function</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../aws/lambda.html#lambda-to-query-redshift">Lambda to query Redshift</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../aws/lambda.html#lambda-to-start-ec2-for-task">Lambda to start EC2 for task</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../aws/roles.html">Roles, Policies, Trust Relationships</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../aws/automation.html">Workflow Automation</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../interaction/debug.html">Debugging Flask and Docker instances</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../interaction/deploy.html">Deploy BISON</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="year4_planB.html">Year 4, Part 2, 2023-2024</a></li>
+<li class="toctree-l1"><a class="reference internal" href="year4_planA.html">Year 4, Part 1, 2023</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Year 3, 2021-2022</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#project-setup">Project setup</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#data-inputs">Data Inputs</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#gbif">GBIF</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#usgs-riis">USGS RIIS</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#census-data-for-determining-point-county-state">Census data for determining point county/state</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#execution">Execution</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#split-gbif-data">1. Split GBIF data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#resolve-us-riis-taxonomy">2. Resolve US-RIIS taxonomy</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#summarize-each-file-of-annotated-dwc-records">3. Summarize each file of annotated DwC records</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#aggregate-summarized-chunks">4. Aggregate summarized chunks</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#development">Development</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#pre-commit">Pre-commit</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#documentation">Documentation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#testing">Testing</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="year5.html">Year 5, 2024</a></li>
+<li class="toctree-l1"><a class="reference internal" href="aws_experiments.html">AWS workflow experiments</a></li>
+<li class="toctree-l1"><a class="reference internal" href="aws_experiments.html#glue-interactive-development">Glue - Interactive Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="aws_experiments.html#bison-aws-data-tools">BISON AWS data/tools</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">LmBISON documentation</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Year 3, 2021-2022</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/pages/history/year3.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="year-3-2021-2022">
+<h1>Year 3, 2021-2022<a class="headerlink" href="#year-3-2021-2022" title="Link to this heading"></a></h1>
+<p>2022, Year 3 SOW specifies building the project as a well-documented Python application,
+that can be run by technically proficient USGS personnel with adequate computing
+resources.</p>
+<p>The initial processes include annotating <strong>GBIF occurrence data</strong> from the
+US, with designations from the <strong>US Registry of Introduced and Invasive Species</strong>
+(RIIS), then summarizing the data by different regions.</p>
+<p>Regions include <strong>US Census state and county boundaries</strong>.  States are required
+in order to identify whether the occurrence of a particular species falls within the
+a RIIS region (Alaska, Hawaii, or Lower 48), where it is identified as “Introduced”
+or “Invasive”.  Region summaries include both state and county boundaries.</p>
+<p>All regions (state, county) will be summarized by count and proportion for species,
+occurrences, and RIIS status.</p>
+<section id="project-setup">
+<h2>Project setup<a class="headerlink" href="#project-setup" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>For a development virtual environment and production build, use a python virtual
+environment.  Install and activate:</p></li>
+</ul>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ python3 -m venv venv
+$ . venv/bin/activate
+(venv) $ pip3 install -r requirements.txt
+</pre></div>
+</div>
+</section>
+<section id="data-inputs">
+<h2>Data Inputs<a class="headerlink" href="#data-inputs" title="Link to this heading"></a></h2>
+<section id="gbif">
+<h3>GBIF<a class="headerlink" href="#gbif" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Download GBIF data, query
+<a class="reference external" href="https://www.gbif.org/occurrence/search?country=US&amp;has_coordinate=true&amp;has_geospatial_issue=false&amp;occurrence_status=present">https://www.gbif.org/occurrence/search?country=US&amp;has_coordinate=true&amp;has_geospatial_issue=false&amp;occurrence_status=present</a></p></li>
+<li><p>Download option Darwin Core Archive (The taxonKey and scientific name in Simple CSV
+option is not always accepted).</p></li>
+<li><p>Latest download:  GBIF.org (19 May 2022) GBIF Occurrence Download
+<a class="reference external" href="https://doi.org/10.15468/dl.y9k4yc">https://doi.org/10.15468/dl.y9k4yc</a></p></li>
+</ul>
+</section>
+<section id="usgs-riis">
+<h3>USGS RIIS<a class="headerlink" href="#usgs-riis" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>United States Register of Introduced and Invasive Species (US-RIIS)
+<a class="reference external" href="https://doi.org/10.5066/P95XL09Q">https://doi.org/10.5066/P95XL09Q</a></p></li>
+<li><p>Test USGS input files</p></li>
+</ul>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>(venv) $ python3 test/test_RIIS.py
+(venv) $ python3 test/test_taxonomy.py
+</pre></div>
+</div>
+</section>
+<section id="census-data-for-determining-point-county-state">
+<h3>Census data for determining point county/state<a class="headerlink" href="#census-data-for-determining-point-county-state" title="Link to this heading"></a></h3>
+<p>Used the US Census 2020 cartographic boundaries from
+<a class="reference external" href="https://www.census.gov/geographies/mapping-files/time-series/geo/cartographic-boundary.html">https://www.census.gov/geographies/mapping-files/time-series/geo/cartographic-boundary.html</a></p>
+<p>Census data are in EPSG:4269 (WGS84), a geographic SRS very close to EPSG:4326 (NAD83).
+For 2 reasons, I did not project the census data:
+* The difference is on the order of meters.
+* The GBIF data usually does not specify a datum</p>
+<p>See <a class="reference external" href="https://gis.stackexchange.com/questions/170839/is-re-projection-needed-from-srid-4326-wgs-84-to-srid-4269-nad-83">https://gis.stackexchange.com/questions/170839/is-re-projection-needed-from-srid-4326-wgs-84-to-srid-4269-nad-83</a></p>
+<p>Occasionally a point would intersect with a county envelope (created for a spatial index)
+but not be contained within the returned geometry.  In that case, I returned the
+values from the geometry nearest to the point.</p>
+</section>
+</section>
+<section id="execution">
+<h2>Execution<a class="headerlink" href="#execution" title="Link to this heading"></a></h2>
+<p>All steps are executed by running the python script ./process_gbif.py with a command
+and (for all commands except resolve, the original input GBIF filename.  Ensure that
+the virtual environment has been activated (the command prompt will be preceded by
+“(venv)”).</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ . venv/bin/activate
+(venv) $
+</pre></div>
+</div>
+<p>The constant BIG_DATA_PATH is set in the bison/common/constants.py file and specifies
+both the location of the original input data file, and the location of logfiles and
+data outputs.  Set this variable to an appropriate location (with enough disk space)
+on the computer running the processes.</p>
+<section id="split-gbif-data">
+<h3>1. Split GBIF data<a class="headerlink" href="#split-gbif-data" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Command: split</p></li>
+<li><p>Input: gbif_&lt;yyyy-mm-dd&gt;.csv</p></li>
+<li><p>Output: list of files of pattern gbif_&lt;yyyy-mm-dd&gt;_chunk-&lt;start_line&gt;-&lt;stop_line&gt;_raw.csv</p></li>
+</ul>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>(venv) $ python  process_gbif.py  split  --gbif_filename=gbif_&lt;yyyy-mm-dd&gt;.csv
+</pre></div>
+</div>
+<p>This step prepares the GBIF data by splitting it into smaller chunks for easier
+processing.  We split the data into chunks based on the number of processors
+(chunk_count = processor_count-2).  Splitting the data and processing it in chunks
+serves several purposes:</p>
+<ol class="arabic simple">
+<li><p>Smaller datasets can be moved more easily.</p></li>
+<li><p>During debugging, errors can be found more quickly on smaller datasets.</p></li>
+</ol>
+<p>3. Some time-consuming processes are run in parallel on different processors, speeding
+execution.</p>
+</section>
+<section id="resolve-us-riis-taxonomy">
+<h3>2. Resolve US-RIIS taxonomy<a class="headerlink" href="#resolve-us-riis-taxonomy" title="Link to this heading"></a></h3>
+<p>RIIS Data: <a class="reference external" href="https://www.sciencebase.gov/catalog/item/6357fcfed34ebe4425031fb6">https://www.sciencebase.gov/catalog/item/6357fcfed34ebe4425031fb6</a></p>
+<ul class="simple">
+<li><p>Command: resolve</p></li>
+<li><p>Input: US-RIIS_MasterList.csv</p></li>
+<li><p>Output: US-US-RIIS_MasterList_updated_gbif.csv</p></li>
+</ul>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>(venv) $ python  process_gbif.py  resolve  --riis_filename=data/US-RIIS_MasterList.csv
+</pre></div>
+</div>
+<p>This step prepares the US-RIIS data (“US-RIIS_MasterList.csv”) by resolving each
+record’s scientificName to the acceptedScientificName in the GBIF Backbone Taxonomy.
+Most GBIF DwC records have a verbatimScientificName that has been resolved to
+acceptedScientificName, grouping records with synonyms, misspellings, and other
+presumed similar names into a single species.  This step facilitates identifying GBIF
+records to a US-RIIS status of introduced, invasive, or presumed_native based on the
+GBIF acceptedScientificName.</p>
+<p>This step appends 3 fields to the US-RIIS data:</p>
+<ul class="simple">
+<li><p><cite>gbif_res_taxonkey</cite>: the acceptedTaxonKey linked to the acceptedScientificName found
+from the GBIF taxon service for the scientific_name in this record.</p></li>
+<li><p><cite>gbif_res_scientificName</cite>: the acceptedScientificName found from the
+GBIF taxon service for the scientific_name in this record.</p></li>
+<li><p><cite>LINENO</cite>: the line number of this record in the original file, used for debugging</p></li>
+</ul>
+<p>## 3. Annotate DwC records</p>
+<ul class="simple">
+<li><p>Command: annotate</p></li>
+<li><p>Input: gbif_&lt;yyyy-mm-dd&gt;.csv</p></li>
+<li><p>Output: list of files of pattern
+gbif_&lt;yyyy-mm-dd&gt;_chunk-&lt;start_line&gt;-&lt;stop_line&gt;_annotated.csv, each with new fields
+added and filled where possible.</p></li>
+</ul>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>(venv) $ python  process_gbif.py  annotate  --gbif_filename=gbif_&lt;yyyy-mm-dd&gt;.csv
+</pre></div>
+</div>
+<p>This step annotates all GBIF DwC records with 5 additional fields, of 3 categories:</p>
+<ol class="arabic simple">
+<li><p>Geographic determined by intersecting coordinates with US Census Boundaries</p>
+<ul class="simple">
+<li><p><cite>georef_cty</cite>: County as determined by census boundaries</p></li>
+<li><p><cite>georef_st</cite>: State as determined by census boundaries</p></li>
+</ul>
+</li>
+<li><p>a flag indicating whether to annotate this record and include it in summaries, by
+marking all records identified to taxonRank species and below as True, all above
+species as False.</p>
+<ul class="simple">
+<li><p><cite>do_summarize</cite>: Mark records identified to taxonRank species or below
+(subspecies, variety, form, infraspecific_name, infrasubspecific_name)
+as True, all above as False.</p></li>
+</ul>
+</li>
+<li><p>RIIS identifier, and RIIS designation introduced, invasive, or presumed native. This
+assessment is computed from the occurrence record’s taxon and region (Alaska, Hawaii,
+or the Lower 48 states). If an occurrence record is determined to a level below
+species (subspecies, variety, form, infraspecific_name, infrasubspecific_name),
+check also the species (higher level) and location are identified as introduced or
+invasive.</p>
+<ul class="simple">
+<li><dl class="simple">
+<dt><cite>riis_occurrence_id</cite>: Matching RIIS unique identifier determination for this</dt><dd><p>record’s acceptedScientificName and location.</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt><cite>riis_assessment</cite>: RIIS assessment of introduced, invasive, or presumed_native, for</dt><dd><p>this record’s taxon and location.</p>
+</dd>
+</dl>
+</li>
+</ul>
+</li>
+</ol>
+<p>This step then writes out the annotated, flagged records.</p>
+</section>
+<section id="summarize-each-file-of-annotated-dwc-records">
+<h3>3. Summarize each file of annotated DwC records<a class="headerlink" href="#summarize-each-file-of-annotated-dwc-records" title="Link to this heading"></a></h3>
+<p>This step summarizes each annotated chunk by county, state, and RIIS status, then writes
+out a summary for each chunked, annotated file</p>
+<ul class="simple">
+<li><p>Command: summarize</p></li>
+<li><p>Input: gbif_&lt;yyyy-mm-dd&gt;.csv</p></li>
+<li><p>Output: list of files of pattern
+gbif_&lt;yyyy-mm-dd&gt;_chunk-&lt;start_line&gt;-&lt;stop_line&gt;_summary.csv AND a full summary in
+gbif_&lt;yyyy-mm-dd&gt;_summary.csv</p></li>
+</ul>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>(venv) $ python  process_gbif.py  summarize  --gbif_filename=gbif_&lt;yyyy-mm-dd&gt;.csv
+</pre></div>
+</div>
+</section>
+<section id="aggregate-summarized-chunks">
+<h3>4. Aggregate summarized chunks<a class="headerlink" href="#aggregate-summarized-chunks" title="Link to this heading"></a></h3>
+<p>This step aggregates the summarized chunk files, and writes the summaries for each state
+and county</p>
+<ul class="simple">
+<li><p>Command: aggregate</p></li>
+<li><p>Input: gbif_&lt;yyyy-mm-dd&gt;_summary.csv</p></li>
+<li><p>Output: list of files of pattern
+&lt;region_type&gt;-&lt;region&gt;.csv, i.e. state_KS.csv, county_KS-Douglas.csv  AND
+a RIIS summary in file gbif_&lt;yyyy-mm-dd&gt;_riis_summary.csv</p></li>
+</ul>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>(venv) $ python  process_gbif.py  aggregate  --gbif_filename=gbif_&lt;yyyy-mm-dd&gt;.csv
+</pre></div>
+</div>
+</section>
+</section>
+<section id="development">
+<h2>Development<a class="headerlink" href="#development" title="Link to this heading"></a></h2>
+<section id="pre-commit">
+<h3>Pre-commit<a class="headerlink" href="#pre-commit" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Instructions in [.pre-commit-config.yaml](.pre-commit-config.yaml)</p></li>
+<li><p>When running a commit (and the pre-commit hooks), if files are modified, make sure to
+restage them, then run commit again to ensure that changes are saved.</p></li>
+</ul>
+</section>
+<section id="documentation">
+<h3>Documentation<a class="headerlink" href="#documentation" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Auto-generate readthedocs:
+<a class="reference external" href="https://docs.readthedocs.io/en/stable/intro/getting-started-with-mkdocs.html">https://docs.readthedocs.io/en/stable/intro/getting-started-with-mkdocs.html</a></p></li>
+</ul>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>(venv) $ pip3 install -r requirements-docs.txt
+</pre></div>
+</div>
+</section>
+<section id="testing">
+<h3>Testing<a class="headerlink" href="#testing" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Include execution of tests in pre-commit hooks, example in
+[Specify7](<a class="reference external" href="https://github.com/specify/specify7/blob/production/.pre-commit-config.yaml">https://github.com/specify/specify7/blob/production/.pre-commit-config.yaml</a>)</p></li>
+<li><p>Create test file with first 100K records + header</p></li>
+</ul>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ head -n 100001 0090372-210914110416597.csv &gt; gbif_2022-01-07_100k.csv
+(venv) $ pip3 install -r requirements-test.txt
+</pre></div>
+</div>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="year4_planA.html" class="btn btn-neutral float-left" title="Year 4, Part 1, 2023" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="year5.html" class="btn btn-neutral float-right" title="Year 5, 2024" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, LmBISON Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,444 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Year 5, 2024 &mdash; LmBISON documentation 1.0a1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=036e6a88"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="AWS workflow experiments" href="aws_experiments.html" />
+    <link rel="prev" title="Year 3, 2021-2022" href="year3.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            LmBISON documentation
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../about.html">About</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../workflow.html">AWS workflow</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../aws/aws_setup.html">AWS Resource Setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../aws/ec2_setup.html">EC2 instance creation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../aws/lambda.html">Create lambda function to initiate processing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../aws/lambda.html#edit-the-configuration-for-lambda-function">Edit the Configuration for lambda function</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../aws/lambda.html#lambda-to-query-redshift">Lambda to query Redshift</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../aws/lambda.html#lambda-to-start-ec2-for-task">Lambda to start EC2 for task</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../aws/roles.html">Roles, Policies, Trust Relationships</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../aws/automation.html">Workflow Automation</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../interaction/debug.html">Debugging Flask and Docker instances</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../interaction/deploy.html">Deploy BISON</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="year4_planB.html">Year 4, Part 2, 2023-2024</a></li>
+<li class="toctree-l1"><a class="reference internal" href="year4_planA.html">Year 4, Part 1, 2023</a></li>
+<li class="toctree-l1"><a class="reference internal" href="year3.html">Year 3, 2021-2022</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Year 5, 2024</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#current-decisions">Current decisions</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#setup">Setup</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#data-preparation">Data Preparation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#usgs-riis-data">USGS RIIS data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#gbif-data">GBIF Data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#region-data">Region Data</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#census-state-and-county">Census: State and County</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#census-aiannh">Census: AIANNH</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#protected-areas-database-us-pad-not-currently-used">Protected Areas Database, US-PAD (not currently used)</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#workflow-options">Workflow options</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#gbif-data-ingestion">GBIF Data Ingestion</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#reference-data">Reference Data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id1">Setup</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#glue">Glue</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#experiment">Experiment</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#workflow">Workflow</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#data-constants">Data constants</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="aws_experiments.html">AWS workflow experiments</a></li>
+<li class="toctree-l1"><a class="reference internal" href="aws_experiments.html#glue-interactive-development">Glue - Interactive Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="aws_experiments.html#bison-aws-data-tools">BISON AWS data/tools</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">LmBISON documentation</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Year 5, 2024</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/pages/history/year5.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="year-5-2024">
+<h1>Year 5, 2024<a class="headerlink" href="#year-5-2024" title="Link to this heading"></a></h1>
+<p>2023, Year 5 SOW specifies building the project as an AWS application, so that USGS
+personnel with little to no technical experience, and no local resources, can run the
+analyses on a regular schedule.</p>
+<p>The initial processes include annotating <strong>GBIF occurrence data</strong> from the
+US, with designations from the <strong>US Registry of Introduced and Invasive Species</strong>
+(RIIS), then summarizing the data by different regions, then aggregating data by a
+geospatial grid of counties, and computing biodiversity statistics.</p>
+<p>Regions include <strong>US Census state and county boundaries</strong>.  States are required
+in order to identify whether the occurrence of a particular species falls within the
+a RIIS region (Alaska, Hawaii, or Lower 48), where it is identified as “Introduced”
+or “Invasive”.  Region summaries include both state and county boundaries.</p>
+<p>Regions also include <strong>American Indian, Alaskan Native, and Native Hawaiian</strong> (AIANNH)
+regions and possibly <strong>US Federal Protected Areas</strong> (US‐PAD). US-PAD has proved
+problematic and has failed to intersect in reasonable times, and crashed python when
+attempting  insertion into an AWS PostgreSQL/PostGIS database.</p>
+<p>All regions (state, county, AIANNH, PAD?) will be summarized by count and proportion
+for species, occurrences, and RIIS status.</p>
+<section id="current-decisions">
+<h2>Current decisions<a class="headerlink" href="#current-decisions" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Region: us-east-1</p></li>
+<li><p>Inputs: same as  <span class="xref std std-ref">Year 4 Data Preparation</span></p></li>
+</ul>
+<section id="setup">
+<h3>Setup<a class="headerlink" href="#setup" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>install aws-cli on local dev machine</p></li>
+<li><p>Add reference data to S3 manually</p></li>
+<li><p>create EC2 for test/debug connection
+* update/upgrade apt, install stuff
+* add aws config and credentials</p></li>
+</ul>
+</section>
+</section>
+<section id="data-preparation">
+<h2>Data Preparation<a class="headerlink" href="#data-preparation" title="Link to this heading"></a></h2>
+<dl class="simple">
+<dt>2023, Year 5 SOW specifies data inputs:</dt><dd><ul class="simple">
+<li><p>US Registry of Introduced and Invasive Species</p></li>
+<li><p>GBIF occurrence data from the US with coordinates</p></li>
+<li><p>US Census state and county boundaries</p></li>
+<li><p>American Indian, Alaskan Native, and Native Hawaiian (AIANNH) Lands</p></li>
+</ul>
+</dd>
+</dl>
+<p>Data inputs may be updated regularly, so constants in some files may change with the
+updates.  Below are constants and their file locations that should be checked and
+possibly modified anytime input data is updated.</p>
+<p>The US-PAD dataset proved unsupportable in any configuration tried so far.  More
+information is below under <strong>Protected Areas Database</strong>.</p>
+<p>Currently, much of our input data (GBIF, census county/state and AIANNH) are in
+EPSG:4326, using decimal degrees.</p>
+<section id="usgs-riis-data">
+<h3>USGS RIIS data<a class="headerlink" href="#usgs-riis-data" title="Link to this heading"></a></h3>
+<p>US-RIIS V2.0, November 2022, available at <a class="reference external" href="https://doi.org/10.5066/P9KFFTOD">https://doi.org/10.5066/P9KFFTOD</a>
+webpage: <a class="reference external" href="https://www.sciencebase.gov/catalog/item/62d59ae5d34e87fffb2dda99">https://www.sciencebase.gov/catalog/item/62d59ae5d34e87fffb2dda99</a></p>
+<p>US-RIIS records consist of a list of species and the areas in which they are considered
+Introduced or Invasive.  Any other species/region combinations encountered will be
+identified as “presumed-native”</p>
+<p>The latest US-RIIS data is present in this Github repository in the <a class="reference external" href="../../data/input">data/input</a> directory.  If a new
+version is available, update it, and any data constants that may have changed.</p>
+</section>
+<section id="gbif-data">
+<h3>GBIF Data<a class="headerlink" href="#gbif-data" title="Link to this heading"></a></h3>
+<p>GBIF data can be requested and retrieved from the data portal in DarwinCore format,
+as in Year 4, or subsetted directly from the GBIF Open Data Registry (ODR) in AWS S3.</p>
+<p>Methods are documented below in <a class="reference internal" href="#gbif-data-ingestion">GBIF Data Ingestion</a>.</p>
+</section>
+<section id="region-data">
+<h3>Region Data<a class="headerlink" href="#region-data" title="Link to this heading"></a></h3>
+<p><strong>Data location</strong>:  The geospatial data may be placed in any accessible directory, but
+must be specified in the “geo_path” value of the configuration file <a class="reference external" href="../../data/config/process_gbif.json">process_gbif.json</a>.</p>
+<section id="census-state-and-county">
+<h4>Census: State and County<a class="headerlink" href="#census-state-and-county" title="Link to this heading"></a></h4>
+<p>Up-to-date census data including state and county boundaries are available at:
+<a class="reference external" href="https://www.census.gov/geographies/mapping-files/time-series/geo/cartographic-boundary.html">https://www.census.gov/geographies/mapping-files/time-series/geo/cartographic-boundary.html</a></p>
+<p>Shapefiles used for 2023 processing (2022 was not yet available at time of download):
+Census, Cartographic Boundary Files, 2021
+* <a class="reference external" href="https://www.census.gov/geographies/mapping-files/time-series/geo/cartographic-boundary.html">https://www.census.gov/geographies/mapping-files/time-series/geo/cartographic-boundary.html</a></p>
+<p><strong>Counties</strong>
+* 1:500,000, cb_2021_us_county_500k.zip</p>
+</section>
+<section id="census-aiannh">
+<h4>Census: AIANNH<a class="headerlink" href="#census-aiannh" title="Link to this heading"></a></h4>
+<p>Up-to-date census data (2023), including American Indian, Alaska Native, and Native Hawaiian,
+are available at:
+<a class="reference external" href="https://catalog.data.gov/dataset/tiger-line-shapefile-current-nation-u-s-american-indian-alaska-native-native-hawaiian-areas-aia">https://catalog.data.gov/dataset/tiger-line-shapefile-current-nation-u-s-american-indian-alaska-native-native-hawaiian-areas-aia</a></p>
+<p><strong>American Indian/Alaska Native Areas/Hawaiian Home Lands</strong>, AIANNH
+* 1:500,000, cb_2021_us_aiannh_500k.zip</p>
+</section>
+<section id="protected-areas-database-us-pad-not-currently-used">
+<h4>Protected Areas Database, US-PAD (not currently used)<a class="headerlink" href="#protected-areas-database-us-pad-not-currently-used" title="Link to this heading"></a></h4>
+<p>U.S. Geological Survey (USGS) Gap Analysis Project (GAP), 2024, Protected Areas Database
+of the United States (PAD-US) 4.0: U.S. Geological Survey data release,
+<a class="reference external" href="https://doi.org/10.5066/P96WBCHS">https://doi.org/10.5066/P96WBCHS</a>.</p>
+<p>Mark Wiltermuth, USGS, suggested the “flattened” dataset, now on version 4.0.
+PAD-US 4.0 Vector Analysis and Summary Statistics .
+<a class="reference external" href="https://www.sciencebase.gov/catalog/item/652d4ebbd34e44db0e2ee458">https://www.sciencebase.gov/catalog/item/652d4ebbd34e44db0e2ee458</a></p>
+<p>This dataset is in ESRI geodatabase format in Data is in SRS
+EPSG:102039 - USA Contiguous Albers Equal Area Conic - USGS Version.</p>
+<p>All geospatial intersections are performed in Amazon Redshift on the unprojected
+occurrence data (aka EPSG:4326).  Redshift only takes CSV or shapefile format.  I
+transformed a subset of the data where GAP_Sts = 1 (or more) into a shapefile using
+the ogr2ogr tool, then projected it to EPSG 4326.</p>
+</section>
+</section>
+</section>
+<section id="workflow-options">
+<h2>Workflow options<a class="headerlink" href="#workflow-options" title="Link to this heading"></a></h2>
+<p>Data ingestion and processing will be executed on Amazon Web Services (AWS), utilizing
+several AWS tools.  Other data inputs will be placed in AWS resources, such as RDS or
+S3, for easy access by AWS tools.  In order to minimize costs, we will experiment with
+different data storage and processing strategies - they each have speed and cost pros
+and cons.</p>
+<section id="gbif-data-ingestion">
+<h3>GBIF Data Ingestion<a class="headerlink" href="#gbif-data-ingestion" title="Link to this heading"></a></h3>
+<p><strong>Option1:</strong> Darwin Core via GBIF data portal</p>
+<dl class="simple">
+<dt>To get a current version of GBIF data via the portal:</dt><dd><ul class="simple">
+<li><p>Create a user account on the GBIF website, then login and</p></li>
+<li><p>request the data by putting the following URL in a browser:
+<a class="reference external" href="https://www.gbif.org/occurrence/search?country=US&amp;has_coordinate=true&amp;has_geospatial_issue=false&amp;occurrence_status=present">https://www.gbif.org/occurrence/search?country=US&amp;has_coordinate=true&amp;has_geospatial_issue=false&amp;occurrence_status=present</a></p></li>
+<li><p>adding a restriction to occurrence data identified to species or a lower rank
+will reduce the amount of data that will be filtered out.</p></li>
+</ul>
+</dd>
+</dl>
+<p>The query will request a download, which will take some time for GBIF to assemble.
+GBIF will send an email with a link for downloading the Darwin Core Archive, a
+very large zipped file.  The download file will have an identifier that is used as the
+name of the download file.  Note this identifier and edit the variable DOWNLOAD_NAME in
+the user_data_for_ec2spot.sh script.  Only the occurrence.txt file is required for data
+processing.  Rename the file with the date for clarity on what data is being used. Use
+the following pattern gbif_yyyy-mm-dd.csv so that interim data filenames can be
+created and parsed consistently.  Note the underscore (_) between ‘gbif’ and the date,
+and the dash (-) between date elements.</p>
+<p>Verify that the file occurrence.txt within the zipfile contains GBIF-annotated records
+that will be the primary input file.  The primary input file will contain fieldnames in
+the first line of the file, and those listed as values for GBIF class attributes with
+(attribute) names ending in _FLD or _KEY should all be among the fields.</p>
+<p>Two scripts are used to ingest the data:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p><a class="reference external" href="../../scripts/gbif_to_s3.py">gbif_to_s3.py</a> launches a Spot EC2 instance which
+will download the data, extract the occurrence dataset, then upload it to S3.</p></li>
+<li><p><a class="reference external" href="../../scripts/user_data_for_ec2spot.sh">user_data_for_ec2spot.sh</a> is a script
+that is written to the EC2 Spot instance and then executed on instantiation.  In
+Update the variable DOWNLOAD_NAME in this script with the identifier for the
+download file.</p></li>
+</ul>
+</div></blockquote>
+<p>References:</p>
+<ul class="simple">
+<li><p><a class="reference external" href="https://docs.aws.amazon.com/AmazonS3/latest/userguide/selecting-content-from-objects.html">AWS S3 Select Doc</a></p></li>
+<li><p><a class="reference external" href="https://aws.amazon.com/blogs/storage/querying-data-without-servers-or-databases-using-amazon-s3-select/">blog post</a></p></li>
+</ul>
+<p><strong>Option 2:</strong> Occurrence Records via AWS S3 Open Data Registry</p>
+<p>The ODR data contains a subset of data fields, but includes the key fields of
+accepted scientific name (resolved to the GBIF Backbone Taxonomy), taxonomic rank,
+and latitude and longitude.
+Ingest in AWS Glue Studio ETL Job: bison_subset_gbif, also documented in
+<a class="reference external" href="../../scripts/glue_bison_subset_gbif.py">glue_bison_subset_gbif.py</a> file.</p>
+<p>As of 2023/11/20, subseting via this Glue job took 14 hours and resulted in about
+923 million records.</p>
+</section>
+<section id="reference-data">
+<h3>Reference Data<a class="headerlink" href="#reference-data" title="Link to this heading"></a></h3>
+<p>Reference data consists of US-RIIS data and geospatial data for intersections.
+Reference data will reside on AWS S3, and will be updated manually when new versions
+becomes available.  These data are uploaded to S3 manually.</p>
+<p>As part of a workflow, a process will add the reference data in S3 to a database in RDS.
+The database must first be created with the SQL script
+<a class="reference external" href="../../scripts/init_database.sql">init_database.sql</a>.  This script will initialize a
+PostgreSQL database in an existing RDS instance, and add PostGIS extensions for
+geospatial data and operations.</p>
+<p>A subsequent part of a workflow will add the data to RDS with the script
+<a class="reference external" href="../../scripts/populate_rds.py">populate_rds.py</a>.  This handles both standard CSV
+data (RIIS) and geospatial data (census, AIANNH, PAD).</p>
+</section>
+<section id="id1">
+<h3>Setup<a class="headerlink" href="#id1" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>install aws-cli on local dev machine</p></li>
+<li><p>Add reference data to S3 manually</p></li>
+<li><p>create EC2 for test/debug connection
+* update/upgrade apt, install stuff
+* add aws config and credentials</p></li>
+<li><dl class="simple">
+<dt>Populate RDS</dt><dd><ul>
+<li><p>add postgis to postgres:
+<a class="reference external" href="https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Appendix.PostgreSQL.CommonDBATasks.PostGIS.html">https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Appendix.PostgreSQL.CommonDBATasks.PostGIS.html</a></p></li>
+<li><p>insert RIIS</p></li>
+<li><p>insert geospatial data: census boundaries, native lands, PAD</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><p>Redshift?</p></li>
+</ul>
+</section>
+<section id="glue">
+<h3>Glue<a class="headerlink" href="#glue" title="Link to this heading"></a></h3>
+<ul>
+<li><p>Can add python code from files in S3</p></li>
+<li><p><a class="reference external" href="https://docs.aws.amazon.com/glue/latest/dg/aws-glue-programming-python-libraries.html">https://docs.aws.amazon.com/glue/latest/dg/aws-glue-programming-python-libraries.html</a></p>
+<blockquote>
+<div><ul class="simple">
+<li><dl class="simple">
+<dt>In Job Details tab, Advanced Properties, Job Parameters add</dt><dd><p>key –additional-python-modules
+value  s3://&lt;bucket_name&gt;/lib/SQLAlchemy-2.0.23.tar.gz</p>
+</dd>
+</dl>
+</li>
+</ul>
+</div></blockquote>
+</li>
+</ul>
+</section>
+<section id="experiment">
+<h3>Experiment<a class="headerlink" href="#experiment" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Find bucket, specify_athena</p></li>
+</ul>
+<p>gbif_extract: 303237553
+gbif_parquet_extract: 301669806</p>
+<p>Use python libs <strong>awscli</strong> and <strong>boto3</strong> to connect with AWS</p>
+<ul>
+<li><p>query (Norway only):</p>
+<p><a class="reference external" href="https://www.gbif.org/occurrence/download?basis_of_record=PRESERVED_SPECIMEN&amp;basis_of_record=FOSSIL_SPECIMEN&amp;basis_of_record=OCCURRENCE&amp;country=NO&amp;occurrence_status=present">https://www.gbif.org/occurrence/download?basis_of_record=PRESERVED_SPECIMEN&amp;basis_of_record=FOSSIL_SPECIMEN&amp;basis_of_record=OCCURRENCE&amp;country=NO&amp;occurrence_status=present</a></p>
+</li>
+<li><p>DwCA 9 GB data (2 GB zipped)</p></li>
+<li><p>5,293,875 records</p></li>
+<li><p>download: <a class="reference external" href="https://www.gbif.org/occurrence/download/0098682-230530130749713">https://www.gbif.org/occurrence/download/0098682-230530130749713</a></p></li>
+</ul>
+</section>
+<section id="workflow">
+<h3>Workflow<a class="headerlink" href="#workflow" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>download GBIF data (~350 GB)</p>
+<ul>
+<li><p>directly to EC2 instance using wget or script</p></li>
+</ul>
+</li>
+<li><p>upload to S3</p>
+<ul>
+<li><p>put-object with AWS CLI v2
+<a class="reference external" href="https://awscli.amazonaws.com/v2/documentation/api/latest/reference/s3api/put-object.html">https://awscli.amazonaws.com/v2/documentation/api/latest/reference/s3api/put-object.html</a></p></li>
+<li><p>AWS Python SDK put_object using Boto3
+<a class="reference external" href="https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3/client/put_object">https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3/client/put_object</a>.html#</p></li>
+</ul>
+</li>
+<li><p>pyspark</p></li>
+</ul>
+</section>
+</section>
+<section id="data-constants">
+<h2>Data constants<a class="headerlink" href="#data-constants" title="Link to this heading"></a></h2>
+<p>Various constants indicate fieldnames or values of interest in code.  Check/modify
+attributes in the <a class="reference external" href="../../bison/common/constants.py">constants.py</a> file:</p>
+<p>GBIF:</p>
+<dl class="simple">
+<dt>In the GBIF class:</dt><dd><ul class="simple">
+<li><p>Edit the filename in DATA_DICT_FNAME</p></li>
+<li><p>Verify that the DWCA_META_FNAME is still the correct file for field definitions.</p></li>
+</ul>
+</dd>
+</dl>
+<p>USGS aggregation regions:</p>
+<p>USGS may choose to change the geospatial regions for aggregation.  If so, the REGION
+class must be changed, and code changed slightly.  Only the county/state data is
+required for matching RIIS records to occurrence records. Each region type
+(class member) in this class contains a dictionary of metadata relating to that region.
+The key “file” contains the relative path to the shapefile, and the key “map” contains
+a dictionary of fieldnames within that shapefile mapped to the corresponding fieldnames
+to be appended to the occurrence data.</p>
+<p>US Registry for Introduced and Invasive Species (RIIS):</p>
+<dl class="simple">
+<dt>In the RIIS_DATA class:</dt><dd><ul class="simple">
+<li><p>Edit the filename in DATA_DICT_FNAME</p></li>
+<li><p>Check the file header, and if necessary, edit the fields in RIIS_DATA if
+changed.</p></li>
+</ul>
+</dd>
+</dl>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="year3.html" class="btn btn-neutral float-left" title="Year 3, 2021-2022" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="aws_experiments.html" class="btn btn-neutral float-right" title="AWS workflow experiments" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, LmBISON Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
