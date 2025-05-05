@@ -32,7 +32,7 @@ S3_OUT_DIR = "output"
 S3_LOG_DIR = "log"
 S3_SUMMARY_DIR = "summary"
 PARQUET_EXT = ".parquet"
-S3_PARQUET_TABLE_SUFFIX = f"_000.{PARQUET_EXT}"
+S3_PARQUET_TABLE_SUFFIX = f"_000{PARQUET_EXT}"
 
 # .............................................................................
 # Docker compose files for tasks
