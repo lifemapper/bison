@@ -32,7 +32,7 @@ S3_OUT_DIR = "output"
 S3_LOG_DIR = "log"
 S3_SUMMARY_DIR = "summary"
 PARQUET_EXT = ".parquet"
-S3_RS_TABLE_SUFFIX = f"_000{PARQUET_EXT}"
+S3_PARQUET_TABLE_SUFFIX = f"_000.{PARQUET_EXT}"
 
 # .............................................................................
 # Docker compose files for tasks
@@ -437,8 +437,8 @@ class SUMMARY:
             meta = {
                 "code": table_type,
                 "fname": f"{table_type}{cls.sep}{cls.dt_token}",
-                # "table_format": "CSV",
-                "file_extension": f"{cls.sep}csv{cls.sep}000",
+                # "table_format": "Parquet",
+                "file_extension": S3_PARQUET_TABLE_SUFFIX,
 
                 "fields": dim["fields"],
                 "key_fld": dim["key_fld"],
@@ -478,7 +478,7 @@ class SUMMARY:
                 "code": table_type,
                 "fname": f"{table_type}{cls.sep}{cls.dt_token}",
                 # "table_format": "Parquet",
-                "file_extension": f"{cls.sep}000.parquet",
+                "file_extension": S3_PARQUET_TABLE_SUFFIX,
                 "data_type": "counts",
 
                 # Dimensions: 0 is row (aka Axis 0) list of records with counts
@@ -820,9 +820,9 @@ class SUMMARY:
         #             not individual matrix and metadata files for each stat.
         # <datacontents>_<datatype>_<YYYY_MM_DD><_optional parquet extension>
         fname = os.path.basename(filename)
-        if fname.endswith(S3_RS_TABLE_SUFFIX):
-            stripped_fn = fname[:-len(S3_RS_TABLE_SUFFIX)]
-            rest = S3_RS_TABLE_SUFFIX
+        if fname.endswith(S3_PARQUET_TABLE_SUFFIX):
+            stripped_fn = fname[:-len(S3_PARQUET_TABLE_SUFFIX)]
+            rest = S3_PARQUET_TABLE_SUFFIX
         else:
             stripped_fn, ext = os.path.splitext(fname)
             rest = ext
